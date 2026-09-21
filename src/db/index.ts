@@ -38,6 +38,14 @@ async function connect(): Promise<Runner> {
       // local server usually speaks plaintext, so do not force TLS there.
       ssl: needsSsl(url) ? { rejectUnauthorized: false } : false,
     });
+    // Serverless Postgres (Neon, Supabase) suspends idle compute, which
+    // terminates pooled connections. node-postgres surfaces that as an
+    // 'error' event on the pool, and an unhandled 'error' event takes the
+    // process down. The pool discards the dead client and the next query
+    // opens a fresh one, so logging is the correct response.
+    pool.on("error", (err) => {
+      console.error(`[medbill] idle Postgres client error: ${err.message}`);
+    });
     return { db: drizzlePg({ client: pool, schema }), exec: async (sql) => void (await pool.query(sql)), shared: true };
   }
 
