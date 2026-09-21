@@ -89,6 +89,14 @@ The project is temporary until you attach it to an account. Claim it with
 `npx neon@latest claim accept <project-id>`, which prints a sign-in URL.
 Unclaimed projects are deleted after 72 hours.
 
+**Claiming invalidates the connection string.** Starting the handover rotates
+the database password and revokes the creating machine's access, by design. So
+run `claim accept` only when you are ready to finish signing in, and afterwards
+replace `DATABASE_URL` in `.env.local` with the connection string from the
+project's **Connect** dialog in the Neon console. Data is unaffected; only the
+credential changes. If you deploy before claiming, update the Vercel
+environment variable afterwards too.
+
 Use the value of `DATABASE_URL` (the **pooled** endpoint, with `-pooler` in the
 hostname) rather than `DATABASE_URL_UNPOOLED`. Serverless instances open many
 short-lived connections, which a direct endpoint will exhaust.
