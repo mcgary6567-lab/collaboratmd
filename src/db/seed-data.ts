@@ -174,7 +174,8 @@ export async function seedDemoData(db: Db) {
     await db.insert(schema.appointments).values({
       practiceId: practice.id,
       patientId: patientRows[(i * 2) % patientRows.length].id,
-      providerId: providerRows[(i * 2) % providerRows.length].id,
+      // Indexed by day-group so a single day's schedule spans several providers.
+      providerId: providerRows[Math.floor(i / 3) % providerRows.length].id,
       startsAt: start,
       endsAt: end,
       type,
