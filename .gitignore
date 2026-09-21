@@ -29,3 +29,6 @@ coverage/
 # local server logs
 *.log
 .neon
+
+# vercel project link
+.vercel
