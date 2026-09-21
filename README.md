@@ -69,6 +69,8 @@ Three seeded member IDs are deliberately rigged so the unhappy paths are visible
 
 ## Deploying to Vercel
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmcgary6567-lab%2Fmedbill-rcm&env=AUTH_SECRET,DATABASE_URL,SEED_DEMO_DATA&envDescription=AUTH_SECRET%20signs%20sessions%3B%20DATABASE_URL%20is%20a%20pooled%20Postgres%20connection%20string%3B%20set%20SEED_DEMO_DATA%3Dtrue%20to%20load%20the%20demo%20practice&envLink=https%3A%2F%2Fgithub.com%2Fmcgary6567-lab%2Fmedbill-rcm%2Fblob%2Fmain%2F.env.example&project-name=medbill-rcm&repository-name=medbill-rcm)
+
 The app is Vercel-ready, but it needs a Postgres database: serverless instances
 have an ephemeral, read-only filesystem, so the embedded PGlite database used
 for local development cannot run there. Startup fails with an explicit message
@@ -76,8 +78,9 @@ rather than a confusing filesystem error if `DATABASE_URL` is missing.
 
 1. **Create a Postgres database.** Neon, Supabase, and Vercel Postgres all work.
    Copy the **pooled** connection string, not the direct one.
-2. **Import the repository** at [vercel.com/new](https://vercel.com/new). Next.js
-   is detected automatically; no build configuration is needed.
+2. **Import the repository** at [vercel.com/new](https://vercel.com/new), or use
+   the button above. Next.js is detected automatically; no build configuration
+   is needed.
 3. **Set environment variables** for the Production environment:
 
    | Variable | Value |
