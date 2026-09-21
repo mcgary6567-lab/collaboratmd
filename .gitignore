@@ -26,5 +26,6 @@ yarn-error.log*
 next-env.d.ts
 coverage/
 
-# local server log
-server.log
+# local server logs
+*.log
+.neon

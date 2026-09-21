@@ -9,7 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build:migrations": "node scripts/build-migrations.mjs"
+    "build:migrations": "node scripts/build-migrations.mjs",
+    "deploy": "node scripts/deploy-vercel.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

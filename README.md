@@ -76,12 +76,42 @@ have an ephemeral, read-only filesystem, so the embedded PGlite database used
 for local development cannot run there. Startup fails with an explicit message
 rather than a confusing filesystem error if `DATABASE_URL` is missing.
 
-1. **Create a Postgres database.** Neon, Supabase, and Vercel Postgres all work.
-   Copy the **pooled** connection string, not the direct one.
-2. **Import the repository** at [vercel.com/new](https://vercel.com/new), or use
+### Create the database (Neon)
+
+This creates a Postgres database and writes its credentials to `.env.local`,
+which is gitignored. No Neon account is needed up front:
+
+```bash
+npx neon@latest claim create --service postgres --file .env.local
+```
+
+The project is temporary until you attach it to an account. Claim it with
+`npx neon@latest claim accept <project-id>`, which prints a sign-in URL.
+Unclaimed projects are deleted after 72 hours.
+
+Use the value of `DATABASE_URL` (the **pooled** endpoint, with `-pooler` in the
+hostname) rather than `DATABASE_URL_UNPOOLED`. Serverless instances open many
+short-lived connections, which a direct endpoint will exhaust.
+
+### Deploy
+
+With the database in place:
+
+```bash
+npx vercel login     # or set VERCEL_TOKEN
+npm run deploy
+```
+
+That reads `DATABASE_URL` from `.env.local`, generates `AUTH_SECRET` if there
+isn't one, uploads both to the Production environment without printing them,
+and deploys. Re-running it replaces the values rather than duplicating them.
+
+To do it by hand instead:
+
+1. **Import the repository** at [vercel.com/new](https://vercel.com/new), or use
    the button above. Next.js is detected automatically; no build configuration
    is needed.
-3. **Set environment variables** for the Production environment:
+2. **Set environment variables** for the Production environment:
 
    | Variable | Value |
    |---|---|
@@ -90,18 +120,8 @@ rather than a confusing filesystem error if `DATABASE_URL` is missing.
    | `SEED_DEMO_DATA` | `true` for a demo deployment, otherwise leave unset |
    | `ANTHROPIC_API_KEY` | optional, enables AI denial explanations |
 
-4. **Deploy.** Migrations run on the first request, guarded by a Postgres
+3. **Deploy.** Migrations run on the first request, guarded by a Postgres
    advisory lock so simultaneous cold starts cannot race each other.
-
-From the command line instead:
-
-```bash
-npx vercel login
-npx vercel link
-npx vercel env add AUTH_SECRET production
-npx vercel env add DATABASE_URL production
-npx vercel --prod
-```
 
 `SEED_DEMO_DATA=true` **truncates the application tables** before loading the
 demo practice, so never set it against a database holding real data. Without it
