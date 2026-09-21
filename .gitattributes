@@ -1,0 +1,5 @@
+# Keep line endings stable across platforms so generated files do not drift.
+* text=auto eol=lf
+*.sql text eol=lf
+*.png binary
+*.ico binary

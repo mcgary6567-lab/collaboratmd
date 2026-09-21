@@ -67,6 +67,47 @@ Optional environment variables are documented in `.env.example`.
 
 Three seeded member IDs are deliberately rigged so the unhappy paths are visible: IDs ending in `X` are rejected at the clearinghouse before reaching the payer, and IDs ending in `D` come back denied on the 835.
 
+## Deploying to Vercel
+
+The app is Vercel-ready, but it needs a Postgres database: serverless instances
+have an ephemeral, read-only filesystem, so the embedded PGlite database used
+for local development cannot run there. Startup fails with an explicit message
+rather than a confusing filesystem error if `DATABASE_URL` is missing.
+
+1. **Create a Postgres database.** Neon, Supabase, and Vercel Postgres all work.
+   Copy the **pooled** connection string, not the direct one.
+2. **Import the repository** at [vercel.com/new](https://vercel.com/new). Next.js
+   is detected automatically; no build configuration is needed.
+3. **Set environment variables** for the Production environment:
+
+   | Variable | Value |
+   |---|---|
+   | `AUTH_SECRET` | output of `openssl rand -base64 32` |
+   | `DATABASE_URL` | pooled Postgres connection string |
+   | `SEED_DEMO_DATA` | `true` for a demo deployment, otherwise leave unset |
+   | `ANTHROPIC_API_KEY` | optional, enables AI denial explanations |
+
+4. **Deploy.** Migrations run on the first request, guarded by a Postgres
+   advisory lock so simultaneous cold starts cannot race each other.
+
+From the command line instead:
+
+```bash
+npx vercel login
+npx vercel link
+npx vercel env add AUTH_SECRET production
+npx vercel env add DATABASE_URL production
+npx vercel --prod
+```
+
+`SEED_DEMO_DATA=true` **truncates the application tables** before loading the
+demo practice, so never set it against a database holding real data. Without it
+a fresh database deploys empty, and empty means no accounts exist to log in
+with, so create one before or after the first deploy.
+
+Check `/api/health` after deploying: it reports which database backend is live
+and how many claims it can see.
+
 ## Clearinghouse and AI are behind interfaces
 
 `ClearinghouseGateway` in [src/lib/clearinghouse/gateway.ts](src/lib/clearinghouse/gateway.ts) is the seam for a real vendor (Stedi, Claim.MD, Availity). The bundled `MockClearinghouse` adjudicates deterministically from a hash of the member ID, so demos and tests are reproducible. Swapping in a real vendor means implementing three methods.
