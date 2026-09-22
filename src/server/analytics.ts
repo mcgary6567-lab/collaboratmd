@@ -53,6 +53,10 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'insurance_payment'), 0)::bigint AS ins_paid,
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)::bigint AS pat_paid,
         COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('adjustment','write_off')), 0)::bigint AS adjustments,
+        -- Contractual adjustments only. Write-offs are lost revenue and must
+        -- not be removed from the net collection denominator, or the rate can
+        -- exceed 100%: you cannot collect more than you were owed.
+        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'adjustment'), 0)::bigint AS contractual,
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'transfer_to_patient'), 0)::bigint AS transferred
       FROM ledger_entries
       WHERE practice_id = ${practiceId}
@@ -115,7 +119,7 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
     daysInAr: Math.round((insuranceArCents + patientArCents) / avgDailyCharges),
     cleanClaimRate: n(c.submitted) ? (n(c.submitted) - n(c.rejected)) / n(c.submitted) : 0,
     denialRate: adjudicated ? n(c.denied) / adjudicated : 0,
-    netCollectionRate: chargesCents - adjustmentsCents > 0 ? (insurancePaidCents + patientPaidCents) / (chargesCents - adjustmentsCents) : 0,
+    netCollectionRate: chargesCents - n(l.contractual) > 0 ? (insurancePaidCents + patientPaidCents) / (chargesCents - n(l.contractual)) : 0,
     firstPassYield: n(c.total) ? n(c.paid) / n(c.total) : 0,
     claimCount: n(c.total),
     patientCount: n(counts[0]?.patients),
@@ -210,7 +214,7 @@ export async function claimsByStatus(db: Db, practiceId: string) {
   return rows.map((r) => ({ status: String(r.status), count: n(r.n), totalCents: n(r.total) }));
 }
 
-/** Payer performance: volume, billed, collected and realisation rate. */
+/** Payer performance: volume, billed, collected and realization rate. */
 export async function payerPerformance(db: Db, practiceId: string, limit = 12) {
   // Claim totals and payments are aggregated separately: joining the ledger to
   // claims first would multiply claim rows and inflate the billed figure.

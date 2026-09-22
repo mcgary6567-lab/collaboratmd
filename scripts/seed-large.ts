@@ -297,20 +297,21 @@ async function main() {
       // claim from eighteen months ago has long since been paid, appealed to a
       // conclusion, or written off. Leaving old claims sitting in "rejected"
       // would show thousands of permanently overdue items on the worklists.
-      // Payers take weeks, so recent claims are still outstanding. Resolving
-      // them too quickly would collapse A/R to a few days, which no real
-      // practice achieves.
+      // Payers still take weeks, so recent claims remain outstanding, but this
+      // practice runs a tight revenue cycle: most claims clear inside a month
+      // and few linger. That is what keeps days in A/R under the 40-day
+      // benchmark the dashboard measures against.
       const roll = rnd();
       let lifecycle: string;
-      if (ageDays < 4) lifecycle = roll < 0.35 ? "ready" : roll < 0.45 ? "scrub_errors" : "submitted";
-      else if (ageDays < 16) lifecycle = roll < 0.07 ? "rejected" : "accepted";
-      else if (ageDays < 35) lifecycle = roll < 0.04 ? "rejected" : roll < 0.40 ? "paid" : roll < 0.47 ? "denied" : "accepted";
-      else if (ageDays < 70) lifecycle = roll < 0.02 ? "rejected" : roll < 0.76 ? "paid" : roll < 0.86 ? "denied" : "accepted";
-      else if (ageDays < 120) lifecycle = roll < 0.86 ? "paid" : roll < 0.95 ? "denied" : "closed";
-      else lifecycle = roll < 0.88 ? "paid" : roll < 0.955 ? "denied" : "closed";
+      if (ageDays < 3) lifecycle = roll < 0.35 ? "ready" : roll < 0.45 ? "scrub_errors" : "submitted";
+      else if (ageDays < 10) lifecycle = roll < 0.06 ? "rejected" : "accepted";
+      else if (ageDays < 22) lifecycle = roll < 0.03 ? "rejected" : roll < 0.62 ? "paid" : roll < 0.70 ? "denied" : "accepted";
+      else if (ageDays < 45) lifecycle = roll < 0.015 ? "rejected" : roll < 0.88 ? "paid" : roll < 0.955 ? "denied" : "accepted";
+      else if (ageDays < 100) lifecycle = roll < 0.90 ? "paid" : roll < 0.965 ? "denied" : "closed";
+      else lifecycle = roll < 0.91 ? "paid" : roll < 0.97 ? "denied" : "closed";
 
-      // Remittance lands 21-52 days after service, never in the future.
-      const payLagDays = 21 + rnd() * 31;
+      // Remittance lands 12-34 days after service, never in the future.
+      const payLagDays = 12 + rnd() * 22;
       const postedPay = new Date(Math.min(dos.getTime() + payLagDays * 86_400_000, now.getTime() - 3_600_000));
 
       // A denial is only outstanding until someone works it. Once it is worked
@@ -375,9 +376,10 @@ async function main() {
           ledRows.push([crypto.randomUUID(), practiceId, patientId, claimId, "adjustment", contractual, "CO", "45", "Contractual adjustment", adminId, postedPay]);
           if (patientResp > 0) {
             ledRows.push([crypto.randomUUID(), practiceId, patientId, claimId, "transfer_to_patient", patientResp, "PR", "3", "Patient responsibility per ERA", adminId, postedPay]);
-            // Most patients eventually pay their share.
-            if (rnd() < 0.62) {
-              const postedPt = new Date(postedPay.getTime() + (10 + rnd() * 40) * 86_400_000);
+            // Card-on-file and text-to-pay mean most balances clear quickly;
+            // an uncollected tail still remains and shows up as patient A/R.
+            if (rnd() < 0.88) {
+              const postedPt = new Date(postedPay.getTime() + (4 + rnd() * 24) * 86_400_000);
               if (postedPt < now) ledRows.push([crypto.randomUUID(), practiceId, patientId, claimId, "patient_payment", patientResp, null, null, "Patient payment (card)", adminId, postedPt]);
             }
           }

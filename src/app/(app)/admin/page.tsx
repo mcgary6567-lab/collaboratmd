@@ -116,7 +116,7 @@ export default async function AdminDashboard() {
         <Card title="Payer performance">
           <table className="table">
             <thead>
-              <tr><th>Payer</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Collected</th><th className="w-28">Realisation</th></tr>
+              <tr><th>Payer</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Collected</th><th className="w-28">Realization</th></tr>
             </thead>
             <tbody>
               {payers.map((p) => {

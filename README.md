@@ -35,6 +35,7 @@ The product scope was defined before any code was written. See [docs/01-product-
 | **Remittance** | 835 parsing and auto-posting: payments, CO contractual adjustments, PR transfers to patient, CARC/RARC capture, unmatched-claim exception list |
 | **Denials** | Auto-created from 835 denial codes, categorized, prioritized by appeal deadline then dollars, with plain-language explanation and next steps |
 | **Patient billing** | Patient balance, payment posting (card, cash, check), ledger split between insurance and patient AR |
+| **Landing page** | Public marketing page at `/` with an inline SVG product mockup, feature grid, revenue-cycle walkthrough, benchmark table and standards section. Signed-in visitors get a link straight to their dashboard |
 | **Admin dashboard** | Practice-wide analytics at `/admin`: seven headline KPIs each shown against its industry benchmark, 12-month charges/collections/adjustments trend, AR aging, payer mix, denial reasons ranked by dollars, payer realisation, provider productivity, timely-filing exposure |
 | **User dashboard** | Work-focused home at `/dashboard`: assigned denials with appeal countdowns, claims blocked by scrubbing or rejection, today's schedule with one-click charge entry, and queue shortcuts |
 | **Reporting** | AR aging by payer, payer reimbursement, provider productivity, denial reasons |

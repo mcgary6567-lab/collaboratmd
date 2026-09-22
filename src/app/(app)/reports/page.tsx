@@ -72,7 +72,7 @@ export default async function ReportsPage() {
         <Card title="Payer reimbursement" className="xl:col-span-2">
           <table className="table">
             <thead>
-              <tr><th>Payer</th><th>Type</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Collected</th><th className="text-right">Denied</th><th className="text-right">Realisation</th></tr>
+              <tr><th>Payer</th><th>Type</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Collected</th><th className="text-right">Denied</th><th className="text-right">Realization</th></tr>
             </thead>
             <tbody>
               {payers.map((r) => (
