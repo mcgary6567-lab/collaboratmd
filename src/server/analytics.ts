@@ -413,6 +413,8 @@ export interface UserWorkload {
   overdueAppeals: number;
   resolved30: number;
   needsAttention: number;
+  /** Rework backlog as a share of all claims, for judging whether it is large. */
+  needsAttentionShare: number;
   readyToSubmit: number;
   todaysAppointments: number;
   checkedIn: number;
@@ -432,7 +434,8 @@ export async function userWorkload(db: Db, practiceId: string, userId: string): 
     db.execute<Record<string, string>>(sql`
       SELECT
         COUNT(*) FILTER (WHERE status IN ('scrub_errors','rejected'))::bigint AS needs_attention,
-        COUNT(*) FILTER (WHERE status = 'ready')::bigint AS ready
+        COUNT(*) FILTER (WHERE status = 'ready')::bigint AS ready,
+        COUNT(*)::bigint AS total
       FROM claims WHERE practice_id = ${practiceId}`),
     db.execute<Record<string, string>>(sql`
       SELECT
@@ -448,6 +451,7 @@ export async function userWorkload(db: Db, practiceId: string, userId: string): 
     overdueAppeals: n(d[0]?.overdue),
     resolved30: n(d[0]?.resolved30),
     needsAttention: n(c[0]?.needs_attention),
+    needsAttentionShare: n(c[0]?.total) ? n(c[0]?.needs_attention) / n(c[0]?.total) : 0,
     readyToSubmit: n(c[0]?.ready),
     todaysAppointments: n(a[0]?.today),
     checkedIn: n(a[0]?.checked_in),

@@ -92,11 +92,15 @@ export default async function UserDashboard() {
           tone={work.overdueAppeals === 0 ? "good" : "bad"}
           hint={work.overdueAppeals === 0 ? "Nothing past deadline" : "Past the payer deadline"}
         />
+        {/* Judged as a share of all claims, not by being non-zero. Every
+            practice always has some claims in rework; what matters is whether
+            the backlog is small. Under 1% is healthy. */}
         <Kpi
           label="Claims to fix"
           value={work.needsAttention.toLocaleString()}
-          tone={work.needsAttention === 0 ? "good" : "warn"}
-          hint="Scrub errors or rejected"
+          tone={work.needsAttentionShare < 0.01 ? "good" : work.needsAttentionShare < 0.03 ? "warn" : "bad"}
+          hint={`${pct(work.needsAttentionShare, 1)} of all claims`}
+          target="Healthy under 1%"
         />
         <Kpi
           label="Ready to submit"
