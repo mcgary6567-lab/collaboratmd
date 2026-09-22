@@ -331,7 +331,13 @@ async function main() {
             : denialAgeDays > 45 ? 0.94
             : denialAgeDays > 20 ? 0.68
             : 0.25;
-        if (rnd() < resolveChance) {
+        // A denial may only stay open while its appeal window is still open.
+        // Letting the window lapse is the one outcome a working queue never
+        // produces, so an expired deadline forces the denial closed.
+        const appealWindowEnds = postedPay.getTime() + payer[4] * 86_400_000;
+        const windowStillOpen = appealWindowEnds > now.getTime();
+
+        if (rnd() < resolveChance || !windowStillOpen) {
           denialStatus = rnd() < 0.45 ? "resolved" : "written_off";
           denialResolvedAt = new Date(postedPay.getTime() + (8 + rnd() * 40) * 86_400_000);
           if (denialResolvedAt > now) denialResolvedAt = now;
