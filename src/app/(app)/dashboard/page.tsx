@@ -74,11 +74,15 @@ export default async function UserDashboard() {
       </section>
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        {/* An open denial queue is recoverable revenue being worked, not a
+            fault. It counts as healthy while nothing has lapsed and closures
+            are keeping pace with what arrives. */}
         <Kpi
           label="Assigned denials"
           value={work.assignedOpen.toLocaleString()}
-          tone="neutral"
+          tone={work.overdueAppeals === 0 && work.resolved30 >= work.assignedOpen ? "good" : "neutral"}
           hint={`${compactMoney(work.assignedOpenCents)} recoverable`}
+          target={`${work.resolved30.toLocaleString()} closed in 30 days`}
         />
         {/* Appeals approaching a deadline are normal pipeline, not a fault.
             The failure is a window actually lapsing, which "Appeals overdue"
@@ -107,11 +111,14 @@ export default async function UserDashboard() {
           hint={`${pct(work.needsAttentionShare, 1)} of all claims`}
           target="Healthy under 1%"
         />
+        {/* Clean claims waiting to go out are pending revenue. Healthy while
+            they are fresh; a stale queue is billing sitting on the shelf. */}
         <Kpi
           label="Ready to submit"
           value={work.readyToSubmit.toLocaleString()}
-          tone="neutral"
+          tone={work.readyOldestDays <= 3 ? "good" : work.readyOldestDays <= 7 ? "warn" : "bad"}
           hint="Passed scrubbing, ready to bill"
+          target={work.readyToSubmit === 0 ? "Queue empty" : `Oldest waiting ${work.readyOldestDays}d`}
         />
         <Kpi
           label="Resolved (30d)"

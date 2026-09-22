@@ -418,6 +418,8 @@ export interface UserWorkload {
   /** Rework backlog as a share of all claims, for judging whether it is large. */
   needsAttentionShare: number;
   readyToSubmit: number;
+  /** Age of the oldest claim sitting ready to bill; stale ones delay revenue. */
+  readyOldestDays: number;
   todaysAppointments: number;
   checkedIn: number;
 }
@@ -437,6 +439,7 @@ export async function userWorkload(db: Db, practiceId: string, userId: string): 
       SELECT
         COUNT(*) FILTER (WHERE status IN ('scrub_errors','rejected'))::bigint AS needs_attention,
         COUNT(*) FILTER (WHERE status = 'ready')::bigint AS ready,
+        COALESCE(MAX(now()::date - created_at::date) FILTER (WHERE status = 'ready'), 0)::int AS ready_oldest,
         COUNT(*)::bigint AS total
       FROM claims WHERE practice_id = ${practiceId}`),
     db.execute<Record<string, string>>(sql`
@@ -456,6 +459,7 @@ export async function userWorkload(db: Db, practiceId: string, userId: string): 
     needsAttention: n(c[0]?.needs_attention),
     needsAttentionShare: n(c[0]?.total) ? n(c[0]?.needs_attention) / n(c[0]?.total) : 0,
     readyToSubmit: n(c[0]?.ready),
+    readyOldestDays: n(c[0]?.ready_oldest),
     todaysAppointments: n(a[0]?.today),
     checkedIn: n(a[0]?.checked_in),
   };
