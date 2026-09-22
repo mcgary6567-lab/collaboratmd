@@ -307,8 +307,11 @@ async function main() {
       else if (ageDays < 10) lifecycle = roll < 0.06 ? "rejected" : "accepted";
       else if (ageDays < 22) lifecycle = roll < 0.03 ? "rejected" : roll < 0.62 ? "paid" : roll < 0.70 ? "denied" : "accepted";
       else if (ageDays < 45) lifecycle = roll < 0.015 ? "rejected" : roll < 0.88 ? "paid" : roll < 0.955 ? "denied" : "accepted";
-      else if (ageDays < 100) lifecycle = roll < 0.90 ? "paid" : roll < 0.965 ? "denied" : "closed";
-      else lifecycle = roll < 0.91 ? "paid" : roll < 0.97 ? "denied" : "closed";
+      // "closed" here means abandoned without ever being adjudicated, which is
+      // revenue simply given up. A practice running this product chases claims
+      // to a conclusion, so abandonment is rare rather than a few percent.
+      else if (ageDays < 100) lifecycle = roll < 0.93 ? "paid" : roll < 0.99 ? "denied" : "closed";
+      else lifecycle = roll < 0.935 ? "paid" : roll < 0.99 ? "denied" : "closed";
 
       // Remittance lands 12-34 days after service, never in the future.
       const payLagDays = 12 + rnd() * 22;
@@ -338,7 +341,10 @@ async function main() {
         const windowStillOpen = appealWindowEnds > now.getTime();
 
         if (rnd() < resolveChance || !windowStillOpen) {
-          denialStatus = rnd() < 0.45 ? "resolved" : "written_off";
+          // Most worked denials are recoverable: the explanation and next
+          // steps are on the claim, so appeals get filed with the right
+          // evidence instead of being abandoned. Roughly three in four win.
+          denialStatus = rnd() < 0.70 ? "resolved" : "written_off";
           denialResolvedAt = new Date(postedPay.getTime() + (8 + rnd() * 40) * 86_400_000);
           if (denialResolvedAt > now) denialResolvedAt = now;
         } else {
