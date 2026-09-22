@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Send } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Send, TrendingUp } from "lucide-react";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { userWorkload, myDenialQueue, claimsNeedingAttention, headlineKpis } from "@/server/analytics";
+import { userWorkload, myDenialQueue, claimsNeedingAttention, collectionsSummary } from "@/server/analytics";
 import { listAppointments } from "@/server/encounters";
 import { Card, PageHeader, StatusBadge, Badge, Empty } from "@/components/ui";
 import { Kpi, compactMoney, pct } from "@/components/kpi";
@@ -14,12 +14,12 @@ export default async function UserDashboard() {
   const s = await requireSession();
   const db = await getDb();
 
-  const [work, denials, attention, today, kpis] = await Promise.all([
+  const [work, denials, attention, today, money] = await Promise.all([
     userWorkload(db, s.practiceId, s.userId),
     myDenialQueue(db, s.practiceId, s.userId),
     claimsNeedingAttention(db, s.practiceId),
     listAppointments(db, s.practiceId, new Date()),
-    s.role === "admin" ? headlineKpis(db, s.practiceId, 1) : Promise.resolve(null),
+    collectionsSummary(db, s.practiceId),
   ]);
 
   const firstName = s.name.split(" ")[0];
@@ -38,12 +38,47 @@ export default async function UserDashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      {/* Money collected leads the page. The work counters below are a queue,
+          not a scorecard, so they are toned as workload rather than failure. */}
+      <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/60 to-white">
+        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)] lg:items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">Collected, last 30 days</span>
+            </div>
+            <div className="mt-2 text-4xl font-extrabold tracking-tight tabular-nums text-emerald-700 lg:text-5xl">
+              {compactMoney(money.last30)}
+            </div>
+            <p className="mt-2 text-sm text-emerald-900/70">
+              {money.postedCount30.toLocaleString()} payments posted ·{" "}
+              {money.charges30 > 0 ? pct(money.last30 / money.charges30, 0) : "0%"} of charges billed in the same period
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Today", value: compactMoney(money.today) },
+              { label: "Last 7 days", value: compactMoney(money.last7) },
+              { label: "Last 12 months", value: compactMoney(money.last365) },
+              { label: "Best month", value: money.bestMonth ? compactMoney(money.bestMonth.amount) : "-", sub: money.bestMonth?.month },
+            ].map((m) => (
+              <div key={m.label} className="rounded-xl border border-emerald-200/70 bg-white/80 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700/70">{m.label}</div>
+                <div className="mt-1 text-lg font-bold tabular-nums text-slate-900">{m.value}</div>
+                {m.sub && <div className="text-[11px] text-slate-400">{m.sub}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Kpi
           label="Assigned denials"
           value={work.assignedOpen.toLocaleString()}
-          tone={work.assignedOpen === 0 ? "good" : work.assignedOpen > 25 ? "bad" : "warn"}
-          hint={`${compactMoney(work.assignedOpenCents)} at risk`}
+          tone="neutral"
+          hint={`${compactMoney(work.assignedOpenCents)} recoverable`}
         />
         <Kpi
           label="Appeals due soon"
@@ -55,7 +90,7 @@ export default async function UserDashboard() {
           label="Appeals overdue"
           value={work.overdueAppeals.toLocaleString()}
           tone={work.overdueAppeals === 0 ? "good" : "bad"}
-          hint="Past the payer deadline"
+          hint={work.overdueAppeals === 0 ? "Nothing past deadline" : "Past the payer deadline"}
         />
         <Kpi
           label="Claims to fix"
@@ -66,8 +101,8 @@ export default async function UserDashboard() {
         <Kpi
           label="Ready to submit"
           value={work.readyToSubmit.toLocaleString()}
-          tone={work.readyToSubmit > 0 ? "warn" : "good"}
-          hint="Passed scrubbing"
+          tone="neutral"
+          hint="Passed scrubbing, ready to bill"
         />
         <Kpi
           label="Resolved (30d)"
@@ -77,12 +112,11 @@ export default async function UserDashboard() {
         />
       </div>
 
-      {kpis && (
+      {s.role === "admin" && (
         <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Practice, last 30 days</span>
-          <span>Charges <strong className="tabular-nums">{compactMoney(kpis.chargesCents)}</strong></span>
-          <span>Collections <strong className="tabular-nums text-emerald-700">{compactMoney(kpis.insurancePaidCents + kpis.patientPaidCents)}</strong></span>
-          <span>Denial rate <strong className="tabular-nums">{pct(kpis.denialRate)}</strong></span>
+          <span>Charges <strong className="tabular-nums">{compactMoney(money.charges30)}</strong></span>
+          <span>Collected <strong className="tabular-nums text-emerald-700">{compactMoney(money.last30)}</strong></span>
           <Link href="/admin" className="ml-auto text-xs font-semibold text-brand-700 underline">Full analytics</Link>
         </div>
       )}

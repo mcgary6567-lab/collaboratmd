@@ -322,7 +322,15 @@ async function main() {
       let denialResolvedAt: Date | null = null;
       if (lifecycle === "denied") {
         const denialAgeDays = Math.floor((now.getTime() - postedPay.getTime()) / 86_400_000);
-        const resolveChance = denialAgeDays > 120 ? 0.985 : denialAgeDays > 60 ? 0.9 : denialAgeDays > 30 ? 0.6 : 0.2;
+        // Beyond the appeal window a denial is always closed out, one way or
+        // another. Leaving even a fraction open produces appeals hundreds of
+        // days past deadline, which a practice that works its queue never has.
+        const resolveChance =
+          denialAgeDays > 150 ? 1
+            : denialAgeDays > 90 ? 0.995
+            : denialAgeDays > 45 ? 0.94
+            : denialAgeDays > 20 ? 0.68
+            : 0.25;
         if (rnd() < resolveChance) {
           denialStatus = rnd() < 0.45 ? "resolved" : "written_off";
           denialResolvedAt = new Date(postedPay.getTime() + (8 + rnd() * 40) * 86_400_000);

@@ -290,6 +290,55 @@ export async function timelyFilingRisk(db: Db, practiceId: string) {
   return { overdue: n(r.overdue), within14: n(r.within_14), atRiskCents: n(r.at_risk) };
 }
 
+export interface CollectionsSummary {
+  today: number;
+  last7: number;
+  last30: number;
+  last365: number;
+  charges30: number;
+  postedCount30: number;
+  bestMonth: { month: string; amount: number } | null;
+}
+
+/**
+ * Money actually collected, for every role.
+ *
+ * Collections are the point of the product, so the figure is available to
+ * anyone signed in rather than only to an administrator.
+ */
+export async function collectionsSummary(db: Db, practiceId: string): Promise<CollectionsSummary> {
+  const paid = sql`type IN ('insurance_payment','patient_payment')`;
+  const [{ rows: totals }, { rows: best }] = await Promise.all([
+    db.execute<Record<string, string>>(sql`
+      SELECT
+        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= date_trunc('day', now())), 0)::bigint AS today,
+        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= now() - interval '7 days'), 0)::bigint AS last7,
+        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= now() - interval '30 days'), 0)::bigint AS last30,
+        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= now() - interval '365 days'), 0)::bigint AS last365,
+        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'charge' AND posted_at >= now() - interval '30 days'), 0)::bigint AS charges30,
+        COUNT(*) FILTER (WHERE ${paid} AND posted_at >= now() - interval '30 days')::bigint AS posted30
+      FROM ledger_entries WHERE practice_id = ${practiceId}`),
+    db.execute<Record<string, string>>(sql`
+      SELECT to_char(date_trunc('month', posted_at), 'Mon YYYY') AS month,
+             SUM(amount_cents)::bigint AS amount
+      FROM ledger_entries
+      WHERE practice_id = ${practiceId} AND ${paid}
+        AND posted_at >= now() - interval '12 months'
+      GROUP BY date_trunc('month', posted_at)
+      ORDER BY amount DESC LIMIT 1`),
+  ]);
+  const t = totals[0] ?? {};
+  return {
+    today: n(t.today),
+    last7: n(t.last7),
+    last30: n(t.last30),
+    last365: n(t.last365),
+    charges30: n(t.charges30),
+    postedCount30: n(t.posted30),
+    bestMonth: best[0] ? { month: String(best[0].month), amount: n(best[0].amount) } : null,
+  };
+}
+
 /* ------------------------------------------------------------ user scope */
 
 export interface UserWorkload {
