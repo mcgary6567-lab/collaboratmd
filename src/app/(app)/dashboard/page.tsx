@@ -2,11 +2,11 @@ import Link from "next/link";
 import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Send, TrendingUp } from "lucide-react";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { userWorkload, myDenialQueue, claimsNeedingAttention, collectionsSummary } from "@/server/analytics";
+import { userWorkload, recentPayments, recoveredDenials, collectionsSummary } from "@/server/analytics";
 import { listAppointments } from "@/server/encounters";
-import { Card, PageHeader, StatusBadge, Badge, Empty } from "@/components/ui";
+import { Card, PageHeader, Badge, Empty } from "@/components/ui";
 import { Kpi, compactMoney, pct } from "@/components/kpi";
-import { fmtDate, daysAgo } from "@/lib/utils";
+import { fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +14,10 @@ export default async function UserDashboard() {
   const s = await requireSession();
   const db = await getDb();
 
-  const [work, denials, attention, today, money] = await Promise.all([
+  const [work, payments, recovered, today, money] = await Promise.all([
     userWorkload(db, s.practiceId, s.userId),
-    myDenialQueue(db, s.practiceId, s.userId),
-    claimsNeedingAttention(db, s.practiceId),
+    recentPayments(db, s.practiceId),
+    recoveredDenials(db, s.practiceId),
     listAppointments(db, s.practiceId, new Date()),
     collectionsSummary(db, s.practiceId),
   ]);
@@ -121,71 +121,65 @@ export default async function UserDashboard() {
         </div>
       )}
 
+      {/* The two panels below report money in, not problems out. The queues
+          they replaced live on /claims and /denials, reachable from the
+          counters above and the sidebar. */}
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card
-          title="My denial queue"
-          actions={<Link href="/denials" className="text-xs font-semibold text-brand-700 hover:underline">All denials</Link>}
+          title="Payments just posted"
+          actions={<Link href="/remittance" className="text-xs font-semibold text-brand-700 hover:underline">Remittance</Link>}
         >
-          {denials.length === 0 ? (
-            <Empty>Nothing assigned to you. <CheckCircle2 className="inline h-4 w-4 text-emerald-600" /></Empty>
+          {payments.length === 0 ? (
+            <Empty>No payments posted yet.</Empty>
           ) : (
             <table className="table">
               <thead>
-                <tr><th>Claim</th><th>Patient</th><th>Reason</th><th className="text-right">Amount</th><th>Appeal by</th></tr>
+                <tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Source</th><th className="text-right">Paid</th><th>Posted</th></tr>
               </thead>
               <tbody>
-                {denials.map((d) => {
-                  const left = d.appealDeadline ? -daysAgo(d.appealDeadline + "T00:00:00") : null;
-                  return (
-                    <tr key={d.id}>
-                      <td>
-                        <Link href={`/claims/${d.claimId}`} className="font-mono text-brand-700 hover:underline">{d.controlNumber}</Link>
-                        <div className="text-xs text-slate-400">{d.payer}</div>
-                      </td>
-                      <td>{d.patient}</td>
-                      <td>
-                        <Badge tone="red">CARC {d.carc}</Badge>
-                        <div className="mt-0.5 text-xs capitalize text-slate-500">{d.category.replace(/_/g, " ")}</div>
-                      </td>
-                      <td className="text-right font-semibold tabular-nums">{compactMoney(d.amountCents)}</td>
-                      <td className={left !== null && left < 14 ? "font-semibold text-red-700" : "text-slate-500"}>
-                        {left === null ? "-" : left < 0 ? `${-left}d overdue` : `${left}d left`}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {payments.map((p) => (
+                  <tr key={p.id}>
+                    <td><Link href={`/claims/${p.claimId}`} className="font-mono text-brand-700 hover:underline">{p.controlNumber}</Link></td>
+                    <td>{p.patient}</td>
+                    <td className="text-slate-600">{p.payer}</td>
+                    <td><Badge tone="green">{p.source}</Badge></td>
+                    <td className="text-right font-bold tabular-nums text-emerald-700">+{compactMoney(p.amountCents)}</td>
+                    <td className="whitespace-nowrap text-slate-500">{fmtDate(p.postedAt)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
         </Card>
 
         <Card
-          title="Claims needing attention"
-          actions={<Link href="/claims?status=scrub_errors" className="text-xs font-semibold text-brand-700 hover:underline">Open worklist</Link>}
+          title="Denials recovered"
+          actions={
+            <span className="text-xs font-semibold text-emerald-700">
+              {recovered.count.toLocaleString()} won · {compactMoney(recovered.amountCents)} back
+            </span>
+          }
         >
-          {attention.length === 0 ? (
-            <Empty>No blocked claims. <CheckCircle2 className="inline h-4 w-4 text-emerald-600" /></Empty>
+          {recovered.rows.length === 0 ? (
+            <Empty>No appeals resolved in the last 90 days.</Empty>
           ) : (
             <table className="table">
               <thead>
-                <tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Status</th><th className="text-right">Billed</th><th>Filing</th></tr>
+                <tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Overturned</th><th className="text-right">Recovered</th></tr>
               </thead>
               <tbody>
-                {attention.map((c) => {
-                  const left = c.deadline ? -daysAgo(c.deadline + "T00:00:00") : null;
-                  return (
-                    <tr key={c.id}>
-                      <td><Link href={`/claims/${c.id}`} className="font-mono text-brand-700 hover:underline">{c.controlNumber}</Link></td>
-                      <td>{c.patient}</td>
-                      <td className="text-slate-600">{c.payer}</td>
-                      <td><StatusBadge status={c.status} /></td>
-                      <td className="text-right tabular-nums">{compactMoney(c.totalCents)}</td>
-                      <td className={left !== null && left < 14 ? "font-semibold text-red-700" : "text-slate-500"}>
-                        {left === null ? "-" : left < 0 ? `${-left}d over` : `${left}d`}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {recovered.rows.map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      <Link href={`/claims/${d.claimId}`} className="font-mono text-brand-700 hover:underline">{d.controlNumber}</Link>
+                      <div className="text-xs capitalize text-slate-400">{d.category.replace(/_/g, " ")}</div>
+                    </td>
+                    <td>{d.patient}</td>
+                    <td className="text-slate-600">{d.payer}</td>
+                    <td><Badge tone="green">CARC {d.carc} won</Badge></td>
+                    <td className="text-right font-bold tabular-nums text-emerald-700">+{compactMoney(d.recoveredCents)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

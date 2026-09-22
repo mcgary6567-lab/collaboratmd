@@ -339,6 +339,71 @@ export async function collectionsSummary(db: Db, practiceId: string): Promise<Co
   };
 }
 
+/** Most recent payments posted, for the "money arriving" panel. */
+export async function recentPayments(db: Db, practiceId: string, limit = 8) {
+  const { rows } = await db.execute<Record<string, string>>(sql`
+    SELECT l.id, l.amount_cents, l.type, l.posted_at,
+           c.id AS claim_id, c.control_number,
+           p.last_name, p.first_name, py.name AS payer
+    FROM ledger_entries l
+    JOIN claims c ON c.id = l.claim_id
+    JOIN patients p ON p.id = c.patient_id
+    JOIN payers py ON py.id = c.payer_id
+    WHERE l.practice_id = ${practiceId}
+      AND l.type IN ('insurance_payment','patient_payment')
+    ORDER BY l.posted_at DESC LIMIT ${limit}`);
+  return rows.map((r) => ({
+    id: String(r.id),
+    amountCents: n(r.amount_cents),
+    source: String(r.type) === "patient_payment" ? "Patient" : "Insurance",
+    postedAt: new Date(String(r.posted_at)),
+    claimId: String(r.claim_id),
+    controlNumber: String(r.control_number),
+    patient: `${r.last_name}, ${r.first_name}`,
+    payer: String(r.payer),
+  }));
+}
+
+/** Denials overturned on appeal, with the dollars actually recovered. */
+export async function recoveredDenials(db: Db, practiceId: string, limit = 8) {
+  const [{ rows }, { rows: totals }] = await Promise.all([
+    db.execute<Record<string, string>>(sql`
+      SELECT d.id, d.carc, d.category, d.resolved_at,
+             c.id AS claim_id, c.control_number,
+             p.last_name, p.first_name, py.name AS payer,
+             COALESCE((SELECT SUM(l.amount_cents) FROM ledger_entries l
+                       WHERE l.claim_id = c.id AND l.type = 'insurance_payment'), 0)::bigint AS recovered
+      FROM denials d
+      JOIN claims c ON c.id = d.claim_id
+      JOIN patients p ON p.id = c.patient_id
+      JOIN payers py ON py.id = c.payer_id
+      WHERE d.practice_id = ${practiceId} AND d.status = 'resolved'
+        AND d.resolved_at >= now() - interval '90 days'
+      ORDER BY recovered DESC LIMIT ${limit}`),
+    db.execute<Record<string, string>>(sql`
+      SELECT COUNT(*)::bigint AS n,
+             COALESCE(SUM(amount_cents), 0)::bigint AS amount
+      FROM denials
+      WHERE practice_id = ${practiceId} AND status = 'resolved'
+        AND resolved_at >= now() - interval '90 days'`),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: String(r.id),
+      carc: String(r.carc),
+      category: String(r.category),
+      recoveredCents: n(r.recovered),
+      resolvedAt: new Date(String(r.resolved_at)),
+      claimId: String(r.claim_id),
+      controlNumber: String(r.control_number),
+      patient: `${r.last_name}, ${r.first_name}`,
+      payer: String(r.payer),
+    })),
+    count: n(totals[0]?.n),
+    amountCents: n(totals[0]?.amount),
+  };
+}
+
 /* ------------------------------------------------------------ user scope */
 
 export interface UserWorkload {
