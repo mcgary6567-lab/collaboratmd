@@ -1,5 +1,11 @@
 # MedBill RCM
 
+**Live demo:** https://medbill-rcm.vercel.app (sign in with `admin@medbill.local` / `admin123`)
+
+Running on Vercel against a Neon Postgres database. The data is synthetic; the
+demo credentials are public, so treat the deployment as a showcase rather than
+somewhere to put anything real.
+
 A cloud medical billing and revenue cycle management (RCM) web application. It covers the whole money path a medical practice walks every day:
 
 ```
