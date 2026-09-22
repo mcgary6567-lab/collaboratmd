@@ -38,34 +38,35 @@ export default async function UserDashboard() {
         }
       />
 
-      {/* Money collected leads the page. The work counters below are a queue,
-          not a scorecard, so they are toned as workload rather than failure. */}
-      <section className="overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 via-green-50/60 to-white">
-        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)] lg:items-center">
+      {/* Collections still lead, but as a neutral card with a green rail
+          rather than a green block: the accent marks the figure as money in,
+          without the panel competing with the rest of the page. */}
+      <section className="card border-l-4 border-l-green-600 p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-center">
           <div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-600" />
-              <span className="text-xs font-bold uppercase tracking-widest text-green-700">Collected, last 30 days</span>
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Collected, last 30 days</span>
             </div>
-            <div className="mt-2 text-4xl font-extrabold tracking-tight tabular-nums text-green-700 lg:text-5xl">
+            <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-green-700">
               {compactMoney(money.last30)}
             </div>
-            <p className="mt-2 text-sm text-green-900/70">
+            <p className="mt-1 text-xs text-slate-500">
               {money.postedCount30.toLocaleString()} payments posted ·{" "}
-              {money.charges30 > 0 ? pct(money.last30 / money.charges30, 0) : "0%"} of charges billed in the same period
+              {money.charges30 > 0 ? pct(money.last30 / money.charges30, 0) : "0%"} of charges billed
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:border-l lg:border-slate-200 lg:pl-6">
             {[
               { label: "Today", value: compactMoney(money.today) },
               { label: "Last 7 days", value: compactMoney(money.last7) },
               { label: "Last 12 months", value: compactMoney(money.last365) },
               { label: "Best month", value: money.bestMonth ? compactMoney(money.bestMonth.amount) : "-", sub: money.bestMonth?.month },
             ].map((m) => (
-              <div key={m.label} className="rounded-xl border border-green-200/70 bg-white/80 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-green-700/70">{m.label}</div>
-                <div className="mt-1 text-lg font-bold tabular-nums text-slate-900">{m.value}</div>
+              <div key={m.label}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{m.label}</div>
+                <div className="mt-0.5 text-base font-bold tabular-nums text-slate-900">{m.value}</div>
                 {m.sub && <div className="text-[11px] text-slate-400">{m.sub}</div>}
               </div>
             ))}
