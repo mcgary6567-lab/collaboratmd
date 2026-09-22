@@ -16,7 +16,7 @@ export function ClaimActions({ claimId, canSubmit, canRescrub }: { claimId: stri
     });
   return (
     <div className="flex items-center gap-2">
-      {msg && <span className={`max-w-xs text-xs ${msg.ok ? "text-emerald-700" : "text-red-700"}`}>{msg.message}</span>}
+      {msg && <span className={`max-w-xs text-xs ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.message}</span>}
       {canRescrub && (
         <button className="btn btn-secondary" disabled={pending} onClick={() => run(() => rescrubClaimAction(claimId))}>
           <RefreshCw className="h-4 w-4" /> Re-scrub

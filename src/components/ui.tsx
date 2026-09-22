@@ -35,7 +35,7 @@ export function StatusBadge({ status }: { status: string }) {
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: "slate" | "green" | "red" | "amber" | "blue" }) {
   const tones = {
     slate: "bg-slate-100 text-slate-700",
-    green: "bg-emerald-100 text-emerald-800",
+    green: "bg-green-100 text-green-800",
     red: "bg-red-100 text-red-800",
     amber: "bg-amber-100 text-amber-800",
     blue: "bg-blue-100 text-blue-800",
@@ -47,7 +47,7 @@ export function Stat({ label, value, hint, tone }: { label: string; value: strin
   return (
     <div className="card p-4">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={cn("mt-1 text-2xl font-bold", tone === "good" && "text-emerald-700", tone === "bad" && "text-red-700")}>{value}</div>
+      <div className={cn("mt-1 text-2xl font-bold", tone === "good" && "text-green-700", tone === "bad" && "text-red-700")}>{value}</div>
       {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
     </div>
   );
@@ -82,7 +82,7 @@ export function Field({ label, children, className }: { label: string; children:
 export function Alert({ kind, children }: { kind: "error" | "success" | "info"; children: ReactNode }) {
   const styles = {
     error: "border-red-200 bg-red-50 text-red-800",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    success: "border-green-200 bg-green-50 text-green-800",
     info: "border-sky-200 bg-sky-50 text-sky-800",
   };
   return <div className={cn("mb-4 rounded-lg border px-4 py-3 text-sm", styles[kind])}>{children}</div>;

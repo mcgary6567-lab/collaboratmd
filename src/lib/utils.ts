@@ -47,7 +47,7 @@ export const CLAIM_STATUS_COLORS: Record<string, string> = {
   accepted: "bg-blue-100 text-blue-800",
   rejected: "bg-red-100 text-red-800",
   pending: "bg-violet-100 text-violet-800",
-  paid: "bg-emerald-100 text-emerald-800",
+  paid: "bg-green-100 text-green-800",
   partially_paid: "bg-teal-100 text-teal-800",
   denied: "bg-rose-100 text-rose-800",
   closed: "bg-slate-200 text-slate-700",

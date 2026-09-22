@@ -81,7 +81,7 @@ export default async function ReportsPage() {
                   <td className="capitalize text-slate-500">{r.type}</td>
                   <td className="text-right tabular-nums">{r.claims.toLocaleString()}</td>
                   <td className="text-right tabular-nums">{compactMoney(r.billedCents)}</td>
-                  <td className="text-right tabular-nums text-emerald-700">{compactMoney(r.paidCents)}</td>
+                  <td className="text-right tabular-nums text-green-700">{compactMoney(r.paidCents)}</td>
                   <td className="text-right tabular-nums text-rose-700">{r.denied.toLocaleString()}</td>
                   <td className="text-right tabular-nums">{share(r.paidCents, r.billedCents)}</td>
                 </tr>

@@ -40,17 +40,17 @@ export default async function UserDashboard() {
 
       {/* Money collected leads the page. The work counters below are a queue,
           not a scorecard, so they are toned as workload rather than failure. */}
-      <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-emerald-50/60 to-white">
+      <section className="overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 via-green-50/60 to-white">
         <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)] lg:items-center">
           <div>
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-600" />
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">Collected, last 30 days</span>
+              <TrendingUp className="h-4 w-4 text-green-600" />
+              <span className="text-xs font-bold uppercase tracking-widest text-green-700">Collected, last 30 days</span>
             </div>
-            <div className="mt-2 text-4xl font-extrabold tracking-tight tabular-nums text-emerald-700 lg:text-5xl">
+            <div className="mt-2 text-4xl font-extrabold tracking-tight tabular-nums text-green-700 lg:text-5xl">
               {compactMoney(money.last30)}
             </div>
-            <p className="mt-2 text-sm text-emerald-900/70">
+            <p className="mt-2 text-sm text-green-900/70">
               {money.postedCount30.toLocaleString()} payments posted ·{" "}
               {money.charges30 > 0 ? pct(money.last30 / money.charges30, 0) : "0%"} of charges billed in the same period
             </p>
@@ -63,8 +63,8 @@ export default async function UserDashboard() {
               { label: "Last 12 months", value: compactMoney(money.last365) },
               { label: "Best month", value: money.bestMonth ? compactMoney(money.bestMonth.amount) : "-", sub: money.bestMonth?.month },
             ].map((m) => (
-              <div key={m.label} className="rounded-xl border border-emerald-200/70 bg-white/80 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700/70">{m.label}</div>
+              <div key={m.label} className="rounded-xl border border-green-200/70 bg-white/80 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-green-700/70">{m.label}</div>
                 <div className="mt-1 text-lg font-bold tabular-nums text-slate-900">{m.value}</div>
                 {m.sub && <div className="text-[11px] text-slate-400">{m.sub}</div>}
               </div>
@@ -132,7 +132,7 @@ export default async function UserDashboard() {
         <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Practice, last 30 days</span>
           <span>Charges <strong className="tabular-nums">{compactMoney(money.charges30)}</strong></span>
-          <span>Collected <strong className="tabular-nums text-emerald-700">{compactMoney(money.last30)}</strong></span>
+          <span>Collected <strong className="tabular-nums text-green-700">{compactMoney(money.last30)}</strong></span>
           <Link href="/admin" className="ml-auto text-xs font-semibold text-brand-700 underline">Full analytics</Link>
         </div>
       )}
@@ -159,7 +159,7 @@ export default async function UserDashboard() {
                     <td>{p.patient}</td>
                     <td className="text-slate-600">{p.payer}</td>
                     <td><Badge tone="green">{p.source}</Badge></td>
-                    <td className="text-right font-bold tabular-nums text-emerald-700">+{compactMoney(p.amountCents)}</td>
+                    <td className="text-right font-bold tabular-nums text-green-700">+{compactMoney(p.amountCents)}</td>
                     <td className="whitespace-nowrap text-slate-500">{fmtDate(p.postedAt)}</td>
                   </tr>
                 ))}
@@ -171,7 +171,7 @@ export default async function UserDashboard() {
         <Card
           title="Denials recovered"
           actions={
-            <span className="text-xs font-semibold text-emerald-700">
+            <span className="text-xs font-semibold text-green-700">
               {recovered.count.toLocaleString()} won · {compactMoney(recovered.amountCents)} back
             </span>
           }
@@ -193,7 +193,7 @@ export default async function UserDashboard() {
                     <td>{d.patient}</td>
                     <td className="text-slate-600">{d.payer}</td>
                     <td><Badge tone="green">CARC {d.carc} won</Badge></td>
-                    <td className="text-right font-bold tabular-nums text-emerald-700">+{compactMoney(d.recoveredCents)}</td>
+                    <td className="text-right font-bold tabular-nums text-green-700">+{compactMoney(d.recoveredCents)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -258,7 +258,7 @@ export default async function UserDashboard() {
               <span className="font-semibold tabular-nums">{work.checkedIn.toLocaleString()}</span>
             </Link>
             <Link href="/remittance" className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
               <span className="flex-1">Post remittances</span>
             </Link>
           </div>

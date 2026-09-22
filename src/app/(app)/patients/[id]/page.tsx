@@ -54,7 +54,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             </div>
           ))}
           {latestCheck && (
-            <div className={`rounded-lg p-3 text-sm ${latestCheck.status === "active" ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>
+            <div className={`rounded-lg p-3 text-sm ${latestCheck.status === "active" ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"}`}>
               <div className="font-semibold">Coverage {latestCheck.status} · {fmtDateTime(latestCheck.checkedAt)}</div>
               {latestCheck.status === "active" ? (
                 <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs">

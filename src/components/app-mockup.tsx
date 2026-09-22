@@ -44,8 +44,8 @@ const MIX = [
 
 const KPIS = [
   { label: "Charges", value: "$30.0M", tone: "text-slate-900", dot: "bg-slate-300" },
-  { label: "Collections", value: "$19.8M", tone: "text-emerald-700", dot: "bg-emerald-500" },
-  { label: "Days in A/R", value: "25", tone: "text-emerald-700", dot: "bg-emerald-500" },
+  { label: "Collections", value: "$19.8M", tone: "text-green-700", dot: "bg-green-500" },
+  { label: "Days in A/R", value: "25", tone: "text-green-700", dot: "bg-green-500" },
   { label: "Denial rate", value: "6.3%", tone: "text-amber-700", dot: "bg-amber-500" },
 ];
 
@@ -61,7 +61,7 @@ export function AppMockup() {
       <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
         <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
         <div className="ml-3 flex-1 truncate rounded-md bg-white px-3 py-1 text-[11px] text-slate-400 ring-1 ring-slate-200">
           medbill-rcm.app/admin
         </div>

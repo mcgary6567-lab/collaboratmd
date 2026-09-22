@@ -129,7 +129,7 @@ export default async function AdminDashboard() {
                     </td>
                     <td className="text-right tabular-nums">{p.claims.toLocaleString()}</td>
                     <td className="text-right tabular-nums">{compactMoney(p.billedCents)}</td>
-                    <td className="text-right tabular-nums text-emerald-700">{compactMoney(p.paidCents)}</td>
+                    <td className="text-right tabular-nums text-green-700">{compactMoney(p.paidCents)}</td>
                     <td>
                       <div className="mb-1 text-right text-xs tabular-nums text-slate-500">{pct(rate, 0)}</div>
                       <MiniBar value={p.billedCents} max={maxPayerBilled} />

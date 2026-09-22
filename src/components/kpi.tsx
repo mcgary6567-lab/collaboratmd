@@ -4,14 +4,14 @@ import { cn } from "@/lib/utils";
 type Tone = "good" | "bad" | "warn" | "neutral";
 
 const TONE_TEXT: Record<Tone, string> = {
-  good: "text-emerald-700",
+  good: "text-green-700",
   bad: "text-red-700",
   warn: "text-amber-700",
   neutral: "text-slate-900",
 };
 
 const TONE_DOT: Record<Tone, string> = {
-  good: "bg-emerald-500",
+  good: "bg-green-500",
   bad: "bg-red-500",
   warn: "bg-amber-500",
   neutral: "bg-slate-300",

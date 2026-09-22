@@ -163,7 +163,7 @@ export default async function LandingPage() {
                 clear of the product shot at any viewport width. */}
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {[
-                { icon: Zap, tone: "text-emerald-600", title: "Scrubbed in 380 ms", body: "22 rules, before submission" },
+                { icon: Zap, tone: "text-green-600", title: "Scrubbed in 380 ms", body: "22 rules, before submission" },
                 { icon: ReceiptText, tone: "text-brand-600", title: "ERA posted automatically", body: "835 matched to claim and line" },
                 { icon: ShieldCheck, tone: "text-slate-700", title: "Append-only ledger", body: "Corrections reverse, never rewrite" },
               ].map(({ icon: Icon, tone, title, body }) => (
@@ -293,7 +293,7 @@ export default async function LandingPage() {
                       <div className="font-semibold text-slate-900">{b.metric}</div>
                       <div className="mt-0.5 text-xs text-slate-500">{b.why}</div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-emerald-700">{b.target}</td>
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-green-700">{b.target}</td>
                   </tr>
                 ))}
               </tbody>
@@ -318,10 +318,10 @@ export default async function LandingPage() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium">
-                  <ShieldCheck className="h-4 w-4 text-emerald-400" /> HIPAA-aligned design
+                  <ShieldCheck className="h-4 w-4 text-green-400" /> HIPAA-aligned design
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium">
-                  <Lock className="h-4 w-4 text-emerald-400" /> Full PHI audit trail
+                  <Lock className="h-4 w-4 text-green-400" /> Full PHI audit trail
                 </span>
               </div>
             </div>

@@ -52,7 +52,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                     <td className="text-xs">
                       {errors > 0 && <span className="mr-1 text-red-700">{errors} err</span>}
                       {warnings > 0 && <span className="text-amber-700">{warnings} warn</span>}
-                      {errors === 0 && warnings === 0 && <span className="text-emerald-700">clean</span>}
+                      {errors === 0 && warnings === 0 && <span className="text-green-700">clean</span>}
                     </td>
                     <td className="text-right"><Money cents={claim.totalCents} /></td>
                     <td className="text-slate-500">{daysAgo(encounter.dateOfService + "T00:00:00")}d</td>

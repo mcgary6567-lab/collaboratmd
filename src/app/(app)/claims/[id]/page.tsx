@@ -141,7 +141,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
 
           {b.claim.edi837 && (
             <Card title="837P transaction (X12 005010X222A1)">
-              <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-emerald-200">{b.claim.edi837}</pre>
+              <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-green-200">{b.claim.edi837}</pre>
             </Card>
           )}
         </div>
@@ -150,7 +150,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
           <Card title="Financials">
             <dl className="space-y-1 text-sm">
               <div className="flex justify-between"><dt className="text-slate-500">Charges</dt><dd><Money cents={fin.chargesCents} /></dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Insurance paid</dt><dd className="text-emerald-700"><Money cents={fin.insurancePaidCents} /></dd></div>
+              <div className="flex justify-between"><dt className="text-slate-500">Insurance paid</dt><dd className="text-green-700"><Money cents={fin.insurancePaidCents} /></dd></div>
               <div className="flex justify-between"><dt className="text-slate-500">Contractual adj.</dt><dd><Money cents={fin.adjustmentsCents} /></dd></div>
               <div className="flex justify-between"><dt className="text-slate-500">Patient resp.</dt><dd><Money cents={fin.patientRespCents} /></dd></div>
               <div className="flex justify-between border-t pt-1 font-semibold"><dt>Insurance balance</dt><dd><Money cents={fin.insuranceBalanceCents} /></dd></div>
