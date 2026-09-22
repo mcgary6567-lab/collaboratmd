@@ -1,0 +1,12 @@
+# Never upload local secrets or local machine state.
+# Note: do NOT exclude .vercel or .next here - a prebuilt deploy uploads
+# .vercel/output, and excluding it silently drops functions from the upload.
+.env
+.env.local
+.env.*.local
+.neon
+
+node_modules
+data
+*.log
+coverage

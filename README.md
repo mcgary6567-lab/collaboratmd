@@ -103,7 +103,12 @@ short-lived connections, which a direct endpoint will exhaust.
 
 ### Deploy
 
-With the database in place:
+**Recommended: let Vercel build from GitHub.** Import the repository at
+[vercel.com/new](https://vercel.com/new) and set the environment variables
+below. Vercel builds on Linux, which avoids the problems described under
+*Local builds* at the end of this section.
+
+From the command line, with the database in place:
 
 ```bash
 npx vercel login     # or set VERCEL_TOKEN
@@ -138,6 +143,25 @@ with, so create one before or after the first deploy.
 
 Check `/api/health` after deploying: it reports which database backend is live
 and how many claims it can see.
+
+### Local builds and anonymous deploys
+
+`vercel deploy --temporary` (an anonymous deployment, no login) **cannot host
+this app**, for two independent reasons:
+
+- Anonymous deployments are capped at 20 serverless functions. This app builds
+  42 function entries across its routes.
+- The build output produced on Windows uses symlinks to share one function
+  across a route's variants, and those do not survive the prebuilt upload; the
+  deploy fails with `ENOENT` on a function directory. Dereferencing them into
+  real directories works, but then every route counts separately and blows past
+  the function cap.
+
+Building on Linux, which is what Vercel does for a normal authenticated deploy
+from GitHub, has neither problem. If you must build locally on Windows, note
+that any `.env*` file present during the build gets traced into the function
+bundle. Keep secrets out of the project directory during a build, or the
+deployment ships them as files.
 
 ## Clearinghouse and AI are behind interfaces
 
