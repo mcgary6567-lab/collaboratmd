@@ -1,10 +1,17 @@
 # MedBill RCM
 
-**Live demo:** https://medbill-rcm.vercel.app (sign in with `admin@medbill.local` / `admin123`)
+**Deployment:** https://medbill-rcm.vercel.app, running on Vercel against a Neon
+Postgres database.
 
-Running on Vercel against a Neon Postgres database. The data is synthetic; the
-demo credentials are public, so treat the deployment as a showcase rather than
-somewhere to put anything real.
+The deployment is private. Vercel Deployment Protection is set to *All
+Deployments*, so every URL, production included, requires a Vercel login with
+access to the project; anonymous visitors are redirected to Vercel. To view it,
+either sign in to Vercel, or create a Shareable Link from the deployment page
+to give someone access without adding them to the project.
+
+Once past that, the app's own demo accounts are `admin@medbill.local` /
+`admin123`, `biller@medbill.local` / `biller123`, and `frontdesk@medbill.local`
+/ `front123`. The data is synthetic.
 
 A cloud medical billing and revenue cycle management (RCM) web application. It covers the whole money path a medical practice walks every day:
 
