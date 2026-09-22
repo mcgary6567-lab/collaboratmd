@@ -410,6 +410,8 @@ export interface UserWorkload {
   assignedOpen: number;
   assignedOpenCents: number;
   dueSoon: number;
+  /** Appeals nearing their deadline as a share of the open queue. */
+  dueSoonShare: number;
   overdueAppeals: number;
   resolved30: number;
   needsAttention: number;
@@ -448,6 +450,7 @@ export async function userWorkload(db: Db, practiceId: string, userId: string): 
     assignedOpen: n(d[0]?.assigned_open),
     assignedOpenCents: n(d[0]?.assigned_cents),
     dueSoon: n(d[0]?.due_soon),
+    dueSoonShare: n(d[0]?.assigned_open) ? n(d[0]?.due_soon) / n(d[0]?.assigned_open) : 0,
     overdueAppeals: n(d[0]?.overdue),
     resolved30: n(d[0]?.resolved30),
     needsAttention: n(c[0]?.needs_attention),

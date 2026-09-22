@@ -80,11 +80,16 @@ export default async function UserDashboard() {
           tone="neutral"
           hint={`${compactMoney(work.assignedOpenCents)} recoverable`}
         />
+        {/* Appeals approaching a deadline are normal pipeline, not a fault.
+            The failure is a window actually lapsing, which "Appeals overdue"
+            tracks. This turns amber only when deadlines are stacking up
+            against the size of the open queue. */}
         <Kpi
           label="Appeals due soon"
           value={work.dueSoon.toLocaleString()}
-          tone={work.dueSoon === 0 ? "good" : "warn"}
-          hint="Within 14 days"
+          tone={work.dueSoonShare < 0.1 ? "good" : work.dueSoonShare < 0.25 ? "warn" : "bad"}
+          hint={`Within 14 days · ${pct(work.dueSoonShare, 0)} of queue`}
+          target="Healthy under 10%"
         />
         <Kpi
           label="Appeals overdue"
