@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:migrations": "node scripts/build-migrations.mjs",
+    "seed:large": "tsx scripts/seed-large.ts",
     "deploy": "node scripts/deploy-vercel.mjs"
   },
   "dependencies": {

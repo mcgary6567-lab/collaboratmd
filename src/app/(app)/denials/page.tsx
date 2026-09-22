@@ -15,19 +15,14 @@ export default async function DenialsPage({ searchParams }: { searchParams: Prom
   const status = sp.status === undefined ? "open" : sp.status;
   const s = await requireSession();
   const db = await getDb();
-  const rows = await listDenials(db, s.practiceId, status || undefined);
-  const total = rows.reduce((a, r) => a + r.denial.amountCents, 0);
-  // Prioritize: nearest appeal deadline first, then largest amount.
-  rows.sort((a, b) => {
-    const da = a.denial.appealDeadline ? new Date(a.denial.appealDeadline).getTime() : Infinity;
-    const dbb = b.denial.appealDeadline ? new Date(b.denial.appealDeadline).getTime() : Infinity;
-    return da - dbb || b.denial.amountCents - a.denial.amountCents;
-  });
-  const byCategory = rows.reduce<Record<string, number>>((acc, r) => ((acc[r.denial.category] = (acc[r.denial.category] ?? 0) + 1), acc), {});
+  const { rows, total, totalCents, categories, truncated } = await listDenials(db, s.practiceId, status || undefined);
 
   return (
     <>
-      <PageHeader title="Denial management" subtitle={`${rows.length} denials · ${(total / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} at risk`} />
+      <PageHeader
+        title="Denial management"
+        subtitle={`${total.toLocaleString()} denials · ${(totalCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} at risk${truncated ? ` · showing the ${rows.length} most urgent` : ""}`}
+      />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <Link key={f} href={f ? `/denials?status=${f}` : "/denials?status="} className={`rounded-full px-3 py-1 text-xs font-semibold ${status === f ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
@@ -35,7 +30,7 @@ export default async function DenialsPage({ searchParams }: { searchParams: Prom
           </Link>
         ))}
         <span className="ml-auto text-xs text-slate-500">
-          Patterns: {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c.replace(/_/g, " ")} ${n}`).join(" · ") || "none"}
+          Patterns: {categories.map((c) => `${c.category.replace(/_/g, " ")} ${c.count.toLocaleString()}`).join(" · ") || "none"}
         </span>
       </div>
       {rows.length === 0 ? (

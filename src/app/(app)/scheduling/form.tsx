@@ -3,18 +3,15 @@
 import { useActionState } from "react";
 import { createAppointmentAction } from "@/app/(app)/actions";
 import { Field, Alert } from "@/components/ui";
+import { PatientPicker } from "@/components/patient-picker";
 
-export function AppointmentForm({ date, providers, patients }: { date: string; providers: { id: string; name: string }[]; patients: { id: string; name: string }[] }) {
+export function AppointmentForm({ date, providers }: { date: string; providers: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createAppointmentAction, undefined);
   return (
     <form action={action} className="space-y-3">
       {state && <Alert kind={state.ok ? "success" : "error"}>{state.message}</Alert>}
       <Field label="Patient">
-        <select name="patientId" className="select" required>
-          {patients.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        <PatientPicker name="patientId" />
       </Field>
       <Field label="Provider">
         <select name="providerId" className="select" required>

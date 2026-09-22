@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listAppointments, listProviders } from "@/server/encounters";
-import { searchPatients } from "@/server/patients";
 import { appointmentStatusAction } from "@/app/(app)/actions";
 import { Card, PageHeader, PatientLink, Badge, Empty } from "@/components/ui";
 import { AppointmentForm } from "./form";
@@ -16,7 +15,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
   const s = await requireSession();
   const db = await getDb();
   const day = date ? new Date(date + "T12:00:00") : new Date();
-  const [appts, providers, patients] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId), searchPatients(db, s.practiceId)]);
+  const [appts, providers] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId)]);
   const iso = day.toISOString().slice(0, 10);
   const shift = (n: number) => {
     const d = new Date(day);
@@ -77,7 +76,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
           )}
         </Card>
         <Card title="Book appointment">
-          <AppointmentForm date={iso} providers={providers.map((p) => ({ id: p.id, name: `Dr. ${p.firstName} ${p.lastName}` }))} patients={patients.map((p) => ({ id: p.id, name: `${p.lastName}, ${p.firstName} (${p.mrn})` }))} />
+          <AppointmentForm date={iso} providers={providers.map((p) => ({ id: p.id, name: `Dr. ${p.firstName} ${p.lastName} — ${p.specialty}` }))} />
         </Card>
       </div>
     </>

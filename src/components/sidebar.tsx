@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CalendarDays, FileText, ClipboardList, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "My work", icon: LayoutDashboard },
+  { href: "/admin", label: "Practice analytics", icon: Building2, adminOnly: true },
   { href: "/scheduling", label: "Scheduling", icon: CalendarDays },
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/encounters/new", label: "Charge Entry", icon: Stethoscope },
@@ -29,7 +30,7 @@ export function Sidebar({ user, logout }: { user: { name: string; role: string }
         </div>
       </div>
       <nav className="flex-1 space-y-0.5 px-3">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.filter((item) => !item.adminOnly || user.role === "admin").map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link key={href} href={href} className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium", active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100")}>
@@ -38,9 +39,6 @@ export function Sidebar({ user, logout }: { user: { name: string; role: string }
             </Link>
           );
         })}
-        <div className="pt-3">
-          <ClipboardList className="hidden" />
-        </div>
       </nav>
       <div className="border-t border-slate-200 p-4">
         <div className="text-sm font-semibold">{user.name}</div>

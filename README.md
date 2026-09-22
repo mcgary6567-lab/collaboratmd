@@ -35,7 +35,9 @@ The product scope was defined before any code was written. See [docs/01-product-
 | **Remittance** | 835 parsing and auto-posting: payments, CO contractual adjustments, PR transfers to patient, CARC/RARC capture, unmatched-claim exception list |
 | **Denials** | Auto-created from 835 denial codes, categorized, prioritized by appeal deadline then dollars, with plain-language explanation and next steps |
 | **Patient billing** | Patient balance, payment posting (card, cash, check), ledger split between insurance and patient AR |
-| **Reporting** | KPI dashboard (days in AR, clean-claim rate, denial rate, net collection rate), AR aging by payer, payer mix and reimbursement, 6-month charge vs payment trend |
+| **Admin dashboard** | Practice-wide analytics at `/admin`: seven headline KPIs each shown against its industry benchmark, 12-month charges/collections/adjustments trend, AR aging, payer mix, denial reasons ranked by dollars, payer realisation, provider productivity, timely-filing exposure |
+| **User dashboard** | Work-focused home at `/dashboard`: assigned denials with appeal countdowns, claims blocked by scrubbing or rejection, today's schedule with one-click charge entry, and queue shortcuts |
+| **Reporting** | AR aging by payer, payer reimbursement, provider productivity, denial reasons |
 | **Platform** | Session auth with three roles, append-only financial ledger, audit log on PHI and financial actions, JSON API, health endpoint |
 
 ## Stack
@@ -62,10 +64,37 @@ Sign in with any of:
 | frontdesk@medbill.local | front123 | front desk |
 
 ```bash
-npm test        # scrub-rule and EDI round-trip tests
+npm test        # scrub-rule, EDI round-trip, clearinghouse and migration tests
 npm run typecheck
 npm run build
 ```
+
+### Loading a full-size practice
+
+The boot-time seed creates a small demo. To populate a real Postgres with a
+practice at production scale, run the bulk loader:
+
+```bash
+npm run seed:large
+```
+
+It reads `DATABASE_URL` from `.env.local` and generates 100 US providers across
+26 specialties, 15,000 patients spread over 50 metro areas, and enough claims to
+reach a target billed volume (default $60M over 24 months), complete with
+adjudication, contractual adjustments, patient responsibility, and a realistic
+denial mix. Volume is configurable:
+
+```bash
+TARGET_CHARGES_USD=20000000 PATIENT_COUNT=5000 npm run seed:large
+```
+
+It generates until the dollar target is met rather than assuming an average
+claim value, so changing the procedure mix does not silently miss the target.
+**It truncates the application tables first**, so never point it at real data.
+
+`npx tsx scripts/db-stats.ts` prints row counts, billed and collected totals,
+and database size, which is worth checking against your provider's storage
+limit before loading a large dataset.
 
 Optional environment variables are documented in `.env.example`.
 

@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
 import { createEncounterAction } from "@/app/(app)/actions";
 import { Field, Alert } from "@/components/ui";
+import { PatientPicker, type PatientOption } from "@/components/patient-picker";
 
 type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string };
 
@@ -22,19 +23,19 @@ const POS = [
 
 export function ChargeEntryForm({
   defaults,
-  patients,
+  initialPatient,
   providers,
   cpts,
   icds,
 }: {
-  defaults: { patientId?: string; providerId?: string; appointmentId?: string; dos: string };
-  patients: { id: string; name: string }[];
+  defaults: { providerId?: string; appointmentId?: string; dos: string };
+  initialPatient: PatientOption | null;
   providers: { id: string; name: string }[];
   cpts: { code: string; description: string; fee: number }[];
   icds: { code: string; description: string }[];
 }) {
   const [state, action, pending] = useActionState(createEncounterAction, undefined);
-  const [patientId, setPatientId] = useState(defaults.patientId ?? patients[0]?.id ?? "");
+  const [patientId, setPatientId] = useState(initialPatient?.id ?? "");
   const [providerId, setProviderId] = useState(defaults.providerId ?? providers[0]?.id ?? "");
   const [dos, setDos] = useState(defaults.dos);
   const [pos, setPos] = useState("11");
@@ -70,11 +71,7 @@ export function ChargeEntryForm({
       {state && !state.ok && <Alert kind="error">{state.message}</Alert>}
       <div className="card grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Patient">
-          <select className="select" value={patientId} onChange={(e) => setPatientId(e.target.value)}>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <PatientPicker initial={initialPatient} onSelect={(p) => setPatientId(p?.id ?? "")} />
         </Field>
         <Field label="Rendering provider">
           <select className="select" value={providerId} onChange={(e) => setProviderId(e.target.value)}>
