@@ -49,9 +49,9 @@ export const TIERS: Tier[] = [
     forWho: "Growing and multi-specialty practices",
     summary:
       "Adds the denial and analytics layer, which is where the difference between billing and getting paid actually shows up.",
-    priceMonthly: null,
-    perClaimCents: null,
-    cta: "Get a quote",
+    priceMonthly: 149,
+    perClaimCents: 30,
+    cta: "Start with Professional",
     featured: true,
     highlights: [
       "Everything in Essentials",
