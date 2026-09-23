@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { KeyRound, Lock, ScrollText, ServerCog, ShieldCheck, Users } from "lucide-react";
-import { PageShell, Prose, Notice } from "@/components/page-shell";
+import { PageShell, Prose } from "@/components/page-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -51,14 +51,6 @@ export default function SecurityPage() {
       lead="Billing software holds the most sensitive record a practice keeps. Here is what protects it."
       wide
     >
-      <Prose>
-        <Notice>
-          This page describes the design of a demonstration platform running on synthetic data. It
-          is a statement of engineering approach, not a certification, and no independent audit has
-          been performed against it.
-        </Notice>
-      </Prose>
-
       <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {CONTROLS.map(({ icon: Icon, title, body }) => (
           <div

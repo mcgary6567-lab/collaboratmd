@@ -291,6 +291,24 @@ export const auditLog = pgTable("audit_log", {
   at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Messages from the public contact form.
+ *
+ * Not tenant-scoped: a visitor sending one has no account and belongs to no
+ * practice, so there is nothing to scope it by.
+ */
+export const contactMessages = pgTable("contact_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  organization: text("organization"),
+  topic: text("topic").notNull(),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("new"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ContactMessage = typeof contactMessages.$inferSelect;
 export type Practice = typeof practices.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Provider = typeof providers.$inferSelect;

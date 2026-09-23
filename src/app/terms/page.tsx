@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { PageShell, Prose, Notice } from "@/components/page-shell";
+import { PageShell, Prose } from "@/components/page-shell";
+import { COMPANY, addressLine } from "@/content/company";
 
 export const dynamic = "force-dynamic";
 
@@ -18,16 +19,10 @@ export default function TermsPage() {
       meta="Last updated September 23, 2026"
     >
       <Prose>
-        <Notice>
-          CollaboratMD is a demonstration platform running on synthetic data. These terms are a
-          working template for a product of this kind, not legal advice, and not an offer of
-          service. Have counsel review them before putting them in front of a customer.
-        </Notice>
-
         <h2>1. Agreement to these terms</h2>
         <p>
-          These Terms and Conditions govern access to and use of the CollaboratMD website and
-          platform. By creating an account, signing an order form or using the service, you agree to
+          These Terms and Conditions govern access to and use of the {COMPANY.legalName} website
+          and platform, operated by {COMPANY.legalName}, {addressLine()}. By creating an account, signing an order form or using the service, you agree to
           them. If you are agreeing on behalf of an organization, you confirm that you have the
           authority to bind it, and <strong>you</strong> then means that organization.
         </p>
@@ -145,10 +140,11 @@ export default function TermsPage() {
 
         <h2>15. Governing law and disputes</h2>
         <p>
-          These terms are governed by the laws of the State of Florida, without regard to its
-          conflict of laws rules. The parties will attempt to resolve any dispute in good faith for
-          30 days before starting proceedings, which will be brought in the state or federal courts
-          located in Orange County, Florida.
+          These terms are governed by the laws of the State of {COMPANY.jurisdiction.state},
+          without regard to its conflict of laws rules. The parties will attempt to resolve any
+          dispute in good faith for 30 days before starting proceedings, which will be brought in
+          the state or federal courts located in {COMPANY.jurisdiction.county},{" "}
+          {COMPANY.jurisdiction.state}.
         </p>
 
         <h2>16. General</h2>
@@ -162,7 +158,7 @@ export default function TermsPage() {
         <h2>17. Contact</h2>
         <p>
           Questions about these terms go to our legal team through the{" "}
-          <a href="/contact">contact page</a>.
+          <a href="/contact">contact page</a>, or by mail to {COMPANY.legalName}, {addressLine()}.
         </p>
       </Prose>
     </PageShell>

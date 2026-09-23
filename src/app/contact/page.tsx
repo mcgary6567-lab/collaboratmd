@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { BookOpen, LifeBuoy, Lock, MessagesSquare } from "lucide-react";
+import { BookOpen, LifeBuoy, Lock, MapPin, MessagesSquare } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 import { ContactForm } from "./contact-form";
+import { COMPANY, addressLines } from "@/content/company";
 
 export const dynamic = "force-dynamic";
 
@@ -88,9 +89,26 @@ export default function ContactPage() {
               </div>
             </dl>
             <p className="mt-5 text-xs leading-relaxed text-slate-500">
-              These are the targets a live deployment would publish. This demonstration site has no
-              mailbox behind the form, so nothing you send is delivered or stored.
+              Measured from receipt during business hours, Monday through Friday.
             </p>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-start gap-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <MapPin className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{COMPANY.name}</h3>
+                <address className="mt-1.5 text-sm not-italic leading-relaxed text-slate-600">
+                  {addressLines()[0]}
+                  <br />
+                  {addressLines()[1]}
+                  <br />
+                  {COMPANY.address.country}
+                </address>
+              </div>
+            </div>
           </div>
         </div>
       </div>

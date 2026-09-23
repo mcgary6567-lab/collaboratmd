@@ -121,7 +121,9 @@ export default async function LandingPage() {
               </a>
             </div>
             <p className="mt-5 text-sm text-slate-500">
-              Sign in with <span className="font-mono text-slate-700">admin@collaboratmd.local</span> / <span className="font-mono text-slate-700">admin123</span>
+              Open the demo environment with{" "}
+              <span className="font-mono text-slate-700">admin@collaboratmd.local</span> /{" "}
+              <span className="font-mono text-slate-700">admin123</span>
             </p>
           </div>
 
@@ -156,18 +158,23 @@ export default async function LandingPage() {
 
       {/* -------------------------------------------------------- stats */}
       <section className="border-y border-slate-200 bg-slate-50">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-6 py-12 lg:grid-cols-4">
+        <div className="mx-auto max-w-7xl px-6 py-12">
+          <p className="text-xs font-bold uppercase tracking-widest text-green-600">
+            Inside the live demo environment
+          </p>
+          <div className="mt-6 grid grid-cols-2 gap-8 lg:grid-cols-4">
           {[
-            { value: "$60M", label: "Billed charges in the demo practice" },
+            { value: "$62.7M", label: "Billed charges carried in the ledger" },
             { value: "100", label: "Providers across 26 specialties" },
             { value: "15,000", label: "Patients in 50 metro areas" },
-            { value: "100k", label: "Claims through the full lifecycle" },
+            { value: "105k", label: "Claims through the full lifecycle" },
           ].map((s) => (
             <div key={s.label}>
               <div className="text-3xl font-extrabold tracking-tight text-slate-900 lg:text-4xl">{s.value}</div>
               <div className="mt-1.5 text-sm leading-snug text-slate-600">{s.label}</div>
             </div>
           ))}
+          </div>
         </div>
       </section>
 

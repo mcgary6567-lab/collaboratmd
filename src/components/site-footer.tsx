@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { COMPANY, addressLines } from "@/content/company";
 
 /**
  * Brand glyphs are drawn here rather than pulled from the icon set: the icon
@@ -30,7 +31,7 @@ const PRODUCT = [
   { href: "/login", label: "Live demo" },
 ];
 
-const COMPANY = [
+const COMPANY_LINKS = [
   { href: "/about", label: "About" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
@@ -44,9 +45,9 @@ const LEGAL = [
 ];
 
 /**
- * The social links point at the platforms themselves. This is a demonstration
- * product with no accounts of its own, and inventing profile URLs would send
- * people somewhere that does not represent it.
+ * Replace these with the company profiles once the accounts exist. They point
+ * at the platforms themselves for now, because a wrong handle sends visitors
+ * to somebody else's page.
  */
 const SOCIAL = [
   { href: "https://www.facebook.com/", label: "Facebook", Icon: FacebookIcon },
@@ -82,6 +83,11 @@ export function SiteFooter() {
               charge capture, claim scrubbing, electronic submission, remittance posting, denial
               management and patient billing in one system.
             </p>
+            <address className="mt-4 text-sm not-italic leading-relaxed text-slate-600">
+              {addressLines()[0]}
+              <br />
+              {addressLines()[1]}
+            </address>
             <div className="mt-5 flex items-center gap-2.5">
               {SOCIAL.map(({ href, label, Icon }) => (
                 <a
@@ -99,14 +105,13 @@ export function SiteFooter() {
           </div>
 
           <Column title="Product" links={PRODUCT} />
-          <Column title="Company" links={COMPANY} />
+          <Column title="Company" links={COMPANY_LINKS} />
           <Column title="Legal" links={LEGAL} />
         </div>
 
         <div className="mt-12 flex flex-col gap-4 border-t border-slate-200 pt-7 sm:flex-row sm:items-center">
           <p className="text-sm text-slate-500">
-            © {new Date().getFullYear()} CollaboratMD. A demonstration platform running on synthetic
-            data. Not for real patient information.
+            © {new Date().getFullYear()} {COMPANY.legalName}. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm font-medium text-slate-600 sm:ml-auto">
             <Link href="/login" className="hover:text-green-700">Sign in</Link>

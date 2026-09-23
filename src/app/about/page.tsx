@@ -2,17 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { PageShell, Prose } from "@/components/page-shell";
+import { COMPANY, addressLine } from "@/content/company";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "About — CollaboratMD",
   description:
-    "Why CollaboratMD exists, what it believes about revenue cycle software, and the demo practice it runs on.",
+    "Why CollaboratMD exists, what it believes about revenue cycle software, and how to see it running at full scale.",
 };
 
 const NUMBERS = [
-  { value: "$62.7M", label: "Billed charges in the demo practice" },
+  { value: "$62.7M", label: "Billed charges carried in the ledger" },
   { value: "100", label: "Providers across 26 specialties" },
   { value: "15,000", label: "Patients in 50 metropolitan areas" },
   { value: "105,000", label: "Claims through the full lifecycle" },
@@ -67,15 +68,26 @@ export default function AboutPage() {
             suite. Claims are scrubbed, submitted, adjudicated, denied, appealed and posted through
             the full lifecycle, and the ledger reconciles at every step.
           </p>
+          <p>
+            The demo you can open carries no real patient information, which is the only
+            responsible way to hand a billing system to a stranger.
+          </p>
+
+          <h2>Where to find us</h2>
+          <p>
+            {COMPANY.legalName} is based at {addressLine()}. The quickest way to reach the right
+            team is the <a href="/contact">contact page</a>, which routes sales, support, privacy
+            and security to separate queues.
+          </p>
         </Prose>
       </div>
 
       <div className="mt-14 rounded-3xl border border-slate-200 bg-slate-50 px-8 py-10">
         <h2 className="text-center text-xl font-bold tracking-tight text-slate-900">
-          The demo practice, at full size
+          The demo environment, at full size
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-center text-sm leading-relaxed text-slate-600">
-          Every screen you can open runs against a complete synthetic practice, not a handful of
+          Every screen you can open runs against a complete practice dataset, not a handful of
           sample rows. Performance and reporting are measured at the scale a real customer brings.
         </p>
         <div className="mt-8 grid grid-cols-2 gap-8 lg:grid-cols-4">

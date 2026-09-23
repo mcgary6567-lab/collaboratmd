@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { PageShell, Prose, Notice } from "@/components/page-shell";
+import { PageShell, Prose } from "@/components/page-shell";
+import { COMPANY, addressLine } from "@/content/company";
 
 export const dynamic = "force-dynamic";
 
@@ -28,12 +29,6 @@ export default function GdprPage() {
       meta="Last updated September 23, 2026"
     >
       <Prose>
-        <Notice>
-          CollaboratMD is a demonstration platform running on synthetic data, so no personal data of
-          a real data subject is processed here. This page is a working template describing how a
-          product of this kind meets the Regulation. It is not legal advice.
-        </Notice>
-
         <h2>1. Controller and processor</h2>
         <p>
           Where a practice uses the platform to bill for care, the practice is the{" "}
@@ -128,9 +123,10 @@ export default function GdprPage() {
           <h2>8. Contact and complaints</h2>
           <p>
             Reach our data protection contact through the <a href="/contact">contact page</a>,
-            selecting the privacy topic. You also have the right to lodge a complaint with your
-            local supervisory authority, and we would ask that you raise the matter with us first so
-            we have the chance to put it right.
+            selecting the privacy topic, or by mail to {COMPANY.legalName}, {addressLine()}. You
+            also have the right to lodge a complaint with your local supervisory authority, and we
+            would ask that you raise the matter with us first so we have the chance to put it
+            right.
           </p>
         </Prose>
       </div>

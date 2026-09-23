@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { PageShell, Prose, Notice } from "@/components/page-shell";
+import { PageShell, Prose } from "@/components/page-shell";
+import { COMPANY, addressLine } from "@/content/company";
 
 export const dynamic = "force-dynamic";
 
@@ -18,19 +19,12 @@ export default function PrivacyPage() {
       meta="Last updated September 23, 2026"
     >
       <Prose>
-        <Notice>
-          CollaboratMD is a demonstration platform. It runs entirely on synthetic records and holds
-          no real patient information. This policy is written as a working template for a product of
-          this kind. It is not legal advice, and a practice deploying the software should have
-          counsel review it before publication.
-        </Notice>
-
         <h2>1. Who we are</h2>
         <p>
-          CollaboratMD provides revenue cycle management software to medical practices and the
-          billing companies that serve them. Throughout this policy, <strong>we</strong> means
-          CollaboratMD, and <strong>you</strong> means a person who visits this website or uses the
-          platform.
+          {COMPANY.legalName} provides revenue cycle management software to medical practices and
+          the billing companies that serve them. Our office is at {addressLine()}. Throughout this
+          policy, <strong>we</strong> means {COMPANY.legalName}, and <strong>you</strong> means a
+          person who visits this website or uses the platform.
         </p>
         <p>
           When a practice uses the platform to bill for care, that practice is the covered entity
@@ -142,8 +136,9 @@ export default function PrivacyPage() {
 
         <h2>11. Contact us</h2>
         <p>
-          Write to our privacy team through the <a href="/contact">contact page</a>. We answer
-          privacy requests within 30 days, and we will tell you if we need longer.
+          Write to our privacy team through the <a href="/contact">contact page</a>, or by mail to{" "}
+          {COMPANY.legalName}, {addressLine()}. We answer privacy requests within 30 days, and we
+          will tell you if we need longer.
         </p>
       </Prose>
     </PageShell>
