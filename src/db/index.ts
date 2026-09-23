@@ -17,7 +17,7 @@ type Runner = {
   shared: boolean;
 };
 
-const globalRef = globalThis as unknown as { __medbillDb?: Promise<Runner> };
+const globalRef = globalThis as unknown as { __collaboratmdDb?: Promise<Runner> };
 
 const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
@@ -44,7 +44,7 @@ async function connect(): Promise<Runner> {
     // process down. The pool discards the dead client and the next query
     // opens a fresh one, so logging is the correct response.
     pool.on("error", (err) => {
-      console.error(`[medbill] idle Postgres client error: ${err.message}`);
+      console.error(`[collaboratmd] idle Postgres client error: ${err.message}`);
     });
     return { db: drizzlePg({ client: pool, schema }), exec: async (sql) => void (await pool.query(sql)), shared: true };
   }
@@ -154,13 +154,13 @@ async function bootstrap(): Promise<Runner> {
 
 /** Singleton database handle (survives Next.js HMR and warm instances). */
 export async function getDb(): Promise<Db> {
-  if (!globalRef.__medbillDb) {
-    globalRef.__medbillDb = bootstrap().catch((err) => {
-      globalRef.__medbillDb = undefined;
+  if (!globalRef.__collaboratmdDb) {
+    globalRef.__collaboratmdDb = bootstrap().catch((err) => {
+      globalRef.__collaboratmdDb = undefined;
       throw err;
     });
   }
-  return (await globalRef.__medbillDb).db;
+  return (await globalRef.__collaboratmdDb).db;
 }
 
 export { schema };

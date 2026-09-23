@@ -5,9 +5,9 @@ import { buildEdi835, parseEdi835 } from "./x835";
 describe("837P generator", () => {
   it("produces a well-formed interchange with claim and service lines", () => {
     const edi = buildEdi837P({
-      controlNumber: "MB000001",
+      controlNumber: "CMD000001",
       interchangeControl: "123456789",
-      senderId: "MEDBILL",
+      senderId: "COLLABORATMD",
       receiverId: "00590",
       now: new Date("2026-09-21T14:30:00Z"),
       billingProvider: { name: "Lakeside Family Medicine", npi: "1234567893", taxId: "12-3456789", address1: "410 Lakeside Ave", city: "Orlando", state: "FL", zip: "32801" },
@@ -23,7 +23,7 @@ describe("837P generator", () => {
     const segs = edi.split("~").map((s) => s.trim()).filter(Boolean);
     expect(segs[0].startsWith("ISA*00*")).toBe(true);
     expect(edi).toContain("ST*837*0001*005010X222A1");
-    expect(edi).toContain("CLM*MB000001*210.00***11:B:1*Y*A*Y*Y");
+    expect(edi).toContain("CLM*CMD000001*210.00***11:B:1*Y*A*Y*Y");
     expect(edi).toContain("HI*ABK:E119*ABF:I10");
     expect(edi).toContain("SV1*HC:99214:25*195.00*UN*1***1:2");
     // NM105-NM107 (middle, prefix, suffix) are empty, so four separators precede the MI qualifier.
@@ -47,7 +47,7 @@ describe("835 round trip", () => {
       paymentDate: new Date("2026-09-20T00:00:00Z"),
       claims: [
         {
-          patientControlNumber: "MB000001",
+          patientControlNumber: "CMD000001",
           payerClaimNumber: "PCN1",
           statusCode: "1",
           chargedCents: 21000,
@@ -59,7 +59,7 @@ describe("835 round trip", () => {
             { cpt: "36415", chargedCents: 1500, paidCents: 1000, units: 1, adjustments: [{ group: "CO", reason: "45", amountCents: 500 }] },
           ],
         },
-        { patientControlNumber: "MB000002", payerClaimNumber: "PCN2", statusCode: "4", chargedCents: 15000, paidCents: 0, patientResponsibilityCents: 0, adjustments: [{ group: "CO", reason: "197", amountCents: 15000 }], remarks: ["N54"], lines: [] },
+        { patientControlNumber: "CMD000002", payerClaimNumber: "PCN2", statusCode: "4", chargedCents: 15000, paidCents: 0, patientResponsibilityCents: 0, adjustments: [{ group: "CO", reason: "197", amountCents: 15000 }], remarks: ["N54"], lines: [] },
       ],
     });
     const remit = parseEdi835(raw);

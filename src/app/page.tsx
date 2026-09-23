@@ -6,11 +6,12 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { AppMockup } from "@/components/app-mockup";
+import { Logo } from "@/components/logo";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "MedBill RCM — Medical billing and revenue cycle management",
+  title: "CollaboratMD — Medical billing and revenue cycle management",
   description:
     "Get paid faster with fewer denials. Eligibility, claim scrubbing, X12 837 and 835, denial management, patient payments and analytics in one platform.",
 };
@@ -80,9 +81,8 @@ export default async function LandingPage() {
       {/* ---------------------------------------------------------- nav */}
       <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <nav className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-lg font-black text-white">M</span>
-            <span className="text-[15px] font-bold tracking-tight text-slate-900">MedBill RCM</span>
+          <Link href="/">
+            <Logo id="cmd-nav" />
           </Link>
           <div className="hidden items-center gap-7 text-sm font-medium text-slate-600 lg:flex">
             <a href="#platform" className="hover:text-slate-900">Platform</a>
@@ -147,7 +147,7 @@ export default async function LandingPage() {
               </a>
             </div>
             <p className="mt-5 text-sm text-slate-500">
-              Sign in with <span className="font-mono text-slate-700">admin@medbill.local</span> / <span className="font-mono text-slate-700">admin123</span>
+              Sign in with <span className="font-mono text-slate-700">admin@collaboratmd.local</span> / <span className="font-mono text-slate-700">admin123</span>
             </p>
           </div>
 
@@ -362,10 +362,7 @@ export default async function LandingPage() {
       {/* ------------------------------------------------------- footer */}
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-600 text-sm font-black text-white">M</span>
-            <span className="text-sm font-bold text-slate-900">MedBill RCM</span>
-          </div>
+          <Logo id="cmd-footer" markClassName="h-8 w-8" textClassName="text-sm" />
           <p className="text-sm text-slate-500 sm:ml-6">
             A demonstration platform with synthetic data. Not for real patient information.
           </p>

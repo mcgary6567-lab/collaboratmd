@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 
-const COOKIE = "medbill_session";
+const COOKIE = "collaboratmd_session";
 
 /**
  * Key used to sign session tokens.

@@ -90,7 +90,7 @@ function daysAgoDate(n: number): string {
 
 /** Populates a freshly truncated database with a realistic demo practice. */
 export async function seedDemoData(db: Db) {
-  console.log("[medbill] Seeding demo data...");
+  console.log("[collaboratmd] Seeding demo data...");
 
   const [practice] = await db
     .insert(schema.practices)
@@ -98,9 +98,9 @@ export async function seedDemoData(db: Db) {
     .returning();
 
   await db.insert(schema.users).values([
-    { practiceId: practice.id, email: "admin@medbill.local", passwordHash: await bcrypt.hash("admin123", 10), name: "Alex Rivera", role: "admin" },
-    { practiceId: practice.id, email: "biller@medbill.local", passwordHash: await bcrypt.hash("biller123", 10), name: "Jordan Lee", role: "biller" },
-    { practiceId: practice.id, email: "frontdesk@medbill.local", passwordHash: await bcrypt.hash("front123", 10), name: "Sam Ortiz", role: "front_desk" },
+    { practiceId: practice.id, email: "admin@collaboratmd.local", passwordHash: await bcrypt.hash("admin123", 10), name: "Alex Rivera", role: "admin" },
+    { practiceId: practice.id, email: "biller@collaboratmd.local", passwordHash: await bcrypt.hash("biller123", 10), name: "Jordan Lee", role: "biller" },
+    { practiceId: practice.id, email: "frontdesk@collaboratmd.local", passwordHash: await bcrypt.hash("front123", 10), name: "Sam Ortiz", role: "front_desk" },
   ]);
   const [admin] = await db.select().from(schema.users).limit(1);
 
@@ -238,5 +238,5 @@ export async function seedDemoData(db: Db) {
   await db.execute(sql`UPDATE claim_events ev SET at = c.created_at + (interval '1 hour' * (SELECT count(*) FROM claim_events x WHERE x.claim_id = ev.claim_id AND x.at <= ev.at)) FROM claims c WHERE c.id = ev.claim_id`);
   await db.execute(sql`UPDATE denials d SET created_at = c.created_at + interval '19 day' FROM claims c WHERE c.id = d.claim_id`);
   await db.execute(sql`UPDATE remittances SET received_at = now() - interval '2 day'`);
-  console.log("[medbill] Seed complete.");
+  console.log("[collaboratmd] Seed complete.");
 }

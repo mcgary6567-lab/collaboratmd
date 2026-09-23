@@ -40,7 +40,7 @@ describe("MockClearinghouse adjudication", () => {
 
   it("balances each paid claim: charged = paid + adjustments", async () => {
     const raw = await ch.fetch835([
-      { controlNumber: "MB000001", payerName: "Aetna", payerId: "60054", memberId: "AE100001A", lines: [{ cpt: "99213", units: 1, chargeCents: 13500 }] },
+      { controlNumber: "CMD000001", payerName: "Aetna", payerId: "60054", memberId: "AE100001A", lines: [{ cpt: "99213", units: 1, chargeCents: 13500 }] },
     ]);
     const [claim] = parseEdi835(raw!).claims;
     const adjustments = claim.lines.flatMap((l) => l.adjustments).reduce((a, x) => a + x.amountCents, 0);
@@ -49,17 +49,17 @@ describe("MockClearinghouse adjudication", () => {
   });
 
   it("denies claims whose member ID ends in D and pays a typical one", async () => {
-    const denied = parseEdi835((await ch.fetch835([{ controlNumber: "MB000002", payerName: "Cigna", payerId: "62308", memberId: "CI200002D", lines: [{ cpt: "90834", units: 1, chargeCents: 15000 }] }]))!).claims[0];
+    const denied = parseEdi835((await ch.fetch835([{ controlNumber: "CMD000002", payerName: "Cigna", payerId: "62308", memberId: "CI200002D", lines: [{ cpt: "90834", units: 1, chargeCents: 15000 }] }]))!).claims[0];
     expect(denied.statusCode).toBe("4");
     expect(denied.paidCents).toBe(0);
     expect(denied.adjustments[0].group).toBe("CO");
   });
 
   it("rejects submissions with an invalid subscriber ID and accepts valid ones", async () => {
-    const bad = await ch.submit837("ISA*00*~CLM*MB1*100.00~", { controlNumber: "MB1", memberId: "BC123X" });
+    const bad = await ch.submit837("ISA*00*~CLM*CMD1*100.00~", { controlNumber: "CMD1", memberId: "BC123X" });
     expect(bad.accepted).toBe(false);
     expect(bad.rejectionCode).toBe("A7:164:IL");
-    const good = await ch.submit837("ISA*00*~CLM*MB2*100.00~", { controlNumber: "MB2", memberId: "BC123A" });
+    const good = await ch.submit837("ISA*00*~CLM*CMD2*100.00~", { controlNumber: "CMD2", memberId: "BC123A" });
     expect(good.accepted).toBe(true);
   });
 

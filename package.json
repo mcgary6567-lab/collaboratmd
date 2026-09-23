@@ -1,8 +1,8 @@
 {
-  "name": "medbill-rcm",
+  "name": "collaboratmd",
   "version": "0.1.0",
   "private": true,
-  "description": "MedBill RCM - cloud medical billing and revenue cycle management platform",
+  "description": "CollaboratMD - cloud medical billing and revenue cycle management platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

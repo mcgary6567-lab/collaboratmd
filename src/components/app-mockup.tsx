@@ -6,6 +6,8 @@
  * stale against a rebuild. The figures mirror the seeded demo practice.
  */
 
+import { LogoMark } from "@/components/logo";
+
 const CHARGES = [2.42, 2.55, 2.61, 2.48, 2.72, 2.66, 2.81, 2.74, 2.62, 2.7, 2.58, 2.47];
 const COLLECTIONS = [1.52, 1.63, 1.71, 1.6, 1.79, 1.74, 1.86, 1.81, 1.72, 1.78, 1.69, 1.61];
 
@@ -63,7 +65,7 @@ export function AppMockup() {
         <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
         <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
         <div className="ml-3 flex-1 truncate rounded-md bg-white px-3 py-1 text-[11px] text-slate-400 ring-1 ring-slate-200">
-          medbill-rcm.app/admin
+          collaboratmd.app/admin
         </div>
       </div>
 
@@ -71,8 +73,8 @@ export function AppMockup() {
         {/* Sidebar */}
         <aside className="hidden w-44 shrink-0 border-r border-slate-200 bg-white py-3 sm:block">
           <div className="mb-3 flex items-center gap-2 px-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-600 text-xs font-black text-white">M</span>
-            <span className="text-[11px] font-bold text-slate-800">MedBill RCM</span>
+            <LogoMark className="h-7 w-7" id="cmd-mockup" />
+            <span className="text-[11px] font-bold text-slate-800">CollaboratMD</span>
           </div>
           <ul className="space-y-0.5 px-2">
             {NAV.map((item, i) => (

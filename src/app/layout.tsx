@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MedBill RCM",
+  title: "CollaboratMD",
   description: "Cloud medical billing and revenue cycle management",
 };
 

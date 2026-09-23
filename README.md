@@ -1,4 +1,4 @@
-# MedBill RCM
+# CollaboratMD
 
 **Deployment:** https://medbill-rcm.vercel.app, running on Vercel against a Neon
 Postgres database.
@@ -9,8 +9,8 @@ access to the project; anonymous visitors are redirected to Vercel. To view it,
 either sign in to Vercel, or create a Shareable Link from the deployment page
 to give someone access without adding them to the project.
 
-Once past that, the app's own demo accounts are `admin@medbill.local` /
-`admin123`, `biller@medbill.local` / `biller123`, and `frontdesk@medbill.local`
+Once past that, the app's own demo accounts are `admin@collaboratmd.local` /
+`admin123`, `biller@collaboratmd.local` / `biller123`, and `frontdesk@collaboratmd.local`
 / `front123`. The data is synthetic.
 
 A cloud medical billing and revenue cycle management (RCM) web application. It covers the whole money path a medical practice walks every day:
@@ -60,9 +60,9 @@ Sign in with any of:
 
 | Email | Password | Role |
 |---|---|---|
-| admin@medbill.local | admin123 | admin |
-| biller@medbill.local | biller123 | biller |
-| frontdesk@medbill.local | front123 | front desk |
+| admin@collaboratmd.local | admin123 | admin |
+| biller@collaboratmd.local | biller123 | biller |
+| frontdesk@collaboratmd.local | front123 | front desk |
 
 ```bash
 npm test        # scrub-rule, EDI round-trip, clearinghouse and migration tests

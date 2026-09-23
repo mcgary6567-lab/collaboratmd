@@ -53,7 +53,7 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
   const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(claims).where(eq(claims.practiceId, practiceId));
-  return "MB" + String(Number(n) + 1).padStart(6, "0");
+  return "CMD" + String(Number(n) + 1).padStart(6, "0");
 }
 
 /** Builds a claim from an encounter, runs the scrubber, and posts the charge ledger entries. */
@@ -120,7 +120,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
   const edi = buildEdi837P({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
-    senderId: "MEDBILL",
+    senderId: "COLLABORATMD",
     receiverId: bundle.payer.payerId,
     now,
     billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip },

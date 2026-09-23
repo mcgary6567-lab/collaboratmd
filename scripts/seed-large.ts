@@ -140,9 +140,9 @@ async function main() {
   ]]);
 
   const users: unknown[][] = [
-    [crypto.randomUUID(), practiceId, "admin@medbill.local", await bcrypt.hash("admin123", 10), "Alex Rivera", "admin"],
-    [crypto.randomUUID(), practiceId, "biller@medbill.local", await bcrypt.hash("biller123", 10), "Jordan Lee", "biller"],
-    [crypto.randomUUID(), practiceId, "frontdesk@medbill.local", await bcrypt.hash("front123", 10), "Sam Ortiz", "front_desk"],
+    [crypto.randomUUID(), practiceId, "admin@collaboratmd.local", await bcrypt.hash("admin123", 10), "Alex Rivera", "admin"],
+    [crypto.randomUUID(), practiceId, "biller@collaboratmd.local", await bcrypt.hash("biller123", 10), "Jordan Lee", "biller"],
+    [crypto.randomUUID(), practiceId, "frontdesk@collaboratmd.local", await bcrypt.hash("front123", 10), "Sam Ortiz", "front_desk"],
   ];
   await insertBatched("users", ["id", "practice_id", "email", "password_hash", "name", "role"], users);
   const adminId = users[0][0] as string;
@@ -362,7 +362,7 @@ async function main() {
       const adjudicated = lifecycle === "paid" || lifecycle === "denied";
       clmRows.push([
         claimId, practiceId, encId, patientId, payerRows[payerIdx][0], insuranceId,
-        "MB" + pad(++claimNo, 8), adjudicated ? "PCN" + pad(int(100000, 999999), 6) : null,
+        "CMD" + pad(++claimNo, 8), adjudicated ? "PCN" + pad(int(100000, 999999), 6) : null,
         "1", status, claimTotal, JSON.stringify(status === "scrub_errors"
           ? [{ rule: "PAT_ADDRESS", severity: "error", message: "Subscriber address is incomplete", field: "patient.address1" }]
           : []),

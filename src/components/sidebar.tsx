@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoMark } from "@/components/logo";
 
 const NAV = [
   { href: "/dashboard", label: "My work", icon: LayoutDashboard },
@@ -23,9 +24,9 @@ export function Sidebar({ user, logout }: { user: { name: string; role: string }
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-black text-white">M</div>
+        <LogoMark className="h-9 w-9" id="cmd-sidebar" />
         <div>
-          <div className="text-sm font-bold leading-tight">MedBill RCM</div>
+          <div className="text-sm font-bold leading-tight">CollaboratMD</div>
           <div className="text-[11px] text-slate-500">Revenue cycle platform</div>
         </div>
       </div>

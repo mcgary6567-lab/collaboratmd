@@ -53,9 +53,9 @@ describe("connection settings", () => {
   it("requires TLS for managed providers and not for local servers", () => {
     expect(needsSsl("postgres://u:p@ep-cool-name.us-east-2.aws.neon.tech/db")).toBe(true);
     expect(needsSsl("postgres://u:p@db.abcdefgh.supabase.co:5432/postgres")).toBe(true);
-    expect(needsSsl("postgres://u:p@localhost:5432/medbill")).toBe(false);
-    expect(needsSsl("postgres://u:p@127.0.0.1:5432/medbill")).toBe(false);
-    expect(needsSsl("postgres://u:p@db.example.com/medbill?sslmode=disable")).toBe(false);
+    expect(needsSsl("postgres://u:p@localhost:5432/collaboratmd")).toBe(false);
+    expect(needsSsl("postgres://u:p@127.0.0.1:5432/collaboratmd")).toBe(false);
+    expect(needsSsl("postgres://u:p@db.example.com/collaboratmd?sslmode=disable")).toBe(false);
   });
 
   it("uses a single connection per serverless instance", () => {

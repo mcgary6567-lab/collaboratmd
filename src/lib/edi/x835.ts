@@ -185,15 +185,15 @@ export function buildEdi835(input: {
   const d8 = input.paymentDate.toISOString().slice(0, 10).replace(/-/g, "");
   const total = input.claims.reduce((a, c) => a + c.paidCents, 0);
   const s: string[][] = [];
-  s.push(["ISA", "00", " ".repeat(10), "00", " ".repeat(10), "ZZ", input.payerId.padEnd(15), "ZZ", "MEDBILL".padEnd(15), d8.slice(2), "1200", "^", "00501", "000000001", "0", "P", ":"]);
-  s.push(["GS", "HP", input.payerId, "MEDBILL", d8, "1200", "1", "X", "005010X221A1"]);
+  s.push(["ISA", "00", " ".repeat(10), "00", " ".repeat(10), "ZZ", input.payerId.padEnd(15), "ZZ", "COLLABORATMD".padEnd(15), d8.slice(2), "1200", "^", "00501", "000000001", "0", "P", ":"]);
+  s.push(["GS", "HP", input.payerId, "COLLABORATMD", d8, "1200", "1", "X", "005010X221A1"]);
   s.push(["ST", "835", "0001"]);
   s.push(["BPR", "I", money(total), "C", "ACH", "CCP", "01", "999999999", "DA", "123456", "1234567890", "", "01", "999999999", "DA", "654321", d8]);
   s.push(["TRN", "1", input.checkNumber, "1" + input.payerId.padStart(9, "0").slice(-9)]);
   s.push(["DTM", "405", d8]);
   s.push(["N1", "PR", input.payerName]);
   s.push(["REF", "2U", input.payerId]);
-  s.push(["N1", "PE", "MEDBILL PRACTICE", "XX", "1234567893"]);
+  s.push(["N1", "PE", "COLLABORATMD PRACTICE", "XX", "1234567893"]);
   s.push(["LX", "1"]);
   const cas = (a: Adjustment[]) => {
     const grouped = new Map<string, Adjustment[]>();
