@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TIERS, MATRIX, FAQ } from "@/content/pricing";
 import { PlanCards } from "./plan-cards";
+import { Faq } from "@/components/faq";
 
 export const dynamic = "force-dynamic";
 
@@ -166,14 +167,12 @@ export default async function PricingPage() {
         <h2 className="text-center text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
           Questions worth asking
         </h2>
-        <dl className="mt-12 space-y-8">
-          {FAQ.map(({ q, a }) => (
-            <div key={q} className="border-l-4 border-green-600 pl-6">
-              <dt className="text-base font-bold text-slate-900">{q}</dt>
-              <dd className="mt-2 text-[15px] leading-relaxed text-slate-600">{a}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className="mx-auto mt-4 max-w-xl text-center text-[15px] leading-relaxed text-slate-600">
+          The ones a practice asks before it moves a billing system.
+        </p>
+        <div className="mt-10">
+          <Faq items={FAQ} />
+        </div>
       </section>
 
       {/* -------------------------------------------------------------- cta */}
