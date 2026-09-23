@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, ChevronDown } from "lucide-react";
 import {
   TIERS,
   ANNUAL_FREE_MONTHS,
@@ -14,6 +14,11 @@ const usdCents = (v: number) =>
 
 /**
  * Condensed pricing for the landing page.
+ *
+ * Each card collapses its feature list, not the section: the prices are the
+ * one thing this section exists to show, so hiding them behind a toggle would
+ * defeat the point. Name, audience and price stay visible, and the plan a
+ * visitor is weighing opens on click. The recommended plan opens by default.
  *
  * Reads the same tier data the pricing page does, so a price change lands in
  * both places at once. Deliberately has no billing toggle: the landing page is
@@ -42,7 +47,7 @@ export function PricingTeaser() {
           {TIERS.map((tier) => (
             <div
               key={tier.id}
-              className={`relative flex flex-col rounded-2xl border bg-white p-7 transition-shadow hover:shadow-lg hover:shadow-slate-900/5 ${
+              className={`relative self-start rounded-2xl border bg-white p-7 transition-shadow hover:shadow-lg hover:shadow-slate-900/5 ${
                 tier.featured ? "border-green-600 shadow-lg shadow-green-900/5" : "border-slate-200"
               }`}
             >
@@ -93,14 +98,22 @@ export function PricingTeaser() {
                 )}
               </div>
 
-              <ul className="mt-6 space-y-2.5 border-t border-slate-100 pt-6">
-                {tier.highlights.slice(0, 4).map((h) => (
-                  <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" strokeWidth={3} />
-                    {h}
-                  </li>
-                ))}
-              </ul>
+              <details open={tier.featured} className="group/d mt-6 border-t border-slate-100 pt-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-1 text-sm font-semibold text-slate-700 transition-colors hover:text-green-700 [&::-webkit-details-marker]:hidden">
+                  What&apos;s included
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors group-open/d:bg-green-600 group-open/d:text-white">
+                    <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-open/d:rotate-180" />
+                  </span>
+                </summary>
+                <ul className="mt-4 space-y-2.5">
+                  {tier.highlights.map((h) => (
+                    <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" strokeWidth={3} />
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           ))}
         </div>
