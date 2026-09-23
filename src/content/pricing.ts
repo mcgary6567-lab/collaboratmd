@@ -1,13 +1,13 @@
 /**
  * Pricing content.
  *
- * `priceMonthly` and `perClaimCents` are null until the real figures are set.
- * A null renders as a quote request rather than a number, because a published
- * price is a commitment a prospect can hold you to, and inventing one would
- * put a figure on the site that nobody in the company had agreed to.
+ * A price here is a public commitment a prospect can hold the company to, so
+ * every figure in this file came from the company rather than from a guess.
+ * Setting either field back to null returns that plan to a quote request.
  *
- * To publish a price, set the value and the page updates itself. Nothing else
- * has to change.
+ * The per-claim rate is the same on all three plans: it covers a clearinghouse
+ * transaction, which costs the same whoever sends it. The plans differ on the
+ * subscription, which is what the feature matrix reflects.
  */
 
 export type Tier = {
@@ -31,9 +31,9 @@ export const TIERS: Tier[] = [
     forWho: "Independent practices, 1 to 5 providers",
     summary:
       "Everything needed to get a clean claim out the door and post the remittance that comes back.",
-    priceMonthly: null,
-    perClaimCents: null,
-    cta: "Get a quote",
+    priceMonthly: 99,
+    perClaimCents: 30,
+    cta: "Start with Essentials",
     highlights: [
       "Scheduling and real-time eligibility",
       "Charge capture with fee-schedule pricing",
@@ -69,8 +69,8 @@ export const TIERS: Tier[] = [
     forWho: "Billing companies managing multiple practices",
     summary:
       "Runs many practices side by side, with the reporting and access control that requires.",
-    priceMonthly: null,
-    perClaimCents: null,
+    priceMonthly: 199,
+    perClaimCents: 30,
     cta: "Talk to sales",
     highlights: [
       "Everything in Professional",
