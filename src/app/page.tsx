@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { AppMockup } from "@/components/app-mockup";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { PricingTeaser } from "@/components/pricing-teaser";
 
 export const dynamic = "force-dynamic";
 
@@ -282,6 +283,8 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      <PricingTeaser />
 
       {/* ---------------------------------------------------- standards */}
       <section id="standards" className="border-t border-slate-200 bg-slate-900 py-20 text-white lg:py-28">
