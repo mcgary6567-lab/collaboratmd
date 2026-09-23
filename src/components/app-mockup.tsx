@@ -33,20 +33,20 @@ const collectionsPath = curve(COLLECTIONS);
 
 /** Donut segments for payer mix. */
 const MIX = [
-  { label: "Medicare", pct: 36, color: "#2563eb" },
-  { label: "Medicaid", pct: 13, color: "#0ea5e9" },
-  { label: "UnitedHealthcare", pct: 12, color: "#14b8a6" },
-  { label: "Aetna", pct: 10, color: "#22c55e" },
+  { label: "Medicare", pct: 36, color: "#15803d" },
+  { label: "Medicaid", pct: 13, color: "#22c55e" },
+  { label: "UnitedHealthcare", pct: 12, color: "#4ade80" },
+  { label: "Aetna", pct: 10, color: "#14b8a6" },
   { label: "Cigna", pct: 8, color: "#84cc16" },
-  { label: "Anthem", pct: 7, color: "#eab308" },
-  { label: "Other", pct: 14, color: "#f97316" },
+  { label: "Anthem", pct: 7, color: "#a3e635" },
+  { label: "Other", pct: 14, color: "#cbd5e1" },
 ];
 
 const KPIS = [
-  { label: "Charges", value: "$30.0M", tone: "text-slate-900", dot: "bg-slate-300" },
-  { label: "Collections", value: "$19.8M", tone: "text-green-700", dot: "bg-green-500" },
-  { label: "Days in A/R", value: "25", tone: "text-green-700", dot: "bg-green-500" },
-  { label: "Denial rate", value: "6.3%", tone: "text-amber-700", dot: "bg-amber-500" },
+  { label: "Charges", value: "$31.4M", tone: "text-slate-900", dot: "bg-slate-300" },
+  { label: "Collections", value: "$21.6M", tone: "text-green-700", dot: "bg-green-500" },
+  { label: "Days in A/R", value: "23", tone: "text-green-700", dot: "bg-green-500" },
+  { label: "Net collection", value: "97.6%", tone: "text-green-700", dot: "bg-green-500" },
 ];
 
 const NAV = ["My work", "Practice analytics", "Scheduling", "Patients", "Claims", "Remittance", "Denials", "Reports"];
@@ -71,7 +71,7 @@ export function AppMockup() {
         {/* Sidebar */}
         <aside className="hidden w-44 shrink-0 border-r border-slate-200 bg-white py-3 sm:block">
           <div className="mb-3 flex items-center gap-2 px-3">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-xs font-black text-white">M</span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-600 text-xs font-black text-white">M</span>
             <span className="text-[11px] font-bold text-slate-800">MedBill RCM</span>
           </div>
           <ul className="space-y-0.5 px-2">
@@ -79,7 +79,7 @@ export function AppMockup() {
               <li
                 key={item}
                 className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium ${
-                  i === 1 ? "bg-brand-50 text-brand-700" : "text-slate-500"
+                  i === 1 ? "bg-green-50 text-green-700" : "text-slate-500"
                 }`}
               >
                 {item}
@@ -121,8 +121,8 @@ export function AppMockup() {
                     <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.02" />
                   </linearGradient>
                   <linearGradient id="mkCollections" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.40" />
-                    <stop offset="100%" stopColor="#2563eb" stopOpacity="0.03" />
+                    <stop offset="0%" stopColor="#16a34a" stopOpacity="0.40" />
+                    <stop offset="100%" stopColor="#16a34a" stopOpacity="0.03" />
                   </linearGradient>
                 </defs>
                 {[0.25, 0.5, 0.75].map((f) => (
@@ -131,11 +131,11 @@ export function AppMockup() {
                 <path d={chargesPath.area} fill="url(#mkCharges)" />
                 <path d={chargesPath.line} fill="none" stroke="#94a3b8" strokeWidth="2" />
                 <path d={collectionsPath.area} fill="url(#mkCollections)" />
-                <path d={collectionsPath.line} fill="none" stroke="#2563eb" strokeWidth="2.5" />
+                <path d={collectionsPath.line} fill="none" stroke="#16a34a" strokeWidth="2.5" />
               </svg>
               <div className="mt-1.5 flex gap-3 text-[8px] text-slate-500">
                 <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> Charges</span>
-                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-brand-600" /> Collections</span>
+                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-green-600" /> Collections</span>
               </div>
             </div>
 
@@ -175,18 +175,18 @@ export function AppMockup() {
 
           {/* Denials strip */}
           <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3">
-            <div className="mb-2 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Denials by reason code</div>
+            <div className="mb-2 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Denials recovered by reason code</div>
             <div className="space-y-1.5">
               {[
-                { code: "CARC 16", w: "92%", amt: "$1.2M" },
-                { code: "CARC 197", w: "74%", amt: "$968k" },
-                { code: "CARC 27", w: "51%", amt: "$664k" },
-                { code: "CARC 11", w: "38%", amt: "$497k" },
+                { code: "CARC 16", w: "92%", amt: "+$1.2M" },
+                { code: "CARC 197", w: "74%", amt: "+$968k" },
+                { code: "CARC 27", w: "51%", amt: "+$664k" },
+                { code: "CARC 11", w: "38%", amt: "+$497k" },
               ].map((d) => (
                 <div key={d.code} className="flex items-center gap-2">
                   <span className="w-12 shrink-0 text-[8px] font-mono text-slate-500">{d.code}</span>
-                  <span className="h-2 rounded-sm bg-rose-500" style={{ width: d.w }} />
-                  <span className="text-[8px] tabular-nums text-slate-400">{d.amt}</span>
+                  <span className="h-2 rounded-sm bg-green-500" style={{ width: d.w }} />
+                  <span className="text-[8px] font-semibold tabular-nums text-green-700">{d.amt}</span>
                 </div>
               ))}
             </div>

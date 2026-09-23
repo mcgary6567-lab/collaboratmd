@@ -81,7 +81,7 @@ export default async function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <nav className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-lg font-black text-white">M</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-lg font-black text-white">M</span>
             <span className="text-[15px] font-bold tracking-tight text-slate-900">MedBill RCM</span>
           </Link>
           <div className="hidden items-center gap-7 text-sm font-medium text-slate-600 lg:flex">
@@ -92,13 +92,13 @@ export default async function LandingPage() {
           </div>
           <div className="ml-auto flex items-center gap-3">
             {session ? (
-              <Link href="/dashboard" className="btn btn-primary">
+              <Link href="/dashboard" className="btn bg-green-600 text-white hover:bg-green-700">
                 Open dashboard <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
               <>
                 <Link href="/login" className="hidden text-sm font-semibold text-slate-600 hover:text-slate-900 sm:block">Sign in</Link>
-                <Link href="/login" className="btn btn-primary">
+                <Link href="/login" className="btn bg-green-600 text-white hover:bg-green-700">
                   View the demo <ArrowRight className="h-4 w-4" />
                 </Link>
               </>
@@ -111,15 +111,15 @@ export default async function LandingPage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_40rem_at_50%_-10rem,rgba(37,99,235,0.14),transparent)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_40rem_at_50%_-10rem,rgba(22,163,74,0.16),transparent)]"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-500/40 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-green-500/40 to-transparent"
         />
         <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-16 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3.5 py-1.5 text-xs font-semibold text-brand-700">
+            <span className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700">
               <Sparkles className="h-3.5 w-3.5" />
               Built on real X12 claim and remittance processing
             </span>
@@ -134,7 +134,7 @@ export default async function LandingPage() {
               posting, denial management and patient payments, in one system.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/login" className="btn btn-primary px-6 py-3 text-base">
+              <Link href="/login" className="btn bg-green-600 text-white hover:bg-green-700 px-6 py-3 text-base">
                 Explore the live demo <ArrowRight className="h-4 w-4" />
               </Link>
               <a
@@ -153,7 +153,7 @@ export default async function LandingPage() {
 
           {/* Product mockup */}
           <div className="relative mx-auto mt-16 max-w-5xl">
-            <div aria-hidden className="absolute -inset-x-8 -top-6 bottom-8 rounded-[2rem] bg-gradient-to-b from-brand-600/10 to-transparent blur-2xl" />
+            <div aria-hidden className="absolute -inset-x-8 -top-6 bottom-8 rounded-[2rem] bg-gradient-to-b from-green-600/10 to-transparent blur-2xl" />
             <div className="relative">
               <AppMockup />
             </div>
@@ -164,7 +164,7 @@ export default async function LandingPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {[
                 { icon: Zap, tone: "text-green-600", title: "Scrubbed in 380 ms", body: "22 rules, before submission" },
-                { icon: ReceiptText, tone: "text-brand-600", title: "ERA posted automatically", body: "835 matched to claim and line" },
+                { icon: ReceiptText, tone: "text-green-600", title: "ERA posted automatically", body: "835 matched to claim and line" },
                 { icon: ShieldCheck, tone: "text-slate-700", title: "Append-only ledger", body: "Corrections reverse, never rewrite" },
               ].map(({ icon: Icon, tone, title, body }) => (
                 <div key={title} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -200,7 +200,7 @@ export default async function LandingPage() {
       {/* ----------------------------------------------------- features */}
       <section id="platform" className="mx-auto max-w-7xl px-6 py-20 lg:py-28">
         <div className="max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-brand-600">The platform</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-600">The platform</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             Everything between the visit and the deposit
           </h2>
@@ -216,7 +216,7 @@ export default async function LandingPage() {
               key={title}
               className="group rounded-2xl border border-slate-200 bg-white p-6 transition-shadow hover:shadow-lg hover:shadow-slate-900/5"
             >
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-600 group-hover:text-white">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600 transition-colors group-hover:bg-green-600 group-hover:text-white">
                 <Icon className="h-5 w-5" />
               </span>
               <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>
@@ -230,7 +230,7 @@ export default async function LandingPage() {
       <section id="workflow" className="border-y border-slate-200 bg-slate-50 py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-6">
           <div className="max-w-2xl">
-            <span className="text-xs font-bold uppercase tracking-widest text-brand-600">How it works</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-600">How it works</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               One loop, start to finish
             </h2>
@@ -264,7 +264,7 @@ export default async function LandingPage() {
       <section id="benchmarks" className="mx-auto max-w-7xl px-6 py-20 lg:py-28">
         <div className="grid gap-14 lg:grid-cols-2 lg:items-center">
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-brand-600">Benchmarks</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-600">Benchmarks</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Numbers with a point of comparison
             </h2>
@@ -273,7 +273,7 @@ export default async function LandingPage() {
               is just trivia. Every headline metric is shown against the industry target and
               colored accordingly, so anyone can read the practice in a glance.
             </p>
-            <Link href="/login" className="btn btn-primary mt-8 px-6 py-3 text-base">
+            <Link href="/login" className="btn bg-green-600 text-white hover:bg-green-700 mt-8 px-6 py-3 text-base">
               See it with real data <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -307,7 +307,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-14 lg:grid-cols-2">
             <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-brand-400">Standards and security</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-green-400">Standards and security</span>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
                 Built on the formats payers actually use
               </h2>
@@ -339,19 +339,19 @@ export default async function LandingPage() {
 
       {/* ---------------------------------------------------------- cta */}
       <section className="mx-auto max-w-7xl px-6 py-20 lg:py-28">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-600 to-brand-500 px-8 py-16 text-center lg:px-16">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-green-700 via-green-600 to-green-500 px-8 py-16 text-center lg:px-16">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(30rem_20rem_at_50%_0%,rgba(255,255,255,0.18),transparent)]" />
           <div className="relative">
             <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
               Walk the whole revenue cycle
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-brand-50">
+            <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-green-50">
               The demo runs on a full-size practice: 100 providers, 15,000 patients and 100,000
               claims that have been scrubbed, submitted, adjudicated, denied and appealed.
             </p>
             <Link
               href="/login"
-              className="mt-9 inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-brand-700 transition-colors hover:bg-brand-50"
+              className="mt-9 inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-green-700 transition-colors hover:bg-green-50"
             >
               Open the demo <ArrowRight className="h-4 w-4" />
             </Link>
@@ -363,7 +363,7 @@ export default async function LandingPage() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-black text-white">M</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-600 text-sm font-black text-white">M</span>
             <span className="text-sm font-bold text-slate-900">MedBill RCM</span>
           </div>
           <p className="text-sm text-slate-500 sm:ml-6">

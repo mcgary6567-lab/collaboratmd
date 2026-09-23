@@ -23,8 +23,8 @@ export function RevenueTrend({ data }: { data: { month: string; charges: number;
             <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.02} />
           </linearGradient>
           <linearGradient id="gPayments" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2563eb" stopOpacity={0.45} />
-            <stop offset="100%" stopColor="#2563eb" stopOpacity={0.03} />
+            <stop offset="0%" stopColor="#16a34a" stopOpacity={0.45} />
+            <stop offset="100%" stopColor="#16a34a" stopOpacity={0.03} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
@@ -33,7 +33,7 @@ export function RevenueTrend({ data }: { data: { month: string; charges: number;
         <Tooltip formatter={(v, name) => [full(Number(v)), String(name)]} />
         <Legend iconType="circle" />
         <Area type="monotone" dataKey="charges" name="Charges" stroke="#94a3b8" strokeWidth={2} fill="url(#gCharges)" />
-        <Area type="monotone" dataKey="payments" name="Collections" stroke="#2563eb" strokeWidth={2} fill="url(#gPayments)" />
+        <Area type="monotone" dataKey="payments" name="Collections" stroke="#16a34a" strokeWidth={2} fill="url(#gPayments)" />
         <Line type="monotone" dataKey="adjustments" name="Adjustments" stroke="#f59e0b" strokeWidth={2} dot={false} />
       </ComposedChart>
     </ResponsiveContainer>
@@ -86,7 +86,7 @@ export function DenialReasonChart({ data }: { data: { carc: string; category: st
   );
 }
 
-const MIX_COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#22c55e", "#84cc16", "#eab308", "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#a855f7", "#6366f1"];
+const MIX_COLORS = ["#16a34a", "#0ea5e9", "#14b8a6", "#8b5cf6", "#84cc16", "#eab308", "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#a855f7", "#6366f1"];
 
 /** Share of billed charges by payer. */
 export function PayerMixChart({ data }: { data: { payer: string; billedCents: number }[] }) {
@@ -105,7 +105,7 @@ export function PayerMixChart({ data }: { data: { payer: string; billedCents: nu
 }
 
 /** Small inline bar used inside table rows. */
-export function MiniBar({ value, max, tone = "#2563eb" }: { value: number; max: number; tone?: string }) {
+export function MiniBar({ value, max, tone = "#16a34a" }: { value: number; max: number; tone?: string }) {
   const pct = max > 0 ? Math.max((value / max) * 100, 1) : 0;
   return (
     <div className="h-1.5 w-full rounded-full bg-slate-100">
