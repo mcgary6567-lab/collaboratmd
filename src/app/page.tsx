@@ -138,7 +138,7 @@ export default async function LandingPage() {
                 Explore the live demo <ArrowRight className="h-4 w-4" />
               </Link>
               <a
-                href="https://github.com/mcgary6567-lab/medbill-rcm"
+                href="https://github.com/mcgary6567-lab/collaboratmd"
                 className="btn btn-secondary px-6 py-3 text-base"
                 target="_blank"
                 rel="noreferrer noopener"
@@ -368,7 +368,7 @@ export default async function LandingPage() {
           </p>
           <div className="flex gap-6 text-sm font-medium text-slate-600 sm:ml-auto">
             <Link href="/login" className="hover:text-slate-900">Sign in</Link>
-            <a href="https://github.com/mcgary6567-lab/medbill-rcm" className="hover:text-slate-900" target="_blank" rel="noreferrer noopener">
+            <a href="https://github.com/mcgary6567-lab/collaboratmd" className="hover:text-slate-900" target="_blank" rel="noreferrer noopener">
               GitHub
             </a>
           </div>

@@ -1,6 +1,6 @@
 # CollaboratMD
 
-**Deployment:** https://medbill-rcm.vercel.app, running on Vercel against a Neon
+**Deployment:** https://collaboratmd.vercel.app, running on Vercel against a Neon
 Postgres database.
 
 The deployment is private. Vercel Deployment Protection is set to *All
@@ -112,7 +112,7 @@ Three seeded member IDs are deliberately rigged so the unhappy paths are visible
 
 ## Deploying to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmcgary6567-lab%2Fmedbill-rcm&env=AUTH_SECRET,DATABASE_URL,SEED_DEMO_DATA&envDescription=AUTH_SECRET%20signs%20sessions%3B%20DATABASE_URL%20is%20a%20pooled%20Postgres%20connection%20string%3B%20set%20SEED_DEMO_DATA%3Dtrue%20to%20load%20the%20demo%20practice&envLink=https%3A%2F%2Fgithub.com%2Fmcgary6567-lab%2Fmedbill-rcm%2Fblob%2Fmain%2F.env.example&project-name=medbill-rcm&repository-name=medbill-rcm)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmcgary6567-lab%2Fcollaboratmd&env=AUTH_SECRET,DATABASE_URL,SEED_DEMO_DATA&envDescription=AUTH_SECRET%20signs%20sessions%3B%20DATABASE_URL%20is%20a%20pooled%20Postgres%20connection%20string%3B%20set%20SEED_DEMO_DATA%3Dtrue%20to%20load%20the%20demo%20practice&envLink=https%3A%2F%2Fgithub.com%2Fmcgary6567-lab%2Fcollaboratmd%2Fblob%2Fmain%2F.env.example&project-name=collaboratmd&repository-name=collaboratmd)
 
 The app is Vercel-ready, but it needs a Postgres database: serverless instances
 have an ephemeral, read-only filesystem, so the embedded PGlite database used
