@@ -33,6 +33,7 @@ const PRODUCT = [
 
 const COMPANY_LINKS = [
   { href: "/about", label: "About" },
+  { href: "/investors", label: "Investors" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
   { href: "/security", label: "Security" },

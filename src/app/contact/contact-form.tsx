@@ -6,6 +6,7 @@ import { contactAction, type ContactState } from "./actions";
 
 const TOPICS = [
   { value: "sales", label: "Sales and pricing" },
+  { value: "investor", label: "Investor inquiry" },
   { value: "support", label: "Product support" },
   { value: "privacy", label: "Privacy and data requests" },
   { value: "security", label: "Security disclosure" },

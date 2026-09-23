@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BookOpen, LifeBuoy, Lock, MapPin, MessagesSquare } from "lucide-react";
+import { BookOpen, LifeBuoy, Lock, MapPin, MessagesSquare, TrendingUp } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 import { ContactForm } from "./contact-form";
 import { COMPANY, addressLines } from "@/content/company";
@@ -17,6 +17,11 @@ const ROUTES = [
     icon: MessagesSquare,
     title: "Sales and pricing",
     body: "Walk through the platform with a full-size practice behind it and get a quote based on claim volume.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Investor inquiries",
+    body: "Healthcare IT and digital health funds reach the founders directly. See the investors page first, then ask here for the data room.",
   },
   {
     icon: LifeBuoy,
@@ -73,6 +78,10 @@ export default function ContactPage() {
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-600">Sales inquiries</dt>
+                <dd className="font-semibold text-slate-900">1 business day</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-600">Investor inquiries</dt>
                 <dd className="font-semibold text-slate-900">1 business day</dd>
               </div>
               <div className="flex justify-between gap-4">

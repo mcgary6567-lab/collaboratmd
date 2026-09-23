@@ -8,7 +8,7 @@ const schema = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
   email: z.string().trim().email("Enter a valid work email address."),
   organization: z.string().trim().max(120).optional(),
-  topic: z.enum(["sales", "support", "privacy", "security", "press"]),
+  topic: z.enum(["sales", "investor", "support", "privacy", "security", "press"]),
   message: z.string().trim().min(20, "Tell us a little more, at least 20 characters."),
 });
 
