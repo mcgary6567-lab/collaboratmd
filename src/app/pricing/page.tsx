@@ -19,14 +19,14 @@ export const metadata: Metadata = {
 function Price({ tier }: { tier: Tier }) {
   if (tier.priceMonthly === null) {
     return (
-      <div className="mt-5">
+      <div className="mt-5 min-h-[5rem]">
         <div className="text-3xl font-extrabold tracking-tight text-slate-900">Custom quote</div>
         <p className="mt-1.5 text-sm text-slate-600">Priced on provider count and claim volume</p>
       </div>
     );
   }
   return (
-    <div className="mt-5">
+    <div className="mt-5 min-h-[5rem]">
       <div className="flex items-baseline gap-1.5">
         <span className="text-4xl font-extrabold tracking-tight text-slate-900">
           ${tier.priceMonthly}
@@ -102,10 +102,12 @@ export default async function PricingPage() {
                 </span>
               )}
               <h2 className="text-lg font-bold tracking-tight text-slate-900">{tier.name}</h2>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-green-700">
+              <p className="mt-1 min-h-[2rem] text-xs font-semibold uppercase tracking-wide text-green-700">
                 {tier.forWho}
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">{tier.summary}</p>
+              <p className="mt-2 min-h-[4.5rem] text-sm leading-relaxed text-slate-600">
+                {tier.summary}
+              </p>
 
               <Price tier={tier} />
 
