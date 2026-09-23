@@ -305,13 +305,17 @@ async function main() {
       let lifecycle: string;
       if (ageDays < 3) lifecycle = roll < 0.35 ? "ready" : roll < 0.45 ? "scrub_errors" : "submitted";
       else if (ageDays < 10) lifecycle = roll < 0.06 ? "rejected" : "accepted";
-      else if (ageDays < 22) lifecycle = roll < 0.03 ? "rejected" : roll < 0.62 ? "paid" : roll < 0.70 ? "denied" : "accepted";
-      else if (ageDays < 45) lifecycle = roll < 0.015 ? "rejected" : roll < 0.88 ? "paid" : roll < 0.955 ? "denied" : "accepted";
+      // Denials are suppressed at the front of the cycle: eligibility is
+      // verified before the visit and the scrubber blocks the coding and
+      // authorization errors that cause most of them, so fewer claims reach
+      // the payer in a deniable state.
+      else if (ageDays < 22) lifecycle = roll < 0.03 ? "rejected" : roll < 0.645 ? "paid" : roll < 0.70 ? "denied" : "accepted";
+      else if (ageDays < 45) lifecycle = roll < 0.015 ? "rejected" : roll < 0.905 ? "paid" : roll < 0.955 ? "denied" : "accepted";
       // "closed" here means abandoned without ever being adjudicated, which is
       // revenue simply given up. A practice running this product chases claims
       // to a conclusion, so abandonment is rare rather than a few percent.
-      else if (ageDays < 100) lifecycle = roll < 0.93 ? "paid" : roll < 0.99 ? "denied" : "closed";
-      else lifecycle = roll < 0.935 ? "paid" : roll < 0.99 ? "denied" : "closed";
+      else if (ageDays < 100) lifecycle = roll < 0.947 ? "paid" : roll < 0.99 ? "denied" : "closed";
+      else lifecycle = roll < 0.951 ? "paid" : roll < 0.99 ? "denied" : "closed";
 
       // Remittance lands 12-34 days after service, never in the future.
       const payLagDays = 12 + rnd() * 22;
