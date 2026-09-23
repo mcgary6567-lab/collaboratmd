@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { AppMockup } from "@/components/app-mockup";
-import { Logo } from "@/components/logo";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -78,34 +79,7 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ---------------------------------------------------------- nav */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-6">
-          <Link href="/">
-            <Logo id="cmd-nav" />
-          </Link>
-          <div className="hidden items-center gap-7 text-sm font-medium text-slate-600 lg:flex">
-            <a href="#platform" className="hover:text-slate-900">Platform</a>
-            <a href="#workflow" className="hover:text-slate-900">How it works</a>
-            <a href="#benchmarks" className="hover:text-slate-900">Benchmarks</a>
-            <a href="#standards" className="hover:text-slate-900">Standards</a>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            {session ? (
-              <Link href="/dashboard" className="btn bg-green-600 text-white hover:bg-green-700">
-                Open dashboard <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <>
-                <Link href="/login" className="hidden text-sm font-semibold text-slate-600 hover:text-slate-900 sm:block">Sign in</Link>
-                <Link href="/login" className="btn bg-green-600 text-white hover:bg-green-700">
-                  View the demo <ArrowRight className="h-4 w-4" />
-                </Link>
-              </>
-            )}
-          </div>
-        </nav>
-      </header>
+      <SiteHeader signedIn={!!session} anchored />
 
       {/* --------------------------------------------------------- hero */}
       <section className="relative overflow-hidden">
@@ -359,21 +333,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------------- footer */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center">
-          <Logo id="cmd-footer" markClassName="h-8 w-8" textClassName="text-sm" />
-          <p className="text-sm text-slate-500 sm:ml-6">
-            A demonstration platform with synthetic data. Not for real patient information.
-          </p>
-          <div className="flex gap-6 text-sm font-medium text-slate-600 sm:ml-auto">
-            <Link href="/login" className="hover:text-slate-900">Sign in</Link>
-            <a href="https://github.com/mcgary6567-lab/collaboratmd" className="hover:text-slate-900" target="_blank" rel="noreferrer noopener">
-              GitHub
-            </a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
