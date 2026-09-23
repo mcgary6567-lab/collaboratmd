@@ -25,6 +25,7 @@ function XIcon({ className = "h-4 w-4" }: { className?: string }) {
 
 const PRODUCT = [
   { href: "/#platform", label: "Platform" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/#workflow", label: "How it works" },
   { href: "/#benchmarks", label: "Benchmarks" },
   { href: "/#standards", label: "Standards" },

@@ -26,7 +26,7 @@ export function SiteHeader({
         <div className="hidden items-center gap-7 text-sm font-medium text-slate-600 lg:flex">
           <a href={`${p}#platform`} className="hover:text-slate-900">Platform</a>
           <a href={`${p}#workflow`} className="hover:text-slate-900">How it works</a>
-          <a href={`${p}#benchmarks`} className="hover:text-slate-900">Benchmarks</a>
+          <Link href="/pricing" className="hover:text-slate-900">Pricing</Link>
           <Link href="/blog" className="hover:text-slate-900">Blog</Link>
           <Link href="/contact" className="hover:text-slate-900">Contact</Link>
         </div>
