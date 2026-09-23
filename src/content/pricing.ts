@@ -10,6 +10,31 @@
  * subscription, which is what the feature matrix reflects.
  */
 
+/**
+ * Annual billing charges for ten months and gives twelve, so the discount is
+ * two months. Everything derived from it goes through the helpers below: a
+ * discount written out by hand in the markup is a discount that disagrees with
+ * itself the first time it changes.
+ */
+export const ANNUAL_FREE_MONTHS = 2;
+export const MONTHS_PER_YEAR = 12;
+export const MONTHS_BILLED_ANNUALLY = MONTHS_PER_YEAR - ANNUAL_FREE_MONTHS;
+
+/** What a year costs up front, per provider. */
+export function annualTotal(priceMonthly: number): number {
+  return priceMonthly * MONTHS_BILLED_ANNUALLY;
+}
+
+/** The annual price expressed per month, which is how people compare plans. */
+export function annualEffectiveMonthly(priceMonthly: number): number {
+  return annualTotal(priceMonthly) / MONTHS_PER_YEAR;
+}
+
+/** Saving against paying monthly for a year, per provider. */
+export function annualSaving(priceMonthly: number): number {
+  return priceMonthly * ANNUAL_FREE_MONTHS;
+}
+
 export type Tier = {
   id: string;
   name: string;
@@ -152,6 +177,10 @@ export const MATRIX: FeatureGroup[] = [
 
 export const FAQ = [
   {
+    q: "Monthly or annual?",
+    a: "Either. Paying annually charges for ten months and gives you twelve, so two months are free and the effective rate drops by about 17%. The per-claim line is usage, so it is billed as incurred each month on both cycles.",
+  },
+  {
     q: "How is the subscription counted?",
     a: "Per rendering provider, per month. Front desk staff, billers and administrators do not consume a seat, because charging for the people who do the billing work would penalize exactly the behavior the software is meant to encourage.",
   },
@@ -172,7 +201,7 @@ export const FAQ = [
     a: "It depends almost entirely on the state of the data being migrated and how many payer enrollments have to be moved. That is the first thing an onboarding call establishes, and we would rather give a real date than a marketing one.",
   },
   {
-    q: "Is there a long-term contract?",
-    a: "Terms are set in the order form. Ask during the quote and we will tell you plainly what the commitment is before you sign anything.",
+    q: "Am I locked in if I pay annually?",
+    a: "An annual term is a twelve-month commitment; that is what the two free months are in exchange for. Monthly billing carries no such term. Whichever you choose, the export commitment in the Terms applies, so your data is never the thing holding you in place.",
   },
 ];

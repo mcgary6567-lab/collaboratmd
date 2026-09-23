@@ -1,11 +1,12 @@
 import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Minus, Receipt, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Check, CalendarClock, Minus, Receipt, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { TIERS, MATRIX, FAQ, type Tier } from "@/content/pricing";
+import { TIERS, MATRIX, FAQ } from "@/content/pricing";
+import { PlanCards } from "./plan-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -14,33 +15,6 @@ export const metadata: Metadata = {
   description:
     "CollaboratMD pricing: a subscription per rendering provider plus a per-claim transaction line, across three plans for practices and billing companies.",
 };
-
-/** Renders a published price, or a quote request while none is set. */
-function Price({ tier }: { tier: Tier }) {
-  if (tier.priceMonthly === null) {
-    return (
-      <div className="mt-5 min-h-[5rem]">
-        <div className="text-3xl font-extrabold tracking-tight text-slate-900">Custom quote</div>
-        <p className="mt-1.5 text-sm text-slate-600">Priced on provider count and claim volume</p>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-5 min-h-[5rem]">
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-4xl font-extrabold tracking-tight text-slate-900">
-          ${tier.priceMonthly}
-        </span>
-        <span className="text-sm font-medium text-slate-600">/ provider / month</span>
-      </div>
-      {tier.perClaimCents !== null && (
-        <p className="mt-1.5 text-sm text-slate-600">
-          plus ${(tier.perClaimCents / 100).toFixed(2)} per submitted claim
-        </p>
-      )}
-    </div>
-  );
-}
 
 /** A matrix cell: true, false, or a short qualifier such as "4 business hours". */
 function Cell({ value }: { value: boolean | string }) {
@@ -81,61 +55,17 @@ export default async function PricingPage() {
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
             A subscription per rendering provider, plus a transaction line tied to claim volume.
             Both scale with the practice, so a two-provider clinic is never paying for a footprint
-            it does not have.
+            it does not have. Pay annually and two months are free.
           </p>
         </div>
       </section>
 
       {/* ------------------------------------------------------------ tiers */}
       <section className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-        <div className="grid gap-6 lg:grid-cols-3">
-          {TIERS.map((tier) => (
-            <div
-              key={tier.id}
-              className={`relative flex flex-col rounded-2xl border bg-white p-7 transition-shadow hover:shadow-lg hover:shadow-slate-900/5 ${
-                tier.featured ? "border-green-600 shadow-lg shadow-green-900/5" : "border-slate-200"
-              }`}
-            >
-              {tier.featured && (
-                <span className="absolute -top-3 left-7 rounded-full bg-green-600 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-                  Most chosen
-                </span>
-              )}
-              <h2 className="text-lg font-bold tracking-tight text-slate-900">{tier.name}</h2>
-              <p className="mt-1 min-h-[2rem] text-xs font-semibold uppercase tracking-wide text-green-700">
-                {tier.forWho}
-              </p>
-              <p className="mt-2 min-h-[4.5rem] text-sm leading-relaxed text-slate-600">
-                {tier.summary}
-              </p>
-
-              <Price tier={tier} />
-
-              <Link
-                href="/contact"
-                className={`btn mt-6 w-full justify-center py-2.5 ${
-                  tier.featured
-                    ? "bg-green-600 text-white hover:bg-green-700"
-                    : "btn-secondary"
-                }`}
-              >
-                {tier.cta} <ArrowRight className="h-4 w-4" />
-              </Link>
-
-              <ul className="mt-7 space-y-3 border-t border-slate-100 pt-6">
-                {tier.highlights.map((h) => (
-                  <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" strokeWidth={3} />
-                    {h}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+        <PlanCards />
 
         {/* how billing works */}
-        <div className="mt-10 grid gap-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 md:grid-cols-3">
+        <div className="mt-10 grid gap-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 md:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: Users,
@@ -146,6 +76,11 @@ export default async function PricingPage() {
               icon: Receipt,
               title: "Per submitted claim",
               body: "Volume drives cost on our side too: every submission crosses a clearinghouse connection and every remittance comes back through one. Splitting it keeps small practices from subsidizing large ones.",
+            },
+            {
+              icon: CalendarClock,
+              title: "Monthly or annual",
+              body: "Annual billing charges for ten months and gives twelve. The per-claim line is usage, so it is billed as incurred each month on either cycle.",
             },
             {
               icon: ShieldCheck,
