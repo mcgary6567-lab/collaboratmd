@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
 import {
   contractFromPercent, ensureSchedule, saveScheduleItems, scanUnderpayments, setUnderpaymentStatus,
 } from "@/server/fees";
@@ -54,14 +54,14 @@ export async function saveScheduleAction(scheduleId: string, formData: FormData)
 }
 
 export async function scanUnderpaymentsAction(): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const db = await getDb();
   await scanUnderpayments(db, s.practiceId);
   revalidatePath("/underpayments");
 }
 
 export async function underpaymentStatusAction(id: string, status: string): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   const db = await getDb();
   await setUnderpaymentStatus(db, s.practiceId, id, status);
   revalidatePath("/underpayments");

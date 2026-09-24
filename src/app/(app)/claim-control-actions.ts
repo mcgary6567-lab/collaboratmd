@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema, type Db } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { createClaimForEncounter, createCorrectedClaim, voidClaim } from "@/server/claims";
 import { cancelAuthorization, createAuthorization, createPayerEdit, setPayerEditActive } from "@/server/payer-edits";
@@ -22,7 +22,7 @@ async function ownClaim(db: Db, practiceId: string, claimId: string) {
 /* ---------------------- Corrections and voids ---------------------- */
 
 export async function correctClaimAction(claimId: string, _prev: FormResult): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   let createdId: string;
   try {
     const db = await getDb();
@@ -37,7 +37,7 @@ export async function correctClaimAction(claimId: string, _prev: FormResult): Pr
 }
 
 export async function voidClaimAction(claimId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   let createdId: string;
   try {
     const db = await getDb();
@@ -53,7 +53,7 @@ export async function voidClaimAction(claimId: string, _prev: FormResult, formDa
 
 /** After a void, bills the same encounter again as a new original claim. */
 export async function billAgainAction(claimId: string, _prev: FormResult): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   let createdId: string;
   try {
     const db = await getDb();
@@ -102,7 +102,7 @@ export async function setPayerEditActiveAction(id: string, active: boolean): Pro
 /* ---------------------------- Authorizations ---------------------------- */
 
 export async function createAuthorizationAction(patientId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
     const payerId = String(formData.get("payerId") ?? "");
@@ -126,7 +126,7 @@ export async function createAuthorizationAction(patientId: string, _prev: FormRe
 }
 
 export async function cancelAuthorizationAction(patientId: string, id: string): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const db = await getDb();
   await cancelAuthorization(db, s.practiceId, id);
   revalidatePath(`/patients/${patientId}`);

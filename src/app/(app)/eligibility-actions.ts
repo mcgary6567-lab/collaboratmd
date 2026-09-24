@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { verifySchedule } from "@/server/patients";
 
 /** Runs a 270/271 for everyone on a day's schedule not already verified for that date. */
 export async function verifyScheduleAction(dateIso: string, _prev: FormResult): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) throw new Error("Invalid date");
     const db = await getDb();

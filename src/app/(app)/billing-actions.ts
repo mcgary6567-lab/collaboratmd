@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import {
   applyDiscount, cancelPlan, createEstimate, createPaymentPlan, createPolicy, generateStatement, generateStatementBatch,
@@ -17,7 +17,7 @@ const dollars = (v: FormDataEntryValue | null) => Math.round(parseFloat(String(v
 /* ----------------------------- Discounts ----------------------------- */
 
 export async function applyDiscountAction(patientId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   try {
     const db = await getDb();
     const entry = await applyDiscount(db, s.practiceId, patientId, String(formData.get("policyId") ?? ""), s.userId);
@@ -56,7 +56,7 @@ export async function togglePolicyAction(id: string, active: boolean): Promise<v
 /* --------------------------- Payment plans --------------------------- */
 
 export async function createPlanAction(patientId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
     const frequency = String(formData.get("frequency")) === "biweekly" ? "biweekly" : "monthly";
@@ -76,7 +76,7 @@ export async function createPlanAction(patientId: string, _prev: FormResult, for
 }
 
 export async function planPaymentAction(planId: string, patientId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
     const r = await recordPlanPayment(db, s.practiceId, planId, dollars(formData.get("amount")), String(formData.get("method") ?? "card"), s.userId);
@@ -90,7 +90,7 @@ export async function planPaymentAction(planId: string, patientId: string, _prev
 }
 
 export async function cancelPlanAction(planId: string, patientId: string): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   const db = await getDb();
   await cancelPlan(db, s.practiceId, planId);
   revalidatePath(`/patients/${patientId}`);
@@ -100,7 +100,7 @@ export async function cancelPlanAction(planId: string, patientId: string): Promi
 /* ----------------------------- Statements ---------------------------- */
 
 export async function generateStatementAction(patientId: string, _prev: FormResult): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   let id: string;
   try {
     const db = await getDb();
@@ -112,7 +112,7 @@ export async function generateStatementAction(patientId: string, _prev: FormResu
 }
 
 export async function statementBatchAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
     const r = await generateStatementBatch(db, s.practiceId, { minBalanceCents: dollars(formData.get("min")) || 500 }, s.userId);
@@ -124,7 +124,7 @@ export async function statementBatchAction(_prev: FormResult, formData: FormData
 }
 
 export async function markStatementSentAction(id: string, channel: "print" | "email"): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const db = await getDb();
   await markStatementSent(db, s.practiceId, id, channel);
   revalidatePath(`/statements/${id}`);
@@ -132,7 +132,7 @@ export async function markStatementSentAction(id: string, channel: "print" | "em
 }
 
 export async function voidStatementAction(id: string): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   const db = await getDb();
   await voidStatement(db, s.practiceId, id);
   revalidatePath(`/statements/${id}`);
@@ -141,7 +141,7 @@ export async function voidStatementAction(id: string): Promise<void> {
 /* ----------------------------- Estimates ----------------------------- */
 
 export async function createEstimateAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const cpts = formData.getAll("cpt").map(String);
   const units = formData.getAll("units").map((u) => Number(u) || 0);
   const insurance = String(formData.get("patientInsuranceId") ?? "");

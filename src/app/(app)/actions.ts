@@ -5,11 +5,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole } from "@/lib/auth";
 import { submitClaim, rescrubClaim, fetchAndPostRemittances, importRemittance, postRemittance, writeOffClaim, transferToPatient } from "@/server/claims";
 import { createPatient, runEligibility, postPatientPayment } from "@/server/patients";
 import { createEncounterWithClaim, createAppointment, setAppointmentStatus } from "@/server/encounters";
 import { updateDenialStatus } from "@/server/reports";
+import { APPOINTMENT_STATUSES, DENIAL_STATUSES, assertOwned } from "@/server/tenancy";
 
 export type ActionResult = { ok: boolean; message: string; id?: string };
 
@@ -20,9 +21,10 @@ function fail(err: unknown): ActionResult {
 /* ----------------------------- Claims ----------------------------- */
 
 export async function submitClaimAction(claimId: string): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
+    await assertOwned(db, s.practiceId, "claim", claimId);
     const { status, result } = await submitClaim(db, claimId, s.userId);
     revalidatePath("/claims");
     revalidatePath(`/claims/${claimId}`);
@@ -34,9 +36,10 @@ export async function submitClaimAction(claimId: string): Promise<ActionResult> 
 }
 
 export async function rescrubClaimAction(claimId: string): Promise<ActionResult> {
-  await requireSession();
+  const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
+    await assertOwned(db, s.practiceId, "claim", claimId);
     const c = await rescrubClaim(db, claimId);
     revalidatePath(`/claims/${claimId}`);
     return { ok: c.status === "ready", message: c.status === "ready" ? "Claim passed scrubbing" : "Claim still has blocking errors" };
@@ -46,7 +49,7 @@ export async function rescrubClaimAction(claimId: string): Promise<ActionResult>
 }
 
 export async function submitAllReadyAction(): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const db = await getDb();
   const { listClaims } = await import("@/server/claims");
   const ready = await listClaims(db, s.practiceId, "ready");
@@ -66,16 +69,18 @@ export async function submitAllReadyAction(): Promise<ActionResult> {
 }
 
 export async function writeOffClaimAction(claimId: string, formData: FormData): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   const db = await getDb();
+  await assertOwned(db, s.practiceId, "claim", claimId);
   await writeOffClaim(db, claimId, String(formData.get("reason") || "Write-off"), s.userId);
   revalidatePath(`/claims/${claimId}`);
   revalidatePath("/denials");
 }
 
 export async function transferToPatientAction(claimId: string): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   const db = await getDb();
+  await assertOwned(db, s.practiceId, "claim", claimId);
   await transferToPatient(db, claimId, s.userId);
   revalidatePath(`/claims/${claimId}`);
 }
@@ -83,7 +88,7 @@ export async function transferToPatientAction(claimId: string): Promise<void> {
 /* --------------------------- Remittance --------------------------- */
 
 export async function fetchRemittancesAction(): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   try {
     const db = await getDb();
     const n = await fetchAndPostRemittances(db, s.practiceId, s.userId);
@@ -98,7 +103,7 @@ export async function fetchRemittancesAction(): Promise<ActionResult> {
 }
 
 export async function import835Action(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_ADJUST);
   const raw = String(formData.get("raw") ?? "").trim();
   if (!raw.startsWith("ISA")) return { ok: false, message: "Paste a full X12 835 file starting with an ISA segment" };
   try {
@@ -116,8 +121,10 @@ export async function import835Action(_prev: ActionResult | undefined, formData:
 /* ----------------------------- Denials ---------------------------- */
 
 export async function denialStatusAction(id: string, status: string): Promise<void> {
-  await requireSession();
+  const s = await requireRole(CAN_ADJUST);
+  if (!(DENIAL_STATUSES as readonly string[]).includes(status)) throw new Error("Unknown denial status");
   const db = await getDb();
+  await assertOwned(db, s.practiceId, "denial", id);
   await updateDenialStatus(db, id, status);
   revalidatePath("/denials");
 }
@@ -143,18 +150,23 @@ const patientSchema = z.object({
 });
 
 export async function createPatientAction(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const data = Object.fromEntries(formData.entries());
   const parsed = patientSchema.safeParse({ ...data, copayCents: Math.round(parseFloat(String(data.copay || "0")) * 100) });
   if (!parsed.success) return { ok: false, message: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
   const db = await getDb();
+  try {
+    await assertOwned(db, s.practiceId, "payer", parsed.data.payerId);
+  } catch (e) {
+    return fail(e);
+  }
   const p = await createPatient(db, s.practiceId, parsed.data);
   revalidatePath("/patients");
   redirect(`/patients/${p.id}`);
 }
 
 export async function eligibilityAction(patientInsuranceId: string, patientId: string): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const db = await getDb();
   const [own] = await db
     .select({ id: schema.patientInsurances.id })
@@ -168,10 +180,11 @@ export async function eligibilityAction(patientInsuranceId: string, patientId: s
 }
 
 export async function patientPaymentAction(patientId: string, formData: FormData): Promise<void> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const cents = Math.round(parseFloat(String(formData.get("amount") || "0")) * 100);
   if (cents <= 0) return;
   const db = await getDb();
+  await assertOwned(db, s.practiceId, "patient", patientId);
   await postPatientPayment(db, s.practiceId, patientId, cents, String(formData.get("method") || "card"), s.userId);
   revalidatePath(`/patients/${patientId}`);
 }
@@ -179,13 +192,21 @@ export async function patientPaymentAction(patientId: string, formData: FormData
 /* ---------------------------- Scheduling -------------------------- */
 
 export async function createAppointmentAction(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   const startsAt = new Date(String(formData.get("startsAt")));
   if (Number.isNaN(startsAt.getTime())) return { ok: false, message: "Invalid start time" };
   const db = await getDb();
+  const patientId = String(formData.get("patientId"));
+  const providerId = String(formData.get("providerId"));
+  try {
+    await assertOwned(db, s.practiceId, "patient", patientId);
+    await assertOwned(db, s.practiceId, "provider", providerId);
+  } catch (e) {
+    return fail(e);
+  }
   await createAppointment(db, s.practiceId, {
-    patientId: String(formData.get("patientId")),
-    providerId: String(formData.get("providerId")),
+    patientId,
+    providerId,
     startsAt,
     minutes: Number(formData.get("minutes") || 30),
     type: String(formData.get("type") || "office_visit"),
@@ -196,8 +217,10 @@ export async function createAppointmentAction(_prev: ActionResult | undefined, f
 }
 
 export async function appointmentStatusAction(id: string, status: string): Promise<void> {
-  await requireSession();
+  const s = await requireRole(CAN_WRITE);
+  if (!(APPOINTMENT_STATUSES as readonly string[]).includes(status)) throw new Error("Unknown appointment status");
   const db = await getDb();
+  await assertOwned(db, s.practiceId, "appointment", id);
   await setAppointmentStatus(db, id, status);
   revalidatePath("/scheduling");
 }
@@ -227,7 +250,7 @@ const encounterSchema = z.object({
 });
 
 export async function createEncounterAction(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {
-  const s = await requireSession();
+  const s = await requireRole(CAN_WRITE);
   let payload: unknown;
   try {
     payload = JSON.parse(String(formData.get("payload")));
@@ -237,6 +260,13 @@ export async function createEncounterAction(_prev: ActionResult | undefined, for
   const parsed = encounterSchema.safeParse(payload);
   if (!parsed.success) return { ok: false, message: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
   const db = await getDb();
+  try {
+    await assertOwned(db, s.practiceId, "patient", parsed.data.patientId);
+    await assertOwned(db, s.practiceId, "provider", parsed.data.providerId);
+    if (parsed.data.appointmentId) await assertOwned(db, s.practiceId, "appointment", parsed.data.appointmentId);
+  } catch (e) {
+    return fail(e);
+  }
   const { claim } = await createEncounterWithClaim(db, s.practiceId, parsed.data, s.userId);
   revalidatePath("/claims");
   redirect(`/claims/${claim.id}`);

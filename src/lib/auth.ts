@@ -95,3 +95,17 @@ export async function requireSession(): Promise<Session> {
   if (!s) redirect("/login");
   return s;
 }
+
+/** Everyone but read-only users may do day-to-day work. */
+export const CAN_WRITE = ["admin", "biller", "front_desk"] as const;
+/** Moving money, writing it off, or taking back what a payer paid. */
+export const CAN_ADJUST = ["admin", "biller"] as const;
+
+/** Returns the signed-in user if their role is one of `roles`, else throws. */
+export async function requireRole(roles: readonly string[]): Promise<Session> {
+  const s = await requireSession();
+  if (!roles.includes(s.role)) {
+    throw new Error(s.role === "readonly" ? "Your account is read-only" : "Your role does not allow this; ask a biller or administrator");
+  }
+  return s;
+}
