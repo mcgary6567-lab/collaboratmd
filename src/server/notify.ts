@@ -114,3 +114,29 @@ export async function acknowledge(s: Submission) {
 
   return send(s.email, `We have your message (${s.reference})`, body);
 }
+
+/** Whether outbound email is configured, so the UI can say what will happen. */
+export function emailEnabled() {
+  return config() !== null;
+}
+
+/**
+ * Sends a patient their check-in link. The email names the practice and the
+ * visit time and nothing clinical; the link itself asks for a date of birth
+ * before showing anything.
+ */
+export async function sendCheckinLink(to: string, p: { firstName: string; practiceName: string; when: string; url: string }) {
+  const body = [
+    `Hi ${p.firstName},`,
+    "",
+    `You can check in online for your visit with ${p.practiceName} on ${p.when}.`,
+    "It takes about two minutes: confirm your contact details and insurance, and sign the practice's forms.",
+    "",
+    p.url,
+    "",
+    "The link works until the end of the day of your visit. If you did not expect this email, you can ignore it.",
+    "",
+    `— ${p.practiceName}`,
+  ].join("\n");
+  return send(to, `Check in for your visit with ${p.practiceName}`, body);
+}

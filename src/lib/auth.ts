@@ -24,6 +24,9 @@ const secret = () => {
   return new TextEncoder().encode("dev-only-secret-change-me-please-0123456789");
 };
 
+/** The same key signs short-lived patient check-in tokens, under their own audience. */
+export const signingKey = secret;
+
 export interface Session {
   userId: string;
   practiceId: string;
@@ -74,6 +77,8 @@ export async function getSession(): Promise<Session | null> {
   let session: Session;
   try {
     const { payload } = await jwtVerify(token, secret());
+    // Staff tokens carry no audience; anything that does (a patient check-in token) is not a staff session.
+    if (payload.aud !== undefined) return null;
     session = {
       userId: String(payload.userId),
       practiceId: String(payload.practiceId),

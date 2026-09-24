@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown, Wallet } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown, Wallet, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 
@@ -10,6 +10,7 @@ const NAV = [
   { href: "/dashboard", label: "My work", icon: LayoutDashboard },
   { href: "/admin", label: "Practice analytics", icon: Building2, adminOnly: true },
   { href: "/scheduling", label: "Scheduling", icon: CalendarDays },
+  { href: "/check-ins", label: "Online check-ins", icon: ClipboardCheck },
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/encounters/new", label: "Charge Entry", icon: Stethoscope },
   { href: "/claims", label: "Claims", icon: FileText },

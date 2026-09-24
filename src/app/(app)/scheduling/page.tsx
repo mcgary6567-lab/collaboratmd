@@ -4,6 +4,8 @@ import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listAppointments, listProviders } from "@/server/encounters";
 import { latestChecks } from "@/server/patients";
+import { checkinStatus } from "@/server/checkin";
+import { CheckinLinkButton } from "./checkin-link";
 import { verifyScheduleAction } from "@/app/(app)/eligibility-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { appointmentStatusAction } from "@/app/(app)/actions";
@@ -29,7 +31,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
         .where(and(inArray(schema.patientInsurances.patientId, patientIds), eq(schema.patientInsurances.active, true), eq(schema.patientInsurances.rank, 1)))
     : [];
   const insByPatient = new Map(primaries.map((p) => [p.patientId, p.id]));
-  const checks = await latestChecks(db, primaries.map((p) => p.id));
+  const [checks, checkins] = await Promise.all([latestChecks(db, primaries.map((p) => p.id)), checkinStatus(db, appts.map((a) => a.appt.id))]);
   const coverage = (patientId: string) => {
     const insId = insByPatient.get(patientId);
     if (!insId) return { label: "No insurance", tone: "amber" as const, title: "Self-pay unless insurance is collected" };
@@ -84,7 +86,12 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                     <td>{appt.type.replace(/_/g, " ")}</td>
                     <td className="text-slate-500">{appt.reason}</td>
                     <td title={coverage(patient.id).title}><Badge tone={coverage(patient.id).tone}>{coverage(patient.id).label}</Badge></td>
-                    <td><Badge tone={TONE[appt.status] ?? "slate"}>{appt.status.replace("_", " ")}</Badge></td>
+                    <td>
+                      <Badge tone={TONE[appt.status] ?? "slate"}>{appt.status.replace("_", " ")}</Badge>
+                      {checkins.get(appt.id)?.submission && (
+                        <div className="mt-1"><Link href="/check-ins" className="text-[11px] font-semibold text-brand-700 hover:underline">Checked in online</Link></div>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap">
                       {appt.status === "scheduled" && (
                         <form action={appointmentStatusAction.bind(null, appt.id, "checked_in")} className="inline">
@@ -95,6 +102,9 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                         <Link href={`/encounters/new?patientId=${patient.id}&providerId=${provider.id}&appointmentId=${appt.id}&dos=${iso}`} className="btn btn-primary text-xs">
                           Enter charges
                         </Link>
+                      )}
+                      {appt.status === "scheduled" && !checkins.get(appt.id)?.submission && (
+                        <span className="ml-1"><CheckinLinkButton appointmentId={appt.id} resend={!!checkins.get(appt.id)?.link} /></span>
                       )}
                       {appt.status === "scheduled" && (
                         <form action={appointmentStatusAction.bind(null, appt.id, "no_show")} className="ml-1 inline">

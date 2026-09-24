@@ -517,6 +517,54 @@ export const contactMessages = pgTable("contact_messages", {
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Digital check-in                                                     */
+/* ------------------------------------------------------------------ */
+
+export const checkinLinks = pgTable("checkin_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  appointmentId: uuid("appointment_id").notNull().references(() => appointments.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CheckinDemographics = { phone: string; email: string; address1: string; city: string; state: string; zip: string };
+export type CheckinInsurance = {
+  /** Unchanged: the card on file is still current. */
+  sameAsOnFile: boolean;
+  payerName: string;
+  memberId: string;
+  groupNumber: string;
+  relationship: string;
+};
+export type CheckinConsents = { privacyNotice: boolean; financialPolicy: boolean; assignmentOfBenefits: boolean; signature: string; signedAt: string };
+
+export const checkinSubmissions = pgTable("checkin_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  linkId: uuid("link_id").notNull().references(() => checkinLinks.id),
+  appointmentId: uuid("appointment_id").notNull().references(() => appointments.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  demographics: jsonb("demographics").$type<CheckinDemographics>().notNull(),
+  insurance: jsonb("insurance").$type<CheckinInsurance>().notNull(),
+  consents: jsonb("consents").$type<CheckinConsents>().notNull(),
+  status: text("status").notNull().default("pending"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CheckinLink = typeof checkinLinks.$inferSelect;
+export type CheckinSubmission = typeof checkinSubmissions.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
 export type FeeSchedule = typeof feeSchedules.$inferSelect;
 export type Underpayment = typeof underpayments.$inferSelect;
