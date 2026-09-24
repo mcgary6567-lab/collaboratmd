@@ -9,7 +9,8 @@
 import { buildEdi835, type Adjustment } from "@/lib/edi/x835";
 import { build999, describeSyntaxError, validateStructure } from "@/lib/edi/x999";
 import { build277CA } from "@/lib/edi/x277ca";
-import { build271, parse270, type Benefit } from "@/lib/edi/x270";
+import { build271, parse270, parse271, type Benefit, type Response271 } from "@/lib/edi/x270";
+import { StediClearinghouse } from "./stedi";
 
 export interface SubmissionResult {
   clearinghouseId: string;
@@ -60,10 +61,21 @@ export interface RemitRequest {
   reversal?: ReversalRequest;
 }
 
+/**
+ * A payer's eligibility answer. Some clearinghouses return the raw 271, others
+ * a JSON rendering of it; either way it is reduced to the same structure.
+ */
+export interface EligibilityAnswer {
+  format: "x12" | "json";
+  /** The 271 as received, or the clearinghouse's JSON, for the record. */
+  raw: string;
+  response: Response271;
+}
+
 export interface ClearinghouseGateway {
   submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult>;
-  /** Sends a 270 eligibility inquiry and returns the payer's 271, both as raw X12. */
-  checkEligibility(edi270: string): Promise<string>;
+  /** Sends a 270 eligibility inquiry and returns the payer's answer. */
+  checkEligibility(edi270: string): Promise<EligibilityAnswer>;
   /** Simulates the payer producing an ERA for previously accepted claims. */
   fetch835(claims: RemitRequest[]): Promise<string | null>;
 }
@@ -126,7 +138,13 @@ export class MockClearinghouse implements ClearinghouseGateway {
    * are not found (AAA 72); everyone else has active coverage whose figures
    * are derived from the member ID, so they are stable between checks.
    */
-  async checkEligibility(edi270: string): Promise<string> {
+  async checkEligibility(edi270: string): Promise<EligibilityAnswer> {
+    const raw = this.respond271(edi270);
+    return { format: "x12", raw, response: parse271(raw) };
+  }
+
+  /** The 271 this simulated payer sends back. */
+  respond271(edi270: string): string {
     const q = parse270(edi270);
     const now = new Date();
     const control = String(hashStr(edi270 + "271") % 1_000_000_000);
@@ -237,7 +255,24 @@ export class MockClearinghouse implements ClearinghouseGateway {
 }
 
 let gateway: ClearinghouseGateway | null = null;
+/**
+ * The configured clearinghouse. CLEARINGHOUSE=stedi with STEDI_API_KEY sends
+ * real transactions through Stedi; anything else uses the simulator, which is
+ * never mistaken for a real payer: its acknowledgments name MOCKCH.
+ */
 export function getClearinghouse(): ClearinghouseGateway {
-  if (!gateway) gateway = new MockClearinghouse();
+  if (gateway) return gateway;
+  if (process.env.CLEARINGHOUSE?.trim().toLowerCase() === "stedi") {
+    const key = process.env.STEDI_API_KEY?.trim();
+    if (!key) throw new Error("CLEARINGHOUSE=stedi needs STEDI_API_KEY");
+    gateway = new StediClearinghouse(key);
+  } else {
+    gateway = new MockClearinghouse();
+  }
   return gateway;
+}
+
+/** Which clearinghouse is live, for the UI and the site's claims about itself. */
+export function clearinghouseName(): "Stedi" | "Simulated" {
+  return process.env.CLEARINGHOUSE?.trim().toLowerCase() === "stedi" && process.env.STEDI_API_KEY ? "Stedi" : "Simulated";
 }

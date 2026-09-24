@@ -97,7 +97,9 @@ describe("MockClearinghouse adjudication", () => {
         payer: { name: "Blue Cross Blue Shield FL", payerId: "00590" }, provider: { name: "Summit", npi: "1234567893" },
         subscriber: { lastName: "Garcia", firstName: "Maria", memberId, dob: "1980-01-01" }, serviceDate: "2026-09-01",
       });
-      const parsed = parse271(await ch.checkEligibility(edi270));
+      const answer = await ch.checkEligibility(edi270);
+      expect(answer.format).toBe("x12");
+      const parsed = parse271(answer.raw);
       expect(parsed.traceNumber).toBe(`T${memberId}`);
       const r = summarize271(parsed);
       expect(r.status).toBe("active");

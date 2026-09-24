@@ -2,7 +2,7 @@ import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { getClearinghouse } from "@/lib/clearinghouse/gateway";
-import { build270, parse271, summarize271, type EligibilitySummary } from "@/lib/edi/x270";
+import { build270, summarize271, type EligibilitySummary } from "@/lib/edi/x270";
 import { listAppointments } from "./encounters";
 
 const { patients, patientInsurances, payers, eligibilityChecks, encounters, ledgerEntries } = schema;
@@ -105,8 +105,9 @@ export async function runEligibility(db: Db, patientInsuranceId: string, service
   let response271: string | null = null;
   let summary: EligibilitySummary;
   try {
-    response271 = await getClearinghouse().checkEligibility(request270);
-    const parsed = parse271(response271);
+    const answer = await getClearinghouse().checkEligibility(request270);
+    response271 = answer.raw;
+    const parsed = answer.response;
     summary = parsed.traceNumber && parsed.traceNumber !== traceNumber
       ? { status: "error", message: `The 271 answered a different inquiry (trace ${parsed.traceNumber})` }
       : summarize271(parsed);

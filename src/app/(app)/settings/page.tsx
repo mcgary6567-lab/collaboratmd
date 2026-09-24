@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { Card, PageHeader, Badge } from "@/components/ui";
 import { money } from "@/lib/utils";
+import { clearinghouseName } from "@/lib/clearinghouse/gateway";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function SettingsPage() {
             <div className="flex justify-between"><dt className="text-slate-500">Tax ID</dt><dd className="font-mono">{practice.taxId}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">NPI (Type 2)</dt><dd className="font-mono">{practice.npi}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Address</dt><dd className="text-right">{practice.address1}<br />{practice.city}, {practice.state} {practice.zip}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Clearinghouse</dt><dd><Badge tone="amber">Mock sandbox</Badge></dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Clearinghouse</dt><dd>{clearinghouseName() === "Stedi" ? <Badge tone="green">Stedi (live)</Badge> : <Badge tone="amber">Simulated (set CLEARINGHOUSE=stedi)</Badge>}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">AI rejection support</dt><dd><Badge tone={process.env.ANTHROPIC_API_KEY ? "green" : "slate"}>{process.env.ANTHROPIC_API_KEY ? "Claude enabled" : "Rules-based (set ANTHROPIC_API_KEY)"}</Badge></dd></div>
           </dl>
         </Card>
