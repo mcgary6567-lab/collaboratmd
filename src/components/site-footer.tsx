@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Lock, MapPin, ScrollText, ShieldCheck } from "lucide-react";
+import { ArrowRight, Lock, Mail, MapPin, MessageCircle, ScrollText, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { COMPANY, addressLines } from "@/content/company";
+import { COMPANY, addressLines, whatsappLink } from "@/content/company";
 
 /**
  * Brand glyphs are drawn here rather than pulled from the icon set: the icon
@@ -124,6 +124,25 @@ export function SiteFooter() {
                 {addressLines()[1]}
               </address>
             </div>
+            <div className="mt-3 space-y-2 text-sm">
+              <a
+                href={`mailto:${COMPANY.contact.general}`}
+                className="flex items-center gap-2.5 text-slate-600 transition-colors hover:text-green-700"
+              >
+                <Mail className="h-4 w-4 shrink-0 text-green-600" />
+                {COMPANY.contact.general}
+              </a>
+              <a
+                href={whatsappLink()}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="flex items-center gap-2.5 text-slate-600 transition-colors hover:text-green-700"
+              >
+                <MessageCircle className="h-4 w-4 shrink-0 text-green-600" />
+                {COMPANY.contact.whatsappDisplay}
+              </a>
+            </div>
+
             <div className="mt-5 flex items-center gap-2.5">
               {SOCIAL.map(({ href, label, Icon }) => (
                 <a
@@ -161,6 +180,7 @@ export function SiteFooter() {
           </p>
           <div className="flex gap-6 text-sm font-medium text-slate-600 sm:ml-auto">
             <Link href="/login" className="hover:text-green-700">Sign in</Link>
+            <Link href="/unsubscribe" className="hover:text-green-700">Unsubscribe</Link>
             <a
               href="https://github.com/mcgary6567-lab/collaboratmd"
               className="hover:text-green-700"

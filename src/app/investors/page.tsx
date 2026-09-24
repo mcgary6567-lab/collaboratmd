@@ -3,13 +3,13 @@ import Link from "next/link";
 import {
   Activity, ArrowRight, BadgeCheck, Binary, Boxes, CheckCircle2, Database, FileCheck2,
   Gauge, Landmark, Layers, LineChart, Lock, Radar, Repeat, ScanLine, ShieldCheck,
-  Sparkles, Timer, TrendingUp, Users, Workflow,
+  Mail, MessageCircle, Sparkles, Timer, TrendingUp, Users, Workflow,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Prose } from "@/components/page-shell";
-import { COMPANY, addressLine } from "@/content/company";
+import { COMPANY, addressLine, whatsappLink } from "@/content/company";
 import { publicMetrics } from "@/server/public-metrics";
 import { compactMoney, pct } from "@/components/kpi";
 
@@ -182,7 +182,7 @@ export default async function InvestorsPage() {
             the moment the claim is created and makes the money trail auditable end to end.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/contact" className="btn bg-green-600 px-6 py-3 text-base text-white hover:bg-green-700">
+            <Link href="/contact?topic=investor" className="btn bg-green-600 px-6 py-3 text-base text-white hover:bg-green-700">
               Request the data room <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href="/login" className="btn btn-secondary px-6 py-3 text-base">
@@ -446,11 +446,27 @@ export default async function InvestorsPage() {
               Start a conversation
             </h2>
             <p className="mx-auto mt-4 max-w-xl leading-relaxed text-green-50">
-              Select the investor topic on the contact form. Tell us the fund, the stage you lead and
-              one healthcare company you have backed, and we will send the data room.
+              Tell us the fund, the stage you lead and one healthcare company you have backed, and we
+              will send the data room within one business day.
             </p>
+            <div className="mx-auto mt-7 flex max-w-lg flex-col justify-center gap-3 sm:flex-row">
+              <a
+                href={`mailto:${COMPANY.contact.investors}`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/40 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10"
+              >
+                <Mail className="h-4 w-4" /> {COMPANY.contact.investors}
+              </a>
+              <a
+                href={whatsappLink("Hi CollaboratMD, I am an investor and would like the data room.")}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/40 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10"
+              >
+                <MessageCircle className="h-4 w-4" /> WhatsApp
+              </a>
+            </div>
             <Link
-              href="/contact"
+              href="/contact?topic=investor"
               className="mt-8 inline-flex items-center gap-2 rounded-lg bg-white px-7 py-3.5 text-base font-bold text-green-700 transition-colors hover:bg-green-50"
             >
               Request the data room <ArrowRight className="h-4 w-4" />

@@ -305,6 +305,12 @@ export const contactMessages = pgTable("contact_messages", {
   topic: text("topic").notNull(),
   message: text("message").notNull(),
   status: text("status").notNull().default("new"),
+  /** Investor submissions only; null everywhere else. */
+  fund: text("fund"),
+  stage: text("stage"),
+  checkSize: text("check_size"),
+  /** Campaign parameters carried in on the landing URL. */
+  source: jsonb("source").$type<Record<string, string>>(),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

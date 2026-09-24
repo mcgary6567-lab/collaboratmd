@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { BookOpen, LifeBuoy, Lock, MapPin, MessagesSquare, TrendingUp } from "lucide-react";
+import { BookOpen, LifeBuoy, Lock, Mail, MapPin, MessageCircle, MessagesSquare, TrendingUp } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 import { ContactForm } from "./contact-form";
-import { COMPANY, addressLines } from "@/content/company";
+import { COMPANY, addressLines, whatsappLink } from "@/content/company";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,15 @@ const ROUTES = [
   },
 ];
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topic?: string }>;
+}) {
+  const { topic } = await searchParams;
+  const valid = ["sales", "investor", "support", "privacy", "security", "press"];
+  const defaultTopic = topic && valid.includes(topic) ? topic : "sales";
+
   return (
     <PageShell
       eyebrow="Company"
@@ -51,7 +59,7 @@ export default function ContactPage() {
       <div className="grid gap-12 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm lg:p-9">
-            <ContactForm />
+            <ContactForm defaultTopic={defaultTopic} />
           </div>
         </div>
 
@@ -100,6 +108,35 @@ export default function ContactPage() {
             <p className="mt-5 text-xs leading-relaxed text-slate-500">
               Measured from receipt during business hours, Monday through Friday.
             </p>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <a
+              href={`mailto:${COMPANY.contact.general}`}
+              className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-green-600"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <Mail className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">Email us directly</div>
+                <div className="truncate text-sm text-slate-600">{COMPANY.contact.general}</div>
+              </div>
+            </a>
+            <a
+              href={whatsappLink("Hi CollaboratMD, I have a question about the platform.")}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-green-600"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <MessageCircle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">WhatsApp</div>
+                <div className="text-sm text-slate-600">{COMPANY.contact.whatsappDisplay}</div>
+              </div>
+            </a>
           </div>
 
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">

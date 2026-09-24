@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
 import { contactAction, type ContactState } from "./actions";
 
@@ -18,11 +18,42 @@ function FieldError({ message }: { message?: string }) {
   return <span className="mt-1.5 block text-xs font-medium text-red-600">{message}</span>;
 }
 
-export function ContactForm() {
+const SOURCE_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "ref"];
+
+export function ContactForm({ defaultTopic = "sales" }: { defaultTopic?: string }) {
   const [state, action, pending] = useActionState<ContactState | undefined, FormData>(
     contactAction,
     undefined,
   );
+
+  const [topic, setTopic] = useState(defaultTopic);
+  const sourceRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Carries campaign parameters from the landing URL into the submission, so an
+   * outbound email can be tied to the reply it produced. Read from the address
+   * bar in an effect rather than through the router hook, which would force the
+   * whole form behind a Suspense boundary for a hidden field.
+   */
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const out: Record<string, string> = {};
+      for (const k of SOURCE_KEYS) {
+        const v = params.get(k);
+        if (v) out[k] = v;
+      }
+      const referrer = document.referrer;
+      if (!out.ref && referrer && !referrer.includes(window.location.host)) out.ref = referrer;
+      if (sourceRef.current && Object.keys(out).length) {
+        sourceRef.current.value = JSON.stringify(out);
+      }
+    } catch {
+      // A blocked address bar or referrer is not worth failing the form over.
+    }
+  }, []);
+
+  const investor = topic === "investor";
 
   if (state?.ok) {
     return (
@@ -30,8 +61,9 @@ export function ContactForm() {
         <CheckCircle2 className="mx-auto h-10 w-10 text-green-600" />
         <h3 className="mt-4 text-lg font-bold text-slate-900">Thank you, we have your message</h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-700">
-          It has been recorded and routed to the queue for the topic you selected. We reply to every
-          message, and the response times on this page are the ones we hold ourselves to.
+          It has been recorded and routed to the queue for the topic you selected, and a
+          confirmation is on its way to your inbox. We reply to every message, and the response
+          times on this page are the ones we hold ourselves to.
         </p>
         {state.reference && (
           <p className="mt-5 text-sm text-slate-600">
@@ -58,6 +90,7 @@ export function ContactForm() {
           Company website
           <input name="company_website" tabIndex={-1} autoComplete="off" />
         </label>
+        <input type="hidden" name="source" ref={sourceRef} />
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
@@ -80,7 +113,12 @@ export function ContactForm() {
         </label>
         <label className="block">
           <span className="label">Topic</span>
-          <select name="topic" className="select" defaultValue={state?.values?.topic ?? "sales"}>
+          <select
+            name="topic"
+            className="select"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+          >
             {TOPICS.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -89,6 +127,41 @@ export function ContactForm() {
           </select>
         </label>
       </div>
+
+      {investor && (
+        <div className="rounded-xl border border-green-200 bg-green-50/60 p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-green-700">
+            So we can send the right material
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <label className="block">
+              <span className="label">Fund</span>
+              <input name="fund" className="input" defaultValue={state?.values?.fund} />
+            </label>
+            <label className="block">
+              <span className="label">Stage you lead</span>
+              <select name="stage" className="select" defaultValue={state?.values?.stage ?? ""}>
+                <option value="">Select</option>
+                <option>Pre-seed</option>
+                <option>Seed</option>
+                <option>Series A</option>
+                <option>Series B or later</option>
+                <option>Angel</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="label">Typical check</span>
+              <select name="checkSize" className="select" defaultValue={state?.values?.checkSize ?? ""}>
+                <option value="">Select</option>
+                <option>Under $250k</option>
+                <option>$250k to $1M</option>
+                <option>$1M to $5M</option>
+                <option>Over $5M</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      )}
 
       <label className="block">
         <span className="label">How can we help?</span>
