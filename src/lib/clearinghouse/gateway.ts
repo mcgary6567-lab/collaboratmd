@@ -32,6 +32,9 @@ export interface EligibilityResult {
   deductibleCents?: number;
   deductibleRemainingCents?: number;
   oopMaxCents?: number;
+  /** Patient share after the deductible, 0-100. */
+  coinsurancePct?: number;
+  oopRemainingCents?: number;
   raw: Record<string, unknown>;
 }
 
@@ -93,13 +96,17 @@ export class MockClearinghouse implements ClearinghouseGateway {
     }
     const deductible = pick([50000, 100000, 150000, 300000], h);
     const remaining = Math.round(deductible * ((h % 7) / 7));
+    const oopMax = deductible * 3;
     return {
       status: "active",
       planName: pick(["PPO Choice Plus", "HMO Select", "POS Standard", "High Deductible Health Plan"], h),
       copayCents: pick([2000, 2500, 3000, 4000], h, 3),
       deductibleCents: deductible,
       deductibleRemainingCents: remaining,
-      oopMaxCents: deductible * 3,
+      oopMaxCents: oopMax,
+      coinsurancePct: pick([10, 20, 30], h, 5),
+      // Spent so far is the deductible already met; the rest of the maximum remains.
+      oopRemainingCents: oopMax - (deductible - remaining),
       raw: { transaction: "271", eb: "1", coverageLevel: "IND", serviceDate: req.serviceDate },
     };
   }

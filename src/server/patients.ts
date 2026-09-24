@@ -101,6 +101,8 @@ export async function runEligibility(db: Db, patientInsuranceId: string) {
       deductibleCents: result.deductibleCents ?? null,
       deductibleRemainingCents: result.deductibleRemainingCents ?? null,
       oopMaxCents: result.oopMaxCents ?? null,
+      coinsurancePct: result.coinsurancePct ?? null,
+      oopRemainingCents: result.oopRemainingCents ?? null,
       response: result.raw,
     })
     .returning();

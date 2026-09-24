@@ -1,0 +1,10 @@
+{
+  "//": "For operational scripts run with tsx (npm run script <file>). Server modules import the server-only guard, which only resolves inside Next; outside it, map the guard to an empty module so scripts can call the same server code the app runs.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "server-only": ["./src/test/empty.ts"]
+    }
+  }
+}

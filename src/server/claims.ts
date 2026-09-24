@@ -283,6 +283,7 @@ export interface ClaimFinancials {
   patientPaidCents: number;
   adjustmentsCents: number;
   patientRespCents: number;
+  discountsCents: number;
   insuranceBalanceCents: number;
   patientBalanceCents: number;
 }
@@ -294,6 +295,7 @@ export function computeFinancials(entries: { type: string; amountCents: number }
   const patientPaidCents = sum("patient_payment");
   const adjustmentsCents = sum("adjustment") + sum("write_off");
   const patientRespCents = sum("transfer_to_patient");
+  const discountsCents = sum("discount");
   const refunds = sum("refund");
   return {
     chargesCents,
@@ -301,8 +303,9 @@ export function computeFinancials(entries: { type: string; amountCents: number }
     patientPaidCents,
     adjustmentsCents,
     patientRespCents,
+    discountsCents,
     insuranceBalanceCents: chargesCents - insurancePaidCents - adjustmentsCents - patientRespCents,
-    patientBalanceCents: patientRespCents - patientPaidCents + refunds,
+    patientBalanceCents: patientRespCents - patientPaidCents - discountsCents + refunds,
   };
 }
 

@@ -122,3 +122,23 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+/* Printable documents (statements, estimates): drop the app chrome. */
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .card {
+    box-shadow: none !important;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+}

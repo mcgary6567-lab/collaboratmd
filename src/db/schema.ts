@@ -7,6 +7,7 @@ import {
   timestamp,
   date,
   jsonb,
+  numeric,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -112,6 +113,8 @@ export const eligibilityChecks = pgTable("eligibility_checks", {
   deductibleCents: integer("deductible_cents"),
   deductibleRemainingCents: integer("deductible_remaining_cents"),
   oopMaxCents: integer("oop_max_cents"),
+  coinsurancePct: numeric("coinsurance_pct", { precision: 5, scale: 2, mode: "number" }),
+  oopRemainingCents: integer("oop_remaining_cents"),
   response: jsonb("response").$type<Record<string, unknown>>(),
   checkedAt: timestamp("checked_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -235,7 +238,7 @@ export const ledgerEntries = pgTable(
     claimId: uuid("claim_id").references(() => claims.id),
     chargeId: uuid("charge_id").references(() => charges.id),
     remittanceId: uuid("remittance_id").references(() => remittances.id),
-    // charge | insurance_payment | patient_payment | adjustment | write_off | transfer_to_patient | refund | reversal
+    // charge | insurance_payment | patient_payment | adjustment | write_off | transfer_to_patient | discount | refund | reversal
     type: text("type").notNull(),
     amountCents: integer("amount_cents").notNull(),
     groupCode: text("group_code"), // CO | PR | OA | PI
@@ -332,6 +335,104 @@ export const underpayments = pgTable("underpayments", {
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
 });
 
+/* ------------------------------------------------------------------ */
+/* Patient billing                                                      */
+/* ------------------------------------------------------------------ */
+
+export const discountPolicies = pgTable("discount_policies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  kind: text("kind").notNull(), // self_pay | prompt_pay | hardship | courtesy
+  percent: numeric("percent", { precision: 5, scale: 2, mode: "number" }).notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const paymentPlans = pgTable("payment_plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  totalCents: integer("total_cents").notNull(),
+  installmentCount: integer("installment_count").notNull(),
+  frequency: text("frequency").notNull().default("monthly"), // monthly | biweekly
+  startDate: date("start_date").notNull(),
+  status: text("status").notNull().default("active"), // active | completed | cancelled | defaulted
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const paymentPlanInstallments = pgTable("payment_plan_installments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  planId: uuid("plan_id").notNull().references(() => paymentPlans.id, { onDelete: "cascade" }),
+  seq: integer("seq").notNull(),
+  dueDate: date("due_date").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  paidCents: integer("paid_cents").notNull().default(0),
+  status: text("status").notNull().default("scheduled"), // scheduled | partial | paid | missed
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+});
+
+export interface StatementVisit {
+  claimId: string | null;
+  dateOfService: string | null;
+  provider: string | null;
+  services: { cpt: string; description: string }[];
+  chargesCents: number;
+  insurancePaidCents: number;
+  adjustmentsCents: number;
+  patientPaidCents: number;
+  youOweCents: number;
+}
+
+export const statements = pgTable("statements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  statementNumber: text("statement_number").notNull(),
+  statementDate: date("statement_date").notNull(),
+  dueDate: date("due_date").notNull(),
+  chargesCents: integer("charges_cents").notNull(),
+  insurancePaidCents: integer("insurance_paid_cents").notNull(),
+  adjustmentsCents: integer("adjustments_cents").notNull(),
+  patientPaidCents: integer("patient_paid_cents").notNull(),
+  amountDueCents: integer("amount_due_cents").notNull(),
+  detail: jsonb("detail").$type<{ visits: StatementVisit[]; unappliedPaymentsCents: number; discountsCents: number }>().notNull(),
+  status: text("status").notNull().default("generated"), // generated | sent | void
+  channel: text("channel"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export interface EstimateLine {
+  cpt: string;
+  description: string;
+  units: number;
+  chargeCents: number;
+  allowedCents: number;
+}
+
+export const estimates = pgTable("estimates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  patientInsuranceId: uuid("patient_insurance_id").references(() => patientInsurances.id),
+  estimateNumber: text("estimate_number").notNull(),
+  kind: text("kind").notNull(), // insured | good_faith
+  serviceDate: date("service_date"),
+  lines: jsonb("lines").$type<EstimateLine[]>().notNull(),
+  totalChargeCents: integer("total_charge_cents").notNull(),
+  allowedCents: integer("allowed_cents").notNull(),
+  insurancePaysCents: integer("insurance_pays_cents").notNull(),
+  patientOwesCents: integer("patient_owes_cents").notNull(),
+  basis: jsonb("basis").$type<Record<string, unknown>>().notNull(),
+  validUntil: date("valid_until"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /**
  * Messages from the public contact form.
  *
@@ -358,6 +459,11 @@ export const contactMessages = pgTable("contact_messages", {
 export type ContactMessage = typeof contactMessages.$inferSelect;
 export type FeeSchedule = typeof feeSchedules.$inferSelect;
 export type Underpayment = typeof underpayments.$inferSelect;
+export type DiscountPolicy = typeof discountPolicies.$inferSelect;
+export type PaymentPlan = typeof paymentPlans.$inferSelect;
+export type PaymentPlanInstallment = typeof paymentPlanInstallments.$inferSelect;
+export type Statement = typeof statements.$inferSelect;
+export type Estimate = typeof estimates.$inferSelect;
 export type Practice = typeof practices.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Provider = typeof providers.$inferSelect;

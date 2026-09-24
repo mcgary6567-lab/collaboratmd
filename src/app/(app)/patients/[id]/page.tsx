@@ -7,6 +7,7 @@ import { computeFinancials } from "@/server/claims";
 import { eligibilityAction, patientPaymentAction } from "@/app/(app)/actions";
 import { Card, PageHeader, Badge, Money, Empty, Field } from "@/components/ui";
 import { fmtDate, fmtDateTime, money } from "@/lib/utils";
+import { BillingSection } from "./billing-section";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             <div className="flex justify-between"><dt className="text-slate-500">Insurance paid</dt><dd><Money cents={fin.insurancePaidCents} /></dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Adjustments</dt><dd><Money cents={fin.adjustmentsCents} /></dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Patient paid</dt><dd><Money cents={fin.patientPaidCents} /></dd></div>
+            {fin.discountsCents > 0 && <div className="flex justify-between"><dt className="text-slate-500">Discounts</dt><dd><Money cents={fin.discountsCents} /></dd></div>}
             <div className="flex justify-between border-t pt-1 font-semibold"><dt>Insurance balance</dt><dd><Money cents={fin.insuranceBalanceCents} /></dd></div>
             <div className="flex justify-between font-semibold"><dt>Patient balance</dt><dd className={fin.patientBalanceCents > 0 ? "text-red-700" : ""}><Money cents={fin.patientBalanceCents} /></dd></div>
           </dl>
@@ -92,6 +94,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           </form>
         </Card>
       </div>
+
+      <BillingSection db={db} practiceId={s.practiceId} patientId={patient.id} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Visits">
