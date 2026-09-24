@@ -16,6 +16,7 @@ import { buildAck, parseHl7, type Hl7Message } from "@/lib/hl7/v2";
 import { ADT_EVENTS, extractEncounter, extractInsurance, extractPatient, type Hl7Insurance, type Hl7Patient } from "@/lib/hl7/extract";
 import { createEncounterWithClaim } from "./encounters";
 import { standardCharges } from "./fees";
+import { applyOru } from "./labs";
 
 const { integrationKeys, integrationMessages, patients, patientInsurances, payers, providers } = schema;
 
@@ -165,7 +166,8 @@ async function applyMessage(db: Db, practiceId: string, msg: Hl7Message, userId?
       result: { patientId: up.patientId, claimId: claim.id, claimStatus: claim.status, lines: lines.length },
     };
   }
-  throw new UnsupportedError(`${msg.type}^${msg.event} is not supported; send ADT A01/A04/A05/A08/A28/A31 or DFT P03`);
+  if (msg.type === "ORU" && msg.event === "R01") return applyOru(db, practiceId, msg);
+  throw new UnsupportedError(`${msg.type}^${msg.event} is not supported; send ADT A01/A04/A05/A08/A28/A31, DFT P03 or ORU R01`);
 }
 
 class UnsupportedError extends Error {}

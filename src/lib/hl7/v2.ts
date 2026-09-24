@@ -157,3 +157,9 @@ export function buildAck(msg: Hl7Message | null, code: "AA" | "AE" | "AR", text 
   const err = code === "AA" ? "" : `\r${["ERR", "", "", "", code === "AR" ? "E" : "W", "", "", "", clean(text)].join(f)}`;
   return `${msh}\r${msa}${err}\r`;
 }
+
+/** A segment from field numbers (values already encoded), so no field lands one pipe off. */
+export function buildSegment(id: string, fields: Record<number, string>): string {
+  const n = Math.max(0, ...Object.keys(fields).map(Number));
+  return [id, ...Array.from({ length: n }, (_, i) => fields[i + 1] ?? "")].join("|");
+}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown, Wallet, ClipboardCheck, Network, Upload } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown, Wallet, ClipboardCheck, Network, Upload, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 import { PracticeSwitcher } from "@/components/practice-switcher";
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/import", label: "Import", icon: Upload },
   { href: "/encounters/new", label: "Charge Entry", icon: Stethoscope },
+  { href: "/labs", label: "Labs", icon: FlaskConical },
   { href: "/claims", label: "Claims", icon: FileText },
   { href: "/remittance", label: "Remittance (ERA)", icon: Receipt },
   { href: "/billing", label: "Patient billing", icon: Wallet },

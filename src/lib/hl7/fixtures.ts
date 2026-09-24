@@ -1,9 +1,5 @@
 /** Sample HL7 messages for tests and the integration page's examples. */
-/** A segment from field numbers, so fixtures cannot miscount pipes. */
-export function seg(id: string, fields: Record<number, string>): string {
-  const n = Math.max(0, ...Object.keys(fields).map(Number));
-  return [id, ...Array.from({ length: n }, (_, i) => fields[i + 1] ?? "")].join("|");
-}
+import { buildSegment as seg } from "./v2";
 
 export const ADT_A04 = [
   "MSH|^~\\&|EPIC|SUMMITCLINIC|COLLABORATMD|SUMMIT|20260924083000||ADT^A04^ADT_A01|MSG00001|P|2.5.1",

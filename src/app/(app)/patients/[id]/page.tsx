@@ -9,6 +9,7 @@ import { Card, PageHeader, Badge, Money, Empty, Field } from "@/components/ui";
 import { fmtDate, fmtDateTime, money } from "@/lib/utils";
 import { BillingSection } from "./billing-section";
 import { AuthorizationsSection } from "./authorizations-section";
+import { LabsSection } from "./labs-section";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
 
       <BillingSection db={db} practiceId={s.practiceId} patientId={patient.id} />
       <AuthorizationsSection db={db} practiceId={s.practiceId} patientId={patient.id} />
+      <LabsSection db={db} practiceId={s.practiceId} patientId={patient.id} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Visits">

@@ -50,7 +50,8 @@ export default async function IntegrationsPage() {
               </li>
               <li>
                 Send <span className="font-medium">ADT</span> A01, A04, A05, A08, A28 or A31 to register and update patients and their primary insurance, and{" "}
-                <span className="font-medium">DFT^P03</span> to post charges. Each DFT becomes a claim that goes through the scrubber.
+                <span className="font-medium">DFT^P03</span> to post charges. Each DFT becomes a claim that goes through the scrubber. Labs send{" "}
+                <span className="font-medium">ORU^R01</span> results, which attach to the matching order.
               </li>
               <li>The response body is the HL7 ACK: AA applied, AE fix and resend, AR not supported. A resent message (same MSH-10) is acknowledged but not applied twice.</li>
             </ol>

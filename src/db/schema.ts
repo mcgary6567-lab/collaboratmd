@@ -582,6 +582,51 @@ export const importJobs = pgTable("import_jobs", {
 });
 
 /* ------------------------------------------------------------------ */
+/* Labs                                                                 */
+/* ------------------------------------------------------------------ */
+
+export type LabOrderTest = { code: string; name: string; cpt: string };
+
+export const labOrders = pgTable(
+  "lab_orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    practiceId: uuid("practice_id").notNull().references(() => practices.id),
+    patientId: uuid("patient_id").notNull().references(() => patients.id),
+    providerId: uuid("provider_id").notNull().references(() => providers.id),
+    labCode: text("lab_code").notNull(),
+    placerOrderNumber: text("placer_order_number").notNull(),
+    fillerOrderNumber: text("filler_order_number"),
+    tests: jsonb("tests").$type<LabOrderTest[]>().notNull(),
+    diagnoses: jsonb("diagnoses").$type<string[]>().notNull().default([]),
+    status: text("status").notNull().default("ordered"),
+    ormMessage: text("orm_message").notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    resultedAt: timestamp("resulted_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("lab_orders_placer_idx").on(t.practiceId, t.placerOrderNumber)],
+);
+
+export const labResults = pgTable("lab_results", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orderId: uuid("order_id").notNull().references(() => labOrders.id),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  testCode: text("test_code").notNull(),
+  loinc: text("loinc").notNull(),
+  name: text("name").notNull(),
+  value: text("value").notNull(),
+  units: text("units"),
+  referenceRange: text("reference_range"),
+  flag: text("flag"),
+  status: text("status").notNull().default("F"),
+  observedAt: date("observed_at"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* ------------------------------------------------------------------ */
 /* Digital check-in                                                     */
 /* ------------------------------------------------------------------ */
 
