@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { submitClaim, rescrubClaim, fetchAndPostRemittances, importRemittance, postRemittance, writeOffClaim, transferToPatient, createCorrectedClaim } from "@/server/claims";
+import { submitClaim, rescrubClaim, fetchAndPostRemittances, importRemittance, postRemittance, writeOffClaim, transferToPatient } from "@/server/claims";
 import { createPatient, runEligibility, postPatientPayment } from "@/server/patients";
 import { createEncounterWithClaim, createAppointment, setAppointmentStatus } from "@/server/encounters";
 import { updateDenialStatus } from "@/server/reports";
@@ -77,15 +77,6 @@ export async function transferToPatientAction(claimId: string): Promise<void> {
   const db = await getDb();
   await transferToPatient(db, claimId, s.userId);
   revalidatePath(`/claims/${claimId}`);
-}
-
-export async function correctedClaimAction(claimId: string): Promise<void> {
-  const s = await requireSession();
-  const db = await getDb();
-  const created = await createCorrectedClaim(db, claimId, s.userId);
-  revalidatePath("/claims");
-  revalidatePath("/denials");
-  redirect(`/claims/${created.id}`);
 }
 
 /* --------------------------- Remittance --------------------------- */

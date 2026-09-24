@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { MockClearinghouse } from "./gateway";
 import { parseEdi835 } from "@/lib/edi/x835";
+import { buildEdi837P } from "@/lib/edi/x837p";
+import { parse999 } from "@/lib/edi/x999";
+import { parse277CA } from "@/lib/edi/x277ca";
 
 const ch = new MockClearinghouse();
 
@@ -55,12 +58,35 @@ describe("MockClearinghouse adjudication", () => {
     expect(denied.adjustments[0].group).toBe("CO");
   });
 
-  it("rejects submissions with an invalid subscriber ID and accepts valid ones", async () => {
-    const bad = await ch.submit837("ISA*00*~CLM*CMD1*100.00~", { controlNumber: "CMD1", memberId: "BC123X" });
+  it("rejects submissions with an invalid subscriber ID and accepts valid ones, with real acknowledgments", async () => {
+    const edi = (control: string, memberId: string) =>
+      buildEdi837P({
+        controlNumber: control, interchangeControl: "1", senderId: "COLLABORATMD", receiverId: "60054", now: new Date("2026-09-24T12:00:00Z"),
+        billingProvider: { name: "Summit", npi: "1234567893", taxId: "84-2917465", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201" },
+        renderingProvider: { lastName: "King", firstName: "Jacob", npi: "1234567893", taxonomy: "207Q00000X" },
+        payer: { name: "Aetna", payerId: "60054" },
+        subscriber: { lastName: "Doe", firstName: "Jane", memberId, groupNumber: null, dob: "1980-01-01", sex: "F", relationship: "self" },
+        claim: { totalCents: 10_000, placeOfService: "11", frequencyCode: "1", dateOfService: "2026-09-20", diagnoses: ["E11.9"] },
+        lines: [{ cpt: "99213", modifiers: [], chargeCents: 10_000, units: 1, dxPointers: [1], dateOfService: "2026-09-20" }],
+      });
+
+    const bad = await ch.submit837(edi("CMD1", "BC123X"), { controlNumber: "CMD1", memberId: "BC123X", chargeCents: 10_000 });
     expect(bad.accepted).toBe(false);
     expect(bad.rejectionCode).toBe("A7:164:IL");
-    const good = await ch.submit837("ISA*00*~CLM*CMD2*100.00~", { controlNumber: "CMD2", memberId: "BC123A" });
+    expect(parse999(bad.ack999!).accepted).toBe(true); // syntax was fine; the claim itself was rejected
+    expect(parse277CA(bad.ack277!)[0]).toMatchObject({ controlNumber: "CMD1", accepted: false, category: "A7" });
+
+    const good = await ch.submit837(edi("CMD2", "BC123A"), { controlNumber: "CMD2", memberId: "BC123A", chargeCents: 10_000 });
     expect(good.accepted).toBe(true);
+    expect(parse277CA(good.ack277!)[0]).toMatchObject({ controlNumber: "CMD2", accepted: true, category: "A2", statusCode: "20" });
+  });
+
+  it("rejects a malformed file with a 999 and sends no 277CA", async () => {
+    const r = await ch.submit837("ISA*00*~CLM*CMD3*100.00~", { controlNumber: "CMD3", memberId: "BC123A" });
+    expect(r.accepted).toBe(false);
+    expect(r.rejectionCode).toBe("999:R");
+    expect(parse999(r.ack999!).accepted).toBe(false);
+    expect(r.ack277).toBeUndefined();
   });
 
   it("returns complete, finite benefits for every eligibility check", async () => {

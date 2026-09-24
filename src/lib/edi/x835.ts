@@ -6,6 +6,7 @@
  * remark codes (LQ*HE). Generator is used by the mock clearinghouse to
  * simulate payer adjudication.
  */
+import { tokenize } from "./x12";
 
 export interface Adjustment {
   group: "CO" | "PR" | "OA" | "PI" | string;
@@ -55,12 +56,8 @@ function isoDate(d8: string | undefined): string {
 }
 
 export function parseEdi835(raw: string): Remit835 {
-  const text = raw.replace(/\r?\n/g, "");
-  const segments = text
-    .split("~")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((s) => s.split("*"));
+  // Delimiters come from the ISA header: a real payer's file may not use "*" and "~".
+  const { segments, delimiters } = tokenize(raw);
 
   const remit: Remit835 = {
     payerName: "",
@@ -125,7 +122,7 @@ export function parseEdi835(raw: string): Remit835 {
         break;
       case "SVC": {
         if (!current) break;
-        const composite = (seg[1] ?? "").split(":");
+        const composite = (seg[1] ?? "").split(delimiters.component);
         currentLine = {
           cpt: composite[1] ?? "",
           modifiers: composite.slice(2).filter(Boolean),
@@ -188,7 +185,11 @@ export function buildEdi835(input: {
   s.push(["ISA", "00", " ".repeat(10), "00", " ".repeat(10), "ZZ", input.payerId.padEnd(15), "ZZ", "COLLABORATMD".padEnd(15), d8.slice(2), "1200", "^", "00501", "000000001", "0", "P", ":"]);
   s.push(["GS", "HP", input.payerId, "COLLABORATMD", d8, "1200", "1", "X", "005010X221A1"]);
   s.push(["ST", "835", "0001"]);
-  s.push(["BPR", "I", money(total), "C", "ACH", "CCP", "01", "999999999", "DA", "123456", "1234567890", "", "01", "999999999", "DA", "654321", d8]);
+  // BPR02 cannot be negative. When recoupments exceed payments the payer sends
+  // a notification-only remittance (BPR01 = H) and nets the rest from a later check.
+  s.push(total < 0
+    ? ["BPR", "H", money(0), "C", "NON", "", "", "", "", "", "", "", "", "", "", "", d8]
+    : ["BPR", "I", money(total), "C", "ACH", "CCP", "01", "999999999", "DA", "123456", "1234567890", "", "01", "999999999", "DA", "654321", d8]);
   s.push(["TRN", "1", input.checkNumber, "1" + input.payerId.padStart(9, "0").slice(-9)]);
   s.push(["DTM", "405", d8]);
   s.push(["N1", "PR", input.payerName]);

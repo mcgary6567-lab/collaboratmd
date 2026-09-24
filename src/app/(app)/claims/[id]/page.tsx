@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { loadClaimBundle, getClaimFinancials } from "@/server/claims";
-import { writeOffClaimAction, transferToPatientAction, correctedClaimAction } from "@/app/(app)/actions";
+import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
+import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
+import { billAgainAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader, StatusBadge, PatientLink, Money, Badge } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { ClaimActions } from "./claim-actions";
@@ -17,12 +19,27 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
   const db = await getDb();
   const b = await loadClaimBundle(db, id);
   if (!b || b.claim.practiceId !== s.practiceId) notFound();
-  const [events, fin, ledger, claimDenials] = await Promise.all([
+  const [events, fin, ledger, claimDenials, acks, related] = await Promise.all([
     db.select().from(schema.claimEvents).where(eq(schema.claimEvents.claimId, id)).orderBy(desc(schema.claimEvents.at)),
     getClaimFinancials(db, id),
     db.select().from(schema.ledgerEntries).where(eq(schema.ledgerEntries.claimId, id)).orderBy(asc(schema.ledgerEntries.postedAt)),
     db.select().from(schema.denials).where(eq(schema.denials.claimId, id)),
+    listAcknowledgments(db, id),
+    // The claim this one replaces or voids, and any claims that replace or void it.
+    db
+      .select({ id: schema.claims.id, controlNumber: schema.claims.controlNumber, frequencyCode: schema.claims.frequencyCode, status: schema.claims.status, originalClaimId: schema.claims.originalClaimId })
+      .from(schema.claims)
+      .where(and(eq(schema.claims.practiceId, s.practiceId), or(eq(schema.claims.originalClaimId, id), ...(b.claim.originalClaimId ? [eq(schema.claims.id, b.claim.originalClaimId)] : [])))),
   ]);
+  const original = related.find((r) => r.id === b.claim.originalClaimId);
+  const successors = related.filter((r) => r.originalClaimId === id);
+  const FREQ: Record<string, string> = { "1": "Original", "7": "Replacement", "8": "Void" };
+  const canCorrect = ["denied", "rejected"].includes(b.claim.status) && fin.insurancePaidCents === 0;
+  const canVoid =
+    ["paid", "partially_paid", "denied"].includes(b.claim.status) &&
+    b.claim.frequencyCode !== "8" &&
+    !!b.claim.payerClaimNumber &&
+    !successors.some((r) => r.frequencyCode === "8");
   const errors = b.claim.scrubResults.filter((f) => f.severity === "error");
   const warnings = b.claim.scrubResults.filter((f) => f.severity === "warning");
   const canSubmit = ["ready", "rejected"].includes(b.claim.status) || (b.claim.status === "scrub_errors" && errors.length === 0);
@@ -77,10 +94,12 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                 </div>
               ))}
               <div className="flex flex-wrap gap-2">
-                {["denied", "rejected", "closed"].includes(b.claim.status) && b.claim.status !== "closed" && (
-                  <form action={correctedClaimAction.bind(null, id)}>
-                    <button className="btn btn-primary text-xs">Create corrected claim (freq. 7)</button>
-                  </form>
+                {canCorrect && (
+                  <ActionForm action={correctClaimAction.bind(null, id)}>
+                    <SubmitButton className="btn btn-primary text-xs" pendingLabel="Creating...">
+                      {b.claim.payerClaimNumber ? "Create replacement claim (freq. 7)" : "Correct and resubmit as a new claim"}
+                    </SubmitButton>
+                  </ActionForm>
                 )}
                 {canClose && (
                   <>
@@ -94,6 +113,78 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                   </>
                 )}
               </div>
+            </Card>
+          )}
+
+          {(original || successors.length > 0 || b.claim.frequencyCode !== "1") && (
+            <Card title={`${FREQ[b.claim.frequencyCode] ?? "Claim"} claim · frequency ${b.claim.frequencyCode}`}>
+              <ul className="space-y-1 text-sm">
+                {original && (
+                  <li>
+                    {b.claim.frequencyCode === "8" ? "Voids" : "Replaces"}{" "}
+                    <Link className="font-mono text-brand-700 hover:underline" href={`/claims/${original.id}`}>{original.controlNumber}</Link>
+                    {b.claim.originalPayerClaimNumber && <> · cites payer claim <span className="font-mono">{b.claim.originalPayerClaimNumber}</span> in REF*F8</>}
+                  </li>
+                )}
+                {successors.map((r) => (
+                  <li key={r.id} className="flex items-center gap-2">
+                    {r.frequencyCode === "8" ? "Voided by" : "Replaced by"}
+                    <Link className="font-mono text-brand-700 hover:underline" href={`/claims/${r.id}`}>{r.controlNumber}</Link>
+                    <StatusBadge status={r.status} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {acks.length > 0 && (
+            <Card title="Clearinghouse acknowledgments">
+              <ul className="space-y-2 text-sm">
+                {acks.map((a) => (
+                  <li key={a.id} className={`rounded-lg border px-3 py-2 ${a.accepted ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={a.accepted ? "green" : "red"}>{a.kind}</Badge>
+                      <span className="font-mono text-xs">{a.code}</span>
+                      <span className="ml-auto text-xs text-slate-500">{fmtDateTime(a.receivedAt)}</span>
+                    </div>
+                    <p className="mt-1 text-slate-800">{a.message}</p>
+                    {a.raw && (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-xs text-slate-500">Raw X12</summary>
+                        <pre className="mt-1 max-h-48 overflow-auto rounded bg-slate-900 p-3 font-mono text-[11px] text-green-200">{a.raw}</pre>
+                      </details>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {(canVoid || b.claim.status === "voided") && (
+            <Card title={b.claim.status === "voided" ? "Voided" : "Void this claim"}>
+              {b.claim.status === "voided" ? (
+                <div className="space-y-2 text-sm text-slate-600">
+                  <p>
+                    The payer reversed this claim and its charge has been removed from A/R. If the service should still be billed, for example to
+                    the right patient or payer after fixing the record, bill it again as a new claim.
+                  </p>
+                  <ActionForm action={billAgainAction.bind(null, id)}>
+                    <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Creating...">Bill this encounter again</SubmitButton>
+                  </ActionForm>
+                </div>
+              ) : (
+                <ActionForm action={voidClaimAction.bind(null, id)} className="space-y-2 text-sm">
+                  <p className="text-slate-600">
+                    For a claim billed in error. This sends a frequency 8 claim citing payer claim{" "}
+                    <span className="font-mono">{b.claim.payerClaimNumber}</span>, and the payer answers with a reversal that takes back anything it
+                    paid. To fix a denied claim instead, create a corrected claim.
+                  </p>
+                  <div className="flex gap-2">
+                    <input name="reason" className="input flex-1 text-xs" placeholder="Why is this claim being voided?" required />
+                    <SubmitButton className="btn btn-danger text-xs" pendingLabel="Creating void...">Create void</SubmitButton>
+                  </div>
+                </ActionForm>
+              )}
             </Card>
           )}
 
@@ -151,7 +242,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             <dl className="space-y-1 text-sm">
               <div className="flex justify-between"><dt className="text-slate-500">Charges</dt><dd><Money cents={fin.chargesCents} /></dd></div>
               <div className="flex justify-between"><dt className="text-slate-500">Insurance paid</dt><dd className="text-green-700"><Money cents={fin.insurancePaidCents} /></dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Contractual adj.</dt><dd><Money cents={fin.adjustmentsCents} /></dd></div>
+              <div className="flex justify-between"><dt className="text-slate-500">Adjustments &amp; write-offs</dt><dd><Money cents={fin.adjustmentsCents} /></dd></div>
               <div className="flex justify-between"><dt className="text-slate-500">Patient resp.</dt><dd><Money cents={fin.patientRespCents} /></dd></div>
               <div className="flex justify-between border-t pt-1 font-semibold"><dt>Insurance balance</dt><dd><Money cents={fin.insuranceBalanceCents} /></dd></div>
             </dl>
@@ -164,6 +255,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               {b.insurance.groupNumber && <div>Group <span className="font-mono">{b.insurance.groupNumber}</span></div>}
               <div className="text-slate-500">Payer ID {b.payer.payerId} · timely filing {b.payer.timelyFilingDays}d</div>
               {b.claim.payerClaimNumber && <div className="mt-2">Payer claim # <span className="font-mono">{b.claim.payerClaimNumber}</span></div>}
+              {b.claim.authorizationNumber && <div>Prior auth <span className="font-mono">{b.claim.authorizationNumber}</span> (REF*G1)</div>}
             </div>
           </Card>
           <Card title="Timeline">

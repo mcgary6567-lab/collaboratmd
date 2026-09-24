@@ -50,7 +50,10 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
     db.execute<Record<string, string>>(sql`
       SELECT
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'charge'), 0)::bigint AS charges,
-        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'insurance_payment'), 0)::bigint AS ins_paid,
+        -- A reversal is money a payer took back (a recoupment), so it nets
+        -- against what was paid rather than counting as a separate flow.
+        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'insurance_payment'), 0)::bigint
+          - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'reversal'), 0)::bigint AS ins_paid,
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)::bigint AS pat_paid,
         COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('adjustment','write_off')), 0)::bigint AS adjustments,
         -- Contractual adjustments only. Write-offs are lost revenue and must
@@ -84,6 +87,7 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
         SELECT c.id,
                SUM(CASE WHEN l.type = 'charge' THEN l.amount_cents
                         WHEN l.type IN ('insurance_payment','adjustment','write_off','transfer_to_patient') THEN -l.amount_cents
+                        WHEN l.type = 'reversal' THEN l.amount_cents
                         ELSE 0 END) AS balance
         FROM claims c JOIN ledger_entries l ON l.claim_id = c.id
         WHERE c.practice_id = ${practiceId} AND c.status NOT IN ('paid','closed')
@@ -137,7 +141,8 @@ export async function monthlyTrend(db: Db, practiceId: string, months = 12) {
     SELECT
       to_char(date_trunc('month', posted_at), 'YYYY-MM') AS month,
       COALESCE(SUM(amount_cents) FILTER (WHERE type = 'charge'), 0)::bigint AS charges,
-      COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('insurance_payment','patient_payment')), 0)::bigint AS payments,
+      COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('insurance_payment','patient_payment')), 0)::bigint
+        - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'reversal'), 0)::bigint AS payments,
       COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('adjustment','write_off')), 0)::bigint AS adjustments
     FROM ledger_entries
     WHERE practice_id = ${practiceId}
@@ -174,6 +179,7 @@ export async function arAging(db: Db, practiceId: string): Promise<{ rows: Aging
       SELECT c.id, c.payer_id, e.date_of_service,
              SUM(CASE WHEN l.type = 'charge' THEN l.amount_cents
                       WHEN l.type IN ('insurance_payment','adjustment','write_off','transfer_to_patient') THEN -l.amount_cents
+                      WHEN l.type = 'reversal' THEN l.amount_cents
                       ELSE 0 END) AS balance
       FROM claims c
       JOIN encounters e ON e.id = c.encounter_id
@@ -183,6 +189,7 @@ export async function arAging(db: Db, practiceId: string): Promise<{ rows: Aging
       GROUP BY c.id, c.payer_id, e.date_of_service
       HAVING SUM(CASE WHEN l.type = 'charge' THEN l.amount_cents
                       WHEN l.type IN ('insurance_payment','adjustment','write_off','transfer_to_patient') THEN -l.amount_cents
+                      WHEN l.type = 'reversal' THEN l.amount_cents
                       ELSE 0 END) > 0
     )
     SELECT p.id AS payer_id, p.name AS payer,
@@ -228,9 +235,9 @@ export async function payerPerformance(db: Db, practiceId: string, limit = 12) {
              COUNT(*) FILTER (WHERE status = 'denied')::bigint AS denied
       FROM claims WHERE practice_id = ${practiceId} GROUP BY payer_id
     ), paid_agg AS (
-      SELECT c.payer_id, SUM(l.amount_cents)::bigint AS paid
+      SELECT c.payer_id, SUM(CASE WHEN l.type = 'reversal' THEN -l.amount_cents ELSE l.amount_cents END)::bigint AS paid
       FROM ledger_entries l JOIN claims c ON c.id = l.claim_id
-      WHERE l.practice_id = ${practiceId} AND l.type = 'insurance_payment'
+      WHERE l.practice_id = ${practiceId} AND l.type IN ('insurance_payment', 'reversal')
       GROUP BY c.payer_id
     )
     SELECT p.name AS payer, p.type,
@@ -309,20 +316,22 @@ export interface CollectionsSummary {
  * anyone signed in rather than only to an administrator.
  */
 export async function collectionsSummary(db: Db, practiceId: string): Promise<CollectionsSummary> {
-  const paid = sql`type IN ('insurance_payment','patient_payment')`;
+  // Recoupments count against collections, so sum a signed amount.
+  const paid = sql`type IN ('insurance_payment','patient_payment','reversal')`;
+  const signed = sql`CASE WHEN type = 'reversal' THEN -amount_cents ELSE amount_cents END`;
   const [{ rows: totals }, { rows: best }] = await Promise.all([
     db.execute<Record<string, string>>(sql`
       SELECT
-        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= date_trunc('day', now())), 0)::bigint AS today,
-        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= now() - interval '7 days'), 0)::bigint AS last7,
-        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= now() - interval '30 days'), 0)::bigint AS last30,
-        COALESCE(SUM(amount_cents) FILTER (WHERE ${paid} AND posted_at >= now() - interval '365 days'), 0)::bigint AS last365,
+        COALESCE(SUM(${signed}) FILTER (WHERE ${paid} AND posted_at >= date_trunc('day', now())), 0)::bigint AS today,
+        COALESCE(SUM(${signed}) FILTER (WHERE ${paid} AND posted_at >= now() - interval '7 days'), 0)::bigint AS last7,
+        COALESCE(SUM(${signed}) FILTER (WHERE ${paid} AND posted_at >= now() - interval '30 days'), 0)::bigint AS last30,
+        COALESCE(SUM(${signed}) FILTER (WHERE ${paid} AND posted_at >= now() - interval '365 days'), 0)::bigint AS last365,
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'charge' AND posted_at >= now() - interval '30 days'), 0)::bigint AS charges30,
         COUNT(*) FILTER (WHERE ${paid} AND posted_at >= now() - interval '30 days')::bigint AS posted30
       FROM ledger_entries WHERE practice_id = ${practiceId}`),
     db.execute<Record<string, string>>(sql`
       SELECT to_char(date_trunc('month', posted_at), 'Mon YYYY') AS month,
-             SUM(amount_cents)::bigint AS amount
+             SUM(${signed})::bigint AS amount
       FROM ledger_entries
       WHERE practice_id = ${practiceId} AND ${paid}
         AND posted_at >= now() - interval '12 months'

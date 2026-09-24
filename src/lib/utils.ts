@@ -51,4 +51,7 @@ export const CLAIM_STATUS_COLORS: Record<string, string> = {
   partially_paid: "bg-teal-100 text-teal-800",
   denied: "bg-rose-100 text-rose-800",
   closed: "bg-slate-200 text-slate-700",
+  void_pending: "bg-orange-100 text-orange-800",
+  voided: "bg-slate-200 text-slate-500 line-through",
+  reversed: "bg-orange-100 text-orange-800",
 };

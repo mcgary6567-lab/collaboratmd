@@ -40,6 +40,10 @@ export interface Edi837Input {
     totalCents: number;
     placeOfService: string;
     frequencyCode: string;
+    /** REF*F8: required when frequencyCode is 7 (replacement) or 8 (void). */
+    originalPayerClaimNumber?: string | null;
+    /** REF*G1: prior authorization number, when one covers the claim. */
+    authorizationNumber?: string | null;
     dateOfService: string; // YYYY-MM-DD
     diagnoses: string[]; // ICD-10-CM without dots
   };
@@ -104,6 +108,15 @@ export function buildEdi837P(input: Edi837Input): string {
   s.push(["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId]);
   // 2300 claim
   s.push(["CLM", input.controlNumber, money(input.claim.totalCents), "", "", `${input.claim.placeOfService}:B:${input.claim.frequencyCode}`, "Y", "A", "Y", "Y"]);
+  // 2300 REF segments precede HI. A replacement or void without the payer's
+  // original claim number is rejected, so refuse to build one.
+  if (input.claim.frequencyCode === "7" || input.claim.frequencyCode === "8") {
+    if (!input.claim.originalPayerClaimNumber) {
+      throw new Error(`Frequency ${input.claim.frequencyCode} claim ${input.controlNumber} needs the payer's original claim number (REF*F8)`);
+    }
+    s.push(["REF", "F8", input.claim.originalPayerClaimNumber]);
+  }
+  if (input.claim.authorizationNumber) s.push(["REF", "G1", input.claim.authorizationNumber]);
   const hi = ["HI", ...input.claim.diagnoses.map((c, i) => `${i === 0 ? "ABK" : "ABF"}:${icd(c)}`)];
   s.push(hi);
   // 2310B rendering provider

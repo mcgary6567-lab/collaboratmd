@@ -1,15 +1,19 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
-import { scrubClaim, hasBlockingErrors, type ScrubClaim } from "@/lib/scrub/rules";
+import { scrubClaim, hasBlockingErrors, type ScrubClaim, type ScrubFinding } from "@/lib/scrub/rules";
+import { evaluatePayerEdits, type EditResult } from "@/lib/scrub/payer-edits";
 import { buildEdi837P } from "@/lib/edi/x837p";
 import { parseEdi835 } from "@/lib/edi/x835";
-import { getClearinghouse } from "@/lib/clearinghouse/gateway";
+import { parse999, describeSyntaxError } from "@/lib/edi/x999";
+import { parse277CA } from "@/lib/edi/x277ca";
+import { getClearinghouse, type RemitRequest, type SubmissionResult } from "@/lib/clearinghouse/gateway";
 import { explainDenial } from "@/lib/ai/explain";
 import { carcCategory } from "@/lib/codes/carc";
 import { checkClaimUnderpayment } from "./fees";
+import { authsForPatient, consumeAuthorization, rulesForPayer } from "./payer-edits";
 
-const { claims, claimEvents, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
+const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
 export interface ClaimBundle {
   claim: typeof claims.$inferSelect;
@@ -41,6 +45,7 @@ export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBun
 
 function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
   return {
+    claim: { frequencyCode: b.claim.frequencyCode, originalPayerClaimNumber: b.claim.originalPayerClaimNumber },
     patient: { firstName: b.patient.firstName, lastName: b.patient.lastName, dob: b.patient.dob, sex: b.patient.sex, address1: b.patient.address1, zip: b.patient.zip },
     insurance: { memberId: b.insurance.memberId, payerId: b.payer.payerId, relationship: b.insurance.relationship },
     provider: { npi: b.provider.npi, taxonomy: b.provider.taxonomy },
@@ -50,6 +55,30 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     payer: { timelyFilingDays: b.payer.timelyFilingDays },
     today,
   };
+}
+
+/**
+ * Runs the general scrubber and this payer's own edits together. A void
+ * (frequency 8) only cancels an earlier claim, so payer edits and
+ * authorization checks do not apply to it.
+ */
+export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: ScrubFinding[]; edits: EditResult }> {
+  const general = scrubClaim(toScrubInput(b));
+  if (b.claim.frequencyCode === "8") return { findings: general, edits: { findings: [], authorization: null, authUnits: 0 } };
+  const [rules, auths] = await Promise.all([
+    rulesForPayer(db, b.claim.practiceId, b.payer.id),
+    authsForPatient(db, b.claim.practiceId, b.patient.id, b.payer.id),
+  ]);
+  const edits = evaluatePayerEdits(
+    {
+      dateOfService: b.encounter.dateOfService,
+      diagnoses: b.encounter.diagnoses,
+      lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units })),
+    },
+    rules,
+    auths,
+  );
+  return { findings: [...general, ...edits.findings], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
@@ -100,9 +129,13 @@ export async function createClaimForEncounter(db: Db, encounterId: string, userI
 export async function rescrubClaim(db: Db, claimId: string) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
-  const findings = scrubClaim(toScrubInput(bundle));
+  const { findings, edits } = await scrubBundle(db, bundle);
   const status = hasBlockingErrors(findings) ? "scrub_errors" : "ready";
-  const [updated] = await db.update(claims).set({ scrubResults: findings, status, updatedAt: new Date() }).where(eq(claims.id, claimId)).returning();
+  const [updated] = await db
+    .update(claims)
+    .set({ scrubResults: findings, status, authorizationNumber: edits.authorization?.authNumber ?? null, updatedAt: new Date() })
+    .where(eq(claims.id, claimId))
+    .returning();
   await db.insert(claimEvents).values({ claimId, status, source: "system", message: `Scrubbed: ${findings.filter((f) => f.severity === "error").length} errors, ${findings.filter((f) => f.severity === "warning").length} warnings` });
   return updated;
 }
@@ -112,11 +145,12 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
   if (!["ready", "rejected", "scrub_errors"].includes(bundle.claim.status)) throw new Error(`Claim in status ${bundle.claim.status} cannot be submitted`);
-  const findings = scrubClaim(toScrubInput(bundle));
+  const { findings, edits } = await scrubBundle(db, bundle);
   if (hasBlockingErrors(findings)) {
     await db.update(claims).set({ scrubResults: findings, status: "scrub_errors", updatedAt: new Date() }).where(eq(claims.id, claimId));
     throw new Error("Claim has blocking scrub errors");
   }
+  const authorizationNumber = edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null;
   const now = new Date();
   const edi = buildEdi837P({
     controlNumber: bundle.claim.controlNumber,
@@ -128,17 +162,41 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     renderingProvider: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
     payer: { name: bundle.payer.name, payerId: bundle.payer.payerId },
     subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
-    claim: { totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode, dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses },
+    claim: {
+      totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
+      originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber,
+      dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses,
+    },
     lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService })),
   });
-  await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, updatedAt: now }).where(eq(claims.id, claimId));
-  await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `837P generated and sent to clearinghouse (${edi.length} bytes)` });
+  await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
+  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : "837P";
+  await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `${kind} generated and sent to clearinghouse (${edi.length} bytes)` });
 
-  const result = await getClearinghouse().submit837(edi, { controlNumber: bundle.claim.controlNumber, memberId: bundle.insurance.memberId });
-  const status = result.accepted ? "accepted" : "rejected";
-  await db.update(claims).set({ status, updatedAt: new Date() }).where(eq(claims.id, claimId));
+  const result = await getClearinghouse().submit837(edi, {
+    controlNumber: bundle.claim.controlNumber, memberId: bundle.insurance.memberId,
+    patientLast: bundle.patient.lastName, patientFirst: bundle.patient.firstName,
+    chargeCents: bundle.claim.totalCents, dateOfService: bundle.encounter.dateOfService,
+    billingName: bundle.practice.name, billingNpi: bundle.practice.npi,
+  });
+  const ack277 = await recordAcknowledgments(db, claimId, bundle.claim.controlNumber, result);
+  const status = result.status;
+  await db
+    .update(claims)
+    .set({ status, payerClaimNumber: ack277?.payerClaimNumber || bundle.claim.payerClaimNumber, updatedAt: new Date() })
+    .where(eq(claims.id, claimId));
   await db.insert(claimEvents).values({ claimId, status, source: "clearinghouse", message: `${result.clearinghouseId}: ${result.message}${result.rejectionCode ? ` [${result.rejectionCode}]` : ""}` });
-  if (!result.accepted) {
+
+  if (status === "accepted") {
+    // Only an original claim draws down the authorization; a replacement is
+    // the same service, already counted when the original was accepted.
+    if (edits.authorization && bundle.claim.frequencyCode === "1") await consumeAuthorization(db, edits.authorization.id, edits.authUnits);
+    if (bundle.claim.frequencyCode === "8" && bundle.claim.originalClaimId) {
+      await db.insert(claimEvents).values({ claimId: bundle.claim.originalClaimId, status: "void_pending", source: "clearinghouse", message: `Void ${bundle.claim.controlNumber} accepted; waiting for the payer to reverse this claim` });
+      await db.update(claims).set({ status: "void_pending", updatedAt: new Date() }).where(eq(claims.id, bundle.claim.originalClaimId));
+    }
+  }
+  if (status === "rejected") {
     const exp = await explainRejection(result.rejectionCode ?? "", result.message);
     await db.insert(denials).values({
       practiceId: bundle.claim.practiceId,
@@ -155,8 +213,41 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
   return { status, result };
 }
 
+/**
+ * Stores the 999 and 277CA exactly as received, with what they said about
+ * this claim. Returns this claim's 277CA status, if there was one.
+ */
+async function recordAcknowledgments(db: Db, claimId: string, controlNumber: string, result: SubmissionResult) {
+  if (result.ack999) {
+    const ack = parse999(result.ack999);
+    const first = ack.errors[0];
+    await db.insert(claimAcknowledgments).values({
+      claimId, kind: "999", accepted: ack.accepted, code: `IK5:${ack.transactionStatus}`,
+      message: ack.accepted ? "File accepted: the 837 is structurally valid" : `File rejected: ${first ? `${describeSyntaxError(first.code)} (${first.segmentId})` : "syntax errors"}`,
+      raw: result.ack999,
+    });
+  }
+  if (!result.ack277) return null;
+  const mine = parse277CA(result.ack277).find((c) => c.controlNumber === controlNumber) ?? null;
+  if (mine) {
+    await db.insert(claimAcknowledgments).values({
+      claimId, kind: "277CA", accepted: mine.accepted,
+      code: [mine.category, mine.statusCode, mine.entity].filter(Boolean).join(":"),
+      message: mine.message, raw: result.ack277,
+    });
+  }
+  return mine;
+}
+
+export async function listAcknowledgments(db: Db, claimId: string) {
+  return db.select().from(claimAcknowledgments).where(eq(claimAcknowledgments.claimId, claimId)).orderBy(asc(claimAcknowledgments.receivedAt));
+}
+
 async function explainRejection(code: string, message: string) {
   // Front-end (277CA) rejections are not CARCs; map the common ones.
+  if (code === "999:R") {
+    return { explanation: `The clearinghouse could not read the file: ${message}. The claim never reached the payer.`, nextSteps: ["Re-scrub the claim", "Resubmit; if it fails again, contact support with the 999"] };
+  }
   if (code.startsWith("A7:164")) {
     return { explanation: "The clearinghouse rejected the claim before it reached the payer because the subscriber member ID is not valid for this payer.", nextSteps: ["Verify the member ID on the insurance card", "Run a real-time eligibility check", "Correct the policy and resubmit"] };
   }
@@ -186,11 +277,19 @@ export async function fetchAndPostRemittances(db: Db, practiceId: string, userId
 
   let processed = 0;
   for (const rows of byPayer.values()) {
-    const items = [];
+    const items: RemitRequest[] = [];
     for (const r of rows) {
+      const base = { controlNumber: r.claim.controlNumber, payerName: r.payer.name, payerId: r.payer.payerId, memberId: r.insurance.memberId };
+      if (r.claim.frequencyCode === "8") {
+        // A void is not adjudicated: the payer answers it by reversing the original.
+        const reversal = r.claim.originalClaimId ? await reversalFor(db, r.claim.originalClaimId) : null;
+        if (reversal) items.push({ ...base, lines: [], reversal });
+        continue;
+      }
       const lines = await db.select().from(charges).where(eq(charges.encounterId, r.claim.encounterId));
-      items.push({ controlNumber: r.claim.controlNumber, payerName: r.payer.name, payerId: r.payer.payerId, memberId: r.insurance.memberId, lines: lines.map((l) => ({ cpt: l.cpt, units: l.units, chargeCents: l.chargeCents * l.units })) });
+      items.push({ ...base, lines: lines.map((l) => ({ cpt: l.cpt, units: l.units, chargeCents: l.chargeCents * l.units })) });
     }
+    if (!items.length) continue;
     const raw = await getClearinghouse().fetch835(items);
     if (!raw) continue;
     const remitId = await importRemittance(db, practiceId, raw, userId);
@@ -198,6 +297,30 @@ export async function fetchAndPostRemittances(db: Db, practiceId: string, userId
     processed++;
   }
   return processed;
+}
+
+/** What the payer takes back when it reverses a claim: everything it posted. */
+async function reversalFor(db: Db, originalClaimId: string) {
+  const [orig] = await db.select().from(claims).where(eq(claims.id, originalClaimId)).limit(1);
+  if (!orig) return null;
+  const entries = await db.select().from(ledgerEntries).where(eq(ledgerEntries.claimId, originalClaimId));
+  const fin = computeFinancials(entries);
+  const grouped = new Map<string, { group: string; reason: string; amountCents: number }>();
+  for (const e of entries) {
+    if (e.type !== "adjustment" && e.type !== "transfer_to_patient") continue;
+    if (!e.groupCode || !e.reasonCode) continue; // manual write-offs and transfers are the practice's, not the payer's
+    const key = `${e.groupCode}:${e.reasonCode}`;
+    const g = grouped.get(key) ?? { group: e.groupCode, reason: e.reasonCode, amountCents: 0 };
+    g.amountCents += e.amountCents;
+    grouped.set(key, g);
+  }
+  return {
+    originalControlNumber: orig.controlNumber,
+    payerClaimNumber: orig.payerClaimNumber ?? "",
+    chargedCents: orig.totalCents,
+    paidCents: fin.insurancePaidCents,
+    adjustments: [...grouped.values()].filter((a) => a.amountCents !== 0),
+  };
 }
 
 export async function importRemittance(db: Db, practiceId: string, raw: string, userId?: string) {
@@ -217,7 +340,7 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   if (!remit) throw new Error("Remittance not found");
   if (remit.posted) return remit.postingSummary;
   const parsed = parseEdi835(remit.raw835);
-  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
+  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
 
   for (const rc of parsed.claims) {
     const [claim] = await db.select().from(claims).where(and(eq(claims.practiceId, remit.practiceId), eq(claims.controlNumber, rc.patientControlNumber))).limit(1);
@@ -227,6 +350,12 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
     }
     summary.matched++;
     const base = { practiceId: remit.practiceId, patientId: claim.patientId, claimId: claim.id, remittanceId, postedBy: userId ?? null };
+    if (rc.statusCode === "22") {
+      await postReversal(db, claim, rc, base, remit.checkNumber);
+      summary.reversals = (summary.reversals ?? 0) + 1;
+      summary.paidCents += rc.paidCents; // negative: money taken back
+      continue;
+    }
     if (rc.paidCents > 0) {
       await db.insert(ledgerEntries).values({ ...base, type: "insurance_payment", amountCents: rc.paidCents, note: `${remit.payerName} ${remit.checkNumber}` });
       summary.paidCents += rc.paidCents;
@@ -277,6 +406,54 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   return summary;
 }
 
+/**
+ * Posts a payer reversal (CLP02 = 22). The payer sends the original claim's
+ * amounts negated: the payment comes back as a recoupment, and the contractual
+ * and patient-responsibility adjustments are backed out with negative entries,
+ * so the claim returns to its full charge. If the reversal answers a void, the
+ * charge is then removed, since the service should not have been billed.
+ */
+async function postReversal(
+  db: Db,
+  claim: typeof claims.$inferSelect,
+  rc: ReturnType<typeof parseEdi835>["claims"][number],
+  base: { practiceId: string; patientId: string; claimId: string; remittanceId: string; postedBy: string | null },
+  checkNumber: string,
+) {
+  if (rc.paidCents !== 0) {
+    await db.insert(ledgerEntries).values({ ...base, type: "reversal", amountCents: Math.abs(rc.paidCents), note: `Payer reversal ${checkNumber}` });
+  }
+  const adjustments = rc.lines.length ? rc.lines.flatMap((l) => l.adjustments) : rc.adjustments;
+  for (const adj of adjustments) {
+    // Mirror the original posting: only PR and CO-45 were posted to the ledger.
+    const amount = -Math.abs(adj.amountCents);
+    if (adj.group === "PR") {
+      await db.insert(ledgerEntries).values({ ...base, type: "transfer_to_patient", amountCents: amount, groupCode: adj.group, reasonCode: adj.reason, note: "Patient responsibility reversed by payer" });
+    } else if (adj.reason === "45") {
+      await db.insert(ledgerEntries).values({ ...base, type: "adjustment", amountCents: amount, groupCode: adj.group, reasonCode: adj.reason, note: "Contractual adjustment reversed by payer" });
+    }
+  }
+  await db.insert(claimEvents).values({ claimId: claim.id, status: "reversed", source: "835", message: `ERA ${checkNumber}: payer reversed this claim, recouping ${(Math.abs(rc.paidCents) / 100).toFixed(2)}` });
+
+  const [voidClaim] = await db
+    .select()
+    .from(claims)
+    .where(and(eq(claims.originalClaimId, claim.id), eq(claims.frequencyCode, "8"), inArray(claims.status, ["accepted", "pending"])))
+    .limit(1);
+  if (!voidClaim) {
+    await db.update(claims).set({ status: "reversed", updatedAt: new Date() }).where(eq(claims.id, claim.id));
+    return;
+  }
+  const fin = await getClaimFinancials(db, claim.id);
+  if (fin.insuranceBalanceCents > 0) {
+    await db.insert(ledgerEntries).values({ ...base, remittanceId: null, type: "write_off", amountCents: fin.insuranceBalanceCents, note: `Charge removed: claim voided by ${voidClaim.controlNumber}` });
+  }
+  await db.update(claims).set({ status: "voided", updatedAt: new Date() }).where(eq(claims.id, claim.id));
+  await db.update(claims).set({ status: "closed", updatedAt: new Date() }).where(eq(claims.id, voidClaim.id));
+  await db.insert(claimEvents).values({ claimId: claim.id, status: "voided", source: "system", message: `Voided; charge removed from A/R${fin.patientBalanceCents < 0 ? `. Patient has a ${(-fin.patientBalanceCents / 100).toFixed(2)} credit to refund` : ""}` });
+  await db.insert(claimEvents).values({ claimId: voidClaim.id, status: "closed", source: "835", message: `Payer reversed ${claim.controlNumber}; void complete` });
+}
+
 export interface ClaimFinancials {
   chargesCents: number;
   insurancePaidCents: number;
@@ -291,7 +468,8 @@ export interface ClaimFinancials {
 export function computeFinancials(entries: { type: string; amountCents: number }[]): ClaimFinancials {
   const sum = (t: string) => entries.filter((e) => e.type === t).reduce((a, e) => a + e.amountCents, 0);
   const chargesCents = sum("charge");
-  const insurancePaidCents = sum("insurance_payment");
+  // A reversal is a payer recoupment: it takes back part of what was paid.
+  const insurancePaidCents = sum("insurance_payment") - sum("reversal");
   const patientPaidCents = sum("patient_payment");
   const adjustmentsCents = sum("adjustment") + sum("write_off");
   const patientRespCents = sum("transfer_to_patient");
@@ -349,10 +527,31 @@ export async function transferToPatient(db: Db, claimId: string, userId?: string
   await db.insert(claimEvents).values({ claimId, status: "closed", source: "user", message: "Balance transferred to patient responsibility" });
 }
 
-/** Creates a corrected claim (frequency code 7) from a denied/rejected claim. */
+/**
+ * Creates the claim that corrects a denied or rejected one.
+ *
+ * If the payer adjudicated the original, it has a payer claim number and the
+ * correction is a replacement (frequency 7) that cites it in REF*F8. If the
+ * original was rejected before it reached the payer, the payer has no record
+ * of it, so a replacement would be rejected too: the correction goes as a new
+ * original claim (frequency 1).
+ *
+ * A claim the payer has paid, even in part, is not corrected this way: void it, then
+ * bill the service again, so the payer's recoupment and the new payment post
+ * against separate claims.
+ */
 export async function createCorrectedClaim(db: Db, claimId: string, userId?: string) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
+  if (!["denied", "rejected", "scrub_errors"].includes(bundle.claim.status)) {
+    throw new Error(`A claim in status ${bundle.claim.status} cannot be corrected here`);
+  }
+  const fin = await getClaimFinancials(db, claimId);
+  if (fin.insurancePaidCents > 0) {
+    throw new Error("The payer has paid part of this claim. Void it and bill the service again instead.");
+  }
+  const pcn = bundle.claim.payerClaimNumber;
+  const frequencyCode = pcn ? "7" : "1";
   const [created] = await db
     .insert(claims)
     .values({
@@ -362,18 +561,65 @@ export async function createCorrectedClaim(db: Db, claimId: string, userId?: str
       payerId: bundle.claim.payerId,
       patientInsuranceId: bundle.claim.patientInsuranceId,
       controlNumber: await nextControlNumber(db, bundle.claim.practiceId),
-      frequencyCode: "7",
+      frequencyCode,
+      originalClaimId: claimId,
+      originalPayerClaimNumber: pcn,
       totalCents: bundle.claim.totalCents,
       status: "draft",
       timelyFilingDeadline: bundle.claim.timelyFilingDeadline,
     })
     .returning();
-  // Move charge ledger entries to the new claim so AR follows the live claim.
+  // Move ledger entries to the new claim so A/R follows the live claim.
   await db.update(ledgerEntries).set({ claimId: created.id }).where(eq(ledgerEntries.claimId, claimId));
   await db.update(claims).set({ status: "closed", updatedAt: new Date() }).where(eq(claims.id, claimId));
   await db.insert(claimEvents).values({ claimId, status: "closed", source: "user", message: `Replaced by corrected claim ${created.controlNumber}` });
-  await db.insert(claimEvents).values({ claimId: created.id, status: "draft", source: "user", message: `Corrected claim (frequency 7) of ${bundle.claim.controlNumber}` });
+  await db.insert(claimEvents).values({
+    claimId: created.id, status: "draft", source: "user",
+    message: pcn
+      ? `Replacement (frequency 7) of ${bundle.claim.controlNumber}, citing payer claim ${pcn}`
+      : `Resubmission of ${bundle.claim.controlNumber} as a new claim: the payer never received the original`,
+  });
   await db.update(denials).set({ status: "resolved", resolvedAt: new Date() }).where(eq(denials.claimId, claimId));
-  await db.insert(schema.auditLog).values({ practiceId: bundle.claim.practiceId, userId: userId ?? null, action: "corrected_claim", entity: "claim", entityId: created.id, details: { original: claimId } });
+  await db.insert(schema.auditLog).values({ practiceId: bundle.claim.practiceId, userId: userId ?? null, action: "corrected_claim", entity: "claim", entityId: created.id, details: { original: claimId, frequencyCode } });
+  return rescrubClaim(db, created.id);
+}
+
+/**
+ * Creates a void (frequency 8) for a claim the payer has adjudicated, to take
+ * back a claim billed in error. The payer answers with a reversal on its ERA,
+ * which recoups any payment; posting that reversal completes the void.
+ */
+export async function voidClaim(db: Db, claimId: string, reason: string, userId?: string) {
+  const bundle = await loadClaimBundle(db, claimId);
+  if (!bundle) throw new Error("Claim not found");
+  if (bundle.claim.frequencyCode === "8") throw new Error("This claim is itself a void");
+  if (!["paid", "partially_paid", "denied"].includes(bundle.claim.status)) {
+    throw new Error(`A claim in status ${bundle.claim.status} cannot be voided. Only a claim the payer has adjudicated can be.`);
+  }
+  if (!bundle.claim.payerClaimNumber) throw new Error("The payer has not assigned a claim number to this claim, so it cannot be voided yet");
+  const [existing] = await db.select({ id: claims.id }).from(claims).where(and(eq(claims.originalClaimId, claimId), eq(claims.frequencyCode, "8"))).limit(1);
+  if (existing) throw new Error("A void already exists for this claim");
+  if (!reason.trim()) throw new Error("Say why the claim is being voided");
+
+  const [created] = await db
+    .insert(claims)
+    .values({
+      practiceId: bundle.claim.practiceId,
+      encounterId: bundle.claim.encounterId,
+      patientId: bundle.claim.patientId,
+      payerId: bundle.claim.payerId,
+      patientInsuranceId: bundle.claim.patientInsuranceId,
+      controlNumber: await nextControlNumber(db, bundle.claim.practiceId),
+      frequencyCode: "8",
+      originalClaimId: claimId,
+      originalPayerClaimNumber: bundle.claim.payerClaimNumber,
+      totalCents: bundle.claim.totalCents,
+      status: "draft",
+      timelyFilingDeadline: bundle.claim.timelyFilingDeadline,
+    })
+    .returning();
+  await db.insert(claimEvents).values({ claimId, status: bundle.claim.status, source: "user", message: `Void ${created.controlNumber} created: ${reason.trim()}` });
+  await db.insert(claimEvents).values({ claimId: created.id, status: "draft", source: "user", message: `Void (frequency 8) of ${bundle.claim.controlNumber}, citing payer claim ${bundle.claim.payerClaimNumber}` });
+  await db.insert(schema.auditLog).values({ practiceId: bundle.claim.practiceId, userId: userId ?? null, action: "void_claim", entity: "claim", entityId: created.id, details: { original: claimId, reason: reason.trim() } });
   return rescrubClaim(db, created.id);
 }

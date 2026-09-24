@@ -14,6 +14,8 @@ export interface ScrubClaim {
   encounter: { dateOfService: string; placeOfService: string; diagnoses: string[] };
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[] }[];
   payer: { timelyFilingDays: number };
+  /** Frequency and replacement reference; absent means an original claim. */
+  claim?: { frequencyCode: string; originalPayerClaimNumber?: string | null };
   today?: Date;
 }
 
@@ -160,6 +162,10 @@ const rules: Record<string, Rule> = {
     }
     return out;
   },
+  FREQ_REFERENCE: (c) =>
+    c.claim && ["7", "8"].includes(c.claim.frequencyCode) && !c.claim.originalPayerClaimNumber?.trim()
+      ? [{ rule: "FREQ_REFERENCE", severity: "error", message: `A ${c.claim.frequencyCode === "7" ? "replacement" : "void"} claim must reference the payer's original claim number; the payer rejects it otherwise`, field: "claim.originalPayerClaimNumber" }]
+      : [],
   EM_WITH_PROCEDURE: (c) => {
     const hasEm = c.lines.some((l) => /^99(2|3|4)\d{2}$/.test(l.cpt));
     const hasProc = c.lines.some((l) => !/^99\d{3}$/.test(l.cpt));

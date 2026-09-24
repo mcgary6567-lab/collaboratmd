@@ -7,13 +7,31 @@
  * -> adjudication -> 835 remittance.
  */
 import { buildEdi835, type Adjustment } from "@/lib/edi/x835";
+import { build999, describeSyntaxError, validateStructure } from "@/lib/edi/x999";
+import { build277CA } from "@/lib/edi/x277ca";
 
 export interface SubmissionResult {
   clearinghouseId: string;
   accepted: boolean;
-  status: "accepted" | "rejected";
+  /** "pending" when acknowledgments arrive later and must be polled for. */
+  status: "accepted" | "rejected" | "pending";
   message: string;
   rejectionCode?: string; // CSCC:CSC style code from 277CA
+  /** Raw X12 acknowledgments, when the clearinghouse returns them with the submission. */
+  ack999?: string;
+  ack277?: string;
+}
+
+/** What a clearinghouse needs alongside the 837 to route and acknowledge it. */
+export interface SubmissionMeta {
+  controlNumber: string;
+  memberId: string;
+  patientLast?: string;
+  patientFirst?: string;
+  chargeCents?: number;
+  dateOfService?: string;
+  billingName?: string;
+  billingNpi?: string;
 }
 
 export interface EligibilityRequest {
@@ -44,11 +62,30 @@ export interface AdjudicationLine {
   chargeCents: number;
 }
 
+/** What the payer posted on a claim it is now reversing, because of a void. */
+export interface ReversalRequest {
+  originalControlNumber: string;
+  payerClaimNumber: string;
+  chargedCents: number;
+  paidCents: number;
+  adjustments: Adjustment[];
+}
+
+export interface RemitRequest {
+  controlNumber: string;
+  payerName: string;
+  payerId: string;
+  lines: AdjudicationLine[];
+  memberId: string;
+  /** Present for an accepted void: the payer answers it by reversing the original claim. */
+  reversal?: ReversalRequest;
+}
+
 export interface ClearinghouseGateway {
-  submit837(edi: string, meta: { controlNumber: string; memberId: string }): Promise<SubmissionResult>;
+  submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult>;
   checkEligibility(req: EligibilityRequest): Promise<EligibilityResult>;
   /** Simulates the payer producing an ERA for previously accepted claims. */
-  fetch835(claims: { controlNumber: string; payerName: string; payerId: string; lines: AdjudicationLine[]; memberId: string }[]): Promise<string | null>;
+  fetch835(claims: RemitRequest[]): Promise<string | null>;
 }
 
 function hashStr(s: string): number {
@@ -71,22 +108,37 @@ function pick<T>(list: readonly T[], hash: number, shift = 0): T {
 
 /** Deterministic pseudo-random adjudication driven by the member ID / control number. */
 export class MockClearinghouse implements ClearinghouseGateway {
-  async submit837(edi: string, meta: { controlNumber: string; memberId: string }): Promise<SubmissionResult> {
+  /**
+   * Answers the way a clearinghouse does: a 999 for the file's syntax, then,
+   * if that passes, a 277CA per claim. Member IDs ending in "X" are rejected at
+   * the front end, which simulates an invalid subscriber.
+   */
+  async submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult> {
     const id = "CH" + hashStr(edi).toString(16).toUpperCase().padStart(8, "0");
-    // Member IDs ending in "X" are rejected at the front end (simulates invalid subscriber).
-    if (/X$/i.test(meta.memberId)) {
+    const now = new Date();
+    const control = String(hashStr(edi + "ack") % 1_000_000_000);
+    const errors = validateStructure(edi);
+    const ack999 = build999({ original837: edi, senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control, errors });
+    if (errors.length) {
       return {
-        clearinghouseId: id,
-        accepted: false,
-        status: "rejected",
-        rejectionCode: "A7:164:IL",
-        message: "Acknowledgement/Rejected for Invalid Information: Entity's contract/member number. Subscriber",
+        clearinghouseId: id, accepted: false, status: "rejected", rejectionCode: "999:R", ack999,
+        message: `Rejected by the clearinghouse: ${describeSyntaxError(errors[0].code)} (${errors[0].segmentId})`,
       };
     }
-    if (!/CLM\*/.test(edi)) {
-      return { clearinghouseId: id, accepted: false, status: "rejected", rejectionCode: "A7:21", message: "Missing or invalid information: Claim segment not found" };
-    }
-    return { clearinghouseId: id, accepted: true, status: "accepted", message: "Acknowledgement/Acceptance into adjudication system (277CA A1:19)" };
+    const rejected = /X$/i.test(meta.memberId);
+    const status = rejected ? "A7:164:IL" : "A2:20";
+    const ack277 = build277CA({
+      senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control,
+      sourceName: "Mock Clearinghouse", submitterName: meta.billingName ?? "Submitter",
+      billingProvider: { name: meta.billingName ?? "Billing provider", npi: meta.billingNpi ?? "" },
+      claims: [{
+        controlNumber: meta.controlNumber, patientLast: meta.patientLast ?? "", patientFirst: meta.patientFirst ?? "",
+        memberId: meta.memberId, chargeCents: meta.chargeCents ?? 0, dateOfService: meta.dateOfService ?? now.toISOString().slice(0, 10), status,
+      }],
+    });
+    return rejected
+      ? { clearinghouseId: id, accepted: false, status: "rejected", rejectionCode: status, ack999, ack277, message: "Acknowledgement/Rejected for Invalid Information: Entity's contract/member number. Subscriber" }
+      : { clearinghouseId: id, accepted: true, status: "accepted", ack999, ack277, message: "Acknowledgement/Acceptance into adjudication system (277CA A2:20)" };
   }
 
   async checkEligibility(req: EligibilityRequest): Promise<EligibilityResult> {
@@ -111,10 +163,25 @@ export class MockClearinghouse implements ClearinghouseGateway {
     };
   }
 
-  async fetch835(claims: { controlNumber: string; payerName: string; payerId: string; lines: AdjudicationLine[]; memberId: string }[]): Promise<string | null> {
+  async fetch835(claims: RemitRequest[]): Promise<string | null> {
     if (claims.length === 0) return null;
     const first = claims[0];
     const gen = claims.map((c) => {
+      if (c.reversal) {
+        // CLP02 = 22: the original claim's amounts, negated, under its own control number.
+        const r = c.reversal;
+        const pr = r.adjustments.filter((a) => a.group === "PR").reduce((s, a) => s + a.amountCents, 0);
+        return {
+          patientControlNumber: r.originalControlNumber,
+          payerClaimNumber: r.payerClaimNumber,
+          statusCode: "22",
+          chargedCents: -r.chargedCents,
+          paidCents: -r.paidCents,
+          patientResponsibilityCents: -pr,
+          adjustments: r.adjustments.map((a) => ({ ...a, amountCents: -a.amountCents })),
+          lines: [],
+        };
+      }
       const h = hashStr(c.controlNumber + c.memberId);
       // Member IDs ending in "D" always deny (for demos); otherwise ~11%, near real-world rates.
       const scenario = c.memberId.endsWith("D") || h % 9 === 0 ? "deny" : "pay";

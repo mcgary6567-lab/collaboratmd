@@ -184,6 +184,12 @@ export const claims = pgTable(
     controlNumber: text("control_number").notNull(),
     payerClaimNumber: text("payer_claim_number"),
     frequencyCode: text("frequency_code").notNull().default("1"), // 1 original, 7 corrected, 8 void
+    /** The claim this one replaces or voids (frequency 7 or 8). */
+    originalClaimId: uuid("original_claim_id"),
+    /** Sent in REF*F8; the payer's number for the claim being replaced or voided. */
+    originalPayerClaimNumber: text("original_payer_claim_number"),
+    /** Sent in REF*G1 when a prior authorization covers the claim. */
+    authorizationNumber: text("authorization_number"),
     status: text("status").notNull().default("draft"),
     totalCents: integer("total_cents").notNull(),
     scrubResults: jsonb("scrub_results")
@@ -433,6 +439,56 @@ export const estimates = pgTable("estimates", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Claim controls                                                       */
+/* ------------------------------------------------------------------ */
+
+export const claimAcknowledgments = pgTable("claim_acknowledgments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  kind: text("kind").notNull(), // 999 | 277CA
+  accepted: boolean("accepted").notNull(),
+  code: text("code"),
+  message: text("message"),
+  raw: text("raw"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type PayerEditParams = {
+  modifiers?: string[];
+  dxPrefixes?: string[];
+  maxUnits?: number;
+};
+
+export const payerEdits = pgTable("payer_edits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  payerId: uuid("payer_id").references(() => payers.id),
+  kind: text("kind").notNull(), // auth_required | modifier_required | dx_required | max_units | not_covered
+  cpt: text("cpt"),
+  params: jsonb("params").$type<PayerEditParams>().notNull().default({}),
+  severity: text("severity").notNull().default("error"),
+  message: text("message").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const authorizations = pgTable("authorizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  authNumber: text("auth_number").notNull(),
+  cpts: jsonb("cpts").$type<string[]>().notNull().default([]),
+  unitsApproved: integer("units_approved"),
+  unitsUsed: integer("units_used").notNull().default(0),
+  validFrom: date("valid_from").notNull(),
+  validTo: date("valid_to").notNull(),
+  status: text("status").notNull().default("active"), // active | cancelled
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /**
  * Messages from the public contact form.
  *
@@ -464,6 +520,9 @@ export type PaymentPlan = typeof paymentPlans.$inferSelect;
 export type PaymentPlanInstallment = typeof paymentPlanInstallments.$inferSelect;
 export type Statement = typeof statements.$inferSelect;
 export type Estimate = typeof estimates.$inferSelect;
+export type ClaimAcknowledgment = typeof claimAcknowledgments.$inferSelect;
+export type PayerEdit = typeof payerEdits.$inferSelect;
+export type Authorization = typeof authorizations.$inferSelect;
 export type Practice = typeof practices.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
