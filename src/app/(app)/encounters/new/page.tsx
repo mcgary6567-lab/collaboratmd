@@ -12,7 +12,7 @@ export default async function NewEncounterPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const s = await requireSession();
   const db = await getDb();
-  const [{ cpts, icds }, providers] = await Promise.all([listCodes(db), listProviders(db, s.practiceId)]);
+  const [{ cpts, icds }, providers] = await Promise.all([listCodes(db, s.practiceId), listProviders(db, s.practiceId)]);
 
   // When arriving from a check-in the patient is already known; otherwise the
   // form searches on demand rather than loading the whole roster.

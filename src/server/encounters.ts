@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { createClaimForEncounter } from "./claims";
+import { standardCharges } from "./fees";
 
 const { encounters, charges, appointments, patients, providers, cptCodes, icd10Codes } = schema;
 
@@ -37,10 +38,16 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
   return { encounter: enc, claim };
 }
 
-export async function listCodes(db: Db) {
+/**
+ * Codes for charge entry. With a practice, each code's fee is that practice's
+ * standard charge where its schedule sets one, falling back to the default.
+ */
+export async function listCodes(db: Db, practiceId?: string) {
   const cpts = await db.select().from(cptCodes).orderBy(asc(cptCodes.code));
   const icds = await db.select().from(icd10Codes).orderBy(asc(icd10Codes.code));
-  return { cpts, icds };
+  if (!practiceId) return { cpts, icds };
+  const fees = await standardCharges(db, practiceId);
+  return { cpts: cpts.map((c) => ({ ...c, defaultFeeCents: fees.get(c.code) ?? c.defaultFeeCents })), icds };
 }
 
 export async function listAppointments(db: Db, practiceId: string, day: Date) {

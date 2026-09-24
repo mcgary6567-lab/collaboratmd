@@ -7,6 +7,7 @@ import { parseEdi835 } from "@/lib/edi/x835";
 import { getClearinghouse } from "@/lib/clearinghouse/gateway";
 import { explainDenial } from "@/lib/ai/explain";
 import { carcCategory } from "@/lib/codes/carc";
+import { checkClaimUnderpayment } from "./fees";
 
 const { claims, claimEvents, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -216,7 +217,7 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   if (!remit) throw new Error("Remittance not found");
   if (remit.posted) return remit.postingSummary;
   const parsed = parseEdi835(remit.raw835);
-  const summary = { matched: 0, unmatched: [] as string[], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
+  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
 
   for (const rc of parsed.claims) {
     const [claim] = await db.select().from(claims).where(and(eq(claims.practiceId, remit.practiceId), eq(claims.controlNumber, rc.patientControlNumber))).limit(1);
@@ -252,6 +253,13 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
     else status = "paid";
     await db.update(claims).set({ status, payerClaimNumber: rc.payerClaimNumber || claim.payerClaimNumber, updatedAt: new Date() }).where(eq(claims.id, claim.id));
     await db.insert(claimEvents).values({ claimId: claim.id, status, source: "835", message: `ERA ${remit.checkNumber}: paid ${(rc.paidCents / 100).toFixed(2)}, patient resp ${(rc.patientResponsibilityCents / 100).toFixed(2)}` });
+
+    // Compare what was allowed with the payer contract, now that it is posted.
+    const under = await checkClaimUnderpayment(db, claim.id, remittanceId);
+    if (under?.underpaid) {
+      summary.underpaid = (summary.underpaid ?? 0) + 1;
+      await db.insert(claimEvents).values({ claimId: claim.id, status, source: "system", message: `Underpaid against contract by ${(under.varianceCents / 100).toFixed(2)} (expected ${(under.expectedCents / 100).toFixed(2)} allowed)` });
+    }
 
     if (denialAdj) {
       const rarc = rc.remarks[0] ?? rc.lines.flatMap((l) => l.remarks)[0] ?? null;

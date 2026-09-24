@@ -291,6 +291,47 @@ export const auditLog = pgTable("audit_log", {
   at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Fee schedules & contract compliance                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * With no payer, the practice's standard charge master (what it bills). With a
+ * payer, that payer's contracted allowed amounts (what it should be paid).
+ */
+export const feeSchedules = pgTable("fee_schedules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  payerId: uuid("payer_id").references(() => payers.id),
+  name: text("name").notNull(),
+  effectiveFrom: date("effective_from").notNull().defaultNow(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const feeScheduleItems = pgTable("fee_schedule_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  feeScheduleId: uuid("fee_schedule_id").notNull().references(() => feeSchedules.id, { onDelete: "cascade" }),
+  cpt: text("cpt").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+});
+
+/** A paid claim whose allowed amount fell short of its contract. One per claim. */
+export const underpayments = pgTable("underpayments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  remittanceId: uuid("remittance_id").references(() => remittances.id),
+  expectedAllowedCents: integer("expected_allowed_cents").notNull(),
+  actualAllowedCents: integer("actual_allowed_cents").notNull(),
+  varianceCents: integer("variance_cents").notNull(),
+  status: text("status").notNull().default("open"), // open | appealed | recovered | accepted
+  note: text("note"),
+  detectedAt: timestamp("detected_at", { withTimezone: true }).defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
 /**
  * Messages from the public contact form.
  *
@@ -315,6 +356,8 @@ export const contactMessages = pgTable("contact_messages", {
 });
 
 export type ContactMessage = typeof contactMessages.$inferSelect;
+export type FeeSchedule = typeof feeSchedules.$inferSelect;
+export type Underpayment = typeof underpayments.$inferSelect;
 export type Practice = typeof practices.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Provider = typeof providers.$inferSelect;

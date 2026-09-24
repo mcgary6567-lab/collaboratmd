@@ -128,8 +128,10 @@ export class MockClearinghouse implements ClearinghouseGateway {
           lines: c.lines.map((l) => ({ cpt: l.cpt, chargedCents: l.chargeCents, paidCents: 0, units: l.units, adjustments: [{ group: "CO", reason: carc, amountCents: l.chargeCents }] })),
         };
       }
-      // Paid: allowed = 60-85% of charge, patient copay/coinsurance on first line.
-      const allowedPct = 0.6 + (((h >>> 4) >>> 0) % 26) / 100;
+      // Paid: allowed = 52-85% of charge, patient copay/coinsurance on first line.
+      // The low end sits below typical contract rates so underpayment detection
+      // has something real to find, as it would with a live payer.
+      const allowedPct = 0.52 + (((h >>> 4) >>> 0) % 34) / 100;
       const copay = pick([2000, 2500, 3000], h, 8);
       let totalPaid = 0;
       let totalPr = 0;

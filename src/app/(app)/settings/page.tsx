@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -60,7 +61,7 @@ export default async function SettingsPage() {
             </tbody>
           </table>
         </Card>
-        <Card title="Fee schedule (CPT / HCPCS)" className="lg:col-span-2">
+        <Card title="Default fees (CPT / HCPCS)" className="lg:col-span-2" actions={<Link href="/settings/fees" className="btn btn-secondary text-xs">Fee schedules and payer contracts</Link>}>
           <table className="table">
             <thead><tr><th>Code</th><th>Description</th><th className="text-right">Fee</th></tr></thead>
             <tbody>

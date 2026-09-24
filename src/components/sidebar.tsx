@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 
@@ -15,6 +15,7 @@ const NAV = [
   { href: "/claims", label: "Claims", icon: FileText },
   { href: "/remittance", label: "Remittance (ERA)", icon: Receipt },
   { href: "/denials", label: "Denials", icon: AlertTriangle },
+  { href: "/underpayments", label: "Underpayments", icon: TrendingDown },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
