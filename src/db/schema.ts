@@ -534,6 +534,54 @@ export const practiceMemberships = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* Integrations                                                         */
+/* ------------------------------------------------------------------ */
+
+export const integrationKeys = pgTable("integration_keys", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  prefix: text("prefix").notNull(),
+  keyHash: text("key_hash").notNull().unique(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+});
+
+export const integrationMessages = pgTable("integration_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  keyId: uuid("key_id").references(() => integrationKeys.id),
+  source: text("source").notNull(),
+  messageType: text("message_type").notNull(),
+  controlId: text("control_id").notNull(),
+  status: text("status").notNull(),
+  error: text("error"),
+  result: jsonb("result").$type<Record<string, unknown>>(),
+  raw: text("raw").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ImportMapping = Record<string, string | null>;
+
+export const importJobs = pgTable("import_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  kind: text("kind").notNull(),
+  filename: text("filename").notNull(),
+  mapping: jsonb("mapping").$type<ImportMapping>().notNull(),
+  mappedBy: text("mapped_by").notNull(),
+  totalRows: integer("total_rows").notNull().default(0),
+  created: integer("created").notNull().default(0),
+  updated: integer("updated").notNull().default(0),
+  skipped: integer("skipped").notNull().default(0),
+  errors: jsonb("errors").$type<{ row: number; message: string }[]>().notNull().default([]),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* ------------------------------------------------------------------ */
 /* Digital check-in                                                     */
 /* ------------------------------------------------------------------ */
 

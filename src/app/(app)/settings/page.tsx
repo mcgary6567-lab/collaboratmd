@@ -51,7 +51,7 @@ export default async function SettingsPage() {
             </tbody>
           </table>
         </Card>
-        <Card title="Payers" actions={<Link href="/settings/payer-edits" className="btn btn-secondary text-xs">Payer edits</Link>}>
+        <Card title="Payers" actions={<span className="flex gap-2"><Link href="/settings/payer-edits" className="btn btn-secondary text-xs">Payer edits</Link><Link href="/settings/integrations" className="btn btn-secondary text-xs">EHR integrations</Link></span>}>
           <table className="table">
             <thead><tr><th>Payer</th><th>Payer ID</th><th>Type</th><th className="text-right">Timely filing</th><th className="text-right">Appeal</th></tr></thead>
             <tbody>

@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": ["**/.env*", "data/**", "docs/**", "scripts/**"],
   },
+  experimental: {
+    // Patient imports send the CSV to a server action. 4 MB fits the
+    // 5,000-row import limit and stays under Vercel's 4.5 MB request cap.
+    serverActions: { bodySizeLimit: "4mb" },
+  },
 };
 
 export default nextConfig;
