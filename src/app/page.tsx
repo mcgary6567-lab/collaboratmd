@@ -9,6 +9,7 @@ import { AppMockup } from "@/components/app-mockup";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PricingTeaser } from "@/components/pricing-teaser";
+import { BuiltFor } from "@/components/built-for";
 
 export const dynamic = "force-dynamic";
 
@@ -156,6 +157,8 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      <BuiltFor />
 
       {/* -------------------------------------------------------- stats */}
       <section className="border-y border-slate-200 bg-slate-50">
