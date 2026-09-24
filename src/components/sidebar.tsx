@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown, Wallet, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, FileText, Receipt, AlertTriangle, BarChart3, Settings, LogOut, Stethoscope, Building2, TrendingDown, Wallet, ClipboardCheck, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
+import { PracticeSwitcher } from "@/components/practice-switcher";
 
 const NAV = [
   { href: "/dashboard", label: "My work", icon: LayoutDashboard },
   { href: "/admin", label: "Practice analytics", icon: Building2, adminOnly: true },
+  { href: "/clients", label: "All clients", icon: Network, multiOnly: true },
   { href: "/scheduling", label: "Scheduling", icon: CalendarDays },
   { href: "/check-ins", label: "Online check-ins", icon: ClipboardCheck },
   { href: "/patients", label: "Patients", icon: Users },
@@ -22,7 +24,17 @@ const NAV = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar({ user, logout }: { user: { name: string; role: string }; logout: () => Promise<void> }) {
+export function Sidebar({
+  user,
+  logout,
+  practices,
+  current,
+}: {
+  user: { name: string; role: string };
+  logout: () => Promise<void>;
+  practices: { id: string; name: string }[];
+  current: string;
+}) {
   const pathname = usePathname();
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
@@ -33,8 +45,9 @@ export function Sidebar({ user, logout }: { user: { name: string; role: string }
           <div className="text-[11px] text-slate-500">Revenue cycle platform</div>
         </div>
       </div>
+      <PracticeSwitcher practices={practices} current={current} />
       <nav className="flex-1 space-y-0.5 px-3">
-        {NAV.filter((item) => !item.adminOnly || user.role === "admin").map(({ href, label, icon: Icon }) => {
+        {NAV.filter((item) => (!item.adminOnly || user.role === "admin") && (!item.multiOnly || practices.length > 1)).map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link key={href} href={href} className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium", active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100")}>

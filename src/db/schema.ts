@@ -10,6 +10,7 @@ import {
   numeric,
   index,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -516,6 +517,21 @@ export const contactMessages = pgTable("contact_messages", {
   source: jsonb("source").$type<Record<string, string>>(),
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/* ------------------------------------------------------------------ */
+/* Multi-practice access                                                */
+/* ------------------------------------------------------------------ */
+
+export const practiceMemberships = pgTable(
+  "practice_memberships",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    practiceId: uuid("practice_id").notNull().references(() => practices.id),
+    role: text("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.practiceId] })],
+);
 
 /* ------------------------------------------------------------------ */
 /* Digital check-in                                                     */

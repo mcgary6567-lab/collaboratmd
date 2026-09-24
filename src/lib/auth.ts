@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "@/db";
+import { and, eq } from "drizzle-orm";
+import { getDb, schema, type Db } from "@/db";
 
 const COOKIE = "collaboratmd_session";
 
@@ -46,6 +46,12 @@ export async function login(email: string, password: string): Promise<Session | 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return null;
   const session: Session = { userId: user.id, practiceId: user.practiceId, name: user.name, email: user.email, role: user.role };
+  await issue(session);
+  await db.insert(schema.auditLog).values({ practiceId: user.practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id });
+  return session;
+}
+
+async function issue(session: Session) {
   const token = await new SignJWT({ ...session })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -53,8 +59,50 @@ export async function login(email: string, password: string): Promise<Session | 
     .sign(secret());
   const jar = await cookies();
   jar.set(COOKIE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 12 });
-  await db.insert(schema.auditLog).values({ practiceId: user.practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id });
-  return session;
+}
+
+/**
+ * The user's role in a practice, or null if they have no access to it. A
+ * membership decides; a user always has their own practice with their own
+ * role. Checked on every request, so removing access takes effect at once.
+ */
+export async function roleIn(db: Db, userId: string, practiceId: string): Promise<string | null> {
+  const [m] = await db
+    .select({ role: schema.practiceMemberships.role })
+    .from(schema.practiceMemberships)
+    .where(and(eq(schema.practiceMemberships.userId, userId), eq(schema.practiceMemberships.practiceId, practiceId)))
+    .limit(1);
+  if (m) return m.role;
+  const [u] = await db.select({ practiceId: schema.users.practiceId, role: schema.users.role }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  return u && u.practiceId === practiceId ? u.role : null;
+}
+
+/** Practices the user can work in, their own first. */
+export async function accessiblePractices(db: Db, userId: string) {
+  const [u] = await db.select({ practiceId: schema.users.practiceId, role: schema.users.role }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  if (!u) return [];
+  const rows = await db
+    .select({ id: schema.practices.id, name: schema.practices.name, role: schema.practiceMemberships.role })
+    .from(schema.practiceMemberships)
+    .innerJoin(schema.practices, eq(schema.practices.id, schema.practiceMemberships.practiceId))
+    .where(eq(schema.practiceMemberships.userId, userId));
+  if (!rows.some((r) => r.id === u.practiceId)) {
+    const [home] = await db.select({ id: schema.practices.id, name: schema.practices.name }).from(schema.practices).where(eq(schema.practices.id, u.practiceId)).limit(1);
+    if (home) rows.push({ ...home, role: u.role });
+  }
+  return rows.sort((a, b) => (a.id === u.practiceId ? -1 : b.id === u.practiceId ? 1 : a.name.localeCompare(b.name)));
+}
+
+/** Moves the signed-in user to another practice they have access to. */
+export async function switchPractice(practiceId: string): Promise<Session> {
+  const current = await requireSession();
+  const db = await getDb();
+  const role = await roleIn(db, current.userId, practiceId);
+  if (!role) throw new Error("You do not have access to that practice");
+  const next: Session = { ...current, practiceId, role };
+  await issue(next);
+  await db.insert(schema.auditLog).values({ practiceId, userId: current.userId, action: "switch_practice", entity: "practice", entityId: practiceId, details: { from: current.practiceId } });
+  return next;
 }
 
 export async function logout() {
@@ -89,9 +137,11 @@ export async function getSession(): Promise<Session | null> {
   } catch {
     return null;
   }
+  // The user must still exist and still have access to this practice; the
+  // role comes from the database, not the token, so a changed role applies now.
   const db = await getDb();
-  const [user] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, session.userId)).limit(1);
-  return user ? session : null;
+  const role = await roleIn(db, session.userId, session.practiceId);
+  return role ? { ...session, role } : null;
 }
 
 /** Returns the signed-in user, or redirects to the login page. */
