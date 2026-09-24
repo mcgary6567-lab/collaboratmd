@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   Activity, ArrowRight, BadgeCheck, Binary, Boxes, CheckCircle2, Database, FileCheck2,
   Gauge, Landmark, Layers, LineChart, Lock, Radar, Repeat, ScanLine, ShieldCheck,
-  Mail, MessageCircle, Sparkles, Timer, TrendingUp, Users, Workflow,
+  ArrowUpRight, Compass, Mail, MessageCircle, PieChart, Sparkles, Timer, TrendingUp, Users, Workflow,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
@@ -12,6 +12,11 @@ import { Prose } from "@/components/page-shell";
 import { COMPANY, addressLine, whatsappLink } from "@/content/company";
 import { publicMetrics } from "@/server/public-metrics";
 import { compactMoney, pct } from "@/components/kpi";
+import Image from "next/image";
+import {
+  TEAM, TRACTION, RAISE, MARKET, LANDSCAPE, DIFFERENTIATORS,
+  marketTier, privatePracticePhysicians, subscriptionTam,
+} from "@/content/investors";
 
 export const dynamic = "force-dynamic";
 
@@ -197,15 +202,17 @@ export default async function InvestorsPage() {
         <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
           <div className="mx-auto max-w-2xl text-center">
             <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-600">
-              <Activity className="h-3.5 w-3.5" /> Live from the running system
+              <Activity className="h-3.5 w-3.5" /> Computed live from the demo environment
             </span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-              Every industry benchmark, cleared
+              Every benchmark, computed live
             </h2>
             <p className="mt-4 text-[15px] leading-relaxed text-slate-600">
-              These figures are read from the database when this page loads. They are the
-              software&apos;s own output, not numbers typed into a slide. If a release made the
-              denial rate worse, this section would say so.
+              These figures are calculated from the database each time this page loads, over a
+              synthetic practice of {m.claimCount.toLocaleString("en-US")} claims that carries no
+              patient information. They show the software computing revenue cycle benchmarks
+              correctly at production volume. The outcomes reflect how the demo data was generated,
+              so they are not results at a customer.
             </p>
           </div>
 
@@ -303,6 +310,26 @@ export default async function InvestorsPage() {
         </section>
       )}
 
+      {/* -------------------------------------------------------- traction */}
+      {TRACTION.length > 0 && (
+        <section className="mx-auto max-w-7xl px-6 pt-16 lg:pt-24">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="text-xs font-bold uppercase tracking-widest text-green-600">Traction</span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              Where we are today
+            </h2>
+          </div>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {TRACTION.map((t) => (
+              <div key={t.label} className="rounded-2xl border border-slate-200 bg-white p-6">
+                <div className="text-xl font-extrabold tracking-tight text-green-700">{t.label}</div>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{t.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ---------------------------------------------------------- proof */}
       <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
@@ -380,6 +407,152 @@ export default async function InvestorsPage() {
         </div>
       </section>
 
+      {/* ---------------------------------------------------- market size */}
+      <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-600">
+            <PieChart className="h-3.5 w-3.5" /> Market size
+          </span>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            {compactMoney(subscriptionTam() * 100)} a year, in subscriptions alone
+          </h2>
+          <p className="mt-4 text-[15px] leading-relaxed text-slate-600">
+            A bottom-up count of who could buy, priced at our own list rate rather than lifted from
+            an industry report.
+          </p>
+        </div>
+
+        <div className="mt-12 grid items-center gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+          {[
+            {
+              value: MARKET.patientCarePhysicians.toLocaleString("en-US"),
+              label: "Physicians in direct patient care in the United States",
+            },
+            { op: "\u00d7" },
+            {
+              value: pct(MARKET.privatePracticeShare),
+              label: `In private practice, or ${privatePracticePhysicians().toLocaleString("en-US")} physicians`,
+            },
+            { op: "\u00d7" },
+            {
+              value: `$${((marketTier().priceMonthly ?? 0) * 12).toLocaleString("en-US")}`,
+              label: `Per provider per year on ${marketTier().name}, at monthly list price`,
+            },
+            { op: "=" },
+            {
+              value: compactMoney(subscriptionTam() * 100),
+              label: "Annual subscription revenue across the addressable base",
+              result: true,
+            },
+          ].map((step, i) =>
+            "op" in step ? (
+              <div key={i} className="text-center text-2xl font-bold text-slate-300">
+                {step.op}
+              </div>
+            ) : (
+              <div
+                key={i}
+                className={`rounded-2xl border p-6 text-center ${
+                  step.result ? "border-green-600 bg-green-50" : "border-slate-200 bg-white"
+                }`}
+              >
+                <div
+                  className={`text-3xl font-extrabold tracking-tight ${
+                    step.result ? "text-green-700" : "text-slate-900"
+                  }`}
+                >
+                  {step.value}
+                </div>
+                <div className="mt-2 text-sm leading-snug text-slate-600">{step.label}</div>
+              </div>
+            ),
+          )}
+        </div>
+
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+            <h3 className="text-sm font-bold text-slate-900">What it leaves out</h3>
+            <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
+              <li>
+                Nurse practitioners, physician assistants and therapists who bill under their own
+                NPI. Plans are priced per rendering provider, so they are customers too.
+              </li>
+              <li>The per-claim transaction line, which is charged on top of every subscription.</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+            <h3 className="text-sm font-bold text-slate-900">What it assumes</h3>
+            <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
+              <li>
+                Every private-practice physician as a customer at monthly list price. Annual billing
+                lowers realized revenue by about 17%.
+              </li>
+              <li>
+                The private-practice share from one survey applied to the physician count from
+                another, a standard approximation for a sizing figure.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
+          Sources:{" "}
+          <a href={MARKET.patientCareSource.url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 hover:text-green-700">
+            {MARKET.patientCareSource.label}
+          </a>
+          {"; "}
+          <a href={MARKET.privatePracticeSource.url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 hover:text-green-700">
+            {MARKET.privatePracticeSource.label}
+          </a>
+          .
+        </p>
+      </section>
+
+      {/* ------------------------------------------------------ landscape */}
+      <section className="border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-600">
+              <Compass className="h-3.5 w-3.5" /> Where we fit
+            </span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              Two ways the market is served today, and a third
+            </h2>
+          </div>
+
+          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            {LANDSCAPE.map((c) => (
+              <div key={c.kind} className="rounded-2xl border border-slate-200 bg-white p-7">
+                <h3 className="text-base font-bold text-slate-900">{c.kind}</h3>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {c.examples}
+                </p>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">{c.approach}</p>
+              </div>
+            ))}
+            <div className="rounded-2xl border-2 border-green-600 bg-white p-7 shadow-lg shadow-green-900/5">
+              <h3 className="text-base font-bold text-slate-900">Billing-first</h3>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-green-700">
+                CollaboratMD
+              </p>
+              <ul className="mt-4 space-y-2.5">
+                {DIFFERENTIATORS.map((d) => (
+                  <li key={d} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-slate-500">
+            Competitor descriptions reflect each company&apos;s public positioning. Product names
+            are trademarks of their owners and are used here only to describe the market.
+          </p>
+        </div>
+      </section>
+
       {/* ------------------------------------------------- model and the ask */}
       <section className="mx-auto max-w-3xl px-6 py-16 lg:py-24">
         <Prose>
@@ -408,6 +581,78 @@ export default async function InvestorsPage() {
           </p>
         </Prose>
       </section>
+
+      {/* ------------------------------------------------------ the round */}
+      {RAISE && (
+        <section className="mx-auto max-w-3xl px-6 pb-16">
+          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-7">
+            <div className="text-xs font-bold uppercase tracking-widest text-green-700">The round</div>
+            <div className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">{RAISE.amount}</div>
+            <div className="mt-1 text-sm text-slate-600">{RAISE.instrument}</div>
+            <div className="mt-6 space-y-3">
+              {RAISE.useOfFunds.map((u) => (
+                <div key={u.label}>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-slate-700">{u.label}</span>
+                    <span className="font-semibold text-green-700">{Math.round(u.share * 100)}%</span>
+                  </div>
+                  <div className="mt-1.5 h-2 rounded-full bg-white">
+                    <div className="h-2 rounded-full bg-green-600" style={{ width: `${u.share * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ----------------------------------------------------------- team */}
+      {TEAM.length > 0 && (
+        <section className="mx-auto max-w-7xl px-6 pb-16 lg:pb-24">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="text-xs font-bold uppercase tracking-widest text-green-600">The team</span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              Who is building it
+            </h2>
+          </div>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {TEAM.map((person) => (
+              <div key={person.name} className="rounded-2xl border border-slate-200 bg-white p-7">
+                <div className="flex items-center gap-4">
+                  {person.photo ? (
+                    <Image
+                      src={person.photo}
+                      alt={person.name}
+                      width={56}
+                      height={56}
+                      className="h-14 w-14 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-green-600 text-lg font-bold text-white">
+                      {person.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+                    </span>
+                  )}
+                  <div>
+                    <div className="text-base font-bold text-slate-900">{person.name}</div>
+                    <div className="text-sm text-green-700">{person.role}</div>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">{person.background}</p>
+                {person.linkedin && (
+                  <a
+                    href={person.linkedin}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-green-700 hover:text-green-800"
+                  >
+                    LinkedIn <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ------------------------------------------------------- data room */}
       <section className="mx-auto max-w-7xl px-6 pb-16 lg:pb-24">
