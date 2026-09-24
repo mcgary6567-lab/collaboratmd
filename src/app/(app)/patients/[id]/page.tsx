@@ -65,9 +65,21 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                   <span>Deductible: {money(latestCheck.deductibleCents)}</span>
                   <span>Remaining: {money(latestCheck.deductibleRemainingCents)}</span>
                   <span>OOP max: {money(latestCheck.oopMaxCents)}</span>
+                  {latestCheck.oopRemainingCents !== null && <span>OOP remaining: {money(latestCheck.oopRemainingCents)}</span>}
+                  {latestCheck.coinsurancePct !== null && <span>Coinsurance: {latestCheck.coinsurancePct}%</span>}
+                  {latestCheck.serviceDate && <span>For DOS: {fmtDate(latestCheck.serviceDate + "T00:00:00")}</span>}
                 </div>
               ) : (
-                <div className="mt-1 text-xs">{String((latestCheck.response as { message?: string })?.message ?? "")}</div>
+                <div className="mt-1 text-xs">{latestCheck.message ?? String((latestCheck.response as { message?: string })?.message ?? "")}</div>
+              )}
+              {latestCheck.request270 && (
+                <details className="mt-2 text-xs">
+                  <summary className="cursor-pointer opacity-70">270 sent and 271 received (trace {latestCheck.traceNumber})</summary>
+                  <pre className="mt-1 max-h-40 overflow-auto rounded bg-slate-900 p-2 font-mono text-[10px] text-green-200">{latestCheck.request270}</pre>
+                  {latestCheck.response271 && (
+                    <pre className="mt-1 max-h-48 overflow-auto rounded bg-slate-900 p-2 font-mono text-[10px] text-green-200">{latestCheck.response271}</pre>
+                  )}
+                </details>
               )}
             </div>
           )}

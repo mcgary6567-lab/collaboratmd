@@ -116,6 +116,11 @@ export const eligibilityChecks = pgTable("eligibility_checks", {
   coinsurancePct: numeric("coinsurance_pct", { precision: 5, scale: 2, mode: "number" }),
   oopRemainingCents: integer("oop_remaining_cents"),
   response: jsonb("response").$type<Record<string, unknown>>(),
+  serviceDate: date("service_date"),
+  traceNumber: text("trace_number"),
+  request270: text("request_270"),
+  response271: text("response_271"),
+  message: text("message"),
   checkedAt: timestamp("checked_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -4,6 +4,7 @@ import { parseEdi835 } from "@/lib/edi/x835";
 import { buildEdi837P } from "@/lib/edi/x837p";
 import { parse999 } from "@/lib/edi/x999";
 import { parse277CA } from "@/lib/edi/x277ca";
+import { build270, parse271, summarize271 } from "@/lib/edi/x270";
 
 const ch = new MockClearinghouse();
 
@@ -91,7 +92,14 @@ describe("MockClearinghouse adjudication", () => {
 
   it("returns complete, finite benefits for every eligibility check", async () => {
     for (const memberId of memberIds.slice(0, 100)) {
-      const r = await ch.checkEligibility({ memberId, payerId: "00590", dob: "1980-01-01", lastName: "Garcia", firstName: "Maria", serviceDate: "2026-09-01" });
+      const edi270 = build270({
+        senderId: "COLLABORATMD", receiverId: "00590", now: new Date(), control: "1", traceNumber: `T${memberId}`,
+        payer: { name: "Blue Cross Blue Shield FL", payerId: "00590" }, provider: { name: "Summit", npi: "1234567893" },
+        subscriber: { lastName: "Garcia", firstName: "Maria", memberId, dob: "1980-01-01" }, serviceDate: "2026-09-01",
+      });
+      const parsed = parse271(await ch.checkEligibility(edi270));
+      expect(parsed.traceNumber).toBe(`T${memberId}`);
+      const r = summarize271(parsed);
       expect(r.status).toBe("active");
       expect(r.planName).toBeTruthy();
       for (const v of [r.copayCents, r.deductibleCents, r.deductibleRemainingCents, r.oopMaxCents]) {

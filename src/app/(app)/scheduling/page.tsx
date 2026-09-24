@@ -1,7 +1,11 @@
 import Link from "next/link";
-import { getDb } from "@/db";
+import { and, eq, inArray } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listAppointments, listProviders } from "@/server/encounters";
+import { latestChecks } from "@/server/patients";
+import { verifyScheduleAction } from "@/app/(app)/eligibility-actions";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { appointmentStatusAction } from "@/app/(app)/actions";
 import { Card, PageHeader, PatientLink, Badge, Empty } from "@/components/ui";
 import { AppointmentForm } from "./form";
@@ -17,6 +21,24 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
   const day = date ? new Date(date + "T12:00:00") : new Date();
   const [appts, providers] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId)]);
   const iso = day.toISOString().slice(0, 10);
+  const patientIds = [...new Set(appts.map((a) => a.patient.id))];
+  const primaries = patientIds.length
+    ? await db
+        .select({ id: schema.patientInsurances.id, patientId: schema.patientInsurances.patientId })
+        .from(schema.patientInsurances)
+        .where(and(inArray(schema.patientInsurances.patientId, patientIds), eq(schema.patientInsurances.active, true), eq(schema.patientInsurances.rank, 1)))
+    : [];
+  const insByPatient = new Map(primaries.map((p) => [p.patientId, p.id]));
+  const checks = await latestChecks(db, primaries.map((p) => p.id));
+  const coverage = (patientId: string) => {
+    const insId = insByPatient.get(patientId);
+    if (!insId) return { label: "No insurance", tone: "amber" as const, title: "Self-pay unless insurance is collected" };
+    const c = checks.get(insId);
+    if (!c) return { label: "Not checked", tone: "slate" as const, title: "" };
+    const forDay = c.serviceDate === iso;
+    if (c.status === "active") return { label: forDay ? "Verified" : "Active (earlier check)", tone: forDay ? ("green" as const) : ("blue" as const), title: c.planName ?? "" };
+    return { label: c.status === "inactive" ? "Not covered" : "Check failed", tone: "red" as const, title: c.message ?? "" };
+  };
   const shift = (n: number) => {
     const d = new Date(day);
     d.setDate(d.getDate() + n);
@@ -37,12 +59,22 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
         }
       />
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card title={`Appointments (${appts.length})`} className="lg:col-span-2">
+        <Card
+          title={`Appointments (${appts.length})`}
+          className="lg:col-span-2"
+          actions={
+            appts.length > 0 ? (
+              <ActionForm action={verifyScheduleAction.bind(null, iso)} className="flex flex-col items-end">
+                <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Checking with payers...">Verify coverage for this day</SubmitButton>
+              </ActionForm>
+            ) : undefined
+          }
+        >
           {appts.length === 0 ? (
             <Empty>No appointments on this day.</Empty>
           ) : (
             <table className="table">
-              <thead><tr><th>Time</th><th>Patient</th><th>Provider</th><th>Type</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Time</th><th>Patient</th><th>Provider</th><th>Type</th><th>Reason</th><th>Coverage</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {appts.map(({ appt, patient, provider }) => (
                   <tr key={appt.id}>
@@ -51,6 +83,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                     <td>Dr. {provider.lastName}</td>
                     <td>{appt.type.replace(/_/g, " ")}</td>
                     <td className="text-slate-500">{appt.reason}</td>
+                    <td title={coverage(patient.id).title}><Badge tone={coverage(patient.id).tone}>{coverage(patient.id).label}</Badge></td>
                     <td><Badge tone={TONE[appt.status] ?? "slate"}>{appt.status.replace("_", " ")}</Badge></td>
                     <td className="whitespace-nowrap">
                       {appt.status === "scheduled" && (

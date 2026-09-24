@@ -9,6 +9,7 @@
 import { buildEdi835, type Adjustment } from "@/lib/edi/x835";
 import { build999, describeSyntaxError, validateStructure } from "@/lib/edi/x999";
 import { build277CA } from "@/lib/edi/x277ca";
+import { build271, parse270, type Benefit } from "@/lib/edi/x270";
 
 export interface SubmissionResult {
   clearinghouseId: string;
@@ -32,28 +33,6 @@ export interface SubmissionMeta {
   dateOfService?: string;
   billingName?: string;
   billingNpi?: string;
-}
-
-export interface EligibilityRequest {
-  memberId: string;
-  payerId: string;
-  dob: string;
-  lastName: string;
-  firstName: string;
-  serviceDate: string;
-}
-
-export interface EligibilityResult {
-  status: "active" | "inactive" | "error";
-  planName?: string;
-  copayCents?: number;
-  deductibleCents?: number;
-  deductibleRemainingCents?: number;
-  oopMaxCents?: number;
-  /** Patient share after the deductible, 0-100. */
-  coinsurancePct?: number;
-  oopRemainingCents?: number;
-  raw: Record<string, unknown>;
 }
 
 export interface AdjudicationLine {
@@ -83,7 +62,8 @@ export interface RemitRequest {
 
 export interface ClearinghouseGateway {
   submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult>;
-  checkEligibility(req: EligibilityRequest): Promise<EligibilityResult>;
+  /** Sends a 270 eligibility inquiry and returns the payer's 271, both as raw X12. */
+  checkEligibility(edi270: string): Promise<string>;
   /** Simulates the payer producing an ERA for previously accepted claims. */
   fetch835(claims: RemitRequest[]): Promise<string | null>;
 }
@@ -141,26 +121,41 @@ export class MockClearinghouse implements ClearinghouseGateway {
       : { clearinghouseId: id, accepted: true, status: "accepted", ack999, ack277, message: "Acknowledgement/Acceptance into adjudication system (277CA A2:20)" };
   }
 
-  async checkEligibility(req: EligibilityRequest): Promise<EligibilityResult> {
-    const h = hashStr(req.memberId + req.payerId);
-    if (/X$/i.test(req.memberId)) {
-      return { status: "inactive", raw: { transaction: "271", eb: "6", message: "Subscriber not found or coverage terminated" } };
-    }
+  /**
+   * Answers a 270 the way a payer does, with a 271. Member IDs ending in "X"
+   * are not found (AAA 72); everyone else has active coverage whose figures
+   * are derived from the member ID, so they are stable between checks.
+   */
+  async checkEligibility(edi270: string): Promise<string> {
+    const q = parse270(edi270);
+    const now = new Date();
+    const control = String(hashStr(edi270 + "271") % 1_000_000_000);
+    const base = { senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control, inquiry: q };
+    if (!q.memberId || /X$/i.test(q.memberId)) return build271({ ...base, rejection: { code: "72" } });
+
+    const h = hashStr(q.memberId + q.payerId);
     const deductible = pick([50000, 100000, 150000, 300000], h);
     const remaining = Math.round(deductible * ((h % 7) / 7));
     const oopMax = deductible * 3;
-    return {
-      status: "active",
-      planName: pick(["PPO Choice Plus", "HMO Select", "POS Standard", "High Deductible Health Plan"], h),
-      copayCents: pick([2000, 2500, 3000, 4000], h, 3),
-      deductibleCents: deductible,
-      deductibleRemainingCents: remaining,
-      oopMaxCents: oopMax,
-      coinsurancePct: pick([10, 20, 30], h, 5),
-      // Spent so far is the deductible already met; the rest of the maximum remains.
-      oopRemainingCents: oopMax - (deductible - remaining),
-      raw: { transaction: "271", eb: "1", coverageLevel: "IND", serviceDate: req.serviceDate },
-    };
+    const plan = pick(["PPO Choice Plus", "HMO Select", "POS Standard", "High Deductible Health Plan"], h);
+    const insuranceType = plan.startsWith("HMO") ? "HM" : plan.startsWith("PPO") ? "PR" : "C1";
+    const eb = (code: string, timePeriod: string, amountCents: number | null, percent: number | null, desc = ""): Benefit => ({
+      code, coverageLevel: "IND", serviceType: "30", insuranceType, planDescription: desc, timePeriod, amountCents, percent, inNetwork: code === "1" ? "" : "Y",
+    });
+    return build271({
+      ...base,
+      planBegin: `${(q.serviceDate || now.toISOString()).slice(0, 4)}-01-01`,
+      benefits: [
+        eb("1", "", null, null, plan),
+        eb("B", "27", pick([2000, 2500, 3000, 4000], h, 3), null),
+        eb("C", "23", deductible, null),
+        eb("C", "29", remaining, null),
+        eb("A", "27", null, pick([10, 20, 30], h, 5)),
+        eb("G", "23", oopMax, null),
+        // Spent so far is the deductible already met; the rest of the maximum remains.
+        eb("G", "29", oopMax - (deductible - remaining), null),
+      ],
+    });
   }
 
   async fetch835(claims: RemitRequest[]): Promise<string | null> {

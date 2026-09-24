@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getDb } from "@/db";
+import { and, eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { submitClaim, rescrubClaim, fetchAndPostRemittances, importRemittance, postRemittance, writeOffClaim, transferToPatient } from "@/server/claims";
 import { createPatient, runEligibility, postPatientPayment } from "@/server/patients";
@@ -153,8 +154,15 @@ export async function createPatientAction(_prev: ActionResult | undefined, formD
 }
 
 export async function eligibilityAction(patientInsuranceId: string, patientId: string): Promise<void> {
-  await requireSession();
+  const s = await requireSession();
   const db = await getDb();
+  const [own] = await db
+    .select({ id: schema.patientInsurances.id })
+    .from(schema.patientInsurances)
+    .innerJoin(schema.patients, eq(schema.patients.id, schema.patientInsurances.patientId))
+    .where(and(eq(schema.patientInsurances.id, patientInsuranceId), eq(schema.patients.id, patientId), eq(schema.patients.practiceId, s.practiceId)))
+    .limit(1);
+  if (!own) throw new Error("Insurance not found");
   await runEligibility(db, patientInsuranceId);
   revalidatePath(`/patients/${patientId}`);
 }
