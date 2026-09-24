@@ -76,7 +76,7 @@ export default async function PricingPage() {
             {
               icon: Receipt,
               title: "Per submitted claim",
-              body: "Volume drives cost on our side too: every submission crosses a clearinghouse connection and every remittance comes back through one. Splitting it keeps small practices from subsidizing large ones.",
+              body: "Volume drives cost on our side too: with a live clearinghouse, every submission crosses its connection and every remittance comes back through one. Splitting it keeps small practices from subsidizing large ones.",
             },
             {
               icon: CalendarClock,
@@ -86,7 +86,7 @@ export default async function PricingPage() {
             {
               icon: ShieldCheck,
               title: "Included in every plan",
-              body: "A business associate agreement, the append-only ledger, the full PHI audit trail and role-based access. Compliance is not an upgrade.",
+              body: "A business associate agreement on request, posted amounts that are never edited, an audit log of key actions, and role-based access. Compliance is not an upgrade.",
             },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title}>

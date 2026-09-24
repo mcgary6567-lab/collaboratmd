@@ -171,11 +171,11 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
           <div className="mt-14 rounded-3xl bg-gradient-to-br from-green-700 via-green-600 to-green-500 px-8 py-10 text-center">
             <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-              See these numbers on a real practice
+              See these numbers on a full-size demo practice
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-green-50">
-              The demo runs on 100 providers, 15,000 patients and 105,000 claims that have been
-              scrubbed, submitted, adjudicated, denied and appealed.
+              The demo runs on a synthetic practice of 100 providers, 15,000 patients and 105,000
+              claims, scrubbed, submitted, adjudicated by a simulated payer, denied and appealed.
             </p>
             <Link
               href="/login"

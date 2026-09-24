@@ -38,7 +38,6 @@ export default function PrivacyPage() {
         <ul>
           <li>Account details such as your name, work email address, role and practice affiliation.</li>
           <li>Anything you send through a contact form, a support request or a sales inquiry.</li>
-          <li>Billing and payment details for the subscription, handled by our payment processor.</li>
         </ul>
         <h3>Information a practice enters</h3>
         <ul>
@@ -49,7 +48,7 @@ export default function PrivacyPage() {
         <h3>Information we collect automatically</h3>
         <ul>
           <li>Log data: IP address, browser and device type, pages requested and timestamps.</li>
-          <li>Audit records of who viewed or changed a record, which HIPAA requires us to keep.</li>
+          <li>Audit records of key actions, such as sign-in, claim submission and corrections, and who took them.</li>
           <li>Strictly necessary cookies that keep you signed in and protect the sign-in form.</li>
         </ul>
 
@@ -57,7 +56,7 @@ export default function PrivacyPage() {
         <p>We use information for a short and specific list of purposes:</p>
         <ul>
           <li><strong>To run the service.</strong> Verifying eligibility, scrubbing and submitting claims, posting remittances, tracking denials and producing statements.</li>
-          <li><strong>To keep it secure.</strong> Detecting unusual access, investigating incidents and maintaining the audit trail.</li>
+          <li><strong>To keep it secure.</strong> Investigating incidents and maintaining the audit log.</li>
           <li><strong>To support you.</strong> Answering questions, diagnosing problems and restoring data after an error.</li>
           <li><strong>To meet legal obligations.</strong> Retention, reporting and responses to lawful requests.</li>
           <li><strong>To improve the product,</strong> using aggregated figures that cannot identify a patient.</li>
@@ -68,10 +67,12 @@ export default function PrivacyPage() {
         </p>
 
         <h2>4. When we share it</h2>
-        <p>Information leaves the platform in four circumstances, and no others:</p>
+        <p>Information leaves the platform in these circumstances, and no others:</p>
         <ul>
-          <li><strong>Payers and clearinghouses,</strong> to submit claims and receive remittance advice, which is the purpose of the software.</li>
-          <li><strong>Service providers</strong> that host infrastructure or process payments, each under a written agreement that limits them to our instructions.</li>
+          <li><strong>Payers and clearinghouses,</strong> to submit claims, check eligibility and receive remittance advice once a practice connects a clearinghouse, which is the purpose of the software.</li>
+          <li><strong>Service providers</strong> that host the application and database or deliver email, each under a written agreement that limits them to our instructions.</li>
+          <li><strong>Anthropic,</strong> when a practice enables AI features: denial codes and non-identifying claim context for plain-language explanations, and column headings and value types when matching an import file. Names, dates of birth, member IDs and other patient identifiers are not sent.</li>
+          <li><strong>A practice&apos;s own EHR and lab interfaces,</strong> which exchange patient, charge, order and result messages with systems the practice connects.</li>
           <li><strong>Legal requirements,</strong> where a subpoena, court order or statute compels disclosure. Where we are permitted to tell you, we will.</li>
           <li><strong>A change of control,</strong> such as a merger or acquisition, with notice before your information becomes subject to a different policy.</li>
         </ul>
@@ -87,11 +88,11 @@ export default function PrivacyPage() {
 
         <h2>6. How we protect it</h2>
         <ul>
-          <li>Encryption in transit with TLS, and encryption at rest for stored records.</li>
-          <li>Role-based access, so a front desk user cannot open the financial ledger.</li>
-          <li>An append-only ledger: a correction is posted as a reversal, so history is never rewritten.</li>
-          <li>Access logging on every record that contains protected health information.</li>
-          <li>Backups with tested restores, and a documented incident response procedure.</li>
+          <li>Encryption in transit with TLS, and encryption at rest provided by our hosting and database providers.</li>
+          <li>Role-based access, so only billers and administrators can post, adjust or write off, and every request is checked against the practice it belongs to.</li>
+          <li>Posted amounts are never edited: a correction is posted as a reversal.</li>
+          <li>An audit log of key actions.</li>
+          <li>Backups and point-in-time recovery provided by our database host.</li>
         </ul>
         <p>
           No system is perfectly secure. If a breach affects your information, we will notify you and

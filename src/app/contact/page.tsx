@@ -21,12 +21,12 @@ const ROUTES = [
   {
     icon: TrendingUp,
     title: "Investor inquiries",
-    body: "Healthcare IT and digital health funds reach the founders directly. See the investors page first, then ask here for the data room.",
+    body: "Healthcare IT and digital health funds reach the company directly. See the investors page first, then ask here for the data room.",
   },
   {
     icon: LifeBuoy,
     title: "Product support",
-    body: "Existing customers reach the support queue here. Include the claim control number when a specific claim is involved.",
+    body: "Customers reach the support queue here. Include the claim control number when a specific claim is involved.",
   },
   {
     icon: Lock,

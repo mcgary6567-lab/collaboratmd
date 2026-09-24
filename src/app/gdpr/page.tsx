@@ -98,16 +98,18 @@ export default function GdprPage() {
 
           <h2>5. Sub-processors</h2>
           <p>
-            We engage sub-processors for hosting, database services, email delivery and payment
-            processing. Each is bound by a written contract imposing the same obligations we carry.
-            We maintain a current list and give controllers advance notice of any addition, with the
-            right to object.
+            We engage sub-processors for hosting, database services, email delivery and, when a
+            practice enables AI features, Anthropic, which receives only non-identifying codes and
+            column descriptions. Each is bound by a written contract imposing the same obligations we
+            carry. The current list is available on request, and we give controllers advance notice
+            of any addition, with the right to object.
           </p>
 
           <h2>6. Security and breach notification</h2>
           <p>
             We apply the technical and organizational measures Article 32 requires: encryption in
-            transit and at rest, role-based access control, access logging and tested backups. If a
+            transit, encryption at rest by our hosting providers, role-based access control, an
+            audit log of key actions, and the database host&apos;s backups. If a
             personal data breach occurs, we notify the controller without undue delay so it can meet
             the 72-hour deadline in Article 33.
           </p>

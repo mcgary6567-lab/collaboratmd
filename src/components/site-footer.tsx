@@ -62,8 +62,8 @@ const SOCIAL = [
 
 const ASSURANCES = [
   { icon: ShieldCheck, label: "HIPAA-aligned design" },
-  { icon: Lock, label: "Encrypted in transit and at rest" },
-  { icon: ScrollText, label: "Append-only audit trail" },
+  { icon: Lock, label: "TLS in transit; encrypted at rest by our hosts" },
+  { icon: ScrollText, label: "Audit log of key actions" },
 ];
 
 function Column({ title, links }: { title: string; links: { href: string; label: string }[] }) {
@@ -93,7 +93,7 @@ export function SiteFooter() {
               See it running on a full-size practice
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-slate-600">
-              105,000 claims scrubbed, submitted, adjudicated, denied and appealed. No sign-up form.
+              105,000 synthetic claims scrubbed, submitted, adjudicated by a simulated payer, denied and appealed. No sign-up form.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 sm:ml-auto sm:shrink-0">
@@ -113,8 +113,8 @@ export function SiteFooter() {
             <Logo id="cmd-footer" markClassName="h-9 w-9" textClassName="text-base" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
               Revenue cycle management for medical practices and billing companies. Eligibility,
-              charge capture, claim scrubbing, electronic submission, remittance posting, denial
-              management and patient billing in one system.
+              charge capture, claim scrubbing, 837P claims, remittance posting, denial management,
+              patient billing and EHR and lab interfaces in one system.
             </p>
             <div className="mt-5 flex items-start gap-2.5 text-sm leading-relaxed text-slate-600">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />

@@ -77,9 +77,10 @@ export default function TermsPage() {
 
         <h2>7. Availability and support</h2>
         <p>
-          We aim for 99.9% monthly availability, excluding scheduled maintenance announced in
-          advance and events outside our reasonable control. Where an order form includes a service
-          level agreement, the remedies in it are your exclusive remedy for missed availability.
+          We work to keep the service available at all times, excluding scheduled maintenance
+          announced in advance and events outside our reasonable control. Where an order form
+          includes a service level agreement, the remedies in it are your exclusive remedy for
+          missed availability.
         </p>
 
         <h2>8. Intellectual property</h2>
@@ -91,7 +92,7 @@ export default function TermsPage() {
 
         <h2>9. Third-party services</h2>
         <p>
-          The platform exchanges transactions with clearinghouses, payers and payment processors.
+          The platform exchanges transactions with clearinghouses, payers, EHRs and laboratories.
           Their performance is their own, and their terms govern their services. We are not
           responsible for a payer&apos;s adjudication decision or for how long it takes.
         </p>
@@ -126,8 +127,8 @@ export default function TermsPage() {
         <h2>13. Term and termination</h2>
         <p>
           Either party may terminate for material breach that is not cured within 30 days of written
-          notice. On termination, your right to use the service ends and we will make your data
-          available for export for 30 days, after which we may delete it in line with the business
+          notice. On termination, your right to use the service ends and we will provide an export
+          of your data on request for 30 days, after which we may delete it in line with the business
           associate agreement and the <a href="/privacy">Privacy Policy</a>.
         </p>
 

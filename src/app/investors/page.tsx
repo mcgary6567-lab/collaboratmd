@@ -3,8 +3,9 @@ import Link from "next/link";
 import {
   Activity, ArrowRight, BadgeCheck, Binary, Boxes, CheckCircle2, Database, FileCheck2,
   Gauge, Landmark, Layers, LineChart, Lock, Radar, Repeat, ScanLine, ShieldCheck,
-  ArrowUpRight, Compass, Mail, MessageCircle, PieChart, Sparkles, Timer, TrendingUp, Users, Workflow,
+  ArrowUpRight, Compass, Mail, MessageCircle, Network, PieChart, Plug, Sparkles, Timer, TrendingUp, Users, Workflow,
 } from "lucide-react";
+import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -32,19 +33,19 @@ const PROOF = [
   {
     icon: Binary,
     title: "Native X12, not a conversion layer",
-    body: "Generates 837P claims and parses 835 remittances directly, with CARC and RARC codes preserved on every service line. Each transaction is validated against golden-file fixtures, so a change that would alter a segment fails before it ships.",
-    tag: "837P · 835 · 270/271",
+    body: "Generates 837P claims and 270 eligibility requests, and parses 999 and 277CA acknowledgments, 271 responses and 835 remittances directly, with CARC and RARC codes preserved on every service line. Segment-level tests catch a change that would alter a segment before it ships.",
+    tag: "837P · 835 · 270/271 · 999 · 277CA",
   },
   {
     icon: ScanLine,
     title: "Validation moved to the desk",
-    body: "Twenty-two rules run on every claim as it is created: NPI check digits, diagnosis pointers, place of service, modifier logic, timely filing. An error caught at entry costs seconds. The same error caught on a remittance costs an appeal and a month of aging.",
-    tag: "22 blocking and warning rules",
+    body: `${RULE_IDS.length} built-in rules run on every claim as it is created (NPI check digits, diagnosis pointers, place of service, timely filing), plus payer-specific edits a practice configures, including prior authorization. An error caught at entry costs seconds; the same error caught on a remittance costs an appeal and a month of aging.`,
+    tag: `${RULE_IDS.length} built-in rules plus payer edits`,
   },
   {
     icon: Lock,
-    title: "Append-only financial ledger",
-    body: "A correction posts as a reversal, never an edit. No row is rewritten, so the money trail reads forward and reconciles to the cent. This is very hard to retrofit into a platform that did not start with it.",
+    title: "Amounts are never edited",
+    body: "A financial correction posts as a reversal, never as an edit to a posted amount, so the money trail reads forward and reconciles to the cent. Payer recoupments post the same way. This is very hard to retrofit into a platform that did not start with it.",
     tag: "Audit-grade by construction",
   },
   {
@@ -53,15 +54,27 @@ const PROOF = [
     body: "Every headline metric is reported against its industry target rather than floating without context. Aggregation happens in SQL, so reporting stays fast as the ledger grows into the millions of rows.",
     tag: "SQL aggregation at scale",
   },
+  {
+    icon: Plug,
+    title: "Interfaces, not re-keying",
+    body: "HL7 v2 over HTTPS brings patients and charges in from an EHR and lab results back from a lab; lab orders go out as HL7. A practice switching systems imports its patient list from any CSV export, with the columns matched for it.",
+    tag: "HL7 ADT · DFT · ORM · ORU",
+  },
+  {
+    icon: Network,
+    title: "Built for the billing company",
+    body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",
+    tag: "Multi-practice by design",
+  },
 ];
 
 const ENGINEERING = [
   { icon: Database, label: "Postgres with bundled migrations", detail: "Ships inside the build, so serverless deploys never read schema off a disk" },
   { icon: Timer, label: "Reporting computed in SQL", detail: "No row ever leaves the database to be summed in the application" },
   { icon: Layers, label: "Typed end to end", detail: "TypeScript strict, Drizzle ORM, server components and server actions" },
-  { icon: ShieldCheck, label: "Golden-file EDI tests", detail: "A segment cannot change silently between releases" },
+  { icon: ShieldCheck, label: "Segment-level EDI tests", detail: "X12 and HL7 output is checked segment by segment" },
   { icon: Radar, label: "Denial intelligence", detail: "CARC and RARC preserved per line, ranked by dollars at risk" },
-  { icon: Workflow, label: "Full lifecycle modeled", detail: "Eligibility, charge capture, scrub, submit, adjudicate, deny, appeal, post" },
+  { icon: Workflow, label: "Full lifecycle modeled", detail: "Eligibility, charge capture, scrub, submit, deny, appeal, post; payer adjudication simulated in the demo" },
 ];
 
 const WHY_NOW = [
@@ -83,12 +96,12 @@ const WHY_NOW = [
 ];
 
 const DATA_ROOM = [
-  "Financial statements, revenue detail and the operating model",
+  "Operating model and use of funds",
   "Capitalization table and prior instruments",
-  "Customer pipeline, pricing and contract terms",
+  "Pricing model and contract terms",
   "Architecture review, security posture and HIPAA documentation",
   "Product roadmap and engineering plan",
-  "Team background and the hiring plan the round funds",
+  "The hiring plan the round funds",
 ];
 
 /* ------------------------------------------------------------ small pieces */
@@ -292,7 +305,7 @@ export default async function InvestorsPage() {
                 <Stat value={m.providerCount.toLocaleString("en-US")} label={`Providers across ${m.specialtyCount} specialties`} />
                 <Stat value={m.patientCount.toLocaleString("en-US")} label="Patients in 50 metro areas" />
                 <Stat value={m.payerCount.toLocaleString("en-US")} label="Payers with distinct filing rules" />
-                <Stat value="22" label="Validation rules on every claim" />
+                <Stat value={String(RULE_IDS.length)} label="Built-in rules on every claim" />
               </div>
               <p className="mt-8 max-w-3xl text-sm leading-relaxed text-green-50/85">
                 This is the demo environment, a complete practice dataset rather than a handful of
@@ -566,8 +579,8 @@ export default async function InvestorsPage() {
             can see the return in metrics they already track.
           </p>
           <p>
-            Specific pricing, contract terms, revenue detail and the operating model are in the data
-            room rather than on a public page.
+            List pricing is public on the pricing page; contract terms and the operating model are in
+            the data room.
           </p>
 
           <h2>What we are looking for</h2>
@@ -692,7 +705,7 @@ export default async function InvestorsPage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl leading-relaxed text-green-50">
               Tell us the fund, the stage you lead and one healthcare company you have backed, and we
-              will send the data room within one business day.
+              will follow up with the data room.
             </p>
             <div className="mx-auto mt-7 flex max-w-lg flex-col justify-center gap-3 sm:flex-row">
               <a

@@ -36,8 +36,8 @@ export const POSTS: Post[] = [
     excerpt:
       "Days in accounts receivable is the metric every practice quotes and few can move. The fix is rarely working the queue harder. It is finding the three places the clock is quietly running.",
     tag: "Revenue cycle",
-    author: "Alex Rivera",
-    role: "Revenue Cycle Lead",
+    author: "CollaboratMD",
+    role: "Revenue cycle notes",
     date: "2026-09-18",
     readingMinutes: 7,
     cover: "aging",
@@ -121,10 +121,10 @@ export const POSTS: Post[] = [
     slug: "five-denial-codes-that-cost-the-most",
     title: "The five denial codes that cost practices the most",
     excerpt:
-      "Across a hundred providers and a hundred thousand claims, denial dollars concentrate in a handful of reason codes. Here is what each one really means and what stops it.",
+      "In most practices, denial dollars concentrate in a handful of reason codes. Here is what each one really means and what stops it.",
     tag: "Denials",
-    author: "Jordan Lee",
-    role: "Denial Management",
+    author: "CollaboratMD",
+    role: "Revenue cycle notes",
     date: "2026-09-11",
     readingMinutes: 8,
     cover: "denials",
@@ -135,7 +135,7 @@ export const POSTS: Post[] = [
       },
       {
         t: "p",
-        text: "When you do that across a large practice, the same five Claim Adjustment Reason Codes account for most of the exposure. They are worth understanding individually, because the fix for each is different and three of them are preventable before submission.",
+        text: "When a practice does that, the same few Claim Adjustment Reason Codes account for most of the exposure. They are worth understanding individually, because the fix for each is different and three of them are preventable before submission.",
       },
       { t: "h2", text: "CARC 16: claim lacks information" },
       {
@@ -219,8 +219,8 @@ export const POSTS: Post[] = [
     excerpt:
       "Most practices report a clean claim rate above 95%. Many of them are measuring the wrong thing, and the number goes up precisely when the process gets worse.",
     tag: "Metrics",
-    author: "Sam Ortiz",
-    role: "Practice Operations",
+    author: "CollaboratMD",
+    role: "Revenue cycle notes",
     date: "2026-09-04",
     readingMinutes: 6,
     cover: "clean",
@@ -294,8 +294,8 @@ export const POSTS: Post[] = [
     excerpt:
       "The 835 is the most information-dense document in the revenue cycle and the least read. Here is how to follow one from the payment header down to a single service line.",
     tag: "EDI",
-    author: "Alex Rivera",
-    role: "Revenue Cycle Lead",
+    author: "CollaboratMD",
+    role: "Revenue cycle notes",
     date: "2026-08-27",
     readingMinutes: 9,
     cover: "remittance",
@@ -393,8 +393,8 @@ export const POSTS: Post[] = [
     excerpt:
       "A 270 request costs pennies and takes seconds. Run at the right moment, it removes an entire category of denial. Run at the wrong moment, it tells you nothing you can use.",
     tag: "Front office",
-    author: "Sam Ortiz",
-    role: "Practice Operations",
+    author: "CollaboratMD",
+    role: "Revenue cycle notes",
     date: "2026-08-20",
     readingMinutes: 6,
     cover: "eligibility",

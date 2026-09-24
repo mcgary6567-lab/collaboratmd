@@ -13,23 +13,23 @@ export const metadata: Metadata = {
 const CONTROLS = [
   {
     icon: Lock,
-    title: "Encryption everywhere",
-    body: "TLS protects data in transit and storage is encrypted at rest. Database connections require TLS, and credentials never live in the application bundle.",
+    title: "Encryption",
+    body: "TLS protects data in transit, including the connection to the database, whose certificate is verified. Data is encrypted at rest by our database host. Credentials never live in the application bundle.",
   },
   {
     icon: Users,
-    title: "Role-based access",
-    body: "Front desk, biller and administrator each see a different application. Practice analytics and the financial ledger are closed to roles that have no business reason to open them.",
+    title: "Role-based access and tenant isolation",
+    body: "Four roles: administrator, biller, front desk and read-only. Posting, adjustments, voids and write-offs are limited to billers and administrators, and practice analytics to administrators. Every request is checked against the practice it belongs to.",
   },
   {
     icon: ScrollText,
-    title: "Append-only ledger",
-    body: "A financial correction posts as a reversal rather than an edit. No row is rewritten, so the money trail reads forward and reconciles to the cent.",
+    title: "Amounts are never edited",
+    body: "A financial correction posts as a reversal rather than an edit to a posted amount, so the money trail reads forward and reconciles to the cent.",
   },
   {
     icon: ShieldCheck,
-    title: "Audit trail on PHI",
-    body: "Every read and write of a record containing protected health information is logged with the user, the action and the timestamp, and retained on the practice's schedule.",
+    title: "Audit log",
+    body: "Key actions are recorded with the user, the action and the time: sign-in, claim submission, corrections and voids, discounts, payment plans, imports, lab orders, check-ins and integration keys.",
   },
   {
     icon: KeyRound,
@@ -38,8 +38,8 @@ const CONTROLS = [
   },
   {
     icon: ServerCog,
-    title: "Tested restores",
-    body: "Backups are meaningless until a restore is proven. Ours are exercised on a schedule, and the migration path is bundled with the application rather than read off a disk at runtime.",
+    title: "Secrets stored as hashes",
+    body: "Integration keys and patient check-in links are random tokens stored only as SHA-256 hashes, so a copy of the database does not yield working credentials. A check-in link locks after repeated wrong dates of birth.",
   },
 ];
 
@@ -70,8 +70,9 @@ export default function SecurityPage() {
         <Prose>
           <h2>HIPAA alignment</h2>
           <p>
-            A practice using the platform is the covered entity; we are its business associate. The
-            business associate agreement sets out what we may do with protected health information,
+            A practice using the platform is the covered entity; we are its business associate. A
+            business associate agreement is available on request and is signed before any protected
+            health information is loaded. It sets out what we may do with protected health information,
             how long we keep it, and what happens to it when the relationship ends. The technical
             safeguards above map to the Security Rule: access control, audit controls, integrity and
             transmission security.
@@ -81,8 +82,9 @@ export default function SecurityPage() {
           <p>
             Claims and remittances are generated and parsed as real ASC X12 transactions rather than
             passed through a conversion layer: 837P for professional claims, 835 for remittance
-            advice, and 270 and 271 for eligibility. Each is validated against golden-file fixtures
-            in the test suite, so a change that would alter a segment fails before it ships.
+            advice, 270 and 271 for eligibility, and 999 and 277CA acknowledgments; EHR and lab
+            traffic is HL7 v2. Each is covered by segment-level tests, so a change that would alter a
+            segment fails before it ships.
           </p>
 
           <h2>Reporting a vulnerability</h2>

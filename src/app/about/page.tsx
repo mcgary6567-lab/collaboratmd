@@ -16,13 +16,13 @@ const NUMBERS = [
   { value: "$62.7M", label: "Billed charges carried in the ledger" },
   { value: "100", label: "Providers across 26 specialties" },
   { value: "15,000", label: "Patients in 50 metropolitan areas" },
-  { value: "105,000", label: "Claims through the full lifecycle" },
+  { value: "105,000", label: "Synthetic claims through the full lifecycle" },
 ];
 
 const BELIEFS = [
   {
     title: "Catch it at the desk, not on the remittance",
-    body: "A denial found three weeks later costs a phone call, an appeal and a month of aging. The same error found before submission costs ten seconds. That is why twenty-two validation rules run on every claim as it is created.",
+    body: "A denial found three weeks later costs a phone call, an appeal and a month of aging. The same error found before submission costs ten seconds. That is why every claim is checked as it is created, against built-in rules and the payer-specific edits a practice sets up.",
   },
   {
     title: "A number without a benchmark is trivia",
@@ -51,7 +51,7 @@ export default function AboutPage() {
           <h2>Why this exists</h2>
           <p>
             Practices lose revenue in small, quiet increments. A missing diagnosis pointer. A
-            modifier that contradicts the place of service. An eligibility check nobody ran. None of
+            procedure that needed prior authorization. An eligibility check nobody ran. None of
             these is dramatic, and all of them surface weeks later as a denial that someone has to
             decode, appeal and chase, often past the point where it is worth the effort.
           </p>
@@ -64,8 +64,8 @@ export default function AboutPage() {
           <h2>Built on real transactions</h2>
           <p>
             The platform is not a mockup of billing. It generates and parses the ASC X12
-            transactions payers actually use, validated against golden-file fixtures in the test
-            suite. Claims are scrubbed, submitted, adjudicated, denied, appealed and posted through
+            transactions payers actually use, covered by segment-level tests. In the demo, claims are
+            scrubbed, submitted, adjudicated by a simulated payer, denied, appealed and posted through
             the full lifecycle, and the ledger reconciles at every step.
           </p>
           <p>
@@ -114,8 +114,8 @@ export default function AboutPage() {
           See it with a full practice behind it
         </h2>
         <p className="max-w-xl text-green-50">
-          The demo opens on real volume: scrubbed claims, posted remittances, live denials and the
-          analytics computed over all of it.
+          The demo opens on full-size synthetic volume: scrubbed claims, posted remittances, worked
+          denials and the analytics computed over all of it.
         </p>
         <Link
           href="/login"

@@ -1,3 +1,5 @@
+import { RULE_IDS } from "@/lib/scrub/rules";
+
 /**
  * Pricing content.
  *
@@ -60,10 +62,10 @@ export const TIERS: Tier[] = [
     perClaimCents: 30,
     cta: "Start with Essentials",
     highlights: [
-      "Scheduling and real-time eligibility",
+      "Scheduling and 270/271 eligibility checks",
       "Charge capture with fee-schedule pricing",
-      "Claim scrubbing, all 22 validation rules",
-      "Electronic submission as 837P",
+      `Claim scrubbing: ${RULE_IDS.length} rules plus payer edits`,
+      "837P claim generation and clearinghouse submission",
       "Automatic 835 remittance posting",
       "Patient statements and balances",
     ],
@@ -85,7 +87,7 @@ export const TIERS: Tier[] = [
       "Payer performance and provider productivity",
       "A/R aging by payer and by bucket",
       "Timely filing risk monitoring",
-      "Priority support",
+      "Underpayment detection against payer contracts",
     ],
   },
   {
@@ -100,10 +102,9 @@ export const TIERS: Tier[] = [
     highlights: [
       "Everything in Professional",
       "Multiple practices under one login",
-      "Per-client reporting and reconciliation",
+      "Side-by-side reporting across clients",
       "Role-based access across teams",
-      "Dedicated onboarding and data migration",
-      "Service level agreement",
+      "HL7 interfaces and CSV patient import",
     ],
   },
 ];
@@ -118,8 +119,9 @@ export const MATRIX: FeatureGroup[] = [
     group: "Front office",
     rows: [
       { feature: "Appointment scheduling", essentials: true, professional: true, billing: true },
-      { feature: "Real-time eligibility (270/271)", essentials: true, professional: true, billing: true },
-      { feature: "Copay and deductible at check-in", essentials: true, professional: true, billing: true },
+      { feature: "Eligibility checks (270/271), single or whole schedule", essentials: true, professional: true, billing: true },
+      { feature: "Online check-in link with copay shown", essentials: true, professional: true, billing: true },
+      { feature: "Estimates and good faith estimates", essentials: true, professional: true, billing: true },
       { feature: "Patient record and insurance history", essentials: true, professional: true, billing: true },
     ],
   },
@@ -127,9 +129,10 @@ export const MATRIX: FeatureGroup[] = [
     group: "Claims",
     rows: [
       { feature: "Charge capture with CPT and ICD-10", essentials: true, professional: true, billing: true },
-      { feature: "Claim scrubbing rules", essentials: "22 rules", professional: "22 rules", billing: "22 rules" },
-      { feature: "Electronic submission (837P)", essentials: true, professional: true, billing: true },
-      { feature: "Clearinghouse acknowledgements", essentials: true, professional: true, billing: true },
+      { feature: "Built-in claim scrubbing rules", essentials: `${RULE_IDS.length} rules`, professional: `${RULE_IDS.length} rules`, billing: `${RULE_IDS.length} rules` },
+      { feature: "Payer-specific edits and prior authorizations", essentials: true, professional: true, billing: true },
+      { feature: "837P generation and submission", essentials: true, professional: true, billing: true },
+      { feature: "999 and 277CA acknowledgments", essentials: true, professional: true, billing: true },
       { feature: "Corrected and voided claims", essentials: true, professional: true, billing: true },
       { feature: "Custom fee schedules per payer", essentials: false, professional: true, billing: true },
     ],
@@ -148,9 +151,9 @@ export const MATRIX: FeatureGroup[] = [
   {
     group: "Patient billing",
     rows: [
-      { feature: "Statements in HFMA patient-friendly format", essentials: true, professional: true, billing: true },
+      { feature: "Statements following HFMA patient-friendly principles", essentials: true, professional: true, billing: true },
       { feature: "Patient A/R tracked separately from insurance", essentials: true, professional: true, billing: true },
-      { feature: "Payment plans", essentials: false, professional: true, billing: true },
+      { feature: "Payment plans and discount policies", essentials: false, professional: true, billing: true },
     ],
   },
   {
@@ -164,13 +167,20 @@ export const MATRIX: FeatureGroup[] = [
     ],
   },
   {
+    group: "Integrations",
+    rows: [
+      { feature: "HL7 v2 interface (ADT, DFT)", essentials: false, professional: true, billing: true },
+      { feature: "Lab orders and results (ORM, ORU)", essentials: false, professional: true, billing: true },
+      { feature: "CSV patient import with column matching", essentials: true, professional: true, billing: true },
+    ],
+  },
+  {
     group: "Security and support",
     rows: [
-      { feature: "Business associate agreement", essentials: true, professional: true, billing: true },
-      { feature: "Append-only ledger and PHI audit trail", essentials: true, professional: true, billing: true },
+      { feature: "Business associate agreement, available on request", essentials: true, professional: true, billing: true },
+      { feature: "Posted amounts never edited; audit log of key actions", essentials: true, professional: true, billing: true },
       { feature: "Role-based access control", essentials: true, professional: true, billing: true },
-      { feature: "Support response target", essentials: "1 business day", professional: "4 business hours", billing: "Per SLA" },
-      { feature: "Dedicated onboarding", essentials: false, professional: false, billing: true },
+      { feature: "Multiple practices under one login", essentials: false, professional: false, billing: true },
     ],
   },
 ];
@@ -186,15 +196,15 @@ export const FAQ = [
   },
   {
     q: "Why is there a per-claim component at all?",
-    a: "Cost scales with volume: every claim submitted is a transaction across a clearinghouse connection, and every remittance is one coming back. Splitting the price into a subscription and a transaction line keeps a low-volume practice from subsidizing a high-volume one.",
+    a: "Cost scales with volume: once a live clearinghouse is connected, every claim submitted is a transaction across it and every remittance is one coming back. Splitting the price into a subscription and a transaction line keeps a low-volume practice from subsidizing a high-volume one.",
   },
   {
     q: "What happens to my data if I leave?",
-    a: "You export it. Patients, claims, remittances and the full ledger are yours, and the Terms commit us to keeping the export available for 30 days after a subscription ends. Billing data is a legal record, not a lock-in mechanism.",
+    a: "It stays yours. Patients, claims, remittances and the ledger are exported for you on request, and the Terms commit us to providing that export for 30 days after a subscription ends. Billing data is a legal record, not a lock-in mechanism.",
   },
   {
     q: "Do you sign a business associate agreement?",
-    a: "Yes, before any protected health information reaches the platform. A practice is the covered entity and we are its business associate, which is the arrangement HIPAA requires.",
+    a: "Yes. A BAA is available on request and is signed before any protected health information is loaded. A practice is the covered entity and we are its business associate, which is the arrangement HIPAA requires.",
   },
   {
     q: "How long does implementation take?",

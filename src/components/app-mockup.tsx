@@ -94,7 +94,7 @@ export function AppMockup() {
         <div className="min-w-0 flex-1 bg-slate-50 p-4">
           <div className="mb-1 text-sm font-bold text-slate-900">Practice analytics</div>
           <div className="mb-3 text-[10px] text-slate-500">
-            100 providers · 15,000 patients · 100,000 claims · trailing 12 months
+            Demo data · 100 providers · 15,000 patients · 105,000 claims · trailing 12 months
           </div>
 
           {/* KPI row */}

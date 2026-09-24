@@ -33,10 +33,12 @@ async function connect(): Promise<Runner> {
       max: poolSize(isServerless),
       idleTimeoutMillis: isServerless ? 10_000 : 30_000,
       connectionTimeoutMillis: 15_000,
-      // Managed providers require TLS but present certificates the default
-      // trust store does not verify; the connection is still encrypted. A
-      // local server usually speaks plaintext, so do not force TLS there.
-      ssl: needsSsl(url) ? { rejectUnauthorized: false } : false,
+      // Managed providers (Neon, Supabase) present publicly trusted
+      // certificates, so verify them: encryption without verification does
+      // not stop an impostor server. DATABASE_SSL_NO_VERIFY=1 is for a
+      // self-hosted server with a private CA. A local server usually speaks
+      // plaintext, so do not force TLS there.
+      ssl: needsSsl(url) ? { rejectUnauthorized: process.env.DATABASE_SSL_NO_VERIFY !== "1" } : false,
     });
     // Serverless Postgres (Neon, Supabase) suspends idle compute, which
     // terminates pooled connections. node-postgres surfaces that as an

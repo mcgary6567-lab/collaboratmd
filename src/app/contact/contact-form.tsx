@@ -61,9 +61,8 @@ export function ContactForm({ defaultTopic = "sales" }: { defaultTopic?: string 
         <CheckCircle2 className="mx-auto h-10 w-10 text-green-600" />
         <h3 className="mt-4 text-lg font-bold text-slate-900">Thank you, we have your message</h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-700">
-          It has been recorded and routed to the queue for the topic you selected, and a
-          confirmation is on its way to your inbox. We reply to every message, and the response
-          times on this page are the ones we hold ourselves to.
+          It has been recorded and routed to the queue for the topic you selected. We reply to
+          every message, and the response times on this page are the ones we hold ourselves to.
         </p>
         {state.reference && (
           <p className="mt-5 text-sm text-slate-600">

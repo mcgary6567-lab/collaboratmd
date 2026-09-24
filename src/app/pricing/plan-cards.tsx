@@ -120,7 +120,7 @@ export function PlanCards() {
           >
             {tier.featured && (
               <span className="absolute -top-3 left-7 rounded-full bg-green-600 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-                Most chosen
+                Recommended
               </span>
             )}
             <h2 className="text-lg font-bold tracking-tight text-slate-900">{tier.name}</h2>

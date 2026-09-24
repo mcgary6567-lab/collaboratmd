@@ -63,10 +63,10 @@ export function BuiltFor() {
 
         <div className="mt-10 rounded-2xl bg-slate-50 px-6 py-5 text-center">
           <p className="text-sm leading-relaxed text-slate-600">
-            <span className="font-semibold text-slate-900">Claims go where your patients are covered.</span>{" "}
-            The platform addresses 837P claims and posts 835 remittances for Medicare Part B, state
-            Medicaid programs, and the major commercial plans including UnitedHealthcare, Aetna,
-            Cigna, Humana and the Blue Cross Blue Shield associations.
+            <span className="font-semibold text-slate-900">Claims in the format every payer reads.</span>{" "}
+            The platform generates 837P claims with the payer IDs for Medicare Part B, state Medicaid
+            programs and the major commercial plans, and posts their 835 remittances. Live submission
+            to payers runs through a connected clearinghouse.
           </p>
         </div>
       </div>
