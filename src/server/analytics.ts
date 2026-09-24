@@ -25,7 +25,8 @@ export interface HeadlineKpis {
   daysInAr: number;
   cleanClaimRate: number;
   denialRate: number;
-  netCollectionRate: number;
+  /** Null until some claims are old enough to have been paid. */
+  netCollectionRate: number | null;
   firstPassYield: number;
   claimCount: number;
   patientCount: number;
@@ -46,7 +47,7 @@ export interface HeadlineKpis {
  * Days in A/R uses a 90-day average daily charge, the usual convention.
  */
 export async function headlineKpis(db: Db, practiceId: string, months = 12): Promise<HeadlineKpis> {
-  const [{ rows: ledger }, { rows: claims }, { rows: counts }, { rows: denials }, { rows: ar }] = await Promise.all([
+  const [{ rows: ledger }, { rows: claims }, { rows: counts }, { rows: denials }, { rows: ar }, { rows: cohort }] = await Promise.all([
     db.execute<Record<string, string>>(sql`
       SELECT
         COALESCE(SUM(amount_cents) FILTER (WHERE type = 'charge'), 0)::bigint AS charges,
@@ -102,6 +103,29 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
          FROM ledger_entries WHERE practice_id = ${practiceId})::bigint AS patient_ar,
         (SELECT COALESCE(SUM(amount_cents), 0) / 90.0 FROM ledger_entries
          WHERE practice_id = ${practiceId} AND type = 'charge' AND posted_at >= now() - interval '90 days')::numeric AS daily_charges`),
+    // Net collection by claim cohort: claims billed in the window, with
+    // everything ever posted to them. Comparing payments posted in a window
+    // with charges posted in it counts payments for older claims and can pass
+    // 100%. The most recent 30 days are left out so claims the payer has not
+    // had time to pay do not drag the rate down. Patient payments not tied to
+    // a claim are counted when posted inside the same period.
+    db.execute<Record<string, string>>(sql`
+      WITH cohort AS (
+        SELECT DISTINCT claim_id FROM ledger_entries
+        WHERE practice_id = ${practiceId} AND type = 'charge' AND claim_id IS NOT NULL
+          AND posted_at >= now() - (${months} || ' months')::interval AND posted_at < now() - interval '30 days'
+      )
+      SELECT
+        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'charge'), 0)::bigint AS charges,
+        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'adjustment'), 0)::bigint AS contractual,
+        COALESCE(SUM(amount_cents) FILTER (WHERE type = 'insurance_payment'), 0)::bigint
+          - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'reversal'), 0)::bigint
+          + COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)::bigint
+          - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'refund'), 0)::bigint AS collected,
+        (SELECT COALESCE(SUM(amount_cents), 0) FROM ledger_entries
+          WHERE practice_id = ${practiceId} AND type = 'patient_payment' AND claim_id IS NULL
+            AND posted_at >= now() - (${months} || ' months')::interval AND posted_at < now() - interval '30 days')::bigint AS unlinked_patient
+      FROM ledger_entries WHERE claim_id IN (SELECT claim_id FROM cohort)`),
   ]);
 
   const l = ledger[0] ?? {};
@@ -125,7 +149,7 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
     daysInAr: Math.round((insuranceArCents + patientArCents) / avgDailyCharges),
     cleanClaimRate: n(c.submitted) ? (n(c.submitted) - n(c.rejected)) / n(c.submitted) : 0,
     denialRate: adjudicated ? n(c.denied) / adjudicated : 0,
-    netCollectionRate: chargesCents - n(l.contractual) > 0 ? (insurancePaidCents + patientPaidCents) / (chargesCents - n(l.contractual)) : 0,
+    netCollectionRate: netCollection(cohort[0] ?? {}),
     firstPassYield: n(c.total) ? n(c.paid) / n(c.total) : 0,
     claimCount: n(c.total),
     patientCount: n(counts[0]?.patients),
@@ -133,6 +157,12 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
     openDenials: n(denials[0]?.open),
     openDenialCents: n(denials[0]?.amount),
   };
+}
+
+/** Collected over what was collectible (charges less contractual adjustments), for a claim cohort. */
+export function netCollection(c: Record<string, string>): number | null {
+  const collectible = n(c.charges) - n(c.contractual);
+  return collectible > 0 ? (n(c.collected) + n(c.unlinked_patient)) / collectible : null;
 }
 
 /** Charges, payments and adjustments per month for trend charts. */

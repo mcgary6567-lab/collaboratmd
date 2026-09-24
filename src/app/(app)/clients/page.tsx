@@ -11,7 +11,7 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 /**
  * Every practice the user works for, side by side: what a billing company
  * checks each morning to see which client needs attention. Figures are for
- * the trailing 90 days except receivables, which are as of now.
+ * the trailing 90 days, rates over 12 months, and receivables as of now.
  */
 export default async function ClientsPage() {
   const s = await requireSession();
@@ -19,16 +19,19 @@ export default async function ClientsPage() {
   const practices = await accessiblePractices(db, s.userId);
   const rows = await Promise.all(
     practices.map(async (p) => {
-      const [k, aging] = await Promise.all([headlineKpis(db, p.id, 3), arAging(db, p.id)]);
+      // Volumes for the last 90 days; rates over 12 months, because a period
+      // rate over a short window counts payments on older claims against
+      // fewer new charges and can pass 100%.
+      const [k, year, aging] = await Promise.all([headlineKpis(db, p.id, 3), headlineKpis(db, p.id, 12), arAging(db, p.id)]);
       const over90 = aging.totals.b91_120 + aging.totals.b120p;
-      return { p, k, over90, arTotal: aging.totals.total };
+      return { p, k, year, over90, arTotal: aging.totals.total };
     }),
   );
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((a, r) => a + f(r), 0);
 
   return (
     <>
-      <PageHeader title="All clients" subtitle={`${practices.length} practices · last 90 days; receivables as of now`} />
+      <PageHeader title="All clients" subtitle={`${practices.length} practices · charges and collections: last 90 days · rates: last 12 months · receivables: as of now`} />
       {rows.length < 2 ? (
         <Card><Empty>You have access to one practice. When you are given access to more, they appear here side by side.</Empty></Card>
       ) : (
@@ -51,7 +54,7 @@ export default async function ClientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ p, k, over90, arTotal }) => {
+                {rows.map(({ p, k, year, over90, arTotal }) => {
                   const risky = arTotal > 0 && over90 / arTotal > 0.2;
                   return (
                     <tr key={p.id} className={p.id === s.practiceId ? "bg-brand-50/40" : ""}>
@@ -61,9 +64,11 @@ export default async function ClientsPage() {
                       </td>
                       <td className="text-right"><Money cents={k.chargesCents} /></td>
                       <td className="text-right"><Money cents={k.insurancePaidCents + k.patientPaidCents} /></td>
-                      <td className="text-right tabular-nums">{pct(k.netCollectionRate)}</td>
-                      <td className="text-right tabular-nums">{pct(k.cleanClaimRate)}</td>
-                      <td className={`text-right tabular-nums ${k.denialRate > 0.1 ? "font-semibold text-red-700" : ""}`}>{pct(k.denialRate)}</td>
+                      <td className="text-right tabular-nums" title={year.netCollectionRate === null ? "No claims older than 30 days yet" : undefined}>
+                        {year.netCollectionRate === null ? <span className="text-slate-400">too new</span> : pct(year.netCollectionRate)}
+                      </td>
+                      <td className="text-right tabular-nums">{pct(year.cleanClaimRate)}</td>
+                      <td className={`text-right tabular-nums ${year.denialRate > 0.1 ? "font-semibold text-red-700" : ""}`}>{pct(year.denialRate)}</td>
                       <td className="text-right tabular-nums">{k.daysInAr.toFixed(0)}</td>
                       <td className="text-right"><Money cents={k.insuranceArCents} /></td>
                       <td className="text-right">

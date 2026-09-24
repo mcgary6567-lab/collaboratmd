@@ -228,9 +228,9 @@ export default async function InvestorsPage() {
             <Benchmark
               icon={TrendingUp}
               metric="Net collection rate"
-              value={pct(m.netCollectionRate)}
+              value={m.netCollectionRate === null ? "n/a" : pct(m.netCollectionRate)}
               target="Industry target: 95% or better"
-              pass={m.netCollectionRate >= 0.95}
+              pass={(m.netCollectionRate ?? 0) >= 0.95}
               note="Share of collectible revenue actually collected."
             />
             <Benchmark

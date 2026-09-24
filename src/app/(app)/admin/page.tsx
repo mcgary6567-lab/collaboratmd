@@ -52,8 +52,8 @@ export default async function AdminDashboard() {
         />
         <Kpi
           label="Net collection"
-          value={pct(k.netCollectionRate)}
-          tone={k.netCollectionRate >= 0.95 ? "good" : k.netCollectionRate >= 0.9 ? "warn" : "bad"}
+          value={k.netCollectionRate === null ? "n/a" : pct(k.netCollectionRate)}
+          tone={k.netCollectionRate === null ? "warn" : k.netCollectionRate >= 0.95 ? "good" : k.netCollectionRate >= 0.9 ? "warn" : "bad"}
           target="Target ≥ 95%"
         />
         <Kpi
