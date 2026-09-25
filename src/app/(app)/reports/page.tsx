@@ -2,6 +2,7 @@ import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { arAging, payerPerformance, providerProductivity, denialReasons } from "@/server/analytics";
 import { Card, PageHeader, Money, Empty } from "@/components/ui";
+import { PrintButton } from "@/components/action-form";
 import { compactMoney, pct } from "@/components/kpi";
 import { AgingChart, PayerMixChart } from "@/components/charts";
 
@@ -20,7 +21,17 @@ export default async function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="Reports" subtitle="Accounts receivable, payer performance and provider productivity" />
+      <PageHeader
+        title="Reports"
+        subtitle="Accounts receivable, payer performance and provider productivity"
+        actions={
+          <span className="no-print flex flex-wrap gap-2">
+            <a href="/api/export/ar-aging" className="btn btn-secondary text-xs">A/R aging CSV</a>
+            <a href="/api/export/payer-performance" className="btn btn-secondary text-xs">Payer performance CSV</a>
+            <PrintButton label="Print or save as PDF" />
+          </span>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card title="Insurance A/R aging by payer" className="xl:col-span-2">

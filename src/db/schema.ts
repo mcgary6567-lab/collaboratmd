@@ -29,7 +29,24 @@ export const practices = pgTable("practices", {
   zip: text("zip").notNull(),
   phone: text("phone"),
   requireMfa: boolean("require_mfa").notNull().default(false),
+  automation: jsonb("automation").$type<AutomationSettings>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AutomationSettings = {
+  appointmentReminders?: boolean;
+  balanceReminders?: boolean;
+  weeklyReport?: boolean;
+  claimFollowUp?: boolean;
+  autopay?: boolean;
+};
+
+export const automationRuns = pgTable("automation_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  ranAt: timestamp("ran_at", { withTimezone: true }).defaultNow().notNull(),
+  summary: jsonb("summary").$type<Record<string, unknown>>().notNull(),
+  error: text("error"),
 });
 
 export const users = pgTable(

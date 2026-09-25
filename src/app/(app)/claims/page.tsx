@@ -42,7 +42,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Claims" subtitle={`${total.toLocaleString()} claim${total === 1 ? "" : "s"} in this view`} actions={<SubmitAllButton disabled={false} />} />
+      <PageHeader title="Claims" subtitle={`${total.toLocaleString()} claim${total === 1 ? "" : "s"} in this view`} actions={<><a href={`/api/export/claims${query ? `?${query}` : ""}`} className="btn btn-secondary">Export CSV</a><SubmitAllButton disabled={false} /></>} />
       <Card>
         <form className="mb-3 grid gap-2 md:grid-cols-[1fr_auto_auto_auto_auto_auto]" action="/claims">
           <input name="q" defaultValue={params.q} className="input" placeholder="Claim number, payer claim number, patient or MRN" />
