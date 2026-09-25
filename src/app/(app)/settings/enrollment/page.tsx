@@ -5,6 +5,7 @@ import { enrollmentAlerts, enrollmentGrid, ENROLLMENT_STATUSES } from "@/server/
 import { saveEnrollmentAction } from "@/app/(app)/enrollment-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
+import { Pager, pageArgs, withParams, type Params } from "@/components/data-table";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,9 @@ const TONE: Record<string, string> = {
   not_started: "bg-slate-100 text-slate-600",
 };
 
-export default async function EnrollmentPage({ searchParams }: { searchParams: Promise<{ provider?: string; payer?: string }> }) {
+const BASE = "/settings/enrollment";
+
+export default async function EnrollmentPage({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams;
   const s = await requireSession();
   const db = await getDb();
@@ -27,6 +30,12 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
   const current = editing?.provider && editing.payer ? grid.get(editing.provider.id, editing.payer.id) : null;
   const name = (id: string) => { const p = grid.providers.find((x) => x.id === id); return p ? `Dr. ${p.firstName} ${p.lastName}` : "Provider"; };
   const payerName = (id: string) => grid.payers.find((x) => x.id === id)?.name ?? "Payer";
+  // Large groups have many providers: search and page the grid rather than render every row.
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const filtered = q ? grid.providers.filter((p) => `${p.firstName} ${p.lastName} ${p.npi}`.toLowerCase().includes(q)) : grid.providers;
+  const { page, pageSize, offset } = pageArgs(sp, 25);
+  const shown = filtered.slice(offset, offset + pageSize);
+  const cell = (providerId: string, payerId: string) => withParams(BASE, sp, { provider: providerId, payer: payerId });
 
   return (
     <>
@@ -35,7 +44,7 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
         <div className="mb-2">
           {alerts.map((a) => (
             <Alert key={`${a.enrollment.id}-${a.kind}`} kind={a.kind === "revalidation_due" ? "info" : "error"}>
-              <Link className="font-semibold underline" href={`/settings/enrollment?provider=${a.enrollment.providerId}&payer=${a.enrollment.payerId}`}>{name(a.enrollment.providerId)} · {payerName(a.enrollment.payerId)}</Link>: {a.message}
+              <Link className="font-semibold underline" href={cell(a.enrollment.providerId, a.enrollment.payerId)}>{name(a.enrollment.providerId)} · {payerName(a.enrollment.payerId)}</Link>: {a.message}
             </Alert>
           ))}
         </div>
@@ -55,7 +64,7 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
               <label className="block text-sm"><span className="label">Effective date</span><input type="date" name="effectiveOn" className="input" defaultValue={current?.effectiveOn ?? ""} disabled={!canEdit} /></label>
               <label className="block text-sm"><span className="label">Revalidation due</span><input type="date" name="revalidationDue" className="input" defaultValue={current?.revalidationDue ?? ""} disabled={!canEdit} /></label>
               <label className="block text-sm md:col-span-3"><span className="label">Notes (reference numbers, who you spoke to)</span><textarea name="notes" rows={3} className="input" defaultValue={current?.notes ?? ""} disabled={!canEdit} /></label>
-              {canEdit && <div className="md:col-span-3 flex gap-2"><SubmitButton pendingLabel="Saving...">Save</SubmitButton><Link href="/settings/enrollment" className="btn btn-secondary">Close</Link></div>}
+              {canEdit && <div className="md:col-span-3 flex gap-2"><SubmitButton pendingLabel="Saving...">Save</SubmitButton><Link href={withParams(BASE, sp, { provider: undefined, payer: undefined })} className="btn btn-secondary">Close</Link></div>}
             </ActionForm>
           </Card>
         </div>
@@ -66,21 +75,25 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
           <Empty>Add providers and payers in Settings first.</Empty>
         ) : (
           <div className="overflow-x-auto">
+            <form action={BASE} className="mb-3 flex gap-2">
+              <input name="q" defaultValue={sp.q} className="input max-w-xs" placeholder="Find a provider by name or NPI" aria-label="Find a provider" />
+              <button className="btn btn-secondary">Search</button>
+            </form>
             <table className="table">
               <thead>
                 <tr><th>Provider</th>{grid.payers.map((p) => <th key={p.id} className="whitespace-nowrap">{p.name}</th>)}</tr>
               </thead>
               <tbody>
-                {grid.providers.map((pr) => (
+                {shown.map((pr) => (
                   <tr key={pr.id}>
                     <td className="whitespace-nowrap font-medium">Dr. {pr.firstName} {pr.lastName}<div className="text-xs font-normal text-slate-500">NPI {pr.npi}</div></td>
                     {grid.payers.map((pa) => {
                       const e = grid.get(pr.id, pa.id);
                       return (
                         <td key={pa.id}>
-                          <Link href={`/settings/enrollment?provider=${pr.id}&payer=${pa.id}`} className={`badge ${TONE[e?.status ?? "none"] ?? "bg-white text-slate-400 ring-1 ring-slate-200"} hover:opacity-80`}>
+                          <a href={cell(pr.id, pa.id)} className={`badge ${TONE[e?.status ?? "none"] ?? "bg-white text-slate-400 ring-1 ring-slate-200"} hover:opacity-80`}>
                             {e ? e.status.replace(/_/g, " ") : "not tracked"}
-                          </Link>
+                          </a>
                           {e?.revalidationDue && <div className="mt-1 text-[11px] text-slate-500">reval {e.revalidationDue}</div>}
                         </td>
                       );
@@ -89,6 +102,8 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
                 ))}
               </tbody>
             </table>
+            {filtered.length === 0 && <Empty>No provider matches &quot;{sp.q}&quot;.</Empty>}
+            <Pager page={page} pageSize={pageSize} total={filtered.length} base={BASE} params={{ ...sp, provider: undefined, payer: undefined }} />
           </div>
         )}
         <p className="mt-3 text-xs text-slate-500">
