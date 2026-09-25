@@ -384,6 +384,8 @@ export const underpayments = pgTable("underpayments", {
   note: text("note"),
   detectedAt: timestamp("detected_at", { withTimezone: true }).defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  disputedAt: timestamp("disputed_at", { withTimezone: true }),
+  recoveredCents: integer("recovered_cents"),
 });
 
 /* ------------------------------------------------------------------ */
@@ -620,6 +622,36 @@ export const ruleSuggestionDismissals = pgTable("rule_suggestion_dismissals", {
   dismissedBy: uuid("dismissed_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.practiceId, t.suggestionKey] })]);
+
+/* Revenue recovery: see migration 0027 and server/recovery.ts. */
+export const chargeReviewDismissals = pgTable("charge_review_dismissals", {
+  appointmentId: uuid("appointment_id").primaryKey().references(() => appointments.id),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  reason: text("reason").notNull(),
+  dismissedBy: uuid("dismissed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const refunds = pgTable("refunds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  claimId: uuid("claim_id").references(() => claims.id),
+  payee: text("payee").notNull(),
+  payerId: uuid("payer_id").references(() => payers.id),
+  amountCents: integer("amount_cents").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("requested"),
+  method: text("method"),
+  reference: text("reference"),
+  ledgerEntryId: uuid("ledger_entry_id").references(() => ledgerEntries.id),
+  requestedBy: uuid("requested_by").references(() => users.id),
+  approvedBy: uuid("approved_by").references(() => users.id),
+  issuedBy: uuid("issued_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  issuedAt: timestamp("issued_at", { withTimezone: true }),
+});
 
 /**
  * Messages from the public contact form.

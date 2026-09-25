@@ -3,7 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { DATASETS, getReport, listReports, normalizeConfig, RANGES, runReport } from "@/server/report-builder";
-import { deleteReportAction, saveReportAction } from "@/app/(app)/report-actions";
+import { askDataAction, deleteReportAction, saveReportAction } from "@/app/(app)/report-actions";
+import { practiceConfig } from "@/server/integrations";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
@@ -33,6 +34,8 @@ export default async function ReportBuilderPage({ searchParams }: { searchParams
     : normalizeConfig(dataset, { columns: many(sp.col), group: one(sp.group) || null, range: one(sp.range) || "30d", payerId: one(sp.payer) || null, providerId: one(sp.provider) || null, status: one(sp.status) || null });
   const result = await runReport(db, s.practiceId, dataset, config, { limit: 200 });
   const canSave = ["admin", "biller"].includes(s.role);
+  const aiOn = !!(await practiceConfig(db, s.practiceId)).anthropic;
+  const asked = one(sp.asked);
   const keepQuery = new URLSearchParams([["dataset", dataset], ["run", "1"], ...config.columns.map((c) => ["col", c]), ["group", config.group ?? ""], ["range", config.range], ["payer", config.payerId ?? ""], ["provider", config.providerId ?? ""], ["status", config.status ?? ""], ...(report ? [["id", report.id]] : [])] as [string, string][]);
 
   return (
@@ -58,6 +61,23 @@ export default async function ReportBuilderPage({ searchParams }: { searchParams
         </div>
 
         <div className="space-y-6 lg:col-span-3">
+          <Card title="Ask your data">
+            <ActionForm action={askDataAction} className="flex flex-wrap items-start gap-2">
+              <input name="q" defaultValue={asked} className="input min-w-0 flex-1" placeholder='e.g. "denials by reason for Aetna this quarter" or "payments by month this year"' maxLength={300} />
+              <SubmitButton pendingLabel="Thinking...">Ask</SubmitButton>
+            </ActionForm>
+            <p className="mt-2 text-xs text-slate-500">
+              {aiOn
+                ? "Claude picks the report; only your question and your payer and provider names are sent, never the results. Leave patient details out."
+                : "Matched by keywords. Connect Claude under Integrations to ask in your own words."}
+            </p>
+            {asked && (
+              <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-slate-700">
+                Showing <strong>{ds.label.toLowerCase()}</strong>{config.group ? <> by <strong>{ds.groups[config.group].label}</strong></> : null}, {RANGES[config.range].toLowerCase()}, for &ldquo;{asked}&rdquo;{one(sp.via) === "ai" ? " (chosen by Claude)" : " (matched by keywords)"}. Adjust anything below.
+                {one(sp.note) && <span className="mt-1 block text-xs text-slate-500">{one(sp.note)}</span>}
+              </p>
+            )}
+          </Card>
           <Card title={report ? `Editing: ${report.name}` : "Build a report"}>
             <form action="/reports/builder" className="space-y-4">
               {report && <input type="hidden" name="id" value={report.id} />}

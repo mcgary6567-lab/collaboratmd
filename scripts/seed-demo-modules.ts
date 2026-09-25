@@ -2,7 +2,8 @@
  * Demo data for the modules added after the base seed: payer contracts and
  * underpayments, payer edits and prior authorizations, statements and
  * payment plans, lab orders (results from the labeled simulator), provider
- * enrollment, a bank deposit file, collection accounts, appeal letters, and
+ * enrollment, a bank deposit file, collection accounts, appeal letters, a few
+ * credit balances (duplicate payments) to refund, and
  * a second practice so the practice switcher and all-clients view have
  * something to compare.
  *
@@ -257,6 +258,37 @@ async function main() {
     }
     log(`appeal letters: ${open.length} drafted from templates, 1 marked sent`);
   } else log("appeal letters: already present");
+
+  /* ---------------- Credit balances ---------------- */
+  const [{ n: creditCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.ledgerEntries).where(and(eq(schema.ledgerEntries.practiceId, practiceId), sql`${schema.ledgerEntries.note} LIKE 'Demo credit:%'`));
+  if (Number(creditCount) === 0) {
+    const ago = (n: number) => new Date(Date.now() - n * 86_400_000);
+    // Patients who owe nothing and then paid a copay twice.
+    const { rows: settled } = await db.execute<{ patient_id: string }>(sql`
+      SELECT patient_id FROM ledger_entries WHERE practice_id = ${practiceId}
+      GROUP BY patient_id HAVING (${billing.patientBalanceSql}) = 0 AND count(*) FILTER (WHERE type = 'patient_payment') > 0
+      ORDER BY patient_id LIMIT 3`);
+    for (const [i, p] of settled.entries()) {
+      await db.insert(schema.ledgerEntries).values({ practiceId, patientId: p.patient_id, type: "patient_payment", amountCents: [2_500, 4_000, 7_500][i], note: "Demo credit: copay collected twice at check-in", postedBy: admin.id, postedAt: ago(10 + i * 9) });
+    }
+    // Paid-in-full claims the payer then paid a second time: two commercial, one Medicare paid 50 days ago.
+    const paidInFull = (type: string, n: number) => db.execute<{ id: string; patient_id: string; paid: string }>(sql`
+      SELECT c.id, c.patient_id, COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'insurance_payment'), 0)::text AS paid
+      FROM claims c JOIN payers py ON py.id = c.payer_id JOIN ledger_entries l ON l.claim_id = c.id
+      WHERE c.practice_id = ${practiceId} AND c.status = 'paid' AND py.type = ${type}
+      GROUP BY c.id
+      HAVING COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'charge'), 0)
+           - COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'insurance_payment'), 0)
+           + COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'reversal'), 0)
+           - COALESCE(sum(l.amount_cents) FILTER (WHERE l.type IN ('adjustment', 'write_off', 'transfer_to_patient')), 0) = 0
+         AND COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'insurance_payment'), 0) BETWEEN 5000 AND 60000
+      ORDER BY c.id LIMIT ${n}`);
+    const dupes = [...(await paidInFull("commercial", 2)).rows.map((r) => ({ ...r, days: 20 })), ...(await paidInFull("medicare", 1)).rows.map((r) => ({ ...r, days: 50 }))];
+    for (const c of dupes) {
+      await db.insert(schema.ledgerEntries).values({ practiceId, patientId: c.patient_id, claimId: c.id, type: "insurance_payment", amountCents: Number(c.paid), note: "Demo credit: payer paid the claim a second time", postedBy: admin.id, postedAt: ago(c.days) });
+    }
+    log(`credit balances: ${settled.length} patient credits, ${dupes.length} duplicate insurance payments`);
+  } else log("credit balances: already present");
 
   /* ---------------- A second practice ---------------- */
   let [second] = await db.select().from(schema.practices).where(eq(schema.practices.name, SECOND_PRACTICE)).limit(1);

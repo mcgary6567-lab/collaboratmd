@@ -27,6 +27,8 @@ export default async function ReportsPage() {
         actions={
           <span className="no-print flex flex-wrap gap-2">
             <a href="/reports/builder" className="btn btn-primary text-xs">Report builder</a>
+            <a href="/reports/forecast" className="btn btn-secondary text-xs">Cash forecast</a>
+            <a href="/reports/payer-alerts" className="btn btn-secondary text-xs">Payer alerts</a>
             <a href="/api/export/ar-aging" className="btn btn-secondary text-xs">A/R aging CSV</a>
             <a href="/api/export/payer-performance" className="btn btn-secondary text-xs">Payer performance CSV</a>
             <PrintButton label="Print or save as PDF" />

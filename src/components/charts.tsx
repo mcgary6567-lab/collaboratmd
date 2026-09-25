@@ -113,3 +113,24 @@ export function MiniBar({ value, max, tone = "#16a34a" }: { value: number; max: 
     </div>
   );
 }
+
+/** Weekly collections: the last eight weeks as posted, then the forecast, stacked insurance over patient. */
+export function ForecastChart({ data }: { data: { week: string; insurance: number; patient: number; forecast: boolean }[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+        <XAxis dataKey="week" {...AXIS} />
+        <YAxis tickFormatter={compact} width={62} {...AXIS} />
+        <Tooltip formatter={(v, name) => [full(Number(v)), String(name)]} />
+        <Legend iconType="circle" />
+        <Bar dataKey="insurance" name="Insurance" stackId="a">
+          {data.map((d) => <Cell key={d.week} fill={d.forecast ? "#93c5fd" : "#2563eb"} />)}
+        </Bar>
+        <Bar dataKey="patient" name="Patient" stackId="a" radius={[4, 4, 0, 0]}>
+          {data.map((d) => <Cell key={d.week} fill={d.forecast ? "#86efac" : "#16a34a"} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}

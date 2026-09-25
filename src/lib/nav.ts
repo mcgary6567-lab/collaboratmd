@@ -1,7 +1,7 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   AlertTriangle, BarChart3, Building2, CalendarDays, CheckSquare, ClipboardCheck, Clock, FileText, FlaskConical, LayoutDashboard,
-  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck,
+  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; multiOnly?: boolean };
@@ -40,12 +40,16 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/underpayments", label: "Underpayments", icon: TrendingDown },
       { href: "/billing", label: "Patient billing", icon: Wallet },
       { href: "/billing/collections", label: "Collections", icon: Gavel },
+      { href: "/billing/missed-charges", label: "Missed charges", icon: SearchCheck },
+      { href: "/billing/credits", label: "Credits and refunds", icon: HandCoins },
     ],
   },
   {
     title: "Insights and setup",
     items: [
       { href: "/reports", label: "Reports", icon: BarChart3 },
+      { href: "/reports/forecast", label: "Cash forecast", icon: LineChart },
+      { href: "/reports/payer-alerts", label: "Payer alerts", icon: Radar },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/settings/enrollment", label: "Payer enrollment", icon: BadgeCheck },
       { href: "/settings/connections", label: "Integrations", icon: Plug, adminOnly: true },
