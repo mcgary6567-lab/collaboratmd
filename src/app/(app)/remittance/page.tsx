@@ -13,7 +13,7 @@ export default async function RemittancePage() {
   const rows = await db.select().from(schema.remittances).where(eq(schema.remittances.practiceId, s.practiceId)).orderBy(desc(schema.remittances.receivedAt)).limit(100);
   return (
     <>
-      <PageHeader title="Remittance (ERA / 835)" subtitle="Electronic remittance advice with automated payment posting" actions={<RemittanceTools />} />
+      <PageHeader title="Remittance (ERA / 835)" subtitle="Electronic remittance advice with automated payment posting" actions={<><a href="/remittance/deposits" className="btn btn-secondary">Bank deposits</a><RemittanceTools /></>} />
       <Card>
         {rows.length === 0 ? (
           <Empty>No remittances yet. Fetch ERAs from the clearinghouse for accepted claims.</Empty>
