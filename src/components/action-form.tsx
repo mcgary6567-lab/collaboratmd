@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { toast } from "@/components/toaster";
 import { useFormStatus } from "react-dom";
 import type { ReactNode } from "react";
 
@@ -23,6 +24,9 @@ export function ActionForm({
   className?: string;
 }) {
   const [state, formAction] = useActionState(action, undefined);
+  useEffect(() => {
+    if (state?.message) toast(state.ok, state.message);
+  }, [state]);
   return (
     <form action={formAction} className={className}>
       {children}

@@ -548,6 +548,46 @@ export const claimStatusChecks = pgTable("claim_status_checks", {
 });
 
 /* ------------------------------------------------------------------ */
+/* Work: tasks, notes, saved views                                      */
+/* ------------------------------------------------------------------ */
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  title: text("title").notNull(),
+  entityType: text("entity_type"),
+  entityId: uuid("entity_id"),
+  assigneeId: uuid("assignee_id").references(() => users.id),
+  createdBy: uuid("created_by").references(() => users.id),
+  dueDate: date("due_date"),
+  priority: text("priority").notNull().default("normal"),
+  status: text("status").notNull().default("open"),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+export const notes = pgTable("notes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  entityType: text("entity_type").notNull(),
+  entityId: uuid("entity_id").notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const savedViews = pgTable("saved_views", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  page: text("page").notNull(),
+  name: text("name").notNull(),
+  query: text("query").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* ------------------------------------------------------------------ */
 /* Multi-practice access                                                */
 /* ------------------------------------------------------------------ */
 

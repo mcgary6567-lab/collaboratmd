@@ -10,6 +10,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader, StatusBadge, PatientLink, Money, Badge } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { ClaimActions } from "./claim-actions";
+import { WorkPanel } from "@/components/work-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,9 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
         actions={
           <>
             <StatusBadge status={b.claim.status} />
+            {["draft", "scrub_errors", "ready", "rejected"].includes(b.claim.status) && b.claim.frequencyCode !== "8" && b.claim.payerSequence !== "S" && (
+              <Link href={`/claims/${id}/edit`} className="btn btn-secondary">Edit claim</Link>
+            )}
             <ClaimActions claimId={id} canSubmit={canSubmit} canRescrub={["draft", "scrub_errors", "ready"].includes(b.claim.status)} />
           </>
         }
@@ -299,6 +303,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               {b.claim.authorizationNumber && <div>Prior auth <span className="font-mono">{b.claim.authorizationNumber}</span> (REF*G1)</div>}
             </div>
           </Card>
+          <WorkPanel db={db} practiceId={s.practiceId} entityType="claim" entityId={id} defaultTitle={`Work claim ${b.claim.controlNumber}`} />
           <Card title="Timeline">
             <ol className="space-y-3 text-sm">
               {events.map((e) => (

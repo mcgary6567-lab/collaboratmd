@@ -3,22 +3,27 @@ import { accessiblePractices, requireSession } from "@/lib/auth";
 import { getDb, schema } from "@/db";
 import { Sidebar } from "@/components/sidebar";
 import { MfaSetup } from "@/components/mfa-setup";
+import { CommandPalette } from "@/components/command-palette";
+import { Toaster } from "@/components/toaster";
+import { pagesFor } from "@/lib/nav";
+import { myTaskCounts } from "@/server/work";
 import { logoutAction } from "@/app/login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
   const db = await getDb();
-  const [practices, [practice], [user]] = await Promise.all([
+  const [practices, [practice], [user], taskCounts] = await Promise.all([
     accessiblePractices(db, session.userId),
     db.select({ requireMfa: schema.practices.requireMfa }).from(schema.practices).where(eq(schema.practices.id, session.practiceId)).limit(1),
     db.select({ mfaSecret: schema.users.mfaSecret }).from(schema.users).where(eq(schema.users.id, session.userId)).limit(1),
+    myTaskCounts(db, session.practiceId, session.userId),
   ]);
   // A practice that requires two-factor gets nothing else until it is set up.
   const mustEnroll = !!practice?.requireMfa && !user?.mfaSecret;
   return (
-    <div className="flex min-h-screen">
-      <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} />
-      <main className="min-w-0 flex-1 p-6 lg:p-8">
+    <div className="app-shell flex min-h-screen">
+      <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} tasks={taskCounts} />
+      <main className="min-w-0 flex-1 px-4 pb-8 pt-20 md:p-6 lg:p-8">
         {mustEnroll ? (
           <div className="mx-auto max-w-2xl">
             <h1 className="text-2xl font-bold">Set up two-factor sign-in</h1>
@@ -29,6 +34,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           children
         )}
       </main>
+      <CommandPalette pages={pagesFor(session.role, practices.length > 1)} />
+      <Toaster />
     </div>
   );
 }

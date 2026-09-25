@@ -10,6 +10,7 @@ import { fmtDate, fmtDateTime, money } from "@/lib/utils";
 import { BillingSection } from "./billing-section";
 import { AuthorizationsSection } from "./authorizations-section";
 import { LabsSection } from "./labs-section";
+import { WorkPanel } from "@/components/work-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +113,9 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
       <BillingSection db={db} practiceId={s.practiceId} patientId={patient.id} />
       <AuthorizationsSection db={db} practiceId={s.practiceId} patientId={patient.id} />
       <LabsSection db={db} practiceId={s.practiceId} patientId={patient.id} />
+      <div className="mt-6 max-w-2xl">
+        <WorkPanel db={db} practiceId={s.practiceId} entityType="patient" entityId={patient.id} defaultTitle={`Follow up with ${patient.firstName} ${patient.lastName}`} />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Visits">

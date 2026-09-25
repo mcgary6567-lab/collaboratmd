@@ -60,7 +60,7 @@ export function MfaSetup({ enabled, recoveryLeft, locked }: { enabled: boolean; 
             </button>
           </>
         ) : (
-          <div className="grid gap-6 md:grid-cols-[auto,1fr]">
+          <div className="grid gap-6 md:grid-cols-[auto_1fr]">
             {/* The SVG is generated on our server from the otpauth URI, not user input. */}
             <div className="h-[200px] w-[200px] rounded-lg border border-slate-200 bg-white p-1" dangerouslySetInnerHTML={{ __html: setup.qrSvg }} />
             <div className="space-y-3">
