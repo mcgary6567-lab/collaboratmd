@@ -85,18 +85,35 @@ export async function importDeposits(db: Db, practiceId: string, text: string, u
 const digits = (s: string) => s.replace(/[^0-9a-z]/gi, "").toUpperCase();
 const dayDiff = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
 
-/** ERAs not yet tied to any deposit. */
-async function openRemittances(db: Db, practiceId: string) {
+const addDays = (iso: string, n: number) => new Date(Date.parse(iso) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** ERAs paid on or after `since` that are not yet tied to any deposit. */
+async function openRemittances(db: Db, practiceId: string, since: string) {
   return db
     .select()
     .from(remittances)
-    .where(and(eq(remittances.practiceId, practiceId), sql`NOT EXISTS (SELECT 1 FROM bank_deposits b WHERE b.remittance_id = ${remittances.id} AND b.status = 'matched')`))
+    .where(and(
+      eq(remittances.practiceId, practiceId),
+      sql`${remittances.paymentDate} >= ${since}`,
+      sql`NOT EXISTS (SELECT 1 FROM bank_deposits b WHERE b.remittance_id = ${remittances.id} AND b.status = 'matched')`,
+    ))
     .orderBy(asc(remittances.paymentDate));
+}
+
+/**
+ * Reconciliation starts with the first bank file imported: ERAs paid well
+ * before it would show as "missing" only because their deposits were never
+ * imported.
+ */
+async function reconcileSince(db: Db, practiceId: string): Promise<string | null> {
+  const [r] = await db.select({ first: sql<string | null>`min(${bankDeposits.depositDate})::text` }).from(bankDeposits).where(eq(bankDeposits.practiceId, practiceId));
+  return r?.first ? addDays(r.first, -10) : null;
 }
 
 export async function autoMatch(db: Db, practiceId: string) {
   const deposits = await db.select().from(bankDeposits).where(and(eq(bankDeposits.practiceId, practiceId), eq(bankDeposits.status, "unmatched"))).orderBy(asc(bankDeposits.depositDate));
-  let open = await openRemittances(db, practiceId);
+  if (!deposits.length) return 0;
+  let open = await openRemittances(db, practiceId, addDays(deposits[0].depositDate, -10));
   let matched = 0;
   for (const d of deposits) {
     const desc = digits(d.description);
@@ -149,22 +166,26 @@ export async function setDepositStatus(db: Db, practiceId: string, depositId: st
 }
 
 export async function depositsOverview(db: Db, practiceId: string) {
-  const [deposits, open] = await Promise.all([
+  const since = await reconcileSince(db, practiceId);
+  const [deposits, open, byStatus] = await Promise.all([
     db
       .select({ deposit: bankDeposits, remittance: remittances })
       .from(bankDeposits)
       .leftJoin(remittances, eq(remittances.id, bankDeposits.remittanceId))
       .where(eq(bankDeposits.practiceId, practiceId))
-      .orderBy(desc(bankDeposits.depositDate))
+      // Deposits needing a person first, then the newest.
+      .orderBy(sql`CASE ${bankDeposits.status} WHEN 'unmatched' THEN 0 ELSE 1 END`, desc(bankDeposits.depositDate))
       .limit(300),
-    openRemittances(db, practiceId),
+    since ? openRemittances(db, practiceId, since) : Promise.resolve([]),
+    db.select({ status: bankDeposits.status, n: sql<number>`count(*)::int` }).from(bankDeposits).where(eq(bankDeposits.practiceId, practiceId)).groupBy(bankDeposits.status),
   ]);
   const today = new Date().toISOString().slice(0, 10);
   const counts = { matched: 0, unmatched: 0, ignored: 0 };
-  for (const d of deposits) counts[d.deposit.status as keyof typeof counts]++;
+  for (const r of byStatus) counts[r.status as keyof typeof counts] = Number(r.n);
   return {
     deposits,
     openRemittances: open,
+    since,
     /** Paid more than 7 days ago by the ERA, and no deposit for it yet. */
     missing: open.filter((r) => dayDiff(today, r.paymentDate) > 7),
     counts,

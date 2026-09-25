@@ -64,7 +64,7 @@ export default async function DepositsPage() {
                 ))}
               </tbody>
             </table>
-            <p className="mt-2 text-xs text-slate-500">Import a newer bank export, or ask the payer to trace the payment.</p>
+            <p className="mt-2 text-xs text-slate-500">Import a newer bank export, or ask the payer to trace the payment. ERAs paid before {o.since ? d(o.since) : "your first import"} are not checked, since their deposits were never imported.</p>
           </Card>
         </div>
       )}
