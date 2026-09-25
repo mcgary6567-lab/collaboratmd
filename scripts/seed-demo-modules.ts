@@ -1,8 +1,9 @@
 /**
  * Demo data for the modules added after the base seed: payer contracts and
  * underpayments, payer edits and prior authorizations, statements and
- * payment plans, lab orders (results from the labeled simulator), and a
- * second practice so the practice switcher and all-clients view have
+ * payment plans, lab orders (results from the labeled simulator), provider
+ * enrollment, a bank deposit file, collection accounts, appeal letters, and
+ * a second practice so the practice switcher and all-clients view have
  * something to compare.
  *
  *   npx tsx --tsconfig tsconfig.scripts.json scripts/seed-demo-modules.ts
@@ -55,6 +56,10 @@ async function main() {
   const encounters = await import("@/server/encounters");
   const claims = await import("@/server/claims");
   const data = await import("@/db/us-data");
+  const enrollment = await import("@/server/enrollment");
+  const deposits = await import("@/server/deposits");
+  const collections = await import("@/server/collections");
+  const appeals = await import("@/server/appeals");
 
   const db = await getDb();
   const [admin] = await db.select().from(schema.users).where(eq(schema.users.email, "admin@collaboratmd.local")).limit(1);
@@ -145,6 +150,113 @@ async function main() {
     }
     log(`lab orders: ${picks.length}, of which ${simulated} have simulated results`);
   } else log("lab orders: already present");
+
+  /* ---------------- Provider enrollment ---------------- */
+  const [{ n: enrollCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.providerEnrollments).where(eq(schema.providerEnrollments.practiceId, practiceId));
+  if (Number(enrollCount) === 0) {
+    const provs = await db.select().from(schema.providers).where(and(eq(schema.providers.practiceId, practiceId), eq(schema.providers.active, true)));
+    const tracked = payers.filter((p) => p.type !== "self_pay").slice(0, 6);
+    const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    const rand = rng(20260925);
+    let saved = 0;
+    for (const [pi, pr] of provs.entries()) {
+      for (const [qi, pa] of tracked.entries()) {
+        const base = { providerId: pr.id, payerId: pa.id, payerProviderId: `${pa.type === "medicare" ? "PTAN" : "PRV"}${String(100000 + pi * 97 + qi * 13).slice(0, 6)}` };
+        let input: Parameters<typeof enrollment.saveEnrollment>[2];
+        if (pi === 0 && qi === 1) input = { ...base, status: "approved", effectiveOn: day(-1780), revalidationDue: day(41), notes: "Demo: revalidation window open" };
+        else if (pi === 1 && qi === 2) input = { ...base, status: "approved", effectiveOn: day(-1850), revalidationDue: day(-9), notes: "Demo: revalidation overdue" };
+        else if (pi === 2 && qi === 3) input = { ...base, payerProviderId: null, status: "in_process", submittedOn: day(-118), notes: "Demo: application still pending with the payer" };
+        else if (pi === 3 && qi === 4) input = { ...base, payerProviderId: null, status: "submitted", submittedOn: day(-19), notes: "Demo: new provider application" };
+        else input = { ...base, status: "approved", effectiveOn: day(-400 - Math.floor(rand() * 1400)), revalidationDue: pa.type === "medicare" || pa.type === "medicaid" ? day(200 + Math.floor(rand() * 1200)) : null };
+        await enrollment.saveEnrollment(db, practiceId, input, admin.id);
+        saved++;
+      }
+    }
+    log(`provider enrollment: ${saved} provider-payer pairs across ${tracked.length} payers (one due, one overdue, one stalled, one new)`);
+  } else log("provider enrollment: already present");
+
+  /* ---------------- Bank deposits ---------------- */
+  const [{ n: depCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.bankDeposits).where(eq(schema.bankDeposits.practiceId, practiceId));
+  if (Number(depCount) === 0) {
+    const recentEras = (await db.select().from(schema.remittances).where(eq(schema.remittances.practiceId, practiceId)).orderBy(desc(schema.remittances.paymentDate)).limit(30)).reverse();
+    // A deposit never lands after the newest ERA's day, so the file never runs into tomorrow in any time zone.
+    const todayIso = recentEras.at(-1)?.paymentDate ?? new Date().toISOString().slice(0, 10);
+    const plus = (iso: string, n: number) => {
+      const d = new Date(Date.parse(iso) + n * 86_400_000).toISOString().slice(0, 10);
+      return d > todayIso ? todayIso : d;
+    };
+    const mdY = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}`;
+    const lines = ["Posting Date,Description,Amount"];
+    let withheld = 0;
+    for (const [i, r] of recentEras.entries()) {
+      // Two older ERAs whose money never shows up in the bank file.
+      if ((i === 3 || i === 9) && recentEras.length > 12) {
+        withheld++;
+        continue;
+      }
+      const who = r.payerName.toUpperCase().replace(/[^A-Z ]/g, "").split(" ")[0];
+      const desc = i % 6 === 5 ? `DEPOSIT REF ${700000 + i * 131}` : `HCCLAIMPMT ${who} TRN*1*${r.checkNumber}*1${String(i).padStart(3, "0")}`;
+      lines.push(`${mdY(plus(r.paymentDate, 1 + (i % 2)))},"${desc}",${(r.amountCents / 100).toFixed(2)}`);
+    }
+    const last = recentEras.at(-1)?.paymentDate ?? todayIso;
+    lines.push(`${mdY(plus(last, -2))},MERCHANT CARD SETTLEMENT,1284.50`);
+    lines.push(`${mdY(plus(last, -1))},MERCHANT CARD SETTLEMENT,932.15`);
+    lines.push(`${mdY(plus(last, -3))},ACH DEBIT PAYROLL,-18450.00`);
+    lines.push(`${mdY(plus(last, -1))},OFFICE SUPPLY CO,-212.40`);
+    const r = await deposits.importDeposits(db, practiceId, lines.join("\n"), admin.id);
+    const [card] = await db.select().from(schema.bankDeposits).where(and(eq(schema.bankDeposits.practiceId, practiceId), eq(schema.bankDeposits.amountCents, 128450))).limit(1);
+    if (card) await deposits.setDepositStatus(db, practiceId, card.id, "ignored", admin.id);
+    log(`bank deposits: ${r.added} imported (${r.matched} matched to ERAs, ${r.skipped} withdrawals skipped); ${withheld} ERAs left without a deposit`);
+  } else log("bank deposits: already present");
+
+  /* ---------------- Collections ---------------- */
+  const [{ n: collCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.patientCollections).where(eq(schema.patientCollections.practiceId, practiceId));
+  if (Number(collCount) === 0) {
+    const onPlan = new Set((await db.select({ id: schema.paymentPlans.patientId }).from(schema.paymentPlans).where(eq(schema.paymentPlans.practiceId, practiceId))).map((p) => p.id));
+    const owing = (await billing.patientsWithBalances(db, practiceId, 7_500, 60)).filter((o) => !onPlan.has(o.patientId)).slice(0, 7);
+    const ago = (n: number) => new Date(Date.now() - n * 86_400_000);
+    const isoAgo = (n: number) => ago(n).toISOString().slice(0, 10);
+    // Each account has had two statements, the first three months ago.
+    for (const o of owing) {
+      for (const days of [95, 65]) {
+        const st = await billing.generateStatement(db, practiceId, o.patientId, admin.id);
+        await db.update(schema.statements).set({ statementDate: isoAgo(days), dueDate: isoAgo(days - 30), status: "sent", sentAt: ago(days) }).where(eq(schema.statements.id, st.id));
+      }
+    }
+    const agency = "Demo Collection Agency";
+    const steps: string[] = [];
+    if (owing[3]) {
+      await collections.sendFinalNotice(db, practiceId, owing[3].patientId, { userId: admin.id, now: ago(24) });
+      steps.push("1 final notice past its 10 days");
+    }
+    if (owing[4]) {
+      await collections.sendFinalNotice(db, practiceId, owing[4].patientId, { userId: admin.id, now: ago(4) });
+      steps.push("1 final notice still running");
+    }
+    if (owing[5]) {
+      const { collection } = await collections.sendFinalNotice(db, practiceId, owing[5].patientId, { userId: admin.id, now: ago(70) });
+      await collections.placeWithAgency(db, practiceId, collection.id, agency, { userId: admin.id, now: ago(55) });
+      steps.push("1 at the agency");
+    }
+    if (owing[6]) {
+      const { collection } = await collections.sendFinalNotice(db, practiceId, owing[6].patientId, { userId: admin.id, now: ago(120) });
+      const placed = await collections.placeWithAgency(db, practiceId, collection.id, agency, { userId: admin.id, now: ago(100) });
+      await collections.closeCollection(db, practiceId, collection.id, "settled", Math.round(placed.amountCents * 0.4), { userId: admin.id, note: "Demo: settled at 40%" });
+      steps.push("1 settled by the agency");
+    }
+    log(`collections: ${Math.min(3, owing.length)} accounts ready for a final notice, ${steps.join(", ")}`);
+  } else log("collections: already present");
+
+  /* ---------------- Appeal letters ---------------- */
+  const [{ n: appealCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.appealLetters).where(eq(schema.appealLetters.practiceId, practiceId));
+  if (Number(appealCount) === 0) {
+    const open = await db.select().from(schema.denials).where(and(eq(schema.denials.practiceId, practiceId), eq(schema.denials.status, "open"))).orderBy(desc(schema.denials.createdAt)).limit(4);
+    for (const [i, d] of open.entries()) {
+      const letter = await appeals.draftAppeal(db, practiceId, d.id, admin.id);
+      if (i === 0) await appeals.markAppealSent(db, practiceId, letter.id, admin.id);
+    }
+    log(`appeal letters: ${open.length} drafted from templates, 1 marked sent`);
+  } else log("appeal letters: already present");
 
   /* ---------------- A second practice ---------------- */
   let [second] = await db.select().from(schema.practices).where(eq(schema.practices.name, SECOND_PRACTICE)).limit(1);
