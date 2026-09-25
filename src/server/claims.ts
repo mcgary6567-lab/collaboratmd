@@ -12,6 +12,7 @@ import { explainDenial } from "@/lib/ai/explain";
 import { carcCategory } from "@/lib/codes/carc";
 import { checkClaimUnderpayment } from "./fees";
 import { authsForPatient, consumeAuthorization, rulesForPayer } from "./payer-edits";
+import { enrollmentFinding, enrollmentFor } from "./enrollment";
 
 const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -65,9 +66,10 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
 export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: ScrubFinding[]; edits: EditResult }> {
   const general = scrubClaim(toScrubInput(b));
   if (b.claim.frequencyCode === "8") return { findings: general, edits: { findings: [], authorization: null, authUnits: 0 } };
-  const [rules, auths] = await Promise.all([
+  const [rules, auths, enrollment] = await Promise.all([
     rulesForPayer(db, b.claim.practiceId, b.payer.id),
     authsForPatient(db, b.claim.practiceId, b.patient.id, b.payer.id),
+    enrollmentFor(db, b.provider.id, b.payer.id),
   ]);
   const edits = evaluatePayerEdits(
     {
@@ -78,7 +80,8 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
     rules,
     auths,
   );
-  return { findings: [...general, ...edits.findings], edits };
+  const enrolled = enrollmentFinding(enrollment, b.encounter.dateOfService, `Dr. ${b.provider.firstName} ${b.provider.lastName}`, b.payer.name);
+  return { findings: [...general, ...edits.findings, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
