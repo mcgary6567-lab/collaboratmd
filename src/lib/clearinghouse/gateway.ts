@@ -7,6 +7,7 @@
  * -> adjudication -> 835 remittance.
  */
 import { buildEdi835, type Adjustment } from "@/lib/edi/x835";
+import { build278Response, parse278Request } from "@/lib/edi/x278";
 import { build999, describeSyntaxError, validateStructure } from "@/lib/edi/x999";
 import { build277CA } from "@/lib/edi/x277ca";
 import { build271, parse270, parse271, type Benefit, type Response271 } from "@/lib/edi/x270";
@@ -83,6 +84,8 @@ export interface ClearinghouseGateway {
   fetch835(claims: RemitRequest[]): Promise<string | null>;
   /** Sends a 276 claim status request and returns the payer's 277, both raw X12. */
   checkClaimStatus(edi276: string): Promise<string>;
+  /** Sends a 278 prior authorization request and returns the payer's 278 response, both raw X12. */
+  requestAuthorization(edi278: string): Promise<string>;
 }
 
 function hashStr(s: string): number {
@@ -198,6 +201,27 @@ export class MockClearinghouse implements ClearinghouseGateway {
       : bucket === 8 ? { category: "P3", statusCode: "294" }
       : { category: "F2", statusCode: "88", entity: "IL" };
     return build277({ senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control: String(h % 1_000_000_000), inquiry: q, status: { ...status, payerClaimNumber: q.payerClaimNumber || `PCN${h % 1_000_000}` } });
+  }
+
+  /**
+   * Answers a 278 the way payers tend to: most requests certified with an
+   * authorization number good for 90 days, some pended for clinical review,
+   * a few not certified or not requiring authorization at all.
+   */
+  async requestAuthorization(edi278: string): Promise<string> {
+    const request = parse278Request(edi278);
+    const h = hashStr(request.trace + request.memberId + "auth");
+    const now = new Date();
+    const base = { senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control: String(h % 1_000_000_000), request };
+    if (!request.memberId) return build278Response({ ...base, action: "", reject: "72" });
+    const bucket = h % 10;
+    const from = request.from || now.toISOString().slice(0, 10);
+    const to = new Date(Date.parse(from) + 90 * 86_400_000).toISOString().slice(0, 10);
+    const units = request.services.reduce((a, s) => a + s.units, 0);
+    if (bucket <= 5) return build278Response({ ...base, action: "A1", authNumber: `PA${h % 100_000_000}`, validFrom: from, validTo: to, units });
+    if (bucket <= 7) return build278Response({ ...base, action: "A4", authNumber: `REF${h % 1_000_000}` });
+    if (bucket === 8) return build278Response({ ...base, action: "A3", authNumber: `REF${h % 1_000_000}` });
+    return build278Response({ ...base, action: "NA" });
   }
 
   async fetch835(claims: RemitRequest[]): Promise<string | null> {

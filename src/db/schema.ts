@@ -528,6 +528,30 @@ export const authorizations = pgTable("authorizations", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** Electronic prior authorization (X12 278) requests: see migration 0023 and server/prior-auth.ts. */
+export const authRequests = pgTable("auth_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  cpts: jsonb("cpts").$type<string[]>().notNull().default([]),
+  diagnoses: jsonb("diagnoses").$type<string[]>().notNull().default([]),
+  units: integer("units").notNull().default(1),
+  serviceFrom: date("service_from").notNull(),
+  serviceTo: date("service_to").notNull(),
+  status: text("status").notNull(),
+  authNumber: text("auth_number"),
+  validFrom: date("valid_from"),
+  validTo: date("valid_to"),
+  message: text("message"),
+  authorizationId: uuid("authorization_id").references(() => authorizations.id),
+  request278: text("request_278").notNull(),
+  response278: text("response_278"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /**
  * Messages from the public contact form.
  *

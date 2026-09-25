@@ -1,13 +1,17 @@
 import { and, asc, eq } from "drizzle-orm";
 import { schema, type Db } from "@/db";
 import { listPatientAuthorizations } from "@/server/payer-edits";
+import { listAuthRequests } from "@/server/prior-auth";
 import { cancelAuthorizationAction, createAuthorizationAction } from "@/app/(app)/claim-control-actions";
+import { requestPriorAuthAction } from "@/app/(app)/prior-auth-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 
+const REQ_TONE: Record<string, "green" | "amber" | "red" | "slate" | "blue"> = { approved: "green", partial: "amber", pended: "blue", denied: "red", error: "red", not_required: "slate", cancelled: "slate" };
+
 export async function AuthorizationsSection({ db, practiceId, patientId }: { db: Db; practiceId: string; patientId: string }) {
-  const [auths, payers] = await Promise.all([
+  const [auths, payers, requests, providers] = await Promise.all([
     listPatientAuthorizations(db, practiceId, patientId),
     db
       .selectDistinct({ id: schema.payers.id, name: schema.payers.name })
@@ -15,6 +19,8 @@ export async function AuthorizationsSection({ db, practiceId, patientId }: { db:
       .innerJoin(schema.payers, eq(schema.payers.id, schema.patientInsurances.payerId))
       .where(and(eq(schema.patientInsurances.patientId, patientId), eq(schema.payers.practiceId, practiceId)))
       .orderBy(asc(schema.payers.name)),
+    listAuthRequests(db, practiceId, patientId),
+    db.select({ id: schema.providers.id, first: schema.providers.firstName, last: schema.providers.lastName }).from(schema.providers).where(and(eq(schema.providers.practiceId, practiceId), eq(schema.providers.active, true))).orderBy(asc(schema.providers.lastName)),
   ]);
   const today = new Date().toISOString().slice(0, 10);
   const state = (a: (typeof auths)[number]["auth"]) => {
@@ -88,6 +94,45 @@ export async function AuthorizationsSection({ db, practiceId, patientId }: { db:
             </Field>
             <SubmitButton pendingLabel="Saving...">Save authorization</SubmitButton>
           </ActionForm>
+        )}
+      </Card>
+      <Card title="Request electronically (X12 278)" className="lg:col-span-3">
+        {payers.length === 0 ? (
+          <p className="text-sm text-slate-600">Add the patient&apos;s insurance first.</p>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ActionForm action={requestPriorAuthAction.bind(null, patientId)} className="grid grid-cols-2 gap-3 text-sm">
+              <Field label="Requesting provider">
+                <select name="providerId" className="input" required>
+                  {providers.map((p) => <option key={p.id} value={p.id}>{p.last}, {p.first}</option>)}
+                </select>
+              </Field>
+              <Field label="Place of service"><input name="pos" className="input" defaultValue="11" maxLength={2} /></Field>
+              <Field label="Procedure codes"><input name="cpts" className="input font-mono" placeholder="70553" required /></Field>
+              <Field label="Diagnosis codes"><input name="diagnoses" className="input font-mono" placeholder="G43.909" required /></Field>
+              <Field label="Planned from"><input name="serviceFrom" type="date" className="input" required /></Field>
+              <Field label="Planned to"><input name="serviceTo" type="date" className="input" /></Field>
+              <Field label="Units or visits"><input name="units" type="number" min={1} defaultValue={1} className="input" /></Field>
+              <div className="flex items-end"><SubmitButton pendingLabel="Asking the payer...">Send request</SubmitButton></div>
+              <p className="col-span-2 text-xs text-slate-500">Sent to the patient&apos;s primary insurance through your clearinghouse. An approval is added to the authorizations above automatically; a pended request creates a follow-up task.</p>
+            </ActionForm>
+            <div>
+              <p className="label">Recent requests</p>
+              {requests.length === 0 ? <p className="text-sm text-slate-500">None yet.</p> : (
+                <ul className="space-y-2 text-sm">
+                  {requests.map(({ req, payerName }) => (
+                    <li key={req.id} className="rounded-lg border border-slate-200 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs">{req.cpts.join(", ")} · {payerName}</span>
+                        <Badge tone={REQ_TONE[req.status] ?? "slate"}>{req.status.replace(/_/g, " ")}</Badge>
+                      </div>
+                      <p className="text-xs text-slate-500">{fmtDate(req.createdAt)} · {req.message}{req.authNumber ? ` · ${req.authNumber}` : ""}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         )}
       </Card>
     </div>

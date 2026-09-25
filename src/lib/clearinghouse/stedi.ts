@@ -105,6 +105,15 @@ export class StediClearinghouse implements ClearinghouseGateway {
   }
 
   /** 276 out, and the raw 277 from the x12 field of Stedi's response. */
+  /**
+   * Not wired to Stedi in this version: its prior authorization product has
+   * not been verified against this integration, so rather than guess at a
+   * live payer API the request is refused with a clear next step.
+   */
+  async requestAuthorization(_edi278: string): Promise<string> {
+    throw new Error("Electronic prior authorization (278) is not enabled for Stedi in this version. Request it on the payer's portal, then record the authorization number here.");
+  }
+
   async checkClaimStatus(edi276: string): Promise<string> {
     const r = await this.post<{ x12?: string }>("/change/medicalnetwork/claimstatus/v2/raw-x12", { x12: edi276 });
     if (!r.x12) throw new Error("Stedi returned no 277 for the status request");
