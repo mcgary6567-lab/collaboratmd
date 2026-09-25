@@ -11,6 +11,8 @@ import { Card, PageHeader, StatusBadge, PatientLink, Money, Badge } from "@/comp
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { ClaimActions } from "./claim-actions";
 import { WorkPanel } from "@/components/work-panel";
+import { claimRisk, PRE_SUBMIT } from "@/server/risk";
+import { RiskBadge } from "@/components/risk-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
     db.select({ id: schema.patientInsurances.id }).from(schema.patientInsurances)
       .where(and(eq(schema.patientInsurances.patientId, b.claim.patientId), eq(schema.patientInsurances.active, true), eq(schema.patientInsurances.rank, 2))).limit(1),
   ]);
+  const risk = PRE_SUBMIT.includes(b.claim.status) ? await claimRisk(db, s.practiceId, id) : null;
   const primaryClaim = related.find((r) => r.id === b.claim.primaryClaimId);
   const secondaryClaim = related.find((r) => r.primaryClaimId === id && r.payerSequence === "S");
   const canBillSecondary =
@@ -77,6 +80,16 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
       />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {risk && (
+            <Card title="Denial risk before you submit" actions={<RiskBadge risk={risk} />}>
+              {risk.reasons.length ? (
+                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">{risk.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+              ) : (
+                <p className="text-sm text-slate-600">Nothing in this practice&apos;s last 12 months with this payer, or in the claim itself, points to a denial.</p>
+              )}
+              <p className="mt-2 text-xs text-slate-500">Based on your own claim history and a few known warning signs, not a guarantee.</p>
+            </Card>
+          )}
           {(errors.length > 0 || warnings.length > 0) && (
             <Card title={`Scrub results · ${errors.length} errors · ${warnings.length} warnings`}>
               <ul className="space-y-2 text-sm">

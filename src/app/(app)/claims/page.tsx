@@ -9,6 +9,8 @@ import { Pager, SortHeader, pageArgs, withParams, type Params } from "@/componen
 import { ClaimBulkBar, SavedViews, SelectAll } from "@/components/list-tools";
 import { fmtDate, daysAgo } from "@/lib/utils";
 import { SubmitAllButton } from "./submit-all";
+import { PRE_SUBMIT, riskForClaims } from "@/server/risk";
+import { RiskBadge } from "@/components/risk-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,10 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
     assignableUsers(db, s.practiceId),
     listViews(db, s.userId, s.practiceId, "claims"),
   ]);
-  const taskCounts = await openTaskCounts(db, s.practiceId, "claim", rows.map((r) => r.claim.id));
+  const [taskCounts, risks] = await Promise.all([
+    openTaskCounts(db, s.practiceId, "claim", rows.map((r) => r.claim.id)),
+    riskForClaims(db, s.practiceId, rows.filter((r) => PRE_SUBMIT.includes(r.claim.status)).map((r) => r.claim.id)),
+  ]);
   const query = new URLSearchParams(Object.entries(params).filter(([k, v]) => v && k !== "page") as [string, string][]).toString();
 
   return (
@@ -109,6 +114,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                         {errors > 0 && <span className="mr-1 text-red-700">{errors} err</span>}
                         {warnings > 0 && <span className="text-amber-700">{warnings} warn</span>}
                         {errors === 0 && warnings === 0 && <span className="text-green-700">clean</span>}
+                        {risks.get(claim.id) && risks.get(claim.id)!.level !== "low" && <span className="ml-1"><RiskBadge risk={risks.get(claim.id)!} compact /></span>}
                       </td>
                       <td className="text-right"><Money cents={claim.totalCents} /></td>
                       <td className={`whitespace-nowrap text-xs ${tfDays !== null && tfDays < 15 && !["paid", "closed", "voided"].includes(claim.status) ? "font-semibold text-red-700" : "text-slate-500"}`}>
