@@ -1,7 +1,7 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   AlertTriangle, BarChart3, Building2, CalendarDays, CheckSquare, ClipboardCheck, Clock, FileText, FlaskConical, LayoutDashboard,
-  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet,
+  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; multiOnly?: boolean };
@@ -29,12 +29,15 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Billing",
     items: [
       { href: "/encounters/new", label: "Charge entry", icon: Stethoscope },
+      { href: "/coding", label: "Coding help", icon: Wand2 },
       { href: "/claims", label: "Claims", icon: FileText },
       { href: "/claims/follow-up", label: "Claim follow-up", icon: Clock },
       { href: "/remittance", label: "Remittance (ERA)", icon: Receipt },
+      { href: "/remittance/deposits", label: "Bank deposits", icon: Landmark },
       { href: "/denials", label: "Denials", icon: AlertTriangle },
       { href: "/underpayments", label: "Underpayments", icon: TrendingDown },
       { href: "/billing", label: "Patient billing", icon: Wallet },
+      { href: "/billing/collections", label: "Collections", icon: Gavel },
     ],
   },
   {
@@ -42,6 +45,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/reports", label: "Reports", icon: BarChart3 },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
+      { href: "/settings/enrollment", label: "Payer enrollment", icon: BadgeCheck },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },
     ],

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/auth";
 import { getDb, schema } from "@/db";
@@ -26,7 +27,7 @@ export default async function NewEncounterPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader title="Charge entry" subtitle="Create an encounter; a claim is built and scrubbed automatically" />
+      <PageHeader title="Charge entry" subtitle="Create an encounter; a claim is built and scrubbed automatically" actions={<Link href="/coding" className="btn btn-secondary">Coding help</Link>} />
       <ChargeEntryForm
         defaults={{ providerId: sp.providerId, appointmentId: sp.appointmentId, dos: sp.dos ?? new Date().toISOString().slice(0, 10) }}
         initialPatient={initialPatient}
