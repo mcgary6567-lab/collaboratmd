@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
   primaryKey,
+  bigint,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -27,6 +28,7 @@ export const practices = pgTable("practices", {
   state: text("state").notNull(),
   zip: text("zip").notNull(),
   phone: text("phone"),
+  requireMfa: boolean("require_mfa").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -39,6 +41,13 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     name: text("name").notNull(),
     role: text("role").notNull().default("biller"), // admin | biller | front_desk | readonly
+    mfaSecret: text("mfa_secret"),
+    mfaPendingSecret: text("mfa_pending_secret"),
+    mfaEnabledAt: timestamp("mfa_enabled_at", { withTimezone: true }),
+    mfaLastStep: bigint("mfa_last_step", { mode: "number" }),
+    mfaRecovery: jsonb("mfa_recovery").$type<string[]>().notNull().default([]),
+    failedLogins: integer("failed_logins").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],

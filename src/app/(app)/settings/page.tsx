@@ -32,7 +32,7 @@ export default async function SettingsPage() {
             <div className="flex justify-between"><dt className="text-slate-500">AI rejection support</dt><dd><Badge tone={process.env.ANTHROPIC_API_KEY ? "green" : "slate"}>{process.env.ANTHROPIC_API_KEY ? "Claude enabled" : "Rules-based (set ANTHROPIC_API_KEY)"}</Badge></dd></div>
           </dl>
         </Card>
-        <Card title="Users">
+        <Card title="Users" actions={<Link href="/settings/security" className="btn btn-secondary text-xs">Sign-in security</Link>}>
           <table className="table">
             <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
             <tbody>
