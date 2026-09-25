@@ -1,7 +1,7 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   AlertTriangle, BarChart3, Building2, CalendarDays, CheckSquare, ClipboardCheck, Clock, FileText, FlaskConical, LayoutDashboard,
-  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug,
+  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; multiOnly?: boolean };
@@ -47,6 +47,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/settings/enrollment", label: "Payer enrollment", icon: BadgeCheck },
       { href: "/settings/connections", label: "Integrations", icon: Plug, adminOnly: true },
+      { href: "/settings/developers", label: "Developers (API)", icon: Code2, adminOnly: true },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },
     ],

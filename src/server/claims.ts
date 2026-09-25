@@ -14,6 +14,7 @@ import { checkClaimUnderpayment } from "./fees";
 import { authsForPatient, consumeAuthorization, rulesForPayer } from "./payer-edits";
 import { enrollmentFinding, enrollmentFor } from "./enrollment";
 import { practiceConfig } from "./integrations";
+import { emit } from "./webhooks";
 
 const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -127,7 +128,9 @@ export async function createClaimForEncounter(db: Db, encounterId: string, userI
   }
   await db.update(encounters).set({ status: "billed" }).where(eq(encounters.id, encounterId));
   await db.insert(claimEvents).values({ claimId: claim.id, status: "draft", source: "system", message: "Claim created from encounter" });
-  return rescrubClaim(db, claim.id);
+  const scrubbed = await rescrubClaim(db, claim.id);
+  await emit(db, enc.practiceId, "claim.created", { claim_id: claim.id, control_number: claim.controlNumber, patient_id: enc.patientId, status: scrubbed.status, total_cents: claim.totalCents });
+  return scrubbed;
 }
 
 export async function rescrubClaim(db: Db, claimId: string) {
@@ -193,6 +196,10 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     .set({ status, payerClaimNumber: ack277?.payerClaimNumber || bundle.claim.payerClaimNumber, updatedAt: new Date() })
     .where(eq(claims.id, claimId));
   await db.insert(claimEvents).values({ claimId, status, source: "clearinghouse", message: `${result.clearinghouseId}: ${result.message}${result.rejectionCode ? ` [${result.rejectionCode}]` : ""}` });
+  await emit(db, bundle.claim.practiceId, "claim.submitted", { claim_id: claimId, control_number: bundle.claim.controlNumber, total_cents: bundle.claim.totalCents });
+  if (status === "accepted" || status === "rejected") {
+    await emit(db, bundle.claim.practiceId, "claim.status_changed", { claim_id: claimId, control_number: bundle.claim.controlNumber, status, message: result.message });
+  }
 
   if (status === "accepted") {
     // Only an original claim draws down the authorization; a replacement is
@@ -215,6 +222,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
       nextSteps: exp.nextSteps,
       status: "open",
     });
+    await emit(db, bundle.claim.practiceId, "denial.created", { claim_id: claimId, control_number: bundle.claim.controlNumber, carc: result.rejectionCode ?? "277CA", category: "coding", amount_cents: bundle.claim.totalCents, explanation: exp.explanation });
   }
   await db.insert(schema.auditLog).values({ practiceId: bundle.claim.practiceId, userId: userId ?? null, action: "submit_claim", entity: "claim", entityId: claimId, details: { status, clearinghouseId: result.clearinghouseId } });
   return { status, result };
@@ -397,6 +405,10 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
     else status = "paid";
     await db.update(claims).set({ status, payerClaimNumber: rc.payerClaimNumber || claim.payerClaimNumber, updatedAt: new Date() }).where(eq(claims.id, claim.id));
     await db.insert(claimEvents).values({ claimId: claim.id, status, source: "835", message: `ERA ${remit.checkNumber}: paid ${(rc.paidCents / 100).toFixed(2)}, patient resp ${(rc.patientResponsibilityCents / 100).toFixed(2)}` });
+    await emit(db, remit.practiceId, "claim.status_changed", { claim_id: claim.id, control_number: claim.controlNumber, status, paid_cents: rc.paidCents, patient_responsibility_cents: rc.patientResponsibilityCents });
+    if (rc.paidCents > 0) {
+      await emit(db, remit.practiceId, "payment.posted", { type: "insurance_payment", claim_id: isSecondary ? claim.primaryClaimId : claim.id, amount_cents: rc.paidCents, payer_name: remit.payerName, check_number: remit.checkNumber, remittance_id: remit.id });
+    }
     if (isSecondary) {
       await db.update(claims).set({ status, updatedAt: new Date() }).where(eq(claims.id, claim.primaryClaimId!));
       await db.insert(claimEvents).values({ claimId: claim.primaryClaimId!, status, source: "835", message: `Secondary ${claim.controlNumber} paid ${(rc.paidCents / 100).toFixed(2)}` });
@@ -421,6 +433,7 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + (payer?.appealDays ?? 60));
       await db.insert(denials).values({ practiceId: remit.practiceId, claimId: claim.id, category: carcCategory(denialAdj.reason), carc: denialAdj.reason, rarc, amountCents: denialAdj.amountCents, explanation: exp.explanation, nextSteps: exp.nextSteps, appealDeadline: deadline.toISOString().slice(0, 10) });
+      await emit(db, remit.practiceId, "denial.created", { claim_id: claim.id, control_number: claim.controlNumber, carc: denialAdj.reason, rarc, category: carcCategory(denialAdj.reason), amount_cents: denialAdj.amountCents, explanation: exp.explanation, appeal_deadline: deadline.toISOString().slice(0, 10) });
       summary.denials++;
     }
   }
@@ -622,6 +635,7 @@ export async function writeOffClaim(db: Db, claimId: string, reason: string, use
   }
   await db.update(claims).set({ status: "closed", updatedAt: new Date() }).where(eq(claims.id, claimId));
   await db.insert(claimEvents).values({ claimId, status: "closed", source: "user", message: `Written off: ${reason}` });
+  await emit(db, claim.practiceId, "claim.status_changed", { claim_id: claimId, control_number: claim.controlNumber, status: "closed", message: "Written off" });
 }
 
 export async function transferToPatient(db: Db, claimId: string, userId?: string) {
@@ -633,6 +647,7 @@ export async function transferToPatient(db: Db, claimId: string, userId?: string
   }
   await db.update(claims).set({ status: "closed", updatedAt: new Date() }).where(eq(claims.id, claimId));
   await db.insert(claimEvents).values({ claimId, status: "closed", source: "user", message: "Balance transferred to patient responsibility" });
+  await emit(db, claim.practiceId, "claim.status_changed", { claim_id: claimId, control_number: claim.controlNumber, status: "closed", message: "Balance transferred to the patient" });
 }
 
 /**

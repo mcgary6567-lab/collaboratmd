@@ -5,6 +5,7 @@ import { getClearinghouse } from "@/lib/clearinghouse/gateway";
 import { build270, summarize271, type EligibilitySummary } from "@/lib/edi/x270";
 import { listAppointments } from "./encounters";
 import { practiceConfig } from "./integrations";
+import { emit } from "./webhooks";
 
 const { patients, patientInsurances, payers, eligibilityChecks, encounters, ledgerEntries } = schema;
 
@@ -74,6 +75,7 @@ export async function createPatient(db: Db, practiceId: string, input: NewPatien
     })
     .returning();
   await db.insert(patientInsurances).values({ patientId: p.id, payerId: input.payerId, memberId: input.memberId.trim(), groupNumber: input.groupNumber || null, rank: 1, relationship: input.relationship, copayCents: input.copayCents });
+  await emit(db, practiceId, "patient.created", { patient_id: p.id, mrn: p.mrn, source: "staff" });
   return p;
 }
 

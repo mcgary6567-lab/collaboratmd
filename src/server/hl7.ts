@@ -11,6 +11,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db";
+import { emit } from "./webhooks";
 import { schema } from "@/db";
 import { buildAck, parseHl7, type Hl7Message } from "@/lib/hl7/v2";
 import { ADT_EVENTS, extractEncounter, extractInsurance, extractPatient, type Hl7Insurance, type Hl7Patient } from "@/lib/hl7/extract";
@@ -114,6 +115,7 @@ export async function upsertPatient(db: Db, practiceId: string, p: Hl7Patient, i
     action = "updated";
   } else {
     const [created] = await db.insert(patients).values({ practiceId, mrn: p.mrn, ...values }).returning();
+    await emit(db, practiceId, "patient.created", { patient_id: created.id, mrn: created.mrn, source: "hl7" });
     patientId = created.id;
     action = "created";
   }

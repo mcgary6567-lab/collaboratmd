@@ -19,6 +19,7 @@ import { buildStatementDetail, patientBalanceCents, plansForPatient, recordPlanP
 import { createTask } from "./work";
 import { stripeClient, stripeReady, type Stripe, type StripeEvent } from "@/lib/stripe";
 import { practiceConfig } from "./integrations";
+import { emit } from "./webhooks";
 
 const { portalLinks, onlinePayments, savedCards, patients, practices, ledgerEntries, statements } = schema;
 
@@ -176,6 +177,7 @@ export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pic
     }
   }
   await db.insert(schema.auditLog).values({ practiceId: pay.practiceId, userId: null, action: "online_payment", entity: "patient", entityId: pay.patientId, details: { amountCents: pay.amountCents, planId: pay.planId } });
+  await emit(db, pay.practiceId, "payment.posted", { type: "patient_payment", patient_id: pay.patientId, amount_cents: pay.amountCents, source: pay.source, plan_id: pay.planId });
   return { handled: true, duplicate: false };
 }
 

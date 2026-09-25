@@ -10,6 +10,7 @@
  */
 import { desc, eq } from "drizzle-orm";
 import type { Db } from "@/db";
+import { emit } from "./webhooks";
 import { schema } from "@/db";
 import { parseCsv, type Table } from "@/lib/import/csv";
 import { PATIENT_FIELDS, autoMap, profileColumn, toPatientRow, type Mapping, type PatientField, type PatientRow } from "@/lib/import/patients";
@@ -118,6 +119,7 @@ export async function importPatients(
       } else {
         const mrn = r.mrn || freshMrn();
         const [p] = await db.insert(patients).values({ practiceId, mrn, ...fields }).returning();
+        await emit(db, practiceId, "patient.created", { patient_id: p.id, mrn: p.mrn, source: "import" });
         patientId = p.id;
         byMrn.set(mrn.toLowerCase(), p.id);
         byName.set(key(r.lastName, r.firstName, r.dob), p.id);
