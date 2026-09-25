@@ -9,7 +9,7 @@ import type { AutomationSettings } from "@/db/schema";
 import { runDailyForPractice } from "@/server/automation";
 import { siteOrigin } from "@/lib/origin";
 
-const KEYS: (keyof AutomationSettings)[] = ["appointmentReminders", "balanceReminders", "weeklyReport", "claimFollowUp", "autopay"];
+const KEYS: (keyof AutomationSettings)[] = ["appointmentReminders", "balanceReminders", "weeklyReport", "claimFollowUp", "autopay", "denialAgent"];
 
 export async function saveAutomationAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
   const s = await requireRole(["admin"]);

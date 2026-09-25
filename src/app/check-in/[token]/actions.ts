@@ -5,6 +5,8 @@ import { getDb } from "@/db";
 import type { FormResult } from "@/components/action-form";
 import { endCheckin, grantCheckin, verifiedFor } from "@/lib/checkin-session";
 import { openLink, submitCheckin, verifyDob } from "@/server/checkin";
+import { startCheckinCopay } from "@/server/portal";
+import { siteOrigin } from "@/lib/origin";
 
 export async function verifyDobAction(token: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
   const db = await getDb();
@@ -39,5 +41,15 @@ export async function submitCheckinAction(token: string, _prev: FormResult, form
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong" };
   }
   await endCheckin();
+  // Check-in is done either way; paying the copay online is an extra the patient chose.
+  if (formData.get("payCopay") === "on") {
+    let url: string | null = null;
+    try {
+      url = (await startCheckinCopay(db, opened.link.id, { origin: await siteOrigin(), token })).url;
+    } catch {
+      redirect(`/check-in/${token}?paid=unavailable`);
+    }
+    if (url) redirect(url);
+  }
   redirect(`/check-in/${token}`);
 }

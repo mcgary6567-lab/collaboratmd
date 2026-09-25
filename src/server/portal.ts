@@ -181,6 +181,43 @@ export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pic
   return { handled: true, duplicate: false };
 }
 
+/**
+ * The copay at online check-in: a card payment on Stripe's hosted page for
+ * the expected copay, posted to the patient's account when Stripe confirms
+ * it. Only offered once the patient has verified their date of birth.
+ */
+export async function startCheckinCopay(
+  db: Db,
+  linkId: string,
+  input: { origin: string; token: string },
+  client?: Pick<Stripe, "createCheckout">,
+) {
+  const { loadCheckin } = await import("./checkin");
+  const data = await loadCheckin(db, linkId);
+  if (!data) throw new Error("This check-in link can no longer be used");
+  if (!data.copayCents || data.copayCents < 100) throw new Error("There is no copay to pay online");
+  const cfg = await practiceConfig(db, data.link.practiceId);
+  if (!client && !stripeReady(cfg.stripe)) throw new Error("Online payment is not available; pay at the front desk");
+  const stripe = client ?? stripeClient(cfg.stripe);
+  const [pay] = await db
+    .insert(onlinePayments)
+    .values({ practiceId: data.link.practiceId, patientId: data.patient.id, amountCents: data.copayCents, source: "checkin" })
+    .returning();
+  const back = `${input.origin}/check-in/${input.token}`;
+  const session = await stripe.createCheckout({
+    amountCents: data.copayCents,
+    description: `${data.practiceName}: copay for your visit`,
+    successUrl: `${back}?paid=1`,
+    cancelUrl: `${back}?paid=0`,
+    email: data.patient.email,
+    saveCard: false,
+    metadata: { payment_id: pay.id, practice_id: data.link.practiceId, autopay: "0" },
+    idempotencyKey: `checkin-${pay.id}`,
+  });
+  await db.update(onlinePayments).set({ providerRef: session.id }).where(eq(onlinePayments.id, pay.id));
+  return { url: session.url, paymentId: pay.id };
+}
+
 /** Patient-reported insurance change: a task for the front desk, not a silent chart edit. */
 export async function reportInsurance(db: Db, linkId: string, input: { payerName: string; memberId: string; groupNumber?: string }) {
   const data = await portalData(db, linkId);

@@ -18,6 +18,7 @@ const OPTIONS = [
   { key: "balanceReminders", label: "Balance reminders", help: "A secure pay link to patients who owe $25 or more, two weeks after a statement, at most once a month. Skips patients on a payment plan." },
   { key: "claimFollowUp", label: "Unpaid claim follow-up", help: "Asks payers the status (276/277) of claims unpaid after 30 days, at most once a week per claim." },
   { key: "autopay", label: "Autopay", help: "Charges saved cards for payment-plan installments on their due dates. Needs Stripe." },
+  { key: "denialAgent", label: "Denial agent", help: "Works new denials overnight: drafts appeals, prepares corrected claims and re-checks coverage, then waits for someone to approve each one." },
   { key: "weeklyReport", label: "Weekly report", help: "Monday email to administrators: collections, denial rate, A/R, unpaid claims, overdue tasks." },
 ] as const;
 

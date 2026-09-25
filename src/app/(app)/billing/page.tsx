@@ -4,7 +4,9 @@ import { requireSession } from "@/lib/auth";
 import {
   ensureDefaultPolicies, listPlans, listPolicies, listStatements, patientsWithBalances, totalPatientBalances,
 } from "@/server/billing";
-import { createPolicyAction, statementBatchAction, togglePolicyAction } from "@/app/(app)/billing-actions";
+import { createPolicyAction, sendPayLinksAction, statementBatchAction, togglePolicyAction } from "@/app/(app)/billing-actions";
+import { practiceConfig } from "@/server/integrations";
+import { stripeReady } from "@/lib/stripe";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
@@ -28,6 +30,10 @@ export default async function BillingPage() {
   const defaulted = plans.filter((p) => p.status === "defaulted");
   const onPlans = active.reduce((a, p) => a + p.totalCents - p.paidCents, 0);
   const admin = s.role === "admin";
+  const cfg = await practiceConfig(db, s.practiceId);
+  const canPay = ["admin", "biller"].includes(s.role);
+  const payReady = stripeReady(cfg.stripe);
+  const msgReady = !!(cfg.twilio || cfg.resend);
 
   return (
     <>
@@ -38,6 +44,22 @@ export default async function BillingPage() {
         <Stat label="On payment plans" value={money(onPlans)} hint={`${active.length} active plans`} tone="good" />
         <Stat label="Defaulted plans" value={String(defaulted.length)} hint="Two or more missed installments" tone={defaulted.length ? "bad" : "good"} />
       </div>
+
+      {canPay && (
+        <div className="mb-6">
+          <Card title="Text-to-pay">
+            <ActionForm action={sendPayLinksAction} className="flex flex-wrap items-end gap-3">
+              <label className="block text-sm"><span className="label">Balances of at least ($)</span><input name="min" defaultValue="25" inputMode="decimal" className="input w-28" /></label>
+              <SubmitButton pendingLabel="Sending...">Send pay links</SubmitButton>
+              <p className="text-xs text-slate-500">
+                Texts patients who agreed to texts and emails the rest a secure link to pay by card. Skips patients on a plan, in collections, opted out, or sent a link in the last 7 days.
+                {!payReady && " Card payment is not connected yet, so patients can see their balance but not pay online. "}
+                {!msgReady && " Connect Twilio or Resend in Integrations first."}
+              </p>
+            </ActionForm>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Largest patient balances" className="lg:col-span-2">

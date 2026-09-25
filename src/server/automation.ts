@@ -18,6 +18,7 @@ import { arAging, headlineKpis } from "./analytics";
 import { sendEmail } from "./notify";
 import { stripeReady } from "@/lib/stripe";
 import { practiceConfig } from "./integrations";
+import { runDenialAgent } from "./denial-agent";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
 
@@ -31,6 +32,43 @@ async function alreadySent(db: Db, practiceId: string, kind: string, entityId: s
       ...(sinceDays ? [gte(messageLog.createdAt, new Date(Date.now() - sinceDays * 86_400_000))] : [])))
     .limit(1);
   return !!row;
+}
+
+/**
+ * Text-to-pay on demand: a secure pay link, by text where the patient agreed
+ * to texts and by email otherwise, to every patient owing at least
+ * `minCents` who is not on a plan or in collections and has not had a pay
+ * link in the last 7 days. Opt-outs are honored.
+ */
+export async function sendPayLinks(db: Db, practiceId: string, origin: string, opts: { minCents?: number; limit?: number } = {}) {
+  const [practice] = await db.select().from(practices).where(eq(practices.id, practiceId)).limit(1);
+  const owing = await patientsWithBalances(db, practiceId, Math.max(100, opts.minCents ?? 2_500), Math.min(opts.limit ?? 200, 500));
+  let sent = 0;
+  let skipped = 0;
+  let excluded = 0;
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+  for (const o of owing) {
+    const [[plan], [open], [recent]] = await Promise.all([
+      db.select({ id: paymentPlans.id }).from(paymentPlans).where(and(eq(paymentPlans.patientId, o.patientId), inArray(paymentPlans.status, ["active", "defaulted"]))).limit(1),
+      db.select({ id: schema.patientCollections.id }).from(schema.patientCollections).where(and(eq(schema.patientCollections.patientId, o.patientId), isNull(schema.patientCollections.closedAt))).limit(1),
+      db.select({ id: messageLog.id }).from(messageLog).where(and(eq(messageLog.patientId, o.patientId), inArray(messageLog.kind, ["pay_link", "balance_reminder"]), eq(messageLog.status, "sent"), gte(messageLog.createdAt, weekAgo))).limit(1),
+    ]);
+    if (plan || open || recent) {
+      excluded++;
+      continue;
+    }
+    const link = await createPortalLink(db, practiceId, o.patientId, undefined, "pay");
+    const url = `${origin}${link.path}`;
+    const amount = `$${(o.balanceCents / 100).toFixed(2)}`;
+    const r = await messagePatient(db, link.patient, {
+      kind: "pay_link", entityId: o.patientId, reminder: true,
+      sms: `${practice.name}: your balance is ${amount}. Pay securely by card: ${url} . Reply STOP to opt out.`,
+      email: { subject: `Pay your balance with ${practice.name}`, text: `Hi ${link.patient.firstName},\n\nYour balance with ${practice.name} is ${amount}. You can see what it is for and pay securely by card here:\n\n${url}\n\nThe link asks for your date of birth and works for 30 days.\n\n${practice.name}` },
+    });
+    if (r.sms === "sent" || r.email === "sent") sent++;
+    else skipped++;
+  }
+  return { candidates: owing.length, sent, skipped, excluded };
 }
 
 /** Tomorrow's appointments, each reminded once, with an online check-in link. */
@@ -151,6 +189,7 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.appointmentReminders) await step("appointmentReminders", () => appointmentReminders(db, practiceId, origin, now));
   if (s.balanceReminders) await step("balanceReminders", () => balanceReminders(db, practiceId, origin));
   if (s.claimFollowUp) await step("claimFollowUp", () => runFollowUp(db, practiceId));
+  if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));
   await db.insert(automationRuns).values({ practiceId, summary, error });

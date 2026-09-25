@@ -160,3 +160,19 @@ export async function createEstimateAction(_prev: FormResult, formData: FormData
   }
   redirect(`/estimates/${id}`);
 }
+
+/** Text-to-pay: sends secure pay links to patients with a balance, respecting consent and opt-outs. */
+export async function sendPayLinksAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const s = await requireRole(CAN_ADJUST);
+  const minCents = Math.round(Number(String(formData.get("min") ?? "25").replace(/[$,]/g, "")) * 100);
+  if (!Number.isFinite(minCents) || minCents < 100) return { ok: false, message: "Enter a minimum balance of at least $1" };
+  try {
+    const { siteOrigin } = await import("@/lib/origin");
+    const { sendPayLinks } = await import("@/server/automation");
+    const r = await sendPayLinks(await getDb(), s.practiceId, await siteOrigin(), { minCents });
+    revalidatePath("/billing");
+    return { ok: true, message: `${r.sent} pay link${r.sent === 1 ? "" : "s"} sent${r.skipped ? `, ${r.skipped} could not be reached (no email or text consent)` : ""}${r.excluded ? `, ${r.excluded} skipped (on a plan, in collections or messaged this week)` : ""}` };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not send" };
+  }
+}

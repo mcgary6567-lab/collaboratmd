@@ -6,6 +6,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { verifiedFor } from "@/lib/checkin-session";
 import { loadCheckin, openLink } from "@/server/checkin";
 import { money } from "@/lib/utils";
+import { practiceConfig } from "@/server/integrations";
+import { stripeReady } from "@/lib/stripe";
 import { submitCheckinAction, verifyDobAction } from "./actions";
 import { InsuranceFields } from "./insurance-fields";
 
@@ -38,8 +40,9 @@ function Shell({ practice, children }: { practice?: string; children: ReactNode 
   );
 }
 
-export default async function CheckInPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function CheckInPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ paid?: string }> }) {
   const { token } = await params;
+  const { paid } = await searchParams;
   const db = await getDb();
   const opened = await openLink(db, token);
 
@@ -56,9 +59,13 @@ export default async function CheckInPage({ params }: { params: Promise<{ token:
       locked: "For your security, this link was locked after several unsuccessful attempts. Please call the office to check in.",
       expired: "This check-in link has expired. Please call the office, or check in at the front desk when you arrive.",
     }[opened.state];
+    const payment = opened.state === "completed" && paid
+      ? { "1": "Your copay payment went through. Stripe emails your receipt, and it will show on your account shortly.", "0": "Your copay was not charged. You can pay at the front desk.", unavailable: "Online payment was not available, so your copay was not charged. You can pay at the front desk." }[paid]
+      : null;
     return (
       <Shell practice={opened.practiceName}>
         <p className="text-sm text-slate-700">{text}</p>
+        {payment && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{payment}</p>}
       </Shell>
     );
   }
@@ -79,6 +86,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ token:
   }
 
   const data = await loadCheckin(db, opened.link.id);
+  const payOnline = stripeReady((await practiceConfig(db, opened.link.practiceId)).stripe);
   if (!data) return <Shell practice={opened.practiceName}><p className="text-sm">This check-in could not be loaded. Please call the office.</p></Shell>;
   const { patient, appt, insurance } = data;
   const when = appt.startsAt.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -109,10 +117,18 @@ export default async function CheckInPage({ params }: { params: Promise<{ token:
           <h2 className="text-sm font-semibold text-slate-900">Insurance</h2>
           <InsuranceFields onFile={insurance ? { payerName: insurance.payerName, memberEnding: insurance.ins.memberId.slice(-4) } : null} />
           {data.copayCents ? (
-            <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-              Based on your plan, expect a copay of <span className="font-semibold">{money(data.copayCents)}</span>, payable at the front desk.
-              Your final amount depends on the services you receive.
-            </p>
+            <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+              <p>
+                Based on your plan, expect a copay of <span className="font-semibold">{money(data.copayCents)}</span>{payOnline ? "." : ", payable at the front desk."}{" "}
+                Your final amount depends on the services you receive.
+              </p>
+              {payOnline && (
+                <label className="mt-2 flex items-start gap-2">
+                  <input type="checkbox" name="payCopay" className="mt-1" />
+                  <span>Pay my {money(data.copayCents)} copay now by card. You will go to Stripe&apos;s secure page after checking in; your card number never reaches the practice.</span>
+                </label>
+              )}
+            </div>
           ) : null}
         </section>
 

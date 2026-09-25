@@ -39,6 +39,7 @@ export type AutomationSettings = {
   weeklyReport?: boolean;
   claimFollowUp?: boolean;
   autopay?: boolean;
+  denialAgent?: boolean;
 };
 
 export const automationRuns = pgTable("automation_runs", {
@@ -644,6 +645,23 @@ export const appealLetters = pgTable("appeal_letters", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
+});
+
+/** The denial agent's proposals, waiting for review: see migration 0021 and server/denial-agent.ts. */
+export const denialAgentItems = pgTable("denial_agent_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  denialId: uuid("denial_id").notNull().unique().references(() => denials.id),
+  action: text("action").notNull(),
+  title: text("title").notNull(),
+  reasons: jsonb("reasons").$type<string[]>().notNull().default([]),
+  letterId: uuid("letter_id").references(() => appealLetters.id),
+  resultClaimId: uuid("result_claim_id").references(() => claims.id),
+  priority: integer("priority").notNull().default(0),
+  status: text("status").notNull().default("proposed"),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const bankDeposits = pgTable("bank_deposits", {
