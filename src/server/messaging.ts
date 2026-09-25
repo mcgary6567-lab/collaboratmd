@@ -13,6 +13,7 @@
  * environment variables). Built from their API references and tested with
  * stubs, not against live accounts.
  */
+import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { sendEmail } from "./notify";
@@ -86,10 +87,14 @@ export async function messagePatient(
   if (m.reminder && p.remindersOptOut) return { ...out, reason: "Patient opted out of reminders" };
 
   const phone = toE164(p.phone);
-  if (m.sms && phone && p.smsConsentAt && smsEnabled(cfg)) {
+  // A number that replied STOP gets nothing until it replies START (see sms-inbox.ts).
+  const optedOut = phone ? (await db.select({ phone: schema.smsOptOuts.phone }).from(schema.smsOptOuts).where(and(eq(schema.smsOptOuts.practiceId, p.practiceId), eq(schema.smsOptOuts.phone, phone))).limit(1)).length > 0 : false;
+  if (m.sms && phone && p.smsConsentAt && !optedOut && smsEnabled(cfg)) {
     const r = await sms(phone, m.sms);
     out.sms = r.ok ? "sent" : "failed";
     await log("sms", phone, out.sms, r.detail);
+    // Into the texting inbox too, so a patient's reply lands under what they were sent.
+    await db.insert(schema.smsMessages).values({ practiceId: p.practiceId, patientId: p.id, direction: "out", phone, body: m.sms, twilioSid: r.ok ? r.detail.replace(/^sid /, "") || null : null, status: r.ok ? "sent" : "failed", readAt: new Date() }).onConflictDoNothing();
   }
   if (m.email && p.email && emailEnabled(cfg)) {
     const ok = await email(p.email, m.email.subject, m.email.text);

@@ -1,7 +1,7 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   AlertTriangle, BarChart3, Building2, CalendarDays, CheckSquare, ClipboardCheck, Clock, FileText, FlaskConical, LayoutDashboard,
-  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar,
+  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar, MessageSquare, UserSearch, UsersRound, KeyRound, Inbox, FileSpreadsheet, ReceiptText,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; multiOnly?: boolean };
@@ -12,8 +12,10 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: "My work", icon: LayoutDashboard },
       { href: "/tasks", label: "Tasks", icon: CheckSquare },
+      { href: "/work", label: "Work queues", icon: Inbox },
       { href: "/admin", label: "Practice analytics", icon: Building2, adminOnly: true },
       { href: "/clients", label: "All clients", icon: Network, multiOnly: true },
+      { href: "/clients/invoicing", label: "Client invoicing", icon: ReceiptText, adminOnly: true },
     ],
   },
   {
@@ -22,6 +24,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/scheduling", label: "Scheduling", icon: CalendarDays },
       { href: "/check-ins", label: "Online check-ins", icon: ClipboardCheck },
       { href: "/patients", label: "Patients", icon: Users },
+      { href: "/messages", label: "Text messages", icon: MessageSquare },
+      { href: "/patients/coverage-discovery", label: "Coverage discovery", icon: UserSearch },
       { href: "/labs", label: "Labs", icon: FlaskConical },
     ],
   },
@@ -42,6 +46,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/billing/collections", label: "Collections", icon: Gavel },
       { href: "/billing/missed-charges", label: "Missed charges", icon: SearchCheck },
       { href: "/billing/credits", label: "Credits and refunds", icon: HandCoins },
+      { href: "/billing/accounting", label: "Accounting", icon: FileSpreadsheet },
     ],
   },
   {
@@ -52,6 +57,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reports/payer-alerts", label: "Payer alerts", icon: Radar },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/settings/enrollment", label: "Payer enrollment", icon: BadgeCheck },
+      { href: "/settings/team", label: "Team and roles", icon: UsersRound, adminOnly: true },
+      { href: "/settings/sso", label: "Single sign-on", icon: KeyRound, adminOnly: true },
       { href: "/settings/connections", label: "Integrations", icon: Plug, adminOnly: true },
       { href: "/settings/developers", label: "Developers (API)", icon: Code2, adminOnly: true },
       { href: "/settings/compliance", label: "Compliance", icon: ShieldCheck, adminOnly: true },

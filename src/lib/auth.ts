@@ -1,11 +1,13 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Db } from "@/db";
 import { appSecret as secret } from "@/lib/app-secret";
+import { allows, type Capability } from "@/lib/capabilities";
+import { clientIp, ipAllowed } from "@/lib/ip";
 
 const COOKIE = "collaboratmd_session";
 
@@ -17,7 +19,34 @@ export interface Session {
   practiceId: string;
   name: string;
   email: string;
+  /** The built-in role (admin | biller | front_desk | readonly); a custom role resolves to its base. */
   role: string;
+  /** A custom role's name, when the user has one. */
+  customRole?: string | null;
+  /** Abilities the custom role switches off. */
+  denied?: string[];
+  /** Signed in through the practice's identity provider (which handles two-factor). */
+  sso?: boolean;
+  /** When the user actually signed in (seconds); a practice switch keeps it, so the session limit still applies. */
+  authAt?: number;
+}
+
+/**
+ * What stops a user who proved who they are: a deactivated account, a
+ * practice that signs in only through its identity provider, or an address
+ * outside the practice's allowlist.
+ */
+async function signInBlock(db: Db, user: typeof schema.users.$inferSelect, via: "password" | "sso"): Promise<string | null> {
+  if (user.disabledAt) return "This account has been deactivated. Ask your practice administrator.";
+  const [practice] = await db.select({ ipAllowlist: schema.practices.ipAllowlist }).from(schema.practices).where(eq(schema.practices.id, user.practiceId)).limit(1);
+  const ip = clientIp(await headers());
+  if (practice && !ipAllowed(ip, practice.ipAllowlist)) return `Your practice allows sign-in only from its approved networks. This connection (${ip ?? "unknown address"}) is not one of them.`;
+  if (via === "password") {
+    const domain = user.email.split("@")[1]?.toLowerCase() ?? "";
+    const { rows } = await db.execute<{ n: number }>(sql`SELECT 1 AS n FROM practice_sso WHERE practice_id = ${user.practiceId} AND enforce AND domains ? ${domain} LIMIT 1`);
+    if (rows.length) return "Your organization signs in with single sign-on. Choose \"Sign in with SSO\" instead.";
+  }
+  return null;
 }
 
 export async function hashPassword(pw: string) {
@@ -45,6 +74,8 @@ export async function login(email: string, password: string): Promise<LoginResul
     const r = await recordFailure(db, user.id);
     return { ok: false, error: r.locked ? "Too many failed attempts. The account is locked for 15 minutes." : "Invalid email or password." };
   }
+  const blocked = await signInBlock(db, user, "password");
+  if (blocked) return { ok: false, error: blocked };
   if (user.mfaSecret) {
     // Password proven; the session waits for the second factor.
     const pending = await new SignJWT({ userId: user.id }).setProtectedHeader({ alg: "HS256" }).setAudience(MFA_AUDIENCE).setIssuedAt().setExpirationTime("5m").sign(secret());
@@ -54,9 +85,21 @@ export async function login(email: string, password: string): Promise<LoginResul
   }
   await clearFailures(db, user.id);
   const session: Session = { userId: user.id, practiceId: user.practiceId, name: user.name, email: user.email, role: user.role };
-  await issue(session);
+  await issue(db, session);
   await db.insert(schema.auditLog).values({ practiceId: user.practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id });
   return { ok: true, session };
+}
+
+/** Starts a session for a user the practice's identity provider vouched for (see server/sso.ts). */
+export async function startSsoSession(db: Db, user: typeof schema.users.$inferSelect, practiceId: string): Promise<Session> {
+  const blocked = await signInBlock(db, user, "sso");
+  if (blocked) throw new Error(blocked);
+  const role = await roleIn(db, user.id, practiceId);
+  if (!role) throw new Error("This account has no access to the practice");
+  const session: Session = { userId: user.id, practiceId, name: user.name, email: user.email, role, sso: true };
+  await issue(db, session);
+  await db.insert(schema.auditLog).values({ practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id, details: { sso: true } });
+  return session;
 }
 
 /** Second step of sign-in: a code from the authenticator app or a recovery code. */
@@ -85,9 +128,11 @@ export async function completeMfaLogin(code: string): Promise<LoginResult> {
     return { ok: false, error: r.locked ? "Too many failed attempts. The account is locked for 15 minutes." : "That code is not valid. Use the newest code from your app." };
   }
   jar.delete({ name: MFA_COOKIE, path: "/login" });
+  const blocked = await signInBlock(db, user, "password");
+  if (blocked) return { ok: false, error: blocked };
   await clearFailures(db, user.id);
   const session: Session = { userId: user.id, practiceId: user.practiceId, name: user.name, email: user.email, role: user.role };
-  await issue(session);
+  await issue(db, session);
   await db.insert(schema.auditLog).values({ practiceId: user.practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id, details: { mfa: kind } });
   return { ok: true, session };
 }
@@ -105,14 +150,20 @@ export async function hasPendingMfa(): Promise<boolean> {
   }
 }
 
-async function issue(session: Session) {
-  const token = await new SignJWT({ ...session })
+/** Signs the session cookie. It lasts as long as the practice's session limit, counted from when the user signed in. */
+async function issue(db: Db, session: Session) {
+  const [practice] = await db.select({ hours: schema.practices.sessionHours }).from(schema.practices).where(eq(schema.practices.id, session.practiceId)).limit(1);
+  const now = Math.floor(Date.now() / 1000);
+  const authAt = session.authAt ?? now;
+  const remaining = Math.max(60, authAt + (practice?.hours ?? 12) * 3600 - now);
+  const { userId, practiceId, name, email, role, sso } = session;
+  const token = await new SignJWT({ userId, practiceId, name, email, role, sso: !!sso, authAt })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("12h")
+    .setExpirationTime(now + remaining)
     .sign(secret());
   const jar = await cookies();
-  jar.set(COOKIE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 12 });
+  jar.set(COOKIE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: remaining });
 }
 
 /**
@@ -154,7 +205,7 @@ export async function switchPractice(practiceId: string): Promise<Session> {
   const role = await roleIn(db, current.userId, practiceId);
   if (!role) throw new Error("You do not have access to that practice");
   const next: Session = { ...current, practiceId, role };
-  await issue(next);
+  await issue(db, next);
   await db.insert(schema.auditLog).values({ practiceId, userId: current.userId, action: "switch_practice", entity: "practice", entityId: practiceId, details: { from: current.practiceId } });
   return next;
 }
@@ -187,15 +238,42 @@ export async function getSession(): Promise<Session | null> {
       name: String(payload.name),
       email: String(payload.email),
       role: String(payload.role),
+      sso: payload.sso === true,
+      authAt: Number(payload.authAt ?? payload.iat ?? 0),
     };
   } catch {
     return null;
   }
-  // The user must still exist and still have access to this practice; the
+  // The user must still exist, be active and have access to this practice; the
   // role comes from the database, not the token, so a changed role applies now.
+  // The practice's session limit and network allowlist are checked each time too.
   const db = await getDb();
-  const role = await roleIn(db, session.userId, session.practiceId);
-  return role ? { ...session, role } : null;
+  const access = await accessFor(db, session.userId, session.practiceId);
+  if (!access) return null;
+  if (Date.now() / 1000 - (session.authAt ?? 0) > access.sessionHours * 3600) return null;
+  if (access.ipAllowlist.length && !ipAllowed(clientIp(await headers()), access.ipAllowlist)) return null;
+  return { ...session, role: access.role, customRole: access.customRole, denied: access.denied };
+}
+
+/** The user's effective role in a practice and the practice's session policy, or null if they may not use it. */
+export async function accessFor(db: Db, userId: string, practiceId: string) {
+  const { rows } = await db.execute<{ disabled_at: string | null; home: string; home_role: string; member_role: string | null; session_hours: number; ip_allowlist: string[] }>(sql`
+    SELECT u.disabled_at, u.practice_id AS home, u.role AS home_role,
+      (SELECT m.role FROM practice_memberships m WHERE m.user_id = u.id AND m.practice_id = ${practiceId} LIMIT 1) AS member_role,
+      p.session_hours, p.ip_allowlist
+    FROM users u JOIN practices p ON p.id = ${practiceId}
+    WHERE u.id = ${userId}`);
+  const r = rows[0];
+  if (!r || r.disabled_at) return null;
+  const raw = r.member_role ?? (r.home === practiceId ? r.home_role : null);
+  if (!raw) return null;
+  let role = raw, customRole: string | null = null, denied: string[] = [];
+  if (raw.startsWith("custom:")) {
+    const [c] = await db.select().from(schema.customRoles).where(and(eq(schema.customRoles.id, raw.slice(7)), eq(schema.customRoles.practiceId, practiceId))).limit(1);
+    if (!c) return null;
+    role = c.baseRole; customRole = c.name; denied = c.denied;
+  }
+  return { role, customRole, denied, sessionHours: Number(r.session_hours) || 12, ipAllowlist: (r.ip_allowlist ?? []) as string[] };
 }
 
 /** Returns the signed-in user, or redirects to the login page. */
@@ -216,5 +294,19 @@ export async function requireRole(roles: readonly string[]): Promise<Session> {
   if (!roles.includes(s.role)) {
     throw new Error(s.role === "readonly" ? "Your account is read-only" : "Your role does not allow this; ask a biller or administrator");
   }
+  // A custom role narrows its built-in role: day-to-day work and money can each be switched off.
+  const cap = roles === CAN_ADJUST ? "adjust" : roles === CAN_WRITE ? "write" : null;
+  if (cap && s.denied?.includes(cap)) throw new Error(`Your role (${s.customRole}) does not allow this; ask an administrator`);
+  return s;
+}
+
+/** Whether the signed-in user can use a feature (reports, exports, texting). */
+export function can(s: Session, cap: Capability) {
+  return allows(s.role, s.denied, cap);
+}
+
+export async function requireCapability(cap: Capability): Promise<Session> {
+  const s = await requireSession();
+  if (!can(s, cap)) throw new Error(`Your role${s.customRole ? ` (${s.customRole})` : ""} does not include this`);
   return s;
 }

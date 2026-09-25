@@ -29,6 +29,8 @@ export const practices = pgTable("practices", {
   zip: text("zip").notNull(),
   phone: text("phone"),
   requireMfa: boolean("require_mfa").notNull().default(false),
+  sessionHours: integer("session_hours").notNull().default(12),
+  ipAllowlist: jsonb("ip_allowlist").$type<string[]>().notNull().default([]),
   automation: jsonb("automation").$type<AutomationSettings>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -66,6 +68,7 @@ export const users = pgTable(
     mfaRecovery: jsonb("mfa_recovery").$type<string[]>().notNull().default([]),
     failedLogins: integer("failed_logins").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
@@ -623,6 +626,129 @@ export const ruleSuggestionDismissals = pgTable("rule_suggestion_dismissals", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.practiceId, t.suggestionKey] })]);
 
+/* Operations: client invoicing, accounting export and close, work rules. See migration 0030. */
+export type InvoiceIssuer = { name: string; address: string | null };
+export const clientAgreements = pgTable("client_agreements", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  issuerName: text("issuer_name").notNull(),
+  issuerAddress: text("issuer_address"),
+  rateBps: integer("rate_bps").notNull(),
+  minimumCents: integer("minimum_cents").notNull().default(0),
+  includePatient: boolean("include_patient").notNull().default(true),
+  termsDays: integer("terms_days").notNull().default(30),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const clientInvoices = pgTable("client_invoices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  number: text("number").notNull(),
+  period: text("period").notNull(),
+  insuranceCents: integer("insurance_cents").notNull(),
+  patientCents: integer("patient_cents").notNull(),
+  baseCents: integer("base_cents").notNull(),
+  rateBps: integer("rate_bps").notNull(),
+  feeCents: integer("fee_cents").notNull(),
+  status: text("status").notNull().default("draft"),
+  dueDate: date("due_date"),
+  issuer: jsonb("issuer").$type<InvoiceIssuer>().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+});
+
+export const accountingSettings = pgTable("accounting_settings", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  accounts: jsonb("accounts").$type<Record<string, string>>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const periodCloses = pgTable("period_closes", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  period: text("period").notNull(),
+  totals: jsonb("totals").$type<Record<string, number>>().notNull(),
+  closedBy: uuid("closed_by").references(() => users.id),
+  closedAt: timestamp("closed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.period] })]);
+
+export type WorkConditions = { payerIds?: string[]; minCents?: number; categories?: string[]; minAgeDays?: number };
+export const workRules = pgTable("work_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  kind: text("kind").notNull(),
+  conditions: jsonb("conditions").$type<WorkConditions>().notNull().default({}),
+  assigneeIds: jsonb("assignee_ids").$type<string[]>().notNull().default([]),
+  slaDays: integer("sla_days").notNull().default(5),
+  priority: text("priority").notNull().default("normal"),
+  active: boolean("active").notNull().default(true),
+  nextIndex: integer("next_index").notNull().default(0),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* Access control: custom roles, SSO and SCIM. See migration 0029 and server/access.ts, server/sso.ts. */
+export const customRoles = pgTable("custom_roles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  baseRole: text("base_role").notNull(),
+  denied: jsonb("denied").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const practiceSso = pgTable("practice_sso", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  issuer: text("issuer").notNull(),
+  clientId: text("client_id").notNull(),
+  clientSecretSealed: text("client_secret_sealed").notNull(),
+  domains: jsonb("domains").$type<string[]>().notNull().default([]),
+  enforce: boolean("enforce").notNull().default(false),
+  autoProvision: boolean("auto_provision").notNull().default(false),
+  defaultRole: text("default_role").notNull().default("readonly"),
+  scimTokenHash: text("scim_token_hash"),
+  scimTokenHint: text("scim_token_hint"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* Front desk: two-way texting and coverage discovery. See migration 0028. */
+export const smsMessages = pgTable("sms_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").references(() => patients.id),
+  direction: text("direction").notNull(), // in | out
+  phone: text("phone").notNull(),
+  body: text("body").notNull(),
+  twilioSid: text("twilio_sid"),
+  status: text("status").notNull().default("received"), // received | sent | failed
+  readAt: timestamp("read_at", { withTimezone: true }),
+  userId: uuid("user_id").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const smsOptOuts = pgTable("sms_opt_outs", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  phone: text("phone").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.phone] })]);
+
+export const coverageSearches = pgTable("coverage_searches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  status: text("status").notNull(), // found | not_found | error
+  memberId: text("member_id"),
+  planName: text("plan_name"),
+  message: text("message"),
+  addedInsuranceId: uuid("added_insurance_id").references(() => patientInsurances.id),
+  checkedBy: uuid("checked_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /* Revenue recovery: see migration 0027 and server/recovery.ts. */
 export const chargeReviewDismissals = pgTable("charge_review_dismissals", {
   appointmentId: uuid("appointment_id").primaryKey().references(() => appointments.id),
@@ -866,6 +992,8 @@ export const tasks = pgTable("tasks", {
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  /** The work rule that created it, if any. */
+  ruleId: uuid("rule_id"),
 });
 
 export const notes = pgTable("notes", {

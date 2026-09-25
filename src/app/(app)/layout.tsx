@@ -19,7 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     myTaskCounts(db, session.practiceId, session.userId),
   ]);
   // A practice that requires two-factor gets nothing else until it is set up.
-  const mustEnroll = !!practice?.requireMfa && !user?.mfaSecret;
+  // Single sign-on users prove a second factor at their identity provider.
+  const mustEnroll = !!practice?.requireMfa && !user?.mfaSecret && !session.sso;
   return (
     <div className="app-shell flex min-h-screen">
       <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} tasks={taskCounts} />

@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDb } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { asc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import { CAN_WRITE, requireSession } from "@/lib/auth";
+import { practiceConfig } from "@/server/integrations";
+import { InsuranceTools } from "./insurance-tools";
+import { CoverageSection } from "./coverage-section";
 import { getPatient } from "@/server/patients";
 import { computeFinancials } from "@/server/claims";
 import { eligibilityAction, patientPaymentAction } from "@/app/(app)/actions";
@@ -25,6 +29,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { patient, insurances, checks, visits, ledger } = data;
   const fin = computeFinancials(ledger);
   const latestCheck = checks[0];
+  const [payerList, cfg] = await Promise.all([
+    db.select({ id: schema.payers.id, name: schema.payers.name, type: schema.payers.type }).from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
+    practiceConfig(db, s.practiceId),
+  ]);
+  const canWrite = (CAN_WRITE as readonly string[]).includes(s.role);
+  const insured = insurances.some(({ insurance, payer }) => insurance.active && payer.type !== "self_pay");
 
   return (
     <>
@@ -105,6 +115,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
               )}
             </div>
           )}
+          {!insured && <CoverageSection practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} simulated={!cfg.stedi} />}
+          {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>
         <Card title="Account balance">
           <dl className="space-y-1 text-sm">

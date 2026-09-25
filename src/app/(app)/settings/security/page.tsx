@@ -4,6 +4,11 @@ import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { mfaStatus } from "@/server/mfa";
 import { setRequireMfaAction } from "@/app/(app)/security-actions";
+import { ipAllowlistAction, sessionHoursAction } from "@/app/(app)/access-actions";
+import { SESSION_HOURS } from "@/server/team";
+import { clientIp } from "@/lib/ip";
+import { headers } from "next/headers";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { MfaSetup } from "@/components/mfa-setup";
 import { Badge, Card, PageHeader } from "@/components/ui";
 
@@ -18,6 +23,7 @@ export default async function SecuritySettingsPage() {
     db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(and(eq(schema.users.practiceId, s.practiceId), isNull(schema.users.mfaSecret))),
   ]);
   const admin = s.role === "admin";
+  const ip = clientIp(await headers());
 
   return (
     <>
@@ -47,6 +53,35 @@ export default async function SecuritySettingsPage() {
               </div>
             )}
           </div>
+        </Card>
+        <Card title="Session length">
+          <p className="mb-3 text-xs text-slate-500">How long someone stays signed in, counted from when they signed in (switching practices does not restart it).</p>
+          {admin ? (
+            <ActionForm action={sessionHoursAction} className="flex items-center gap-2 text-sm">
+              <select name="hours" defaultValue={String(practice.sessionHours)} className="input w-auto">
+                {SESSION_HOURS.map((h) => <option key={h} value={h}>{h} hour{h === 1 ? "" : "s"}</option>)}
+              </select>
+              <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Saving...">Save</SubmitButton>
+            </ActionForm>
+          ) : <p className="text-sm">{practice.sessionHours} hours</p>}
+        </Card>
+        <Card title="Allowed networks" className="lg:col-span-2">
+          <p className="mb-3 text-xs text-slate-500">
+            Limit sign-in to your offices&apos; internet addresses. One address or range per line (203.0.113.10 or 203.0.113.0/24; IPv6 works too). Empty allows sign-in from anywhere.
+            People already signed in are signed out as soon as they use the app from elsewhere. You are connecting from <strong>{ip ?? "an unknown address"}</strong>.
+          </p>
+          {admin ? (
+            <ActionForm action={ipAllowlistAction} className="space-y-2">
+              <textarea name="allowlist" rows={4} defaultValue={practice.ipAllowlist.join("\n")} className="input font-mono text-xs" placeholder={ip ?? "203.0.113.0/24"} />
+              <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Saving...">Save</SubmitButton>
+            </ActionForm>
+          ) : <p className="text-sm">{practice.ipAllowlist.length ? practice.ipAllowlist.join(", ") : "Anywhere"}</p>}
+        </Card>
+        <Card title="More">
+          <ul className="space-y-2 text-sm">
+            <li><Link href="/settings/team" className="font-semibold text-brand-700 hover:underline">Team and roles</Link><span className="block text-xs text-slate-500">People, roles, custom roles, invites</span></li>
+            <li><Link href="/settings/sso" className="font-semibold text-brand-700 hover:underline">Single sign-on and SCIM</Link><span className="block text-xs text-slate-500">Okta, Entra ID, Google Workspace and others</span></li>
+          </ul>
         </Card>
       </div>
     </>

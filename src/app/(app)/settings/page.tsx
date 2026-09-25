@@ -34,7 +34,7 @@ export default async function SettingsPage() {
             <div className="flex justify-between"><dt className="text-slate-500">AI rejection support</dt><dd><Badge tone={cfg.anthropic ? "green" : "slate"}>{cfg.anthropic ? "Claude enabled" : "Rules-based · connect Claude"}</Badge></dd></div>
           </dl>
         </Card>
-        <Card title="Users" actions={<Link href="/settings/security" className="btn btn-secondary text-xs">Sign-in security</Link>}>
+        <Card title="Users" actions={<span className="flex gap-2"><Link href="/settings/team" className="btn btn-secondary text-xs">Team and roles</Link><Link href="/settings/sso" className="btn btn-secondary text-xs">Single sign-on</Link><Link href="/settings/security" className="btn btn-secondary text-xs">Sign-in security</Link></span>}>
           <table className="table">
             <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
             <tbody>

@@ -19,6 +19,7 @@ export interface Inquiry270 {
   traceNumber: string;
   payer: { name: string; payerId: string };
   provider: { name: string; npi: string };
+  /** An empty memberId makes this a search by name and date of birth, which many payers support (coverage discovery). */
   subscriber: { lastName: string; firstName: string; memberId: string; dob: string; sex?: string | null };
   serviceDate: string; // YYYY-MM-DD
   /** EQ01 service type codes; 30 is general health plan coverage. */
@@ -37,7 +38,9 @@ export function build270(q: Inquiry270): string {
     ["NM1", "1P", "2", q.provider.name, "", "", "", "", "XX", q.provider.npi],
     ["HL", "3", "2", "22", "0"],
     ["TRN", "1", q.traceNumber, "9" + q.senderId.replace(/\W/g, "").padEnd(9, "0").slice(0, 9)],
-    ["NM1", "IL", "1", q.subscriber.lastName, q.subscriber.firstName, "", "", "", "MI", q.subscriber.memberId],
+    q.subscriber.memberId
+      ? ["NM1", "IL", "1", q.subscriber.lastName, q.subscriber.firstName, "", "", "", "MI", q.subscriber.memberId]
+      : ["NM1", "IL", "1", q.subscriber.lastName, q.subscriber.firstName],
     ["DMG", "D8", d8(q.subscriber.dob), q.subscriber.sex === "F" || q.subscriber.sex === "M" ? q.subscriber.sex : "U"],
     ["DTP", "291", "D8", d8(q.serviceDate)],
     ...(q.serviceTypes?.length ? q.serviceTypes : ["30"]).map((st) => ["EQ", st]),
@@ -111,6 +114,8 @@ export interface Build271Input {
   control: string;
   inquiry: ReturnType<typeof parse270>;
   rejection?: { code: string; followUp?: string };
+  /** The member ID the payer found, when the inquiry searched by name and date of birth. */
+  memberId?: string;
   planBegin?: string;
   benefits?: Benefit[];
 }
@@ -126,7 +131,7 @@ export function build271(input: Build271Input): string {
     ["NM1", "1P", "2", q.providerName, "", "", "", "", "XX", q.providerNpi],
     ["HL", "3", "2", "22", "0"],
     ["TRN", "2", q.traceNumber, "9" + input.senderId.replace(/\W/g, "").padEnd(9, "0").slice(0, 9)],
-    ["NM1", "IL", "1", q.lastName, q.firstName, "", "", "", "MI", q.memberId],
+    (input.memberId ?? q.memberId) ? ["NM1", "IL", "1", q.lastName, q.firstName, "", "", "", "MI", input.memberId ?? q.memberId] : ["NM1", "IL", "1", q.lastName, q.firstName],
   ];
   if (input.rejection) {
     // Subscriber-level rejection: C = please correct and resubmit.

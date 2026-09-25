@@ -95,6 +95,14 @@ export default async function ConnectionsPage() {
                         <p className="label">Webhook URL for Stripe</p>
                         {origin ? <CopyField value={`${origin}/api/stripe/webhook/${s.practiceId}`} /> : <p className="text-xs text-slate-500">Set APP_URL to see the webhook address.</p>}
                         <p className="mt-1 text-xs text-slate-500">In Stripe → Developers → Webhooks, add this endpoint for the events checkout.session.completed and checkout.session.async_payment_succeeded.</p>
+                        <p className="mt-2 text-xs text-slate-500">Apple Pay and Google Pay: Stripe Checkout shows them automatically on supported phones and browsers once they are turned on under Stripe → Settings → Payment methods. Nothing else to set up here.</p>
+                      </div>
+                    )}
+                    {i.provider === "twilio" && (
+                      <div>
+                        <p className="label">Incoming message webhook for Twilio</p>
+                        {origin ? <CopyField value={`${origin}/api/twilio/sms/${s.practiceId}`} /> : <p className="text-xs text-slate-500">Set APP_URL to see the webhook address.</p>}
+                        <p className="mt-1 text-xs text-slate-500">In Twilio → Phone Numbers → your number → Messaging, set &ldquo;A message comes in&rdquo; to this URL (HTTP POST). Replies then appear under Text messages, and STOP replies turn texting off for that number.</p>
                       </div>
                     )}
                   </div>

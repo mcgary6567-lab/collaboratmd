@@ -290,6 +290,45 @@ async function main() {
     log(`credit balances: ${settled.length} patient credits, ${dupes.length} duplicate insurance payments`);
   } else log("credit balances: already present");
 
+  /* ---------------- Front desk: self-pay patients and text threads ---------------- */
+  const [{ n: selfPayCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.patients).where(and(eq(schema.patients.practiceId, practiceId), sql`${schema.patients.mrn} LIKE 'DEMO-SP%'`));
+  if (Number(selfPayCount) === 0) {
+    const people = [
+      { firstName: "Harper", lastName: "Quinlan", dob: "1988-04-17", sex: "F", phone: "555-010-2231" },
+      { firstName: "Mateo", lastName: "Vance", dob: "1979-11-02", sex: "M", phone: "555-010-2232" },
+      { firstName: "Ivy", lastName: "Castellano", dob: "1993-07-29", sex: "F", phone: "555-010-2233" },
+      { firstName: "Desmond", lastName: "Okafor", dob: "1965-01-08", sex: "M", phone: "555-010-2234" },
+    ];
+    const [provider] = await db.select().from(schema.providers).where(eq(schema.providers.practiceId, practiceId)).limit(1);
+    for (const [i, p] of people.entries()) {
+      const [row] = await db.insert(schema.patients).values({ practiceId, mrn: `DEMO-SP${i + 1}`, ...p, address1: `${100 + i} Demo Lane`, city: "Dallas", state: "TX", zip: "75201" }).returning();
+      if (provider && i < 3) {
+        const starts = new Date(Date.now() + (i + 2) * 86_400_000);
+        starts.setUTCHours(15, 0, 0, 0);
+        await db.insert(schema.appointments).values({ practiceId, patientId: row.id, providerId: provider.id, startsAt: starts, endsAt: new Date(starts.getTime() + 1_800_000), reason: "New patient visit" });
+      }
+    }
+    log(`self-pay patients: ${people.length} without insurance for coverage discovery`);
+  } else log("self-pay patients: already present");
+
+  const [{ n: smsCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.smsMessages).where(eq(schema.smsMessages.practiceId, practiceId));
+  if (Number(smsCount) === 0) {
+    const withPhones = await db.select().from(schema.patients).where(and(eq(schema.patients.practiceId, practiceId), sql`${schema.patients.phone} IS NOT NULL`, sql`${schema.patients.mrn} NOT LIKE 'DEMO-SP%'`)).limit(3);
+    const ago = (m: number) => new Date(Date.now() - m * 60_000);
+    const e164 = (ph: string) => `+1${ph.replace(/\D/g, "").slice(-10)}`;
+    const threads: [string, string, number][][] = [
+      [["out", "Summit Health Partners: your statement is ready. View and pay: (link)", 2900], ["in", "Can I split this into payments?", 2880]],
+      [["out", "Reminder from Summit Health Partners: appointment tomorrow at 9:30 AM. Reply C to confirm.", 1500], ["in", "C", 1490], ["in", "Also do I need to bring my new insurance card?", 1485]],
+      [["out", "Summit Health Partners: please complete check-in before your visit: (link)", 300], ["in", "Done, thanks!", 42]],
+    ];
+    for (const [i, p] of withPhones.entries()) {
+      for (const [direction, body, minutes] of threads[i] ?? []) {
+        await db.insert(schema.smsMessages).values({ practiceId, patientId: p.id, direction, phone: e164(p.phone!), body, status: direction === "in" ? "received" : "sent", readAt: direction === "out" || minutes > 2000 ? ago(minutes) : null, createdAt: ago(minutes) });
+      }
+    }
+    log(`text threads: ${Math.min(3, withPhones.length)} demo conversations`);
+  } else log("text threads: already present");
+
   /* ---------------- A second practice ---------------- */
   let [second] = await db.select().from(schema.practices).where(eq(schema.practices.name, SECOND_PRACTICE)).limit(1);
   if (!second) {

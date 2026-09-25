@@ -1236,4 +1236,157 @@ CREATE TABLE IF NOT EXISTS refunds (
 CREATE INDEX IF NOT EXISTS refunds_practice_idx ON refunds (practice_id, status);
 `,
   },
+  {
+    name: "0028_front_desk",
+    sql: `-- Two-way texting: every text in or out, threaded by the patient's number.
+CREATE TABLE IF NOT EXISTS sms_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  patient_id uuid REFERENCES patients(id),
+  direction text NOT NULL,            -- in | out
+  phone text NOT NULL,                -- the patient's number, E.164
+  body text NOT NULL,
+  twilio_sid text,
+  status text NOT NULL DEFAULT 'received', -- received | sent | failed
+  read_at timestamptz,
+  user_id uuid REFERENCES users(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sms_messages_thread_idx ON sms_messages (practice_id, phone, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS sms_messages_sid_idx ON sms_messages (twilio_sid) WHERE twilio_sid IS NOT NULL;
+
+-- Numbers that replied STOP. Nothing is texted to them until they reply START.
+CREATE TABLE IF NOT EXISTS sms_opt_outs (
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  phone text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (practice_id, phone)
+);
+
+-- Coverage discovery: eligibility searches by name and date of birth for patients with no insurance on file.
+CREATE TABLE IF NOT EXISTS coverage_searches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  patient_id uuid NOT NULL REFERENCES patients(id),
+  payer_id uuid NOT NULL REFERENCES payers(id),
+  status text NOT NULL,               -- found | not_found | error
+  member_id text,
+  plan_name text,
+  message text,
+  added_insurance_id uuid REFERENCES patient_insurances(id),
+  checked_by uuid REFERENCES users(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS coverage_searches_patient_idx ON coverage_searches (practice_id, patient_id, created_at);
+`,
+  },
+  {
+    name: "0029_access_control",
+    sql: `-- Deactivated users keep their history but cannot sign in.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at timestamptz;
+
+-- Practice sign-in policy: how long a session lasts, and where sign-in is allowed from.
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS session_hours integer NOT NULL DEFAULT 12;
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS ip_allowlist jsonb NOT NULL DEFAULT '[]';
+
+-- Custom roles: a built-in role with some abilities switched off. users.role and
+-- practice_memberships.role hold 'custom:<id>' for someone given one.
+CREATE TABLE IF NOT EXISTS custom_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  name text NOT NULL,
+  base_role text NOT NULL,          -- admin | biller | front_desk | readonly
+  denied jsonb NOT NULL DEFAULT '[]', -- capability keys switched off
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (practice_id, name)
+);
+
+-- Single sign-on (OpenID Connect) and SCIM provisioning, per practice.
+CREATE TABLE IF NOT EXISTS practice_sso (
+  practice_id uuid PRIMARY KEY REFERENCES practices(id),
+  issuer text NOT NULL,
+  client_id text NOT NULL,
+  client_secret_sealed text NOT NULL,
+  domains jsonb NOT NULL DEFAULT '[]',   -- email domains that sign in here
+  enforce boolean NOT NULL DEFAULT false, -- passwords refused for those domains
+  auto_provision boolean NOT NULL DEFAULT false,
+  default_role text NOT NULL DEFAULT 'readonly',
+  scim_token_hash text,
+  scim_token_hint text,
+  updated_by uuid REFERENCES users(id),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+`,
+  },
+  {
+    name: "0030_operations",
+    sql: `-- Billing-company invoicing: what a client practice pays for billing services.
+CREATE TABLE IF NOT EXISTS client_agreements (
+  practice_id uuid PRIMARY KEY REFERENCES practices(id),
+  issuer_name text NOT NULL,
+  issuer_address text,
+  rate_bps integer NOT NULL,             -- percent of collections, in basis points (650 = 6.5%)
+  minimum_cents integer NOT NULL DEFAULT 0,
+  include_patient boolean NOT NULL DEFAULT true,
+  terms_days integer NOT NULL DEFAULT 30,
+  updated_by uuid REFERENCES users(id),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS client_invoices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  number text NOT NULL,
+  period text NOT NULL,                  -- YYYY-MM
+  insurance_cents integer NOT NULL,
+  patient_cents integer NOT NULL,
+  base_cents integer NOT NULL,           -- collections the fee is charged on
+  rate_bps integer NOT NULL,
+  fee_cents integer NOT NULL,
+  status text NOT NULL DEFAULT 'draft',  -- draft | sent | paid | void
+  due_date date,
+  issuer jsonb NOT NULL,
+  created_by uuid REFERENCES users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  sent_at timestamptz,
+  paid_at timestamptz,
+  UNIQUE (practice_id, number)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS client_invoices_period_idx ON client_invoices (practice_id, period) WHERE status <> 'void';
+
+-- Accounting: the practice's names for the general-ledger accounts the journal posts to.
+CREATE TABLE IF NOT EXISTS accounting_settings (
+  practice_id uuid PRIMARY KEY REFERENCES practices(id),
+  accounts jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Month-end close: the month's totals frozen, so later changes to that month show up as a difference.
+CREATE TABLE IF NOT EXISTS period_closes (
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  period text NOT NULL,                  -- YYYY-MM
+  totals jsonb NOT NULL,
+  closed_by uuid REFERENCES users(id),
+  closed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (practice_id, period)
+);
+
+-- Work queues: rules that turn denials and stuck claims into assigned tasks with a due date.
+CREATE TABLE IF NOT EXISTS work_rules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  practice_id uuid NOT NULL REFERENCES practices(id),
+  name text NOT NULL,
+  kind text NOT NULL,                    -- denials | stalled_claims | rejections
+  conditions jsonb NOT NULL DEFAULT '{}',
+  assignee_ids jsonb NOT NULL DEFAULT '[]',
+  sla_days integer NOT NULL DEFAULT 5,
+  priority text NOT NULL DEFAULT 'normal',
+  active boolean NOT NULL DEFAULT true,
+  next_index integer NOT NULL DEFAULT 0,
+  created_by uuid REFERENCES users(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rule_id uuid REFERENCES work_rules(id);
+`,
+  },
 ];

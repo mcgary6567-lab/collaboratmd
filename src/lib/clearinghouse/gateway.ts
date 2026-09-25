@@ -159,9 +159,16 @@ export class MockClearinghouse implements ClearinghouseGateway {
     const now = new Date();
     const control = String(hashStr(edi270 + "271") % 1_000_000_000);
     const base = { senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control, inquiry: q };
-    if (!q.memberId || /X$/i.test(q.memberId)) return build271({ ...base, rejection: { code: "72" } });
+    let memberId = q.memberId;
+    if (!memberId) {
+      // A search by name and date of birth: this simulated payer finds about one person in six.
+      const d = hashStr(`${q.lastName}|${q.firstName}|${q.dob}|${q.payerId}`);
+      if (!q.lastName || !q.dob || d % 6 !== 0) return build271({ ...base, rejection: { code: "75" } });
+      memberId = `SIM${String(d % 1_000_000_000).padStart(9, "0")}`;
+    }
+    if (/X$/i.test(memberId)) return build271({ ...base, rejection: { code: "72" } });
 
-    const h = hashStr(q.memberId + q.payerId);
+    const h = hashStr(memberId + q.payerId);
     const deductible = pick([50000, 100000, 150000, 300000], h);
     const remaining = Math.round(deductible * ((h % 7) / 7));
     const oopMax = deductible * 3;
@@ -172,6 +179,7 @@ export class MockClearinghouse implements ClearinghouseGateway {
     });
     return build271({
       ...base,
+      memberId,
       planBegin: `${(q.serviceDate || now.toISOString()).slice(0, 4)}-01-01`,
       benefits: [
         eb("1", "", null, null, plan),

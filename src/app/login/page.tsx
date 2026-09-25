@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { LoginForm } from "./login-form";
@@ -15,6 +16,7 @@ export default async function LoginPage() {
         </div>
         <div className="card p-6 shadow-xl">
           <LoginForm />
+          <p className="mt-4 text-center text-sm"><Link href="/login/sso" className="font-semibold text-brand-700 hover:underline">Sign in with SSO</Link></p>
           <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
             <div className="mb-1 font-semibold">Demo accounts</div>
             <div>admin@collaboratmd.local / admin123</div>
