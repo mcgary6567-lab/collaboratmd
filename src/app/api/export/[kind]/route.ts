@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { toCsv, dollars } from "@/lib/csv-out";
 import { searchClaims, searchDenials } from "@/server/lists";
 import { arAging, payerPerformance } from "@/server/analytics";
+import { agencyPlacements } from "@/server/collections";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     const r = await payerPerformance(db, session.practiceId, 100);
     headers = Object.keys(r[0] ?? { payer: "" });
     rows = r.map((x) => headers.map((h) => (x as Record<string, unknown>)[h]));
+  } else if (kind === "collections") {
+    // The agency's placement file: who to collect from and how much.
+    const r = await agencyPlacements(db, session.practiceId);
+    headers = ["Account", "Last name", "First name", "Date of birth", "Address", "City", "State", "ZIP", "Phone", "Email", "Agency", "Placed", "Amount placed", "Last payment"];
+    rows = r.map(({ collection: c, patient: p, lastPayment }) => [
+      p.mrn, p.lastName, p.firstName, p.dob, p.address1, p.city, p.state, p.zip, p.phone, p.email, c.agency, c.placedAt?.toISOString().slice(0, 10), dollars(c.amountCents), lastPayment,
+    ]);
   } else {
     return new Response("Unknown export", { status: 404 });
   }

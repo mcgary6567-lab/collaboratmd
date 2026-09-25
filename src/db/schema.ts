@@ -282,7 +282,7 @@ export const ledgerEntries = pgTable(
     claimId: uuid("claim_id").references(() => claims.id),
     chargeId: uuid("charge_id").references(() => charges.id),
     remittanceId: uuid("remittance_id").references(() => remittances.id),
-    // charge | insurance_payment | patient_payment | adjustment | write_off | transfer_to_patient | discount | refund | reversal
+    // charge | insurance_payment | patient_payment | adjustment | write_off | transfer_to_patient | discount | bad_debt | refund | reversal
     type: text("type").notNull(),
     amountCents: integer("amount_cents").notNull(),
     groupCode: text("group_code"), // CO | PR | OA | PI

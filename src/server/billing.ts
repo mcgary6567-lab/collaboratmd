@@ -20,7 +20,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 /**
  * What the patient owes: responsibility transferred to them, less what they
- * paid and any discount granted, plus refunds sent back. Computed from the
+ * paid, any discount granted and any balance written off as bad debt when
+ * sent to a collection agency, plus refunds sent back. Computed from the
  * ledger every time rather than stored, so it cannot drift from the entries
  * that justify it.
  */
@@ -28,6 +29,7 @@ export const patientBalanceSql = sql`
   COALESCE(SUM(amount_cents) FILTER (WHERE type = 'transfer_to_patient'), 0)
   - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)
   - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'discount'), 0)
+  - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'bad_debt'), 0)
   + COALESCE(SUM(amount_cents) FILTER (WHERE type = 'refund'), 0)`;
 
 export async function patientBalanceCents(db: Db, patientId: string): Promise<number> {
@@ -294,7 +296,7 @@ export async function buildStatementDetail(db: Db, patientId: string) {
   for (const r of rows) {
     if (!r.claimId) {
       if (r.type === "patient_payment") unappliedPaymentsCents += r.amountCents;
-      else if (r.type === "discount") discountsCents += r.amountCents;
+      else if (r.type === "discount" || r.type === "bad_debt") discountsCents += r.amountCents;
       else if (r.type === "refund") unappliedPaymentsCents -= r.amountCents;
       continue;
     }
@@ -313,7 +315,7 @@ export async function buildStatementDetail(db: Db, patientId: string) {
       case "adjustment": case "write_off": v.adjustmentsCents += r.amountCents; break;
       case "transfer_to_patient": v.youOweCents += r.amountCents; break;
       case "patient_payment": v.patientPaidCents += r.amountCents; v.youOweCents -= r.amountCents; break;
-      case "discount": v.adjustmentsCents += r.amountCents; v.youOweCents -= r.amountCents; break;
+      case "discount": case "bad_debt": v.adjustmentsCents += r.amountCents; v.youOweCents -= r.amountCents; break;
       case "refund": v.youOweCents += r.amountCents; break;
     }
   }

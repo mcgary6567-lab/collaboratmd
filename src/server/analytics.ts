@@ -99,6 +99,7 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
         (SELECT COALESCE(SUM(amount_cents) FILTER (WHERE type = 'transfer_to_patient'), 0)
               - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)
               - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'discount'), 0)
+              - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'bad_debt'), 0)
               + COALESCE(SUM(amount_cents) FILTER (WHERE type = 'refund'), 0)
          FROM ledger_entries WHERE practice_id = ${practiceId})::bigint AS patient_ar,
         (SELECT COALESCE(SUM(amount_cents), 0) / 90.0 FROM ledger_entries

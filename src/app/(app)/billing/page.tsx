@@ -31,7 +31,7 @@ export default async function BillingPage() {
 
   return (
     <>
-      <PageHeader title="Patient billing" subtitle="Statements, payment plans and discounts for what patients owe" />
+      <PageHeader title="Patient billing" subtitle="Statements, payment plans and discounts for what patients owe" actions={<Link href="/billing/collections" className="btn btn-secondary">Collections</Link>} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Owed by patients" value={money(total.totalCents)} hint={`${total.accounts.toLocaleString("en-US")} accounts with a balance`} />
