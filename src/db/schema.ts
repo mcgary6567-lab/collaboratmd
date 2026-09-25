@@ -664,6 +664,23 @@ export const denialAgentItems = pgTable("denial_agent_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export type ReportConfig = { columns: string[]; group?: string | null; range: string; payerId?: string | null; providerId?: string | null; status?: string | null };
+
+/** Saved report-builder reports: see migration 0022 and server/report-builder.ts. */
+export const customReports = pgTable("custom_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  dataset: text("dataset").notNull(),
+  config: jsonb("config").$type<ReportConfig>().notNull(),
+  schedule: text("schedule").notNull().default("none"),
+  recipients: jsonb("recipients").$type<string[]>().notNull().default([]),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const bankDeposits = pgTable("bank_deposits", {
   id: uuid("id").defaultRandom().primaryKey(),
   practiceId: uuid("practice_id").notNull().references(() => practices.id),

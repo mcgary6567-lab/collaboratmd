@@ -19,6 +19,7 @@ import { sendEmail } from "./notify";
 import { stripeReady } from "@/lib/stripe";
 import { practiceConfig } from "./integrations";
 import { runDenialAgent } from "./denial-agent";
+import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
 
@@ -192,6 +193,8 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));
+  const resend = (await practiceConfig(db, practiceId)).resend;
+  if (resend && (await hasScheduledReports(db, practiceId))) await step("scheduledReports", () => sendScheduledReports(db, practiceId, origin, (to, subject, text) => sendEmail(to, subject, text, undefined, resend), now));
   await db.insert(automationRuns).values({ practiceId, summary, error });
   return summary;
 }

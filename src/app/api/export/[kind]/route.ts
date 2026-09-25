@@ -4,6 +4,7 @@ import { toCsv, dollars } from "@/lib/csv-out";
 import { searchClaims, searchDenials } from "@/server/lists";
 import { arAging, payerPerformance } from "@/server/analytics";
 import { agencyPlacements } from "@/server/collections";
+import { getReport, runReport } from "@/server/report-builder";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     const r = await payerPerformance(db, session.practiceId, 100);
     headers = Object.keys(r[0] ?? { payer: "" });
     rows = r.map((x) => headers.map((h) => (x as Record<string, unknown>)[h]));
+  } else if (kind === "report") {
+    // A saved report-builder report, all rows.
+    const report = q.id ? await getReport(db, session.practiceId, q.id) : null;
+    if (!report) return new Response("Report not found", { status: 404 });
+    const r = await runReport(db, session.practiceId, report.dataset, report.config, { limit: MAX_ROWS });
+    headers = r.headers.map((h) => (h.kind === "money" ? `${h.label} ($)` : h.label));
+    rows = r.rows.map((row) => r.headers.map((h) => (h.kind === "money" ? dollars(row[h.key] as number | null) : row[h.key])));
   } else if (kind === "collections") {
     // The agency's placement file: who to collect from and how much.
     const r = await agencyPlacements(db, session.practiceId);
