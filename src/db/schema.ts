@@ -630,6 +630,65 @@ export const messageLog = pgTable("message_log", {
 });
 
 /* ------------------------------------------------------------------ */
+/* Appeals, deposits, enrollment, collections                           */
+/* ------------------------------------------------------------------ */
+
+export const appealLetters = pgTable("appeal_letters", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  denialId: uuid("denial_id").notNull().references(() => denials.id),
+  body: text("body").notNull(),
+  source: text("source").notNull(),
+  status: text("status").notNull().default("draft"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+});
+
+export const bankDeposits = pgTable("bank_deposits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  depositDate: date("deposit_date").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  description: text("description").notNull(),
+  remittanceId: uuid("remittance_id").references(() => remittances.id),
+  status: text("status").notNull().default("unmatched"),
+  matchReason: text("match_reason"),
+  fingerprint: text("fingerprint").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const providerEnrollments = pgTable("provider_enrollments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  status: text("status").notNull().default("not_started"),
+  payerProviderId: text("payer_provider_id"),
+  submittedOn: date("submitted_on"),
+  effectiveOn: date("effective_on"),
+  revalidationDue: date("revalidation_due"),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const patientCollections = pgTable("patient_collections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  stage: text("stage").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  agency: text("agency"),
+  finalNoticeAt: timestamp("final_notice_at", { withTimezone: true }),
+  placedAt: timestamp("placed_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* ------------------------------------------------------------------ */
 /* Work: tasks, notes, saved views                                      */
 /* ------------------------------------------------------------------ */
 

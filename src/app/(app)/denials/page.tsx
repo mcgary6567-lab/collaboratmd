@@ -102,6 +102,7 @@ export default async function DenialsPage({ searchParams }: { searchParams: Prom
                     {!["resolved", "written_off"].includes(denial.status) && (
                       <form action={denialStatusAction.bind(null, denial.id, "resolved")}><button className="btn btn-primary text-xs">Resolve</button></form>
                     )}
+                    {!["resolved", "written_off"].includes(denial.status) && <Link href={`/denials/${denial.id}/appeal`} className="btn btn-secondary text-xs">Appeal letter</Link>}
                     <Link href={`/claims/${claim.id}`} className="btn btn-secondary text-xs">Open claim</Link>
                   </span>
                 </div>
