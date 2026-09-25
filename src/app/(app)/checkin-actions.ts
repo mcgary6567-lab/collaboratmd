@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -8,24 +7,9 @@ import { CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { applyCheckin, createCheckinLink, dismissCheckin } from "@/server/checkin";
 import { sendCheckinLink } from "@/server/notify";
+import { siteOrigin } from "@/lib/origin";
 
 export type LinkResult = (FormResult & { url?: string }) | undefined;
-
-/**
- * Where patient links point. APP_URL fixes it; otherwise Vercel's production
- * domain; the request's host only in development, since a forged Host header
- * must never decide the domain in an email sent to a patient.
- */
-async function origin() {
-  const configured = process.env.APP_URL?.trim().replace(/\/$/, "");
-  if (configured) return configured;
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  if (process.env.NODE_ENV === "production") throw new Error("Set APP_URL to the site's address before sending check-in links");
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 /** Creates a fresh check-in link for an appointment, emailing it when email is configured. */
 export async function createCheckinLinkAction(appointmentId: string, _prev: LinkResult): Promise<LinkResult> {
@@ -33,7 +17,7 @@ export async function createCheckinLinkAction(appointmentId: string, _prev: Link
   try {
     const db = await getDb();
     const created = await createCheckinLink(db, s.practiceId, appointmentId, s.userId);
-    const url = `${await origin()}${created.path}`;
+    const url = `${await siteOrigin()}${created.path}`;
     let sent = false;
     if (created.patient?.email) {
       const [practice] = await db.select({ name: schema.practices.name }).from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1);

@@ -94,6 +94,8 @@ export const patients = pgTable(
     city: text("city"),
     state: text("state"),
     zip: text("zip"),
+    smsConsentAt: timestamp("sms_consent_at", { withTimezone: true }),
+    remindersOptOut: boolean("reminders_opt_out").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -545,6 +547,69 @@ export const claimStatusChecks = pgTable("claim_status_checks", {
   response277: text("response_277"),
   error: text("error"),
   checkedAt: timestamp("checked_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* ------------------------------------------------------------------ */
+/* Patient portal, online payments, messages                            */
+/* ------------------------------------------------------------------ */
+
+export const portalLinks = pgTable("portal_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  purpose: text("purpose").notNull().default("portal"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const onlinePayments = pgTable("online_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  planId: uuid("plan_id").references(() => paymentPlans.id),
+  provider: text("provider").notNull().default("stripe"),
+  providerRef: text("provider_ref"),
+  amountCents: integer("amount_cents").notNull(),
+  status: text("status").notNull().default("pending"),
+  source: text("source").notNull(),
+  ledgerEntryId: uuid("ledger_entry_id"),
+  failure: text("failure"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+});
+
+export const savedCards = pgTable("saved_cards", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  providerCustomer: text("provider_customer").notNull(),
+  providerMethod: text("provider_method").notNull(),
+  brand: text("brand"),
+  last4: text("last4"),
+  expMonth: integer("exp_month"),
+  expYear: integer("exp_year"),
+  autopayPlanId: uuid("autopay_plan_id").references(() => paymentPlans.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  removedAt: timestamp("removed_at", { withTimezone: true }),
+});
+
+export const messageLog = pgTable("message_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").references(() => patients.id),
+  channel: text("channel").notNull(),
+  kind: text("kind").notNull(),
+  recipient: text("recipient").notNull(),
+  entityId: uuid("entity_id"),
+  status: text("status").notNull(),
+  detail: text("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 /* ------------------------------------------------------------------ */

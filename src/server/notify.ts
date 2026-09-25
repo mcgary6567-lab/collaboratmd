@@ -30,6 +30,11 @@ function config() {
   };
 }
 
+/** Sends one plain-text email; false when email is not configured or the provider refuses. */
+export async function sendEmail(to: string, subject: string, text: string, replyTo?: string) {
+  return send(to, subject, text, replyTo);
+}
+
 async function send(to: string, subject: string, text: string, replyTo?: string) {
   const c = config();
   if (!c) {

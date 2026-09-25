@@ -11,6 +11,8 @@ import { BillingSection } from "./billing-section";
 import { AuthorizationsSection } from "./authorizations-section";
 import { LabsSection } from "./labs-section";
 import { WorkPanel } from "@/components/work-panel";
+import { PortalLinkButton } from "./patient-contact";
+import { remindersOptOutAction, smsConsentAction } from "@/app/(app)/portal-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,24 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             <div className="flex justify-between"><dt className="text-slate-500">Email</dt><dd>{patient.email ?? "-"}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Address</dt><dd className="text-right">{patient.address1}<br />{patient.city}, {patient.state} {patient.zip}</dd></div>
           </dl>
+          <div className="mt-4 space-y-2 border-t border-slate-200 pt-3 text-xs">
+            <div className="flex items-center justify-between">
+              <span>Texts: {patient.smsConsentAt ? <span className="text-green-700">consented {fmtDate(patient.smsConsentAt)}</span> : <span className="text-slate-500">no consent on file</span>}</span>
+              <form action={smsConsentAction.bind(null, patient.id, !patient.smsConsentAt)}>
+                <button className="font-semibold text-brand-700 hover:underline">{patient.smsConsentAt ? "Withdraw" : "Record consent"}</button>
+              </form>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Reminders: {patient.remindersOptOut ? <span className="text-amber-700">opted out</span> : "on"}</span>
+              <form action={remindersOptOutAction.bind(null, patient.id, !patient.remindersOptOut)}>
+                <button className="font-semibold text-brand-700 hover:underline">{patient.remindersOptOut ? "Turn back on" : "Opt out"}</button>
+              </form>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <PortalLinkButton patientId={patient.id} purpose="portal" label="Send portal link" />
+              <PortalLinkButton patientId={patient.id} purpose="pay" label="Send pay link" />
+            </div>
+          </div>
         </Card>
         <Card title="Insurance">
           {insurances.map(({ insurance, payer }) => (
