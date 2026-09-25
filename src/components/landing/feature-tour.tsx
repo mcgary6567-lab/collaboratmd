@@ -172,7 +172,8 @@ const STAGES: Stage[] = [
       { text: "835 auto-posting: payments, adjustments and patient responsibility by line" },
       { text: "Bank deposits matched to ERAs by trace number or amount" },
       { text: "ERAs with no deposit after 7 days flagged for a payer trace" },
-      { text: "Underpayments caught against your contracted rates" },
+      { text: "Underpayments caught against your contracted rates, with a dispute letter per payer" },
+      { text: "Missed charges and credit balances found and resolved" },
     ],
     preview: (
       <Frame title="Bank deposits">
@@ -217,11 +218,12 @@ const STAGES: Stage[] = [
     key: "run",
     label: "Run the business",
     icon: Gauge,
-    title: "The numbers, the work, and the Monday report",
-    lead: "Metrics against industry targets, a task inbox for the team, and automation that runs every morning.",
+    title: "The numbers, the work, and the cash ahead",
+    lead: "Metrics against industry targets, an 8-week cash forecast, work queues for the team, and automation that runs every morning.",
     bullets: [
       { text: "Days in A/R, net collection, clean claim and denial rates vs benchmarks" },
-      { text: "Tasks, notes, saved views and bulk actions for the billing team" },
+      { text: "Cash forecast from your payers' own history, and alerts when a payer changes" },
+      { text: "Work queues that assign denials and stuck claims, with due dates" },
       { text: "Daily automation and a weekly report by email", needs: "Resend" },
       { text: "Many practices under one login for billing companies" },
     ],

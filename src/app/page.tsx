@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  ArrowRight, BadgeCheck, Brain, CalendarDays, CreditCard, EyeOff, FileSearch, Gauge, KeyRound, Landmark, Lock,
-  ReceiptText, ScanLine, Send, ShieldCheck, Sparkles, Stethoscope, Wand2, Zap,
+  ArrowRight, BadgeCheck, Brain, CalendarDays, CreditCard, EyeOff, FileSearch, Gauge, KeyRound, Landmark, LineChart, Lock,
+  Radar, ReceiptText, ScanLine, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Wand2, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "CollaboratMD — Medical billing and revenue cycle management",
   description:
-    "Get paid faster with fewer denials. Eligibility, coding help, claim scrubbing with denial risk scores, X12 837 and 835, appeal letters, bank reconciliation, a patient payment portal and analytics in one platform.",
+    "Get paid faster with fewer denials. Eligibility, coding help, NCCI-checked claims with denial risk scores, 837P/I/D and 835, appeals, missed-charge and underpayment recovery, cash forecasting, a patient payment portal, SSO and analytics in one platform.",
 };
 
 /** Features that only work once the practice connects its own account with an outside service say which. */
@@ -38,6 +38,9 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Prior authorization tracking with units" },
       { name: "Copay by card at online check-in", needs: "Stripe" },
       { name: "Check-in and patient portal in English and Spanish" },
+      { name: "Two-way text inbox, with STOP honored", needs: "Twilio" },
+      { name: "Insurance card read from a photo", needs: "AI key + BAA" },
+      { name: "Coverage discovery for self-pay patients", needs: "clearinghouse" },
     ],
   },
   {
@@ -54,6 +57,10 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Edit, correct and void claims with an audit trail" },
       { name: "Facility claims: 837I / UB-04 with revenue codes" },
       { name: "Electronic prior authorization (278)", needs: "clearinghouse" },
+      { name: "Dental claims: 837D with tooth, surfaces and quadrant" },
+      { name: "NCCI edits and Medicare coverage checks" },
+      { name: "Payer rules suggested from your own denials" },
+      { name: "Claim attachments (PWK) with a fax cover sheet" },
     ],
   },
   {
@@ -67,6 +74,9 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Appeal letters in one click", needs: "AI key, optional" },
       { name: "276/277 follow-up on quiet claims" },
       { name: "Denial agent that prepares each day's work for approval" },
+      { name: "Missed charges: visits seen but never billed" },
+      { name: "Underpayment dispute letters, one per payer" },
+      { name: "Credit balances refunded with approval" },
     ],
   },
   {
@@ -94,10 +104,25 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Many practices under one login" },
       { name: "EHR interface (HL7) and CSV patient import" },
       { name: "Ctrl+K search, shortcuts, dark mode, phone layout" },
-      { name: "Report builder with scheduled email" },
+      { name: "Report builder, and questions answered as reports" },
+      { name: "8-week cash forecast and payer behavior alerts" },
+      { name: "Work queues with assignment rules and SLAs" },
+      { name: "Client invoicing for billing companies" },
+      { name: "Accounting journal export and month-end close" },
+    ],
+  },
+  {
+    group: "Security and admin",
+    icon: ShieldCheck,
+    items: [
+      { name: "Single sign-on (OpenID Connect) and SCIM provisioning" },
+      { name: "Custom roles, session limits and office-network allowlists" },
+      { name: "Two-factor sign-in, required per practice if you choose" },
+      { name: "Team page with invites and one-click removal" },
+      { name: "Compliance center: access reviews, BAAs, audit export" },
       { name: "REST API and signed webhooks" },
       { name: "Integrations screen: paste keys, test, go live" },
-      { name: "Compliance center: access reviews, BAAs, audit export" },
+      { name: "Public status page and server error monitoring" },
     ],
   },
 ];
@@ -123,15 +148,25 @@ const SMART = [
     title: "Coding help at charge entry",
     body: "Visit level by the AMA time and medical decision making rules, and a diagnosis finder that understands everyday words. AI coding of full visit notes stays off until the practice has a BAA with the AI provider.",
   },
+  {
+    icon: LineChart,
+    title: "A cash forecast from your own history",
+    body: "Every claim in flight is projected from how that payer has actually paid you: how often, how much and how fast, adjusted for the claim's age. Scheduled visits and patient payments are added, and the method is on the page.",
+  },
+  {
+    icon: Radar,
+    title: "Payers that change, caught early",
+    body: "Each payer's last 30 days are compared with its previous 90: more denials, slower payment, lower payment or a denial reason that suddenly spikes. Alerts need real volume, so noise stays out.",
+  },
 ];
 
 const WORKFLOW = [
   { icon: CalendarDays, title: "Schedule and verify", body: "Book the visit, check coverage for the whole day, and send a reminder with an online check-in link." },
   { icon: Stethoscope, title: "Capture and code", body: "Charges priced from your fee schedule, with coding help for the visit level and diagnoses." },
   { icon: ScanLine, title: "Scrub and risk-check", body: "Blocking errors stop the claim; the risk score shows what could still get it denied." },
-  { icon: Zap, title: "Submit and follow up", body: "837P out, acknowledgments in, status inquiries for quiet claims, secondary billed on its own." },
+  { icon: Zap, title: "Submit and follow up", body: "837P, 837I or 837D out, acknowledgments in, status inquiries for quiet claims, secondary billed on its own." },
   { icon: Landmark, title: "Post and reconcile", body: "835 remittances post by line, deposits match their ERAs, and underpayments are flagged." },
-  { icon: BadgeCheck, title: "Resolve and collect", body: "Denials become appeals; balances become statements, portal payments, plans or, last, collections." },
+  { icon: BadgeCheck, title: "Resolve and collect", body: "Denials become appeals, underpayments become dispute letters, missed visits get billed; balances become statements, portal payments, plans or, last, collections." },
 ];
 
 const BENCHMARKS = [
@@ -149,16 +184,21 @@ const STANDARDS = [
   "X12 005010X212 (276/277)",
   "X12 005010X223A2 (837I)",
   "X12 005010X217 (278)",
+  "X12 005010X224A2 (837D)",
   "X12 999 and 277CA acknowledgments",
   "HL7 v2.5.1 ADT, DFT, ORM, ORU",
-  "ICD-10-CM · CPT · HCPCS",
+  "ICD-10-CM · CPT · HCPCS · CDT",
+  "NCCI PTP and MUE edits",
+  "OpenID Connect and SCIM 2.0",
   "CARC and RARC code sets",
 ];
 
 const SECURITY = [
   { icon: KeyRound, text: "Two-factor sign-in, required per practice if you choose" },
   { icon: Lock, text: "Account lockout after repeated failed sign-ins" },
-  { icon: ShieldCheck, text: "Roles for admin, biller, front desk and read-only" },
+  { icon: ShieldCheck, text: "Built-in roles, and custom roles that can only narrow them" },
+  { icon: UsersRound, text: "Single sign-on and SCIM: access ends when someone leaves" },
+  { icon: SearchCheck, text: "Session limits and an allowlist of office networks" },
   { icon: ReceiptText, text: "Ledger amounts never edited; corrections are reversals" },
   { icon: EyeOff, text: "Patient links and keys stored only as hashes" },
   { icon: CreditCard, text: "Card numbers stay on Stripe's page, never our servers" },
@@ -167,9 +207,10 @@ const SECURITY = [
 const CONNECTS = [
   { name: "Stedi", what: "Clearinghouse for claims, eligibility and status" },
   { name: "Stripe", what: "Card payments and autopay" },
-  { name: "Twilio", what: "Text message reminders" },
+  { name: "Twilio", what: "Text reminders and a two-way inbox" },
   { name: "Resend", what: "Email reminders and reports" },
-  { name: "Anthropic Claude", what: "Denial explanations, appeals, coding" },
+  { name: "Anthropic Claude", what: "Denials, appeals, coding, report questions" },
+  { name: "Okta, Entra ID, Google", what: "Single sign-on and SCIM provisioning" },
   { name: "Any HL7 v2 EHR or lab", what: "Patients, charges, orders and results" },
 ];
 
@@ -188,7 +229,7 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <a href="#platform" className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
               <Sparkles className="h-3.5 w-3.5" />
-              New: integrations hub, public API, denial agent and UB-04 facility claims
+              New: cash forecast, missed-charge recovery, single sign-on and dental claims
               <ArrowRight className="h-3.5 w-3.5" />
             </a>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
@@ -198,8 +239,8 @@ export default async function LandingPage() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
               The complete revenue cycle for medical practices and billing companies. Verify coverage,
-              code the visit, score every claim for denial risk before it goes out, post remittances,
-              match deposits, appeal in one click and let patients pay from their phone.
+              code the visit, check every claim against NCCI and your payers before it goes out, post remittances,
+              match deposits, recover what was missed or underpaid, forecast cash and let patients pay from their phone.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link href="/login" className="btn bg-green-600 px-6 py-3 text-base text-white hover:bg-green-700">
@@ -331,7 +372,7 @@ export default async function LandingPage() {
             <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium">needs …</span> = connect the practice&apos;s own account
           </p>
         </div>
-        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {CAPABILITIES.map(({ group, icon: Icon, items }) => (
             <div key={group} className="rounded-2xl border border-slate-200 bg-white p-5">
               <div className="flex items-center gap-2">
