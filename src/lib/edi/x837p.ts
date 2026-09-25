@@ -47,6 +47,20 @@ export interface Edi837Input {
     dateOfService: string; // YYYY-MM-DD
     diagnoses: string[]; // ICD-10-CM without dots
   };
+  /**
+   * Set on a secondary claim: the payer that adjudicated first and what it
+   * decided, sent in loops 2320/2330 so the secondary pays only what is left.
+   */
+  otherPayer?: {
+    name: string;
+    payerId: string;
+    subscriber: { lastName: string; firstName: string; memberId: string; groupNumber?: string | null; relationship: string };
+    paidCents: number;
+    /** Date the primary adjudicated (remittance date), YYYY-MM-DD. */
+    adjudicatedOn: string;
+    /** Claim-level adjustments from the primary's remittance, e.g. CO-45, PR-2. */
+    adjustments: { group: string; reason: string; amountCents: number }[];
+  };
   lines: {
     cpt: string;
     modifiers: string[];
@@ -100,7 +114,7 @@ export function buildEdi837P(input: Edi837Input): string {
   s.push(["REF", "EI", input.billingProvider.taxId.replace("-", "")]);
   // 2000B subscriber
   s.push(["HL", "2", "1", "22", "0"]);
-  s.push(["SBR", "P", relCode[input.subscriber.relationship] ?? "18", input.subscriber.groupNumber ?? "", "", "", "", "", "", "CI"]);
+  s.push(["SBR", input.otherPayer ? "S" : "P", relCode[input.subscriber.relationship] ?? "18", input.subscriber.groupNumber ?? "", "", "", "", "", "", "CI"]);
   s.push(["NM1", "IL", "1", input.subscriber.lastName, input.subscriber.firstName, "", "", "", "MI", input.subscriber.memberId]);
   if (input.subscriber.address1) s.push(["N3", input.subscriber.address1]);
   if (input.subscriber.city) s.push(["N4", input.subscriber.city, input.subscriber.state ?? "", (input.subscriber.zip ?? "").replace("-", "")]);
@@ -122,6 +136,20 @@ export function buildEdi837P(input: Edi837Input): string {
   // 2310B rendering provider
   s.push(["NM1", "82", "1", input.renderingProvider.lastName, input.renderingProvider.firstName, "", "", "", "XX", input.renderingProvider.npi]);
   s.push(["PRV", "PE", "PXC", input.renderingProvider.taxonomy]);
+  if (input.otherPayer) {
+    const o = input.otherPayer;
+    // 2320 other subscriber: the primary coverage, its adjudication, and the amount it paid.
+    s.push(["SBR", "P", relCode[o.subscriber.relationship] ?? "18", o.subscriber.groupNumber ?? "", "", "", "", "", "", "CI"]);
+    const byGroup = new Map<string, { reason: string; amountCents: number }[]>();
+    for (const a of o.adjustments.filter((x) => x.amountCents !== 0)) byGroup.set(a.group, [...(byGroup.get(a.group) ?? []), a]);
+    for (const [group, list] of byGroup) s.push(["CAS", group, ...list.slice(0, 6).flatMap((a) => [a.reason, money(a.amountCents), ""])]);
+    s.push(["AMT", "D", money(o.paidCents)]);
+    s.push(["OI", "", "", "Y", "", "", "Y"]);
+    // 2330A other subscriber, 2330B other payer with its adjudication date.
+    s.push(["NM1", "IL", "1", o.subscriber.lastName, o.subscriber.firstName, "", "", "", "MI", o.subscriber.memberId]);
+    s.push(["NM1", "PR", "2", o.name, "", "", "", "", "PI", o.payerId]);
+    s.push(["DTP", "573", "D8", d8(o.adjudicatedOn)]);
+  }
   // 2400 service lines
   input.lines.forEach((line, idx) => {
     s.push(["LX", String(idx + 1)]);

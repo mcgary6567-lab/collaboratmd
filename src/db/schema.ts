@@ -196,6 +196,10 @@ export const claims = pgTable(
     originalPayerClaimNumber: text("original_payer_claim_number"),
     /** Sent in REF*G1 when a prior authorization covers the claim. */
     authorizationNumber: text("authorization_number"),
+    /** P primary, S secondary. A secondary claim carries the primary's adjudication. */
+    payerSequence: text("payer_sequence").notNull().default("P"),
+    /** On a secondary claim, the primary claim whose balance it bills. */
+    primaryClaimId: uuid("primary_claim_id"),
     status: text("status").notNull().default("draft"),
     totalCents: integer("total_cents").notNull(),
     scrubResults: jsonb("scrub_results")

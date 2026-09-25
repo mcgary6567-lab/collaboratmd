@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema, type Db } from "@/db";
 import { CAN_ADJUST, CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
-import { createClaimForEncounter, createCorrectedClaim, voidClaim } from "@/server/claims";
+import { createClaimForEncounter, createCorrectedClaim, createSecondaryClaim, submitClaim, voidClaim } from "@/server/claims";
 import { cancelAuthorization, createAuthorization, createPayerEdit, setPayerEditActive } from "@/server/payer-edits";
 
 const fail = (e: unknown): FormResult => ({ ok: false, message: e instanceof Error ? e.message : "Something went wrong" });
@@ -60,6 +60,24 @@ export async function billAgainAction(claimId: string, _prev: FormResult): Promi
     const claim = await ownClaim(db, s.practiceId, claimId);
     if (claim.status !== "voided") throw new Error("Only a voided claim can be billed again");
     createdId = (await createClaimForEncounter(db, claim.encounterId, s.userId)).id;
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath("/claims");
+  redirect(`/claims/${createdId}`);
+}
+
+/** Bills the patient's secondary insurance for what the primary left, and sends it if it scrubs clean. */
+export async function billSecondaryAction(claimId: string, _prev: FormResult): Promise<FormResult> {
+  const s = await requireRole(CAN_WRITE);
+  let createdId: string;
+  try {
+    const db = await getDb();
+    await ownClaim(db, s.practiceId, claimId);
+    const created = await createSecondaryClaim(db, claimId, s.userId);
+    if (!created) return { ok: false, message: "Nothing to bill: the patient has no secondary insurance or owes nothing on this claim" };
+    if (created.status === "ready") await submitClaim(db, created.id, s.userId);
+    createdId = created.id;
   } catch (e) {
     return fail(e);
   }

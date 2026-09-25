@@ -5,7 +5,7 @@ import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
-import { billAgainAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
+import { billAgainAction, billSecondaryAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader, StatusBadge, PatientLink, Money, Badge } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
@@ -19,18 +19,32 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
   const db = await getDb();
   const b = await loadClaimBundle(db, id);
   if (!b || b.claim.practiceId !== s.practiceId) notFound();
-  const [events, fin, ledger, claimDenials, acks, related] = await Promise.all([
+  // A secondary claim's money posts to its primary, so show the primary's books.
+  const ledgerClaimId = b.claim.payerSequence === "S" && b.claim.primaryClaimId ? b.claim.primaryClaimId : id;
+  const [events, fin, ledger, claimDenials, acks, related, secondaryIns] = await Promise.all([
     db.select().from(schema.claimEvents).where(eq(schema.claimEvents.claimId, id)).orderBy(desc(schema.claimEvents.at)),
-    getClaimFinancials(db, id),
-    db.select().from(schema.ledgerEntries).where(eq(schema.ledgerEntries.claimId, id)).orderBy(asc(schema.ledgerEntries.postedAt)),
+    getClaimFinancials(db, ledgerClaimId),
+    db.select().from(schema.ledgerEntries).where(eq(schema.ledgerEntries.claimId, ledgerClaimId)).orderBy(asc(schema.ledgerEntries.postedAt)),
     db.select().from(schema.denials).where(eq(schema.denials.claimId, id)),
     listAcknowledgments(db, id),
     // The claim this one replaces or voids, and any claims that replace or void it.
     db
-      .select({ id: schema.claims.id, controlNumber: schema.claims.controlNumber, frequencyCode: schema.claims.frequencyCode, status: schema.claims.status, originalClaimId: schema.claims.originalClaimId })
+      .select({ id: schema.claims.id, controlNumber: schema.claims.controlNumber, frequencyCode: schema.claims.frequencyCode, status: schema.claims.status, originalClaimId: schema.claims.originalClaimId, primaryClaimId: schema.claims.primaryClaimId, payerSequence: schema.claims.payerSequence })
       .from(schema.claims)
-      .where(and(eq(schema.claims.practiceId, s.practiceId), or(eq(schema.claims.originalClaimId, id), ...(b.claim.originalClaimId ? [eq(schema.claims.id, b.claim.originalClaimId)] : [])))),
+      .where(and(eq(schema.claims.practiceId, s.practiceId), or(
+        eq(schema.claims.originalClaimId, id),
+        eq(schema.claims.primaryClaimId, id),
+        ...(b.claim.originalClaimId ? [eq(schema.claims.id, b.claim.originalClaimId)] : []),
+        ...(b.claim.primaryClaimId ? [eq(schema.claims.id, b.claim.primaryClaimId)] : []),
+      ))),
+    db.select({ id: schema.patientInsurances.id }).from(schema.patientInsurances)
+      .where(and(eq(schema.patientInsurances.patientId, b.claim.patientId), eq(schema.patientInsurances.active, true), eq(schema.patientInsurances.rank, 2))).limit(1),
   ]);
+  const primaryClaim = related.find((r) => r.id === b.claim.primaryClaimId);
+  const secondaryClaim = related.find((r) => r.primaryClaimId === id && r.payerSequence === "S");
+  const canBillSecondary =
+    b.claim.payerSequence === "P" && ["paid", "partially_paid"].includes(b.claim.status) && !secondaryClaim && secondaryIns.length > 0 &&
+    fin.patientRespCents - fin.patientPaidCents - fin.discountsCents > 0;
   const original = related.find((r) => r.id === b.claim.originalClaimId);
   const successors = related.filter((r) => r.originalClaimId === id);
   const FREQ: Record<string, string> = { "1": "Original", "7": "Replacement", "8": "Void" };
@@ -111,6 +125,33 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                       <button className="btn btn-danger text-xs">Write off</button>
                     </form>
                   </>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {(primaryClaim || secondaryClaim || canBillSecondary) && (
+            <Card title={b.claim.payerSequence === "S" ? "Secondary claim" : "Secondary insurance"}>
+              <div className="space-y-2 text-sm">
+                {primaryClaim && (
+                  <p>
+                    Bills the balance the primary payer left on{" "}
+                    <Link className="font-mono text-brand-700 hover:underline" href={`/claims/${primaryClaim.id}`}>{primaryClaim.controlNumber}</Link>.
+                    Its payments post to that claim, so the financials here are the primary claim&apos;s.
+                  </p>
+                )}
+                {secondaryClaim && (
+                  <p className="flex items-center gap-2">
+                    Balance billed to secondary insurance on
+                    <Link className="font-mono text-brand-700 hover:underline" href={`/claims/${secondaryClaim.id}`}>{secondaryClaim.controlNumber}</Link>
+                    <StatusBadge status={secondaryClaim.status} />
+                  </p>
+                )}
+                {canBillSecondary && (
+                  <ActionForm action={billSecondaryAction.bind(null, id)} className="space-y-2">
+                    <p className="text-slate-600">The patient has secondary insurance. Bill it for the patient responsibility the primary left, instead of the patient.</p>
+                    <SubmitButton className="btn btn-primary text-xs" pendingLabel="Billing...">Bill secondary insurance</SubmitButton>
+                  </ActionForm>
                 )}
               </div>
             </Card>

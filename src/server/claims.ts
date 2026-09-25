@@ -151,6 +151,8 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     throw new Error("Claim has blocking scrub errors");
   }
   const authorizationNumber = edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null;
+  const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
+  if (bundle.claim.payerSequence === "S" && !otherPayer) throw new Error("The primary claim has no posted remittance to send to the secondary payer");
   const now = new Date();
   const edi = buildEdi837P({
     controlNumber: bundle.claim.controlNumber,
@@ -168,9 +170,10 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
       dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses,
     },
     lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService })),
+    otherPayer,
   });
   await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
-  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : "837P";
+  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : "837P";
   await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `${kind} generated and sent to clearinghouse (${edi.length} bytes)` });
 
   const result = await getClearinghouse().submit837(edi, {
@@ -287,7 +290,10 @@ export async function fetchAndPostRemittances(db: Db, practiceId: string, userId
         continue;
       }
       const lines = await db.select().from(charges).where(eq(charges.encounterId, r.claim.encounterId));
-      items.push({ ...base, lines: lines.map((l) => ({ cpt: l.cpt, units: l.units, chargeCents: l.chargeCents * l.units })) });
+      const secondary = r.claim.payerSequence === "S" && r.claim.primaryClaimId
+        ? { balanceCents: (await getClaimFinancials(db, r.claim.primaryClaimId)).insuranceBalanceCents }
+        : undefined;
+      items.push({ ...base, lines: lines.map((l) => ({ cpt: l.cpt, units: l.units, chargeCents: l.chargeCents * l.units })), secondary });
     }
     if (!items.length) continue;
     const raw = await getClearinghouse().fetch835(items);
@@ -340,7 +346,8 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   if (!remit) throw new Error("Remittance not found");
   if (remit.posted) return remit.postingSummary;
   const parsed = parseEdi835(remit.raw835);
-  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
+  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number; secondaryBilled?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
+  const readyForSecondary: string[] = [];
 
   for (const rc of parsed.claims) {
     const [claim] = await db.select().from(claims).where(and(eq(claims.practiceId, remit.practiceId), eq(claims.controlNumber, rc.patientControlNumber))).limit(1);
@@ -349,7 +356,9 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
       continue;
     }
     summary.matched++;
-    const base = { practiceId: remit.practiceId, patientId: claim.patientId, claimId: claim.id, remittanceId, postedBy: userId ?? null };
+    // A secondary's payment settles the balance of the primary claim, so it posts there.
+    const isSecondary = claim.payerSequence === "S" && !!claim.primaryClaimId;
+    const base = { practiceId: remit.practiceId, patientId: claim.patientId, claimId: isSecondary ? claim.primaryClaimId! : claim.id, remittanceId, postedBy: userId ?? null };
     if (rc.statusCode === "22") {
       await postReversal(db, claim, rc, base, remit.checkNumber);
       summary.reversals = (summary.reversals ?? 0) + 1;
@@ -364,6 +373,8 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
     // Line-level adjustments take precedence when present; avoid double-posting claim-level duplicates.
     const adjustments = rc.lines.length ? rc.lines.flatMap((l) => l.adjustments) : rc.adjustments;
     for (const adj of adjustments) {
+      // CARC 23 is the part the prior payer already settled; nothing to post.
+      if (adj.reason === "23") continue;
       if (adj.group === "PR") {
         await db.insert(ledgerEntries).values({ ...base, type: "transfer_to_patient", amountCents: adj.amountCents, groupCode: adj.group, reasonCode: adj.reason, note: "Patient responsibility per ERA" });
         summary.patientRespCents += adj.amountCents;
@@ -375,16 +386,23 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
         summary.adjustedCents += adj.amountCents;
       }
     }
-    const denialAdj = allAdj.find((a) => a.group !== "PR" && a.reason !== "45");
+    const denialAdj = allAdj.find((a) => a.group !== "PR" && a.reason !== "45" && a.reason !== "23");
     let status: string;
     if (rc.statusCode === "4" || (rc.paidCents === 0 && denialAdj)) status = "denied";
     else if (rc.paidCents > 0 && denialAdj) status = "partially_paid";
     else status = "paid";
     await db.update(claims).set({ status, payerClaimNumber: rc.payerClaimNumber || claim.payerClaimNumber, updatedAt: new Date() }).where(eq(claims.id, claim.id));
     await db.insert(claimEvents).values({ claimId: claim.id, status, source: "835", message: `ERA ${remit.checkNumber}: paid ${(rc.paidCents / 100).toFixed(2)}, patient resp ${(rc.patientResponsibilityCents / 100).toFixed(2)}` });
+    if (isSecondary) {
+      await db.update(claims).set({ status, updatedAt: new Date() }).where(eq(claims.id, claim.primaryClaimId!));
+      await db.insert(claimEvents).values({ claimId: claim.primaryClaimId!, status, source: "835", message: `Secondary ${claim.controlNumber} paid ${(rc.paidCents / 100).toFixed(2)}` });
+    } else if (status !== "denied" && rc.patientResponsibilityCents > 0) {
+      readyForSecondary.push(claim.id);
+    }
 
     // Compare what was allowed with the payer contract, now that it is posted.
-    const under = await checkClaimUnderpayment(db, claim.id, remittanceId);
+    // A secondary pays against another payer's allowed amount, not a contract.
+    const under = isSecondary ? null : await checkClaimUnderpayment(db, claim.id, remittanceId);
     if (under?.underpaid) {
       summary.underpaid = (summary.underpaid ?? 0) + 1;
       await db.insert(claimEvents).values({ claimId: claim.id, status, source: "system", message: `Underpaid against contract by ${(under.varianceCents / 100).toFixed(2)} (expected ${(under.expectedCents / 100).toFixed(2)} allowed)` });
@@ -402,8 +420,93 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
       summary.denials++;
     }
   }
+  // Bill the patient's second insurer for what the first left, where there is one.
+  for (const id of readyForSecondary) {
+    try {
+      const created = await createSecondaryClaim(db, id, userId);
+      if (!created) continue;
+      summary.secondaryBilled = (summary.secondaryBilled ?? 0) + 1;
+      if (created.status === "ready") await submitClaim(db, created.id, userId);
+    } catch (e) {
+      await db.insert(claimEvents).values({ claimId: id, status: "paid", source: "system", message: `Secondary claim not created: ${e instanceof Error ? e.message : "error"}` });
+    }
+  }
   await db.update(remittances).set({ posted: true, postingSummary: summary }).where(eq(remittances.id, remittanceId));
   return summary;
+}
+
+/** The primary payer's decision on a claim, as a secondary claim must report it. */
+async function primaryAdjudication(db: Db, primaryClaimId: string) {
+  const bundle = await loadClaimBundle(db, primaryClaimId);
+  if (!bundle) return undefined;
+  // Only what the primary payer posted: its remittances, not a later secondary's.
+  const rows = await db
+    .select({ entry: ledgerEntries, paymentDate: remittances.paymentDate })
+    .from(ledgerEntries)
+    .innerJoin(remittances, eq(remittances.id, ledgerEntries.remittanceId))
+    .where(and(eq(ledgerEntries.claimId, primaryClaimId), eq(remittances.payerId, bundle.claim.payerId)))
+    .orderBy(asc(ledgerEntries.postedAt));
+  if (!rows.length) return undefined;
+  const paidCents = rows.reduce((a, r) => a + (r.entry.type === "insurance_payment" ? r.entry.amountCents : r.entry.type === "reversal" ? -r.entry.amountCents : 0), 0);
+  const grouped = new Map<string, { group: string; reason: string; amountCents: number }>();
+  for (const { entry } of rows) {
+    if (!entry.groupCode || !entry.reasonCode || (entry.type !== "adjustment" && entry.type !== "transfer_to_patient")) continue;
+    const key = `${entry.groupCode}:${entry.reasonCode}`;
+    const g = grouped.get(key) ?? { group: entry.groupCode, reason: entry.reasonCode, amountCents: 0 };
+    g.amountCents += entry.amountCents;
+    grouped.set(key, g);
+  }
+  return {
+    name: bundle.payer.name,
+    payerId: bundle.payer.payerId,
+    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, relationship: bundle.insurance.relationship },
+    paidCents,
+    adjudicatedOn: rows[rows.length - 1].paymentDate,
+    adjustments: [...grouped.values()],
+  };
+}
+
+/**
+ * Bills the patient's secondary insurance for what the primary left as
+ * patient responsibility. That amount moves off the patient's balance (it is
+ * no longer theirs to pay unless the secondary declines it) and back onto
+ * the primary claim's insurance balance, which the secondary's payment then
+ * settles. Returns null when there is nothing to bill or no secondary.
+ */
+export async function createSecondaryClaim(db: Db, primaryClaimId: string, userId?: string) {
+  const [primary] = await db.select().from(claims).where(eq(claims.id, primaryClaimId)).limit(1);
+  if (!primary) throw new Error("Claim not found");
+  if (primary.payerSequence !== "P") throw new Error("Only a primary claim has a secondary");
+  if (!["paid", "partially_paid"].includes(primary.status)) throw new Error("The primary payer has not paid this claim yet");
+  const [existing] = await db.select({ id: claims.id }).from(claims).where(and(eq(claims.primaryClaimId, primaryClaimId), eq(claims.payerSequence, "S"))).limit(1);
+  if (existing) throw new Error("A secondary claim already exists for this claim");
+  const [secondary] = await db
+    .select()
+    .from(patientInsurances)
+    .where(and(eq(patientInsurances.patientId, primary.patientId), eq(patientInsurances.active, true), eq(patientInsurances.rank, 2)))
+    .limit(1);
+  if (!secondary) return null;
+  const fin = await getClaimFinancials(db, primaryClaimId);
+  const owed = fin.patientRespCents - fin.patientPaidCents - fin.discountsCents;
+  if (owed <= 0) return null;
+
+  await db.insert(ledgerEntries).values({
+    practiceId: primary.practiceId, patientId: primary.patientId, claimId: primaryClaimId, type: "transfer_to_patient", amountCents: -owed,
+    postedBy: userId ?? null, note: "Patient responsibility billed to secondary insurance",
+  });
+  const [created] = await db
+    .insert(claims)
+    .values({
+      practiceId: primary.practiceId, encounterId: primary.encounterId, patientId: primary.patientId,
+      payerId: secondary.payerId, patientInsuranceId: secondary.id, controlNumber: await nextControlNumber(db, primary.practiceId),
+      payerSequence: "S", primaryClaimId, totalCents: primary.totalCents, status: "draft", timelyFilingDeadline: primary.timelyFilingDeadline,
+    })
+    .returning();
+  await db.update(claims).set({ status: "billed_secondary", updatedAt: new Date() }).where(eq(claims.id, primaryClaimId));
+  await db.insert(claimEvents).values({ claimId: primaryClaimId, status: "billed_secondary", source: "system", message: `${(owed / 100).toFixed(2)} billed to secondary insurance on ${created.controlNumber}` });
+  await db.insert(claimEvents).values({ claimId: created.id, status: "draft", source: "system", message: `Secondary claim for ${primary.controlNumber}, balance ${(owed / 100).toFixed(2)}` });
+  await db.insert(schema.auditLog).values({ practiceId: primary.practiceId, userId: userId ?? null, action: "secondary_claim", entity: "claim", entityId: created.id, details: { primary: primaryClaimId, owedCents: owed } });
+  return rescrubClaim(db, created.id);
 }
 
 /**

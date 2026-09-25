@@ -59,6 +59,8 @@ export interface RemitRequest {
   memberId: string;
   /** Present for an accepted void: the payer answers it by reversing the original claim. */
   reversal?: ReversalRequest;
+  /** Present for a secondary claim: what the primary left unpaid. */
+  secondary?: { balanceCents: number };
 }
 
 /**
@@ -192,6 +194,27 @@ export class MockClearinghouse implements ClearinghouseGateway {
           paidCents: -r.paidCents,
           patientResponsibilityCents: -pr,
           adjustments: r.adjustments.map((a) => ({ ...a, amountCents: -a.amountCents })),
+          lines: [],
+        };
+      }
+      if (c.secondary) {
+        // CLP02 = 2, processed as secondary. CARC 23 covers what the primary
+        // settled; the rest is paid, less a share some plans leave the patient.
+        const charged = c.lines.reduce((a, l) => a + l.chargeCents, 0);
+        const balance = Math.max(0, Math.min(c.secondary.balanceCents, charged));
+        const h2 = hashStr(c.controlNumber + "secondary");
+        const pr = h2 % 4 === 0 ? Math.round(balance * 0.2) : 0;
+        return {
+          patientControlNumber: c.controlNumber,
+          payerClaimNumber: "SEC" + (h2 % 1_000_000).toString().padStart(6, "0"),
+          statusCode: "2",
+          chargedCents: charged,
+          paidCents: balance - pr,
+          patientResponsibilityCents: pr,
+          adjustments: [
+            { group: "OA", reason: "23", amountCents: charged - balance },
+            ...(pr ? [{ group: "PR", reason: "2", amountCents: pr }] : []),
+          ] as Adjustment[],
           lines: [],
         };
       }
