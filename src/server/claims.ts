@@ -17,6 +17,7 @@ import { authsForPatient, consumeAuthorization, rulesForPayer } from "./payer-ed
 import { enrollmentFinding, enrollmentFor } from "./enrollment";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
+import { codeSetFindings } from "./code-sets";
 
 const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -95,7 +96,11 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
     auths,
   );
   const enrolled = enrollmentFinding(enrollment, b.encounter.dateOfService, `Dr. ${b.provider.firstName} ${b.provider.lastName}`, b.payer.name);
-  return { findings: [...general, ...edits.findings, ...(enrolled ? [enrolled] : [])], edits };
+  const national = await codeSetFindings(db, {
+    payerType: b.payer.type, dateOfService: b.encounter.dateOfService, diagnoses: b.encounter.diagnoses,
+    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units })),
+  });
+  return { findings: [...general, ...edits.findings, ...national, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {

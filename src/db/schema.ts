@@ -581,6 +581,46 @@ export const vendorAgreements = pgTable("vendor_agreements", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/* National code sets (CMS NCCI and coverage policies): see migration 0026 and server/code-sets.ts. */
+export const ncciPtp = pgTable("ncci_ptp", {
+  column1: text("column1").notNull(),
+  column2: text("column2").notNull(),
+  effective: date("effective").notNull(),
+  deletion: date("deletion"),
+  modifierIndicator: text("modifier_indicator").notNull(),
+  rationale: text("rationale"),
+}, (t) => [primaryKey({ columns: [t.column1, t.column2, t.effective] })]);
+
+export const ncciMue = pgTable("ncci_mue", {
+  code: text("code").primaryKey(),
+  maxUnits: integer("max_units").notNull(),
+  adjudicationIndicator: text("adjudication_indicator"),
+  rationale: text("rationale"),
+});
+
+export const coveragePolicyCodes = pgTable("coverage_policy_codes", {
+  policyId: text("policy_id").notNull(),
+  title: text("title").notNull(),
+  cpt: text("cpt").notNull(),
+  icd10: text("icd10").notNull(),
+}, (t) => [primaryKey({ columns: [t.policyId, t.cpt, t.icd10] })]);
+
+export const codeSetLoads = pgTable("code_set_loads", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  codeSet: text("code_set").notNull(),
+  label: text("label").notNull(),
+  rows: integer("rows").notNull(),
+  loadedBy: text("loaded_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const ruleSuggestionDismissals = pgTable("rule_suggestion_dismissals", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  suggestionKey: text("suggestion_key").notNull(),
+  dismissedBy: uuid("dismissed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.suggestionKey] })]);
+
 /**
  * Messages from the public contact form.
  *

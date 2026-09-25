@@ -3,6 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listPayerEdits } from "@/server/payer-edits";
+import { KIND_LABEL, suggestRules } from "@/server/rule-suggestions";
+import { adoptSuggestionAction, dismissSuggestionAction } from "@/app/(app)/code-set-actions";
 import { EDIT_KINDS } from "@/lib/scrub/payer-edits";
 import { createPayerEditAction, setPayerEditActiveAction } from "@/app/(app)/claim-control-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -20,8 +22,9 @@ function detail(kind: string, params: { modifiers?: string[]; dxPrefixes?: strin
 export default async function PayerEditsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [edits, payers] = await Promise.all([
+  const [edits, suggestions, payers] = await Promise.all([
     listPayerEdits(db, s.practiceId),
+    suggestRules(db, s.practiceId),
     db.select().from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
   ]);
   const admin = s.role === "admin";
@@ -32,8 +35,31 @@ export default async function PayerEditsPage() {
       <PageHeader
         title="Payer edits"
         subtitle="Rules one payer applies and another does not, checked on every claim before it is sent"
-        actions={<Link href="/settings" className="btn btn-secondary">Back to settings</Link>}
+        actions={<><Link href="/settings/code-sets" className="btn btn-secondary">National code sets</Link><Link href="/settings" className="btn btn-secondary">Back to settings</Link></>}
       />
+      {suggestions.length > 0 && (
+        <div className="mb-6">
+          <Card title={`Suggested from your denials · ${suggestions.length}`}>
+            <p className="mb-3 text-sm text-slate-600">These payers keep denying the same code for the same reason. Adding the rule stops the next claim at the desk instead of weeks later on a remittance.</p>
+            <ul className="space-y-3">
+              {suggestions.map((sg) => (
+                <li key={sg.key} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">{sg.payerName} · {sg.cpt}: {KIND_LABEL[sg.kind]}{detail(sg.kind, sg.params) ? ` (${detail(sg.kind, sg.params)})` : ""}</p>
+                    <p className="text-slate-600">{sg.evidence} {(sg.deniedCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} denied.</p>
+                  </div>
+                  {["admin", "biller"].includes(s.role) && (
+                    <div className="flex gap-2">
+                      <ActionForm action={adoptSuggestionAction.bind(null, sg.key)}><SubmitButton className="btn btn-primary text-xs" pendingLabel="Adding...">Add rule</SubmitButton></ActionForm>
+                      <ActionForm action={dismissSuggestionAction.bind(null, sg.key)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Dismiss</SubmitButton></ActionForm>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title={`Edits on file · ${edits.filter((e) => e.edit.active).length} active`} className="lg:col-span-2">
           {edits.length === 0 ? (

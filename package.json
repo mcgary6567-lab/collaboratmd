@@ -11,6 +11,7 @@
     "test": "vitest run",
     "build:migrations": "node scripts/build-migrations.mjs",
     "seed:large": "tsx scripts/seed-large.ts",
+    "import:code-sets": "tsx --tsconfig tsconfig.scripts.json scripts/import-code-sets.ts",
     "deploy": "node scripts/deploy-vercel.mjs"
   },
   "dependencies": {
