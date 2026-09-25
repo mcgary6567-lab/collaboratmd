@@ -18,6 +18,7 @@ type Item = { href: string; label: string; anchor?: boolean };
 
 const ITEMS: Item[] = [
   { href: "#platform", label: "Platform", anchor: true },
+  { href: "#features", label: "Features", anchor: true },
   { href: "#workflow", label: "How it works", anchor: true },
   { href: "/pricing", label: "Pricing" },
   { href: "/blog", label: "Blog" },
