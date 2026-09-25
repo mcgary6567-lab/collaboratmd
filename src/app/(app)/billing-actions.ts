@@ -9,6 +9,7 @@ import {
   applyDiscount, cancelPlan, createEstimate, createPaymentPlan, createPolicy, generateStatement, generateStatementBatch,
   markStatementSent, recordPlanPayment, setPolicyActive, voidStatement,
 } from "@/server/billing";
+import { getPolicies } from "@/server/policies";
 
 const ok = (message: string): FormResult => ({ ok: true, message });
 const fail = (e: unknown): FormResult => ({ ok: false, message: e instanceof Error ? e.message : "Something went wrong" });
@@ -115,7 +116,8 @@ export async function statementBatchAction(_prev: FormResult, formData: FormData
   const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
-    const r = await generateStatementBatch(db, s.practiceId, { minBalanceCents: dollars(formData.get("min")) || 500 }, s.userId);
+    const policies = await getPolicies(db, s.practiceId);
+    const r = await generateStatementBatch(db, s.practiceId, { minBalanceCents: dollars(formData.get("min")) || policies.statementMinCents || 500, skipDays: policies.statementIntervalDays ?? 25 }, s.userId);
     revalidatePath("/billing");
     return ok(`${r.generated} statements generated, ${r.skipped} skipped as recently billed`);
   } catch (e) {

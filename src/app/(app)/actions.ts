@@ -6,7 +6,8 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_ADJUST, CAN_WRITE, requireRole } from "@/lib/auth";
-import { submitClaim, rescrubClaim, fetchAndPostRemittances, importRemittance, postRemittance, writeOffClaim, transferToPatient } from "@/server/claims";
+import { submitClaim, rescrubClaim, fetchAndPostRemittances, importRemittance, postRemittance, writeOffClaim, transferToPatient, getClaimFinancials } from "@/server/claims";
+import { assertWriteOffAllowed } from "@/server/policies";
 import { createPatient, runEligibility, postPatientPayment } from "@/server/patients";
 import { createEncounterWithClaim, createAppointment, setAppointmentStatus } from "@/server/encounters";
 import { updateDenialStatus } from "@/server/reports";
@@ -25,7 +26,7 @@ export async function submitClaimAction(claimId: string): Promise<ActionResult> 
   try {
     const db = await getDb();
     await assertOwned(db, s.practiceId, "claim", claimId);
-    const { status, result } = await submitClaim(db, claimId, s.userId);
+    const { status, result } = await submitClaim(db, claimId, s.userId, { role: s.role });
     revalidatePath("/claims");
     revalidatePath(`/claims/${claimId}`);
     return { ok: status === "accepted", message: result.message };
@@ -57,7 +58,7 @@ export async function submitAllReadyAction(): Promise<ActionResult> {
   let rejected = 0;
   for (const r of ready) {
     try {
-      const { status } = await submitClaim(db, r.claim.id, s.userId);
+      const { status } = await submitClaim(db, r.claim.id, s.userId, { role: s.role });
       if (status === "accepted") accepted++;
       else rejected++;
     } catch {
@@ -72,6 +73,7 @@ export async function writeOffClaimAction(claimId: string, formData: FormData): 
   const s = await requireRole(CAN_ADJUST);
   const db = await getDb();
   await assertOwned(db, s.practiceId, "claim", claimId);
+  await assertWriteOffAllowed(db, s.practiceId, s.role, (await getClaimFinancials(db, claimId)).insuranceBalanceCents);
   await writeOffClaim(db, claimId, String(formData.get("reason") || "Write-off"), s.userId);
   revalidatePath(`/claims/${claimId}`);
   revalidatePath("/denials");

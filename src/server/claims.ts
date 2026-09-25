@@ -8,6 +8,8 @@ import { buildEdi837I } from "@/lib/edi/x837i";
 import { buildEdi837D } from "@/lib/edi/x837d";
 import { scrubDental } from "@/lib/scrub/dental";
 import { attachmentRefs, markAttachmentsSent } from "./attachments";
+import { blocksSubmission } from "./policies";
+import { claimRisk } from "./risk";
 import { scrubInstitutional } from "@/lib/scrub/institutional";
 import { parseEdi835 } from "@/lib/edi/x835";
 import { parse999, describeSyntaxError } from "@/lib/edi/x999";
@@ -166,7 +168,7 @@ export async function rescrubClaim(db: Db, claimId: string) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
   const { findings, edits } = await scrubBundle(db, bundle);
-  const status = hasBlockingErrors(findings) ? "scrub_errors" : "ready";
+  const status = blocksSubmission(findings, bundle.practice.policies) ? "scrub_errors" : "ready";
   const [updated] = await db
     .update(claims)
     .set({ scrubResults: findings, status, authorizationNumber: edits.authorization?.authNumber ?? null, updatedAt: new Date() })
@@ -239,7 +241,7 @@ export async function previewClaimEdi(db: Db, claimId: string) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
   const { findings, edits } = await scrubBundle(db, bundle);
-  if (hasBlockingErrors(findings)) throw new Error("Fix the scrub errors first");
+  if (blocksSubmission(findings, bundle.practice.policies)) throw new Error(bundle.practice.policies?.strictScrub && !hasBlockingErrors(findings) ? "Strict scrubbing is on: resolve the warnings first" : "Fix the scrub errors first");
   const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
   const edi = buildClaimEdi(bundle, { now: new Date(), authorizationNumber: edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null, attachments: await attachmentRefs(db, claimId), otherPayer });
   const kind = bundle.claim.claimType === "dental" ? "837D" : bundle.claim.claimType === "institutional" ? "837I" : "837P";
@@ -247,14 +249,26 @@ export async function previewClaimEdi(db: Db, claimId: string) {
 }
 
 /** Generates the 837P and submits it through the clearinghouse gateway. */
-export async function submitClaim(db: Db, claimId: string, userId?: string) {
+/**
+ * `opts.role` is the role of the person sending it. Under a risk hold policy,
+ * an original claim scoring at or above the practice's threshold is held for
+ * an administrator; automated resubmissions (no role) are not held.
+ */
+export async function submitClaim(db: Db, claimId: string, userId?: string, opts: { role?: string } = {}) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
   if (!["ready", "rejected", "scrub_errors"].includes(bundle.claim.status)) throw new Error(`Claim in status ${bundle.claim.status} cannot be submitted`);
   const { findings, edits } = await scrubBundle(db, bundle);
-  if (hasBlockingErrors(findings)) {
+  const policies = bundle.practice.policies;
+  if (blocksSubmission(findings, policies)) {
     await db.update(claims).set({ scrubResults: findings, status: "scrub_errors", updatedAt: new Date() }).where(eq(claims.id, claimId));
-    throw new Error("Claim has blocking scrub errors");
+    throw new Error(hasBlockingErrors(findings) ? "Claim has blocking scrub errors" : "Strict scrubbing is on: resolve the scrubber warnings before sending");
+  }
+  if (policies?.riskHoldScore && opts.role && opts.role !== "admin" && bundle.claim.frequencyCode === "1") {
+    const risk = await claimRisk(db, bundle.claim.practiceId, claimId);
+    if (risk && risk.score >= policies.riskHoldScore) {
+      throw new Error(`Held for review: denial risk ${risk.score} is at or above the practice's limit of ${policies.riskHoldScore}. An administrator can send it.`);
+    }
   }
   const authorizationNumber = edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null;
   const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;

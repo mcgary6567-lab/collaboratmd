@@ -31,10 +31,10 @@ function ThemeToggle() {
   );
 }
 
-function NavLinks({ role, multi, onNavigate }: { role: string; multi: boolean; onNavigate?: () => void }) {
+function NavLinks({ role, multi, hidden, onNavigate }: { role: string; multi: boolean; hidden: string[]; onNavigate?: () => void }) {
   const pathname = usePathname();
   // The longest matching link is the active one, so /claims/follow-up does not also light up /claims.
-  const visible = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (!i.adminOnly || role === "admin") && (!i.multiOnly || multi)) })).filter((g) => g.items.length);
+  const visible = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (!i.adminOnly || role === "admin") && (!i.multiOnly || multi) && !hidden.includes(i.href)) })).filter((g) => g.items.length);
   const activeHref = ALL_PAGES.map((i) => i.href).filter((h) => pathname === h || pathname.startsWith(h + "/")).sort((a, b) => b.length - a.length)[0];
   return (
     <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
@@ -66,12 +66,15 @@ export function Sidebar({
   practices,
   current,
   tasks,
+  hidden = [],
 }: {
   user: { name: string; role: string };
   logout: () => Promise<void>;
   practices: { id: string; name: string }[];
   current: string;
   tasks: { open: number; due: number };
+  /** Menu items the practice has hidden. */
+  hidden?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -139,7 +142,7 @@ export function Sidebar({
               </button>
             </div>
             <PracticeSwitcher practices={practices} current={current} />
-            <NavLinks role={user.role} multi={multi} onNavigate={() => setOpen(false)} />
+            <NavLinks role={user.role} multi={multi} hidden={hidden} onNavigate={() => setOpen(false)} />
             {footer}
           </aside>
         </div>
@@ -157,7 +160,7 @@ export function Sidebar({
         </div>
         <PracticeSwitcher practices={practices} current={current} />
         {searchButton}
-        <NavLinks role={user.role} multi={multi} />
+        <NavLinks role={user.role} multi={multi} hidden={hidden} />
         {footer}
       </aside>
     </>

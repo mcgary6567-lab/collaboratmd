@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth";
 import { mfaStatus } from "@/server/mfa";
 import { setRequireMfaAction } from "@/app/(app)/security-actions";
 import { ipAllowlistAction, sessionHoursAction } from "@/app/(app)/access-actions";
+import { signOutEveryoneAction } from "@/app/(app)/admin-actions";
 import { SESSION_HOURS } from "@/server/team";
 import { clientIp } from "@/lib/ip";
 import { headers } from "next/headers";
@@ -76,6 +77,14 @@ export default async function SecuritySettingsPage() {
               <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Saving...">Save</SubmitButton>
             </ActionForm>
           ) : <p className="text-sm">{practice.ipAllowlist.length ? practice.ipAllowlist.join(", ") : "Anywhere"}</p>}
+        </Card>
+        <Card title="Sign everyone out">
+          <p className="mb-3 text-xs text-slate-500">Ends every session in this practice right away, on every device: after a lost laptop, a departure, or a change to these rules. Everyone signs in again; you stay signed in. To sign out one person, use Team and roles.</p>
+          {admin ? (
+            <ActionForm action={signOutEveryoneAction}>
+              <SubmitButton className="btn btn-secondary text-xs text-red-700" pendingLabel="Signing out...">Sign everyone else out now</SubmitButton>
+            </ActionForm>
+          ) : <p className="text-sm text-slate-500">An administrator can do this.</p>}
         </Card>
         <Card title="More">
           <ul className="space-y-2 text-sm">

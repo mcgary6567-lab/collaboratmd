@@ -1,80 +1,66 @@
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { Card, PageHeader, Badge } from "@/components/ui";
-import { money } from "@/lib/utils";
-import { clearinghouseName } from "@/lib/clearinghouse/gateway";
+import { isValidNpi } from "@/lib/scrub/rules";
+import { settingsFor } from "@/lib/settings-sections";
 import { practiceConfig } from "@/server/integrations";
+import { getSso } from "@/server/sso";
+import { Badge, Card, PageHeader } from "@/components/ui";
+import { SettingsDirectory } from "./settings-directory";
 
 export const dynamic = "force-dynamic";
+
+type Check = { label: string; state: "ok" | "todo" | "info"; detail: string; href: string };
 
 export default async function SettingsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [[practice], providers, payers, users, cpts] = await Promise.all([
+  const since = new Date(Date.now() - 26 * 3_600_000);
+  const [[practice], [providers], [payers], [noMfa], [runs], [ncci], cfg, sso] = await Promise.all([
     db.select().from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1),
-    db.select().from(schema.providers).where(eq(schema.providers.practiceId, s.practiceId)).orderBy(asc(schema.providers.lastName)),
-    db.select().from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
-    db.select().from(schema.users).where(eq(schema.users.practiceId, s.practiceId)).orderBy(asc(schema.users.name)),
-    db.select().from(schema.cptCodes).orderBy(asc(schema.cptCodes.code)),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.providers).where(and(eq(schema.providers.practiceId, s.practiceId), eq(schema.providers.active, true))),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.users).where(and(eq(schema.users.practiceId, s.practiceId), isNull(schema.users.mfaSecret), isNull(schema.users.disabledAt))),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.automationRuns).where(and(eq(schema.automationRuns.practiceId, s.practiceId), gte(schema.automationRuns.ranAt, since))),
+    db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM (SELECT 1 FROM ncci_ptp LIMIT 1) x`).then((r) => r.rows),
+    practiceConfig(db, s.practiceId),
+    getSso(db, s.practiceId),
   ]);
-  const cfg = await practiceConfig(db, s.practiceId);
+  const p = practice.policies ?? {};
+  const policiesOn = [p.writeOffLimitCents != null, p.strictScrub, p.riskHoldScore != null, p.smallBalanceCents != null, p.exportsAdminOnly, p.refundDualControl].filter(Boolean).length;
+
+  const checks: Check[] = [
+    { label: "Practice profile", state: isValidNpi(practice.npi) && /^\d{2}-?\d{7}$/.test(practice.taxId) && practice.phone ? "ok" : "todo", detail: isValidNpi(practice.npi) ? (practice.phone ? `NPI ${practice.npi}` : "Add a phone number") : "The NPI fails its check digit", href: "/settings/profile" },
+    { label: "Providers and payers", state: Number(providers.n) && Number(payers.n) ? "ok" : "todo", detail: `${providers.n} active providers, ${payers.n} payers`, href: "/settings/providers" },
+    { label: "Clearinghouse", state: cfg.stedi ? "ok" : "todo", detail: cfg.stedi ? "Stedi connected: claims go to payers" : "Simulated: connect Stedi to send real claims", href: "/settings/connections" },
+    { label: "Two-factor sign-in", state: practice.requireMfa ? "ok" : "todo", detail: practice.requireMfa ? "Required for everyone" : `Optional; ${noMfa.n} ${Number(noMfa.n) === 1 ? "person is" : "people are"} without it`, href: "/settings/security" },
+    { label: "Daily automation", state: Number(runs.n) ? "ok" : "todo", detail: Number(runs.n) ? "Ran in the last day" : "Has not run in the last day (check CRON_SECRET on the server)", href: "/settings/automation" },
+    { label: "Billing policies", state: policiesOn ? "ok" : "info", detail: policiesOn ? `${policiesOn} rule${policiesOn === 1 ? "" : "s"} on` : "None on: limits and approvals are open", href: "/settings/policies" },
+    { label: "National code sets", state: Number(ncci?.n) ? "ok" : "info", detail: Number(ncci?.n) ? "NCCI edits loaded" : "Not loaded: NCCI checks are skipped", href: "/settings/code-sets" },
+    { label: "Single sign-on", state: sso ? "ok" : "info", detail: sso ? `On for ${sso.domains.join(", ")}` : "Optional: sign in with Okta, Entra ID or Google", href: "/settings/sso" },
+  ];
+  const done = checks.filter((c) => c.state === "ok").length;
+  const TONE = { ok: "green", todo: "amber", info: "slate" } as const;
+  const WORD = { ok: "Done", todo: "To do", info: "Optional" } as const;
+
   return (
     <>
-      <PageHeader title="Settings" subtitle="Practice configuration, providers, payers, users and fee schedule" actions={<Link href="/settings/connections" className="btn btn-primary">Integrations and API keys</Link>} />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Practice (billing provider)">
-          <dl className="space-y-1 text-sm">
-            <div className="flex justify-between"><dt className="text-slate-500">Name</dt><dd className="font-medium">{practice.name}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Tax ID</dt><dd className="font-mono">{practice.taxId}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">NPI (Type 2)</dt><dd className="font-mono">{practice.npi}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Address</dt><dd className="text-right">{practice.address1}<br />{practice.city}, {practice.state} {practice.zip}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Clearinghouse</dt><dd>{clearinghouseName(cfg.stedi?.apiKey) === "Stedi" ? <Badge tone="green">Stedi (live)</Badge> : <Link href="/settings/connections"><Badge tone="amber">Simulated · connect Stedi</Badge></Link>}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">AI rejection support</dt><dd><Badge tone={cfg.anthropic ? "green" : "slate"}>{cfg.anthropic ? "Claude enabled" : "Rules-based · connect Claude"}</Badge></dd></div>
-          </dl>
-        </Card>
-        <Card title="Users" actions={<span className="flex gap-2"><Link href="/settings/team" className="btn btn-secondary text-xs">Team and roles</Link><Link href="/settings/sso" className="btn btn-secondary text-xs">Single sign-on</Link><Link href="/settings/security" className="btn btn-secondary text-xs">Sign-in security</Link></span>}>
-          <table className="table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}><td>{u.name}</td><td>{u.email}</td><td className="capitalize">{u.role.replace("_", " ")}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <Card title="Providers">
-          <table className="table">
-            <thead><tr><th>Provider</th><th>NPI</th><th>Taxonomy</th><th>Specialty</th></tr></thead>
-            <tbody>
-              {providers.map((p) => (
-                <tr key={p.id}><td>Dr. {p.firstName} {p.lastName}</td><td className="font-mono">{p.npi}</td><td className="font-mono">{p.taxonomy}</td><td>{p.specialty}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <Card title="Payers" actions={<span className="flex gap-2"><Link href="/settings/enrollment" className="btn btn-secondary text-xs">Enrollment</Link><Link href="/settings/payer-edits" className="btn btn-secondary text-xs">Payer edits</Link><Link href="/settings/integrations" className="btn btn-secondary text-xs">EHR integrations</Link><Link href="/settings/automation" className="btn btn-secondary text-xs">Automation</Link></span>}>
-          <table className="table">
-            <thead><tr><th>Payer</th><th>Payer ID</th><th>Type</th><th className="text-right">Timely filing</th><th className="text-right">Appeal</th></tr></thead>
-            <tbody>
-              {payers.map((p) => (
-                <tr key={p.id}><td>{p.name}</td><td className="font-mono">{p.payerId}</td><td className="capitalize">{p.type}</td><td className="text-right">{p.timelyFilingDays}d</td><td className="text-right">{p.appealDays}d</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <Card title="Default fees (CPT / HCPCS)" className="lg:col-span-2" actions={<Link href="/settings/fees" className="btn btn-secondary text-xs">Fee schedules and payer contracts</Link>}>
-          <table className="table">
-            <thead><tr><th>Code</th><th>Description</th><th className="text-right">Fee</th></tr></thead>
-            <tbody>
-              {cpts.map((c) => (
-                <tr key={c.code}><td className="font-mono">{c.code}</td><td>{c.description}</td><td className="text-right">{money(c.defaultFeeCents)}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      </div>
+      <PageHeader title="Settings" subtitle={`${practice.name} · everything that controls how the practice bills, who can do what, and what it connects to`} />
+      <Card title={`Setup health · ${done} of ${checks.length}`} className="mb-8">
+        <div className="mb-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-green-500" style={{ width: `${Math.round((done / checks.length) * 100)}%` }} /></div>
+        <ul className="grid gap-x-8 gap-y-3 md:grid-cols-2">
+          {checks.map((c) => (
+            <li key={c.label}>
+              <Link href={c.href} className="flex items-start justify-between gap-3 rounded-lg p-1 hover:bg-slate-50">
+                <span><span className="font-medium text-slate-900">{c.label}</span><span className="block text-xs text-slate-500">{c.detail}</span></span>
+                <Badge tone={TONE[c.state]}>{WORD[c.state]}</Badge>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <SettingsDirectory sections={settingsFor(s.role)} />
     </>
   );
 }

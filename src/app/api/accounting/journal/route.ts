@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { can, getSession } from "@/lib/auth";
 import { accountNames, journalCsv, journalLines, periodTotals } from "@/server/accounting";
+import { getPolicies } from "@/server/policies";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
+  if (session.role !== "admin" && (await getPolicies(await getDb(), session.practiceId)).exportsAdminOnly) return new Response("Your practice limits exports to administrators", { status: 403 });
   if (!can(session, "export") || !["admin", "biller"].includes(session.role)) return new Response("The journal is for billers and administrators", { status: 403 });
   const url = new URL(req.url);
   const period = url.searchParams.get("period") ?? "";

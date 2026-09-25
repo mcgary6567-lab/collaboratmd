@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const db = await getDb();
   const [practices, [practice], [user], taskCounts] = await Promise.all([
     accessiblePractices(db, session.userId),
-    db.select({ requireMfa: schema.practices.requireMfa }).from(schema.practices).where(eq(schema.practices.id, session.practiceId)).limit(1),
+    db.select({ requireMfa: schema.practices.requireMfa, hiddenNav: schema.practices.hiddenNav }).from(schema.practices).where(eq(schema.practices.id, session.practiceId)).limit(1),
     db.select({ mfaSecret: schema.users.mfaSecret }).from(schema.users).where(eq(schema.users.id, session.userId)).limit(1),
     myTaskCounts(db, session.practiceId, session.userId),
   ]);
@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const mustEnroll = !!practice?.requireMfa && !user?.mfaSecret && !session.sso;
   return (
     <div className="app-shell flex min-h-screen">
-      <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} tasks={taskCounts} />
+      <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} tasks={taskCounts} hidden={practice?.hiddenNav ?? []} />
       <main className="min-w-0 flex-1 px-4 pb-8 pt-20 md:p-6 lg:p-8">
         {mustEnroll ? (
           <div className="mx-auto max-w-2xl">

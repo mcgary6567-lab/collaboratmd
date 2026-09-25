@@ -210,6 +210,12 @@ export async function switchPractice(practiceId: string): Promise<Session> {
   return next;
 }
 
+/** Starts a fresh session for the signed-in user, e.g. for the administrator who just signed everyone else out. */
+export async function renewSession() {
+  const current = await requireSession();
+  await issue(await getDb(), { ...current, authAt: Math.ceil(Date.now() / 1000) + 1 });
+}
+
 export async function logout() {
   const jar = await cookies();
   jar.delete(COOKIE);
@@ -252,13 +258,15 @@ export async function getSession(): Promise<Session | null> {
   if (!access) return null;
   if (Date.now() / 1000 - (session.authAt ?? 0) > access.sessionHours * 3600) return null;
   if (access.ipAllowlist.length && !ipAllowed(clientIp(await headers()), access.ipAllowlist)) return null;
+  // An administrator signed everyone (or this person) out after this session began.
+  if (access.revokedAt && (session.authAt ?? 0) * 1000 < access.revokedAt) return null;
   return { ...session, role: access.role, customRole: access.customRole, denied: access.denied };
 }
 
 /** The user's effective role in a practice and the practice's session policy, or null if they may not use it. */
 export async function accessFor(db: Db, userId: string, practiceId: string) {
-  const { rows } = await db.execute<{ disabled_at: string | null; home: string; home_role: string; member_role: string | null; session_hours: number; ip_allowlist: string[] }>(sql`
-    SELECT u.disabled_at, u.practice_id AS home, u.role AS home_role,
+  const { rows } = await db.execute<{ disabled_at: string | null; home: string; home_role: string; member_role: string | null; session_hours: number; ip_allowlist: string[]; user_revoked: string | null; practice_revoked: string | null }>(sql`
+    SELECT u.disabled_at, u.practice_id AS home, u.role AS home_role, u.sessions_revoked_at::text AS user_revoked, p.sessions_revoked_at::text AS practice_revoked,
       (SELECT m.role FROM practice_memberships m WHERE m.user_id = u.id AND m.practice_id = ${practiceId} LIMIT 1) AS member_role,
       p.session_hours, p.ip_allowlist
     FROM users u JOIN practices p ON p.id = ${practiceId}
@@ -273,7 +281,8 @@ export async function accessFor(db: Db, userId: string, practiceId: string) {
     if (!c) return null;
     role = c.baseRole; customRole = c.name; denied = c.denied;
   }
-  return { role, customRole, denied, sessionHours: Number(r.session_hours) || 12, ipAllowlist: (r.ip_allowlist ?? []) as string[] };
+  const revokedAt = Math.max(r.user_revoked ? Date.parse(r.user_revoked) : 0, r.practice_revoked ? Date.parse(r.practice_revoked) : 0) || null;
+  return { role, customRole, denied, sessionHours: Number(r.session_hours) || 12, ipAllowlist: (r.ip_allowlist ?? []) as string[], revokedAt };
 }
 
 /** Returns the signed-in user, or redirects to the login page. */

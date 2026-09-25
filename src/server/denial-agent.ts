@@ -14,7 +14,8 @@ import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { draftAppeal, markAppealSent } from "./appeals";
-import { createCorrectedClaim, writeOffClaim } from "./claims";
+import { createCorrectedClaim, getClaimFinancials, writeOffClaim } from "./claims";
+import { assertWriteOffAllowed } from "./policies";
 import { runEligibility } from "./patients";
 import { createTask } from "./work";
 
@@ -159,7 +160,7 @@ async function ownItem(db: Db, practiceId: string, id: string) {
 }
 
 /** Carries out what the agent proposed. */
-export async function approveItem(db: Db, practiceId: string, id: string, userId?: string) {
+export async function approveItem(db: Db, practiceId: string, id: string, userId?: string, role = "admin") {
   const { item, denial } = await ownItem(db, practiceId, id);
   let resultClaimId: string | null = null;
   let message = "";
@@ -176,6 +177,7 @@ export async function approveItem(db: Db, practiceId: string, id: string, userId
       break;
     }
     case "write_off":
+      await assertWriteOffAllowed(db, practiceId, role, (await getClaimFinancials(db, denial.claimId)).insuranceBalanceCents);
       await writeOffClaim(db, denial.claimId, `Duplicate: same visit paid on another claim (denial agent, approved)`, userId);
       await db.update(denials).set({ status: "written_off", resolvedAt: new Date() }).where(eq(denials.id, denial.id));
       message = "Duplicate written off.";

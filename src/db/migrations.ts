@@ -1433,4 +1433,15 @@ CREATE TABLE IF NOT EXISTS claim_attachments (
 CREATE INDEX IF NOT EXISTS claim_attachments_claim_idx ON claim_attachments (claim_id);
 `,
   },
+  {
+    name: "0032_admin_controls",
+    sql: `-- Practice policies (billing rules an administrator sets), menu customization,
+-- and "sign everyone out": sessions that began before this moment end.
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS policies jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS hidden_nav jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS sessions_revoked_at timestamptz;
+-- One person's sessions, ended by an administrator.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sessions_revoked_at timestamptz;
+`,
+  },
 ];

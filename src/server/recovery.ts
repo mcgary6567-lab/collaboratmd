@@ -13,6 +13,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { patientBalanceSql } from "./billing";
 import { contractRates } from "./fees";
+import { getPolicies } from "./policies";
 
 const { chargeReviewDismissals, refunds, underpayments, ledgerEntries, auditLog, claims, payers, patients, practices, patientInsurances, encounters, charges } = schema;
 type Row = Record<string, string | null>;
@@ -221,6 +222,7 @@ async function ownRefund(db: Db, practiceId: string, id: string) {
 export async function approveRefund(db: Db, practiceId: string, id: string, userId: string) {
   const r = await ownRefund(db, practiceId, id);
   if (r.status !== "requested") throw new Error(`This refund is already ${r.status}`);
+  if (r.requestedBy === userId && (await getPolicies(db, practiceId)).refundDualControl) throw new Error("Practice policy: someone other than the person who requested a refund must approve it");
   await db.update(refunds).set({ status: "approved", approvedBy: userId, approvedAt: new Date() }).where(eq(refunds.id, id));
   await db.insert(auditLog).values({ practiceId, userId, action: "refund_approved", entity: "refund", entityId: id, details: { amountCents: r.amountCents, sameAsRequester: r.requestedBy === userId } });
 }

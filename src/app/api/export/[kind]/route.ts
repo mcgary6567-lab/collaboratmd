@@ -1,5 +1,6 @@
 import { getDb, schema } from "@/db";
 import { can, getSession } from "@/lib/auth";
+import { getPolicies } from "@/server/policies";
 import { toCsv, dollars } from "@/lib/csv-out";
 import { searchClaims, searchDenials } from "@/server/lists";
 import { arAging, payerPerformance } from "@/server/analytics";
@@ -20,6 +21,7 @@ const MAX_ROWS = 50_000;
 export async function GET(req: Request, { params }: { params: Promise<{ kind: string }> }) {
   const session = await getSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
+  if (session.role !== "admin" && (await getPolicies(await getDb(), session.practiceId)).exportsAdminOnly) return new Response("Your practice limits exports to administrators", { status: 403 });
   if (!can(session, "export")) return new Response(session.customRole ? `Your role (${session.customRole}) does not include exports` : "Exports are for billers and administrators", { status: 403 });
   const { kind } = await params;
   const q = Object.fromEntries(new URL(req.url).searchParams);

@@ -74,7 +74,7 @@ export async function bulkClaimsAction(_prev: FormResult, formData: FormData): P
       for (const id of ids.slice(0, 200)) {
         try {
           await assertOwned(db, s.practiceId, "claim", id);
-          const { status } = await submitClaim(db, id, s.userId);
+          const { status } = await submitClaim(db, id, s.userId, { role: s.role });
           if (status === "accepted") accepted++;
           else rejected++;
         } catch {

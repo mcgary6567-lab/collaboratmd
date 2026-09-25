@@ -24,7 +24,7 @@ export async function runAgentAction(_prev: FormResult): Promise<FormResult> {
 export async function approveAgentItemAction(id: string, _prev: FormResult): Promise<FormResult> {
   const s = await requireRole(CAN_ADJUST);
   try {
-    const r = await approveItem(await getDb(), s.practiceId, id, s.userId);
+    const r = await approveItem(await getDb(), s.practiceId, id, s.userId, s.role);
     revalidatePath(PATH);
     revalidatePath("/denials");
     return { ok: true, message: r.message };

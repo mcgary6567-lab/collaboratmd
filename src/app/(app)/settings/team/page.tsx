@@ -5,6 +5,7 @@ import { BUILT_IN_ROLES, CAPABILITIES } from "@/lib/capabilities";
 import { listCustomRoles, listTeam } from "@/server/team";
 import { deleteRoleAction, inviteAction, inviteLinkAction, saveRoleAction, setActiveAction, setRoleAction } from "@/app/(app)/access-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { signOutUserAction } from "@/app/(app)/admin-actions";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { RevealForm } from "../developers/reveal-form";
 
@@ -51,6 +52,11 @@ export default async function TeamPage() {
                             <summary className="btn btn-secondary cursor-pointer px-2 py-1 text-xs">Invite link</summary>
                             <div className="mt-2 w-72"><RevealForm action={inviteLinkAction.bind(null, m.userId)} label="Make a new link"><span /></RevealForm></div>
                           </details>
+                        )}
+                        {!m.disabled && (
+                          <ActionForm action={signOutUserAction.bind(null, m.userId)}>
+                            <SubmitButton className="btn btn-secondary px-2 py-1 text-xs" pendingLabel="...">Sign out</SubmitButton>
+                          </ActionForm>
                         )}
                         {(m.home || !m.disabled) && (
                           <ActionForm action={setActiveAction.bind(null, m.userId, m.disabled)}>

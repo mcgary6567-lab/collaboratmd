@@ -76,7 +76,7 @@ export async function billSecondaryAction(claimId: string, _prev: FormResult): P
     await ownClaim(db, s.practiceId, claimId);
     const created = await createSecondaryClaim(db, claimId, s.userId);
     if (!created) return { ok: false, message: "Nothing to bill: the patient has no secondary insurance or owes nothing on this claim" };
-    if (created.status === "ready") await submitClaim(db, created.id, s.userId);
+    if (created.status === "ready") await submitClaim(db, created.id, s.userId, { role: s.role });
     createdId = created.id;
   } catch (e) {
     return fail(e);

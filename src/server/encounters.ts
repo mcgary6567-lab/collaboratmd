@@ -74,8 +74,9 @@ export async function setAppointmentStatus(db: Db, id: string, status: string) {
   await db.update(appointments).set({ status }).where(eq(appointments.id, id));
 }
 
-export async function listProviders(db: Db, practiceId: string) {
-  return db.select().from(providers).where(eq(providers.practiceId, practiceId)).orderBy(asc(providers.lastName));
+/** Providers for pickers: active ones unless `includeInactive`. */
+export async function listProviders(db: Db, practiceId: string, includeInactive = false) {
+  return db.select().from(providers).where(includeInactive ? eq(providers.practiceId, practiceId) : and(eq(providers.practiceId, practiceId), eq(providers.active, true))).orderBy(asc(providers.lastName));
 }
 
 export async function listPayers(db: Db, practiceId: string) {

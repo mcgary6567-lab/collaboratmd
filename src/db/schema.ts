@@ -32,8 +32,33 @@ export const practices = pgTable("practices", {
   sessionHours: integer("session_hours").notNull().default(12),
   ipAllowlist: jsonb("ip_allowlist").$type<string[]>().notNull().default([]),
   automation: jsonb("automation").$type<AutomationSettings>().notNull().default({}),
+  policies: jsonb("policies").$type<PracticePolicies>().notNull().default({}),
+  /** Menu items this practice has hidden (hrefs); they stay reachable by search and links. */
+  hiddenNav: jsonb("hidden_nav").$type<string[]>().notNull().default([]),
+  /** Sessions that started before this are ended ("sign everyone out"). */
+  sessionsRevokedAt: timestamp("sessions_revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Billing rules an administrator sets for the practice. See server/policies.ts for where each is enforced. */
+export type PracticePolicies = {
+  /** Non-administrators cannot write off more than this on one claim. */
+  writeOffLimitCents?: number | null;
+  /** Scrubber warnings block submission, like errors. */
+  strictScrub?: boolean;
+  /** Claims with a denial risk score at or above this need an administrator to submit. */
+  riskHoldScore?: number | null;
+  /** Statement batches: minimum balance, and days before the same patient is billed again. */
+  statementMinCents?: number;
+  statementIntervalDays?: number;
+  /** Patient balances below this, untouched for `smallBalanceAgeDays`, are adjusted off daily. */
+  smallBalanceCents?: number | null;
+  smallBalanceAgeDays?: number;
+  /** Only administrators can download CSV exports and the accounting journal. */
+  exportsAdminOnly?: boolean;
+  /** A refund must be approved by someone other than the person who requested it. */
+  refundDualControl?: boolean;
+};
 
 export type AutomationSettings = {
   appointmentReminders?: boolean;
@@ -69,6 +94,7 @@ export const users = pgTable(
     failedLogins: integer("failed_logins").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    sessionsRevokedAt: timestamp("sessions_revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
