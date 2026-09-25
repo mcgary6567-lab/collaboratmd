@@ -41,6 +41,9 @@ const COMPANY_LINKS = [
 const RESOURCES = [
   { href: "/blog", label: "Blog" },
   { href: "/security", label: "Security" },
+  { href: "/trust", label: "Trust center" },
+  { href: "/changelog", label: "Changelog" },
+  { href: "/switch", label: "Switching to us" },
   { href: "/#standards", label: "Standards" },
 ];
 

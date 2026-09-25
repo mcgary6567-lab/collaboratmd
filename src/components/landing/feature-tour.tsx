@@ -9,9 +9,9 @@
  * practice connects its own outside account carries a tag saying which.
  */
 
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
-  BadgeCheck, CalendarDays, Check, CreditCard, FileSearch, Gauge, MessageSquareText, ScanLine, Wand2,
+  BadgeCheck, CalendarDays, Check, CreditCard, FileSearch, Gauge, MessageSquareText, Pause, Play, ScanLine, Wand2,
 } from "lucide-react";
 
 type Bullet = { text: string; needs?: string };
@@ -247,12 +247,26 @@ const STAGES: Stage[] = [
   },
 ];
 
+const AUTOPLAY_MS = 7000;
+
 export function FeatureTour() {
   const [active, setActive] = useState(0);
+  // The tour plays itself until the visitor takes over, and never for people who asked for reduced motion.
+  const [playing, setPlaying] = useState(false);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const stage = STAGES[active];
 
+  useEffect(() => {
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setPlaying(true);
+  }, []);
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => setActive((a) => (a + 1) % STAGES.length), AUTOPLAY_MS);
+    return () => clearInterval(id);
+  }, [playing]);
+
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    setPlaying(false);
     const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!delta) return;
     e.preventDefault();
@@ -276,7 +290,7 @@ export function FeatureTour() {
               aria-selected={on}
               aria-controls={`tour-panel-${s.key}`}
               tabIndex={on ? 0 : -1}
-              onClick={() => setActive(i)}
+              onClick={() => { setActive(i); setPlaying(false); }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
                 on ? "border-green-600 bg-green-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700"
               }`}
@@ -287,7 +301,17 @@ export function FeatureTour() {
         })}
       </div>
 
+      <div className="mt-3 flex items-center gap-3">
+        <button type="button" onClick={() => setPlaying((p) => !p)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-green-700" aria-label={playing ? "Pause the tour" : "Play the tour"}>
+          {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />} {playing ? "Pause tour" : "Play tour"}
+        </button>
+        <div className="flex gap-1" aria-hidden>
+          {STAGES.map((s, i) => <span key={s.key} className={`h-1 rounded-full transition-all ${i === active ? "w-6 bg-green-600" : "w-2 bg-slate-200"}`} />)}
+        </div>
+      </div>
+
       <div
+        onPointerEnter={() => setPlaying(false)}
         role="tabpanel"
         id={`tour-panel-${stage.key}`}
         aria-labelledby={`tour-tab-${stage.key}`}

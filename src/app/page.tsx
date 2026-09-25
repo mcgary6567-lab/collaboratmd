@@ -36,6 +36,8 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Appointment reminders by text and email", needs: "Twilio / Resend" },
       { name: "Lab orders and results over HL7" },
       { name: "Prior authorization tracking with units" },
+      { name: "Copay by card at online check-in", needs: "Stripe" },
+      { name: "Check-in and patient portal in English and Spanish" },
     ],
   },
   {
@@ -50,6 +52,8 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "837P claims, 999 and 277CA acknowledgments" },
       { name: "Secondary claims billed automatically" },
       { name: "Edit, correct and void claims with an audit trail" },
+      { name: "Facility claims: 837I / UB-04 with revenue codes" },
+      { name: "Electronic prior authorization (278)", needs: "clearinghouse" },
     ],
   },
   {
@@ -62,6 +66,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Denials in plain English with next steps" },
       { name: "Appeal letters in one click", needs: "AI key, optional" },
       { name: "276/277 follow-up on quiet claims" },
+      { name: "Denial agent that prepares each day's work for approval" },
     ],
   },
   {
@@ -74,6 +79,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Patient portal with card payments", needs: "Stripe" },
       { name: "Autopay for plan installments", needs: "Stripe" },
       { name: "Final notice and collection agency workflow" },
+      { name: "Text-to-pay campaigns", needs: "Twilio / Resend" },
     ],
   },
   {
@@ -88,6 +94,10 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Many practices under one login" },
       { name: "EHR interface (HL7) and CSV patient import" },
       { name: "Ctrl+K search, shortcuts, dark mode, phone layout" },
+      { name: "Report builder with scheduled email" },
+      { name: "REST API and signed webhooks" },
+      { name: "Integrations screen: paste keys, test, go live" },
+      { name: "Compliance center: access reviews, BAAs, audit export" },
     ],
   },
 ];
@@ -137,6 +147,8 @@ const STANDARDS = [
   "X12 005010X221A1 (835)",
   "X12 005010X279A1 (270/271)",
   "X12 005010X212 (276/277)",
+  "X12 005010X223A2 (837I)",
+  "X12 005010X217 (278)",
   "X12 999 and 277CA acknowledgments",
   "HL7 v2.5.1 ADT, DFT, ORM, ORU",
   "ICD-10-CM · CPT · HCPCS",
@@ -176,7 +188,7 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <a href="#platform" className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
               <Sparkles className="h-3.5 w-3.5" />
-              New: denial risk scores, one-click appeals, patient portal and bank reconciliation
+              New: integrations hub, public API, denial agent and UB-04 facility claims
               <ArrowRight className="h-3.5 w-3.5" />
             </a>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
@@ -449,7 +461,7 @@ export default async function LandingPage() {
                 ))}
               </ul>
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Connects to, with your own account</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Connects to, with your own account, from one settings screen</p>
                 <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                   {CONNECTS.map((c) => (
                     <li key={c.name} className="rounded-xl border border-white/10 px-4 py-3">
