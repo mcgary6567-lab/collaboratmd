@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_WRITE, requireSession } from "@/lib/auth";
+import { AttachmentsSection } from "./attachments-section";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
 import { billAgainAction, billSecondaryAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
@@ -22,6 +23,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
   const db = await getDb();
   const b = await loadClaimBundle(db, id);
   if (!b || b.claim.practiceId !== s.practiceId) notFound();
+  const dental = b.claim.claimType === "dental";
   // A secondary claim's money posts to its primary, so show the primary's books.
   const ledgerClaimId = b.claim.payerSequence === "S" && b.claim.primaryClaimId ? b.claim.primaryClaimId : id;
   const [events, fin, ledger, claimDenials, acks, related, secondaryIns] = await Promise.all([
@@ -261,9 +263,25 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
 
           <Card title="Service lines">
             <table className="table">
-              <thead><tr><th>#</th>{b.claim.claimType === "institutional" && <th>Revenue</th>}<th>{b.claim.claimType === "institutional" ? "HCPCS" : "CPT"}</th><th>Description</th><th>Mods</th><th>Units</th><th>Dx ptr</th><th className="text-right">Charge</th></tr></thead>
+              <thead>
+                {dental ? (
+                  <tr><th>#</th><th>CDT</th><th>Description</th><th>Tooth</th><th>Surfaces</th><th>Area</th><th className="text-right">Fee</th></tr>
+                ) : (
+                  <tr><th>#</th>{b.claim.claimType === "institutional" && <th>Revenue</th>}<th>{b.claim.claimType === "institutional" ? "HCPCS" : "CPT"}</th><th>Description</th><th>Mods</th><th>Units</th><th>Dx ptr</th><th className="text-right">Charge</th></tr>
+                )}
+              </thead>
               <tbody>
-                {b.lines.map((l) => (
+                {b.lines.map((l) => dental ? (
+                  <tr key={l.id}>
+                    <td>{l.lineNumber}</td>
+                    <td className="font-mono">{l.cpt}</td>
+                    <td className="text-slate-600">{l.description}</td>
+                    <td className="font-mono">{l.tooth ?? ""}</td>
+                    <td className="font-mono">{l.surfaces ?? ""}</td>
+                    <td className="font-mono">{l.oralCavity ?? ""}</td>
+                    <td className="text-right"><Money cents={l.chargeCents * l.units} /></td>
+                  </tr>
+                ) : (
                   <tr key={l.id}>
                     <td>{l.lineNumber}</td>
                     {b.claim.claimType === "institutional" && <td className="font-mono">{l.revenueCode}</td>}
@@ -277,7 +295,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                 ))}
               </tbody>
               <tfoot>
-                <tr><td colSpan={b.claim.claimType === "institutional" ? 7 : 6} className="text-right font-semibold">Total</td><td className="text-right font-semibold"><Money cents={b.claim.totalCents} /></td></tr>
+                <tr><td colSpan={dental ? 6 : b.claim.claimType === "institutional" ? 7 : 6} className="text-right font-semibold">Total</td><td className="text-right font-semibold"><Money cents={b.claim.totalCents} /></td></tr>
               </tfoot>
             </table>
             <div className="mt-3 text-sm text-slate-600">
@@ -302,10 +320,16 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             </table>
           </Card>
 
-          {b.claim.edi837 && (
-            <Card title="837P transaction (X12 005010X222A1)">
+          <AttachmentsSection practiceId={s.practiceId} claimId={b.claim.id} submitted={!!b.claim.submittedAt} canWrite={(CAN_WRITE as readonly string[]).includes(s.role)} />
+
+          {b.claim.edi837 ? (
+            <Card title={dental ? "837D transaction (X12 005010X224A2)" : b.claim.claimType === "institutional" ? "837I transaction (X12 005010X223A2)" : "837P transaction (X12 005010X222A1)"}>
               <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-green-200">{b.claim.edi837}</pre>
             </Card>
+          ) : b.claim.status === "ready" && (
+            <p className="text-sm text-slate-600">
+              <a href={`/api/claims/${b.claim.id}/edi`} className="font-semibold text-brand-700 hover:underline">Download the {dental ? "837D" : b.claim.claimType === "institutional" ? "837I" : "837P"} file</a> to upload to another clearinghouse without sending it from here.
+            </p>
           )}
         </div>
 

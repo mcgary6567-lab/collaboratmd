@@ -43,6 +43,7 @@ const RESOURCES = [
   { href: "/security", label: "Security" },
   { href: "/trust", label: "Trust center" },
   { href: "/changelog", label: "Changelog" },
+  { href: "/status", label: "Status" },
   { href: "/switch", label: "Switching to us" },
   { href: "/#standards", label: "Standards" },
 ];

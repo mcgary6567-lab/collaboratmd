@@ -206,6 +206,10 @@ export const charges = pgTable("charges", {
   description: text("description"),
   /** Institutional lines: the revenue code (the procedure code may be blank). */
   revenueCode: text("revenue_code"),
+  /** Dental lines (837D): tooth number, surfaces (e.g. MOD) and oral cavity area. */
+  tooth: text("tooth"),
+  surfaces: text("surfaces"),
+  oralCavity: text("oral_cavity"),
 });
 
 /* ------------------------------------------------------------------ */
@@ -625,6 +629,38 @@ export const ruleSuggestionDismissals = pgTable("rule_suggestion_dismissals", {
   dismissedBy: uuid("dismissed_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.practiceId, t.suggestionKey] })]);
+
+/* Error monitoring, dental lines and claim attachments. See migration 0031. */
+export const errorEvents = pgTable("error_events", {
+  fingerprint: text("fingerprint").primaryKey(),
+  message: text("message").notNull(),
+  digest: text("digest"),
+  routePath: text("route_path"),
+  routeType: text("route_type"),
+  method: text("method"),
+  path: text("path"),
+  count: integer("count").notNull().default(1),
+  firstSeen: timestamp("first_seen", { withTimezone: true }).defaultNow().notNull(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
+export const claimAttachments = pgTable("claim_attachments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  reportType: text("report_type").notNull(),
+  transmission: text("transmission").notNull(),
+  controlNumber: text("control_number").notNull(),
+  filename: text("filename").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  sha256: text("sha256").notNull(),
+  dataBase64: text("data_base64").notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 /* Operations: client invoicing, accounting export and close, work rules. See migration 0030. */
 export type InvoiceIssuer = { name: string; address: string | null };

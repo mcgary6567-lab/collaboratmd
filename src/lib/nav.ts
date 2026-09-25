@@ -1,7 +1,7 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   AlertTriangle, BarChart3, Building2, CalendarDays, CheckSquare, ClipboardCheck, Clock, FileText, FlaskConical, LayoutDashboard,
-  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar, MessageSquare, UserSearch, UsersRound, KeyRound, Inbox, FileSpreadsheet, ReceiptText,
+  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar, MessageSquare, UserSearch, UsersRound, KeyRound, Inbox, FileSpreadsheet, ReceiptText, Smile,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; multiOnly?: boolean };
@@ -35,6 +35,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/encounters/new", label: "Charge entry", icon: Stethoscope },
       { href: "/coding", label: "Coding help", icon: Wand2 },
       { href: "/encounters/institutional", label: "Facility claim (UB-04)", icon: Hospital },
+      { href: "/encounters/dental", label: "Dental claim (837D)", icon: Smile },
       { href: "/claims", label: "Claims", icon: FileText },
       { href: "/claims/follow-up", label: "Claim follow-up", icon: Clock },
       { href: "/remittance", label: "Remittance (ERA)", icon: Receipt },

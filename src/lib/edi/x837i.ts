@@ -9,6 +9,7 @@
  * (NM1*71), and service lines that carry a revenue code (SV2).
  */
 import { envelope } from "./x12";
+import { pwk, type ClaimAttachmentRef } from "./x837p";
 
 export interface Institutional {
   /** Four digits, e.g. 0131 hospital outpatient, 0111 inpatient admit through discharge. */
@@ -44,6 +45,7 @@ export interface Edi837IInput {
     authorizationNumber?: string | null;
     diagnoses: string[];
     institutional: Institutional;
+    attachments?: ClaimAttachmentRef[];
   };
   lines: { revenueCode: string; hcpcs?: string | null; modifiers?: string[]; chargeCents: number; units: number; dateOfService: string }[];
 }
@@ -89,6 +91,7 @@ export function buildEdi837I(input: Edi837IInput): string {
     ...(inst.admissionDate ? [["DTP", "435", "DT", `${d8(inst.admissionDate)}${(inst.admissionHour ?? "0000").padStart(4, "0")}`]] : []),
     ["DTP", "434", "RD8", `${d8(inst.statementFrom)}-${d8(inst.statementTo)}`],
     ["CL1", inst.admissionType ?? "", inst.admissionSource ?? "", inst.patientStatus],
+    ...(input.claim.attachments ?? []).map(pwk),
   ];
   if (input.claim.frequencyCode === "7" || input.claim.frequencyCode === "8") {
     if (!input.claim.originalPayerClaimNumber) throw new Error(`Frequency ${input.claim.frequencyCode} claim ${input.controlNumber} needs the payer's original claim number (REF*F8)`);

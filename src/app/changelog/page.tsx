@@ -10,6 +10,19 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-25",
+    title: "Recovery, forecasting, access control and dental claims",
+    items: [
+      "National code sets: NCCI procedure-to-procedure and unit edits and Medicare coverage checks in the scrubber, and payer rules suggested from your own denials",
+      "Revenue recovery: missed charges, underpayment dispute letters, and credit balances refunded through request, approval and issue",
+      "Cash forecast for eight weeks from your own payment history and schedule, payer behavior alerts, and questions answered as reports",
+      "Two-way texting inbox with STOP handling, insurance cards read from a photo (with a BAA), and coverage discovery for self-pay patients",
+      "Single sign-on (OpenID Connect) and SCIM provisioning, custom roles, session length and network allowlists",
+      "Client invoicing for billing companies, accounting journal export with month-end close, and work queues with service levels",
+      "Dental claims as 837D, claim attachments referenced by PWK with a fax cover sheet, server error monitoring and a public status page",
+    ],
+  },
+  {
+    date: "2026-09-25",
     title: "Integrations, API, denial agent, facility claims and compliance",
     items: [
       "Integrations screen: connect Stedi, Stripe, Twilio, Resend and Claude with your own keys, test each connection, and the features that need them switch on",

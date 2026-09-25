@@ -6,6 +6,19 @@
  * (billing provider, subscriber, payer, claim, diagnoses, service lines).
  */
 
+/** A supporting document for a claim (see server/attachments.ts). */
+export type ClaimAttachmentRef = { reportType: string; transmission: string; controlNumber: string };
+
+/**
+ * PWK (loop 2300): tells the payer a document supports the claim and how it
+ * is coming. PWK01 is the report type, PWK02 the transmission (FX fax, BM
+ * mail, EL electronic, AA available on request), PWK05-06 the attachment
+ * control number the payer matches the document by (not sent for AA).
+ */
+export function pwk(a: ClaimAttachmentRef): string[] {
+  return a.transmission === "AA" ? ["PWK", a.reportType, "AA"] : ["PWK", a.reportType, a.transmission, "", "", "AC", a.controlNumber];
+}
+
 export interface Edi837Input {
   controlNumber: string; // patient control number (CLM01)
   interchangeControl: string; // 9 digits
@@ -46,6 +59,8 @@ export interface Edi837Input {
     authorizationNumber?: string | null;
     dateOfService: string; // YYYY-MM-DD
     diagnoses: string[]; // ICD-10-CM without dots
+    /** PWK: supporting documents sent separately, matched by control number. */
+    attachments?: ClaimAttachmentRef[];
   };
   /**
    * Set on a secondary claim: the payer that adjudicated first and what it
@@ -122,6 +137,7 @@ export function buildEdi837P(input: Edi837Input): string {
   s.push(["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId]);
   // 2300 claim
   s.push(["CLM", input.controlNumber, money(input.claim.totalCents), "", "", `${input.claim.placeOfService}:B:${input.claim.frequencyCode}`, "Y", "A", "Y", "Y"]);
+  for (const a of input.claim.attachments ?? []) s.push(pwk(a));
   // 2300 REF segments precede HI. A replacement or void without the payer's
   // original claim number is rejected, so refuse to build one.
   if (input.claim.frequencyCode === "7" || input.claim.frequencyCode === "8") {

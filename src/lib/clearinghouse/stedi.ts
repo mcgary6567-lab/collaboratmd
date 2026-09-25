@@ -82,6 +82,8 @@ export class StediClearinghouse implements ClearinghouseGateway {
   }
 
   async submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult> {
+    // Dental claims are not wired to Stedi: its dental endpoint has not been verified against this integration.
+    if (meta.claimType === "dental") throw new Error("Sending dental (837D) claims through Stedi is not enabled in this version. Download the 837D from the claim and upload it to your dental clearinghouse, or bill on the payer's portal.");
     // The idempotency key makes a retried request safe: Stedi will not send the claim twice.
     const path = meta.claimType === "institutional"
       ? "/change/medicalnetwork/institutionalclaims/v1/raw-x12-submission"

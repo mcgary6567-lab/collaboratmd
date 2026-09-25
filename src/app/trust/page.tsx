@@ -13,11 +13,14 @@ export const metadata: Metadata = {
 const SAFEGUARDS = [
   "Two-factor sign-in, which an administrator can require for every user",
   "Account lockout for 15 minutes after five failed sign-ins",
-  "Four roles (administrator, biller, front desk, read-only), checked on every request",
+  "Four roles (administrator, biller, front desk, read-only), plus custom roles that can only narrow them, checked on every request",
+  "Single sign-on through your identity provider (OpenID Connect) and SCIM to remove access when people leave",
+  "Per-practice session length and an optional allowlist of office networks",
   "Every record scoped to its practice, with ownership checked on every change",
   "Posted amounts never edited; corrections post as reversals",
   "An audit log of sign-ins, claims, payments, exports and settings changes, exportable by administrators",
-  "Patient links, API keys and recovery codes stored only as hashes",
+  "Patient links, API keys, SCIM tokens and recovery codes stored only as hashes",
+  "Server errors recorded with patient details masked, and no request headers or query strings kept",
   "Integration keys and authenticator secrets encrypted (AES-256-GCM) before they are stored",
   "HTTPS everywhere, and a certificate-verified TLS connection to the database",
   "Card numbers entered on Stripe's hosted page, never on our servers",
@@ -31,7 +34,7 @@ const SUBPROCESSORS = [
   { name: "Stripe", role: "Card payments and saved cards", when: "Only for practices that connect it" },
   { name: "Twilio", role: "Text messages to patients who agreed to texts", when: "Only for practices that connect it" },
   { name: "Resend", role: "Email to patients and staff", when: "Only for practices that connect it" },
-  { name: "Anthropic", role: "AI: denial explanations, appeal drafts, coding help", when: "Only for practices that connect it" },
+  { name: "Anthropic", role: "AI: denial explanations, appeal drafts, coding help, report questions, insurance card reading", when: "Only for practices that connect it" },
 ];
 
 const ASSURANCE = [
@@ -98,7 +101,8 @@ export default function TrustPage() {
           <p className="mt-3 text-sm leading-relaxed text-slate-700">
             AI is off until a practice connects its own Anthropic account. When on, denial explanations and appeal drafts are written from codes only (CARC, RARC, CPT, ICD-10, payer type);
             patient names, dates of birth, member IDs and addresses are filled in by our servers after the AI answers. Import column matching sends column headers and the shape of values, never the values.
-            Coding from full visit notes, which contain patient information, stays off unless the practice confirms it has a BAA with Anthropic.
+            Questions asked of the report builder send the question and the practice&apos;s payer and provider names, never report results.
+            Coding from full visit notes and reading insurance card photos, which contain patient information, stay off unless the practice confirms it has a BAA with Anthropic.
           </p>
         </section>
 

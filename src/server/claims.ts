@@ -5,6 +5,9 @@ import { scrubClaim, hasBlockingErrors, type ScrubClaim, type ScrubFinding } fro
 import { evaluatePayerEdits, type EditResult } from "@/lib/scrub/payer-edits";
 import { buildEdi837P } from "@/lib/edi/x837p";
 import { buildEdi837I } from "@/lib/edi/x837i";
+import { buildEdi837D } from "@/lib/edi/x837d";
+import { scrubDental } from "@/lib/scrub/dental";
+import { attachmentRefs, markAttachmentsSent } from "./attachments";
 import { scrubInstitutional } from "@/lib/scrub/institutional";
 import { parseEdi835 } from "@/lib/edi/x835";
 import { parse999, describeSyntaxError } from "@/lib/edi/x999";
@@ -69,6 +72,15 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
  * authorization checks do not apply to it.
  */
 export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: ScrubFinding[]; edits: EditResult }> {
+  if (b.claim.claimType === "dental") {
+    const findings = scrubDental({
+      billingNpi: b.practice.npi, renderingNpi: b.provider.npi, memberId: b.insurance.memberId, payerId: b.payer.payerId, dateOfService: b.encounter.dateOfService,
+      lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cdt: l.cpt, tooth: l.tooth, surfaces: l.surfaces, oralCavity: l.oralCavity, units: l.units, chargeCents: l.chargeCents })),
+    });
+    const enrollment = await enrollmentFor(db, b.provider.id, b.payer.id);
+    const enrolled = enrollmentFinding(enrollment, b.encounter.dateOfService, `Dr. ${b.provider.firstName} ${b.provider.lastName}`, b.payer.name);
+    return { findings: [...findings, ...(enrolled ? [enrolled] : [])], edits: { findings: [], authorization: null, authUnits: 0 } };
+  }
   if (b.claim.claimType === "institutional") {
     const findings = scrubInstitutional({
       institutional: b.claim.institutional ?? null, billingNpi: b.practice.npi, attendingNpi: b.provider.npi,
@@ -164,23 +176,30 @@ export async function rescrubClaim(db: Db, claimId: string) {
   return updated;
 }
 
-/** Generates the 837P and submits it through the clearinghouse gateway. */
-export async function submitClaim(db: Db, claimId: string, userId?: string) {
-  const bundle = await loadClaimBundle(db, claimId);
-  if (!bundle) throw new Error("Claim not found");
-  if (!["ready", "rejected", "scrub_errors"].includes(bundle.claim.status)) throw new Error(`Claim in status ${bundle.claim.status} cannot be submitted`);
-  const { findings, edits } = await scrubBundle(db, bundle);
-  if (hasBlockingErrors(findings)) {
-    await db.update(claims).set({ scrubResults: findings, status: "scrub_errors", updatedAt: new Date() }).where(eq(claims.id, claimId));
-    throw new Error("Claim has blocking scrub errors");
-  }
-  const authorizationNumber = edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null;
-  const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
-  if (bundle.claim.payerSequence === "S" && !otherPayer) throw new Error("The primary claim has no posted remittance to send to the secondary payer");
-  const now = new Date();
+/** The 837 (P, I or D, by claim type) for a claim, without sending it. */
+export function buildClaimEdi(
+  bundle: ClaimBundle,
+  o: { now: Date; authorizationNumber: string | null; attachments: Awaited<ReturnType<typeof attachmentRefs>>; otherPayer?: Awaited<ReturnType<typeof primaryAdjudication>> },
+): string {
+  const { now, authorizationNumber, attachments, otherPayer } = o;
+  const dental = bundle.claim.claimType === "dental";
   const institutional = bundle.claim.claimType === "institutional";
-  if (institutional && otherPayer) throw new Error("Secondary institutional claims are not supported yet; bill the secondary payer on paper or through its portal");
-  const edi = institutional ? buildEdi837I({
+  return dental ? buildEdi837D({
+    controlNumber: bundle.claim.controlNumber,
+    interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
+    senderId: "COLLABORATMD",
+    receiverId: bundle.payer.payerId,
+    now,
+    billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, taxonomy: bundle.provider.taxonomy },
+    rendering: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
+    payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
+    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
+    claim: {
+      totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
+      originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber, diagnoses: bundle.encounter.diagnoses, attachments,
+    },
+    lines: bundle.lines.map((l) => ({ cdt: l.cpt, chargeCents: l.chargeCents * l.units, units: l.units, dateOfService: bundle.encounter.dateOfService, tooth: l.tooth, surfaces: l.surfaces, oralCavity: l.oralCavity })),
+  }) : institutional ? buildEdi837I({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
     senderId: "COLLABORATMD",
@@ -192,7 +211,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
     claim: {
       totalCents: bundle.claim.totalCents, frequencyCode: bundle.claim.frequencyCode, originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber,
-      authorizationNumber, diagnoses: bundle.encounter.diagnoses, institutional: bundle.claim.institutional!,
+      authorizationNumber, diagnoses: bundle.encounter.diagnoses, institutional: bundle.claim.institutional!, attachments,
     },
     lines: bundle.lines.map((l) => ({ revenueCode: l.revenueCode ?? "", hcpcs: l.cpt || null, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dateOfService: bundle.encounter.dateOfService })),
   }) : buildEdi837P({
@@ -208,13 +227,50 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     claim: {
       totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
       originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber,
-      dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses,
+      dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses, attachments,
     },
     lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService })),
     otherPayer,
   });
+}
+
+/** The claim's 837 as it would be sent now, for uploading to another clearinghouse or checking. Scrub errors still block it. */
+export async function previewClaimEdi(db: Db, claimId: string) {
+  const bundle = await loadClaimBundle(db, claimId);
+  if (!bundle) throw new Error("Claim not found");
+  const { findings, edits } = await scrubBundle(db, bundle);
+  if (hasBlockingErrors(findings)) throw new Error("Fix the scrub errors first");
+  const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
+  const edi = buildClaimEdi(bundle, { now: new Date(), authorizationNumber: edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null, attachments: await attachmentRefs(db, claimId), otherPayer });
+  const kind = bundle.claim.claimType === "dental" ? "837D" : bundle.claim.claimType === "institutional" ? "837I" : "837P";
+  return { edi, filename: `${bundle.claim.controlNumber}-${kind}.x12`, practiceId: bundle.claim.practiceId };
+}
+
+/** Generates the 837P and submits it through the clearinghouse gateway. */
+export async function submitClaim(db: Db, claimId: string, userId?: string) {
+  const bundle = await loadClaimBundle(db, claimId);
+  if (!bundle) throw new Error("Claim not found");
+  if (!["ready", "rejected", "scrub_errors"].includes(bundle.claim.status)) throw new Error(`Claim in status ${bundle.claim.status} cannot be submitted`);
+  const { findings, edits } = await scrubBundle(db, bundle);
+  if (hasBlockingErrors(findings)) {
+    await db.update(claims).set({ scrubResults: findings, status: "scrub_errors", updatedAt: new Date() }).where(eq(claims.id, claimId));
+    throw new Error("Claim has blocking scrub errors");
+  }
+  const authorizationNumber = edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null;
+  const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
+  if (bundle.claim.payerSequence === "S" && !otherPayer) throw new Error("The primary claim has no posted remittance to send to the secondary payer");
+  const now = new Date();
+  const institutional = bundle.claim.claimType === "institutional";
+  const dental = bundle.claim.claimType === "dental";
+  if ((institutional || dental) && otherPayer) throw new Error(`Secondary ${dental ? "dental" : "institutional"} claims are not supported yet; bill the secondary payer on paper or through its portal`);
+  if (dental && (await practiceConfig(db, bundle.claim.practiceId)).stedi) {
+    throw new Error("Sending dental (837D) claims through Stedi is not enabled in this version. Download the 837D from the claim and upload it to your dental clearinghouse, or bill on the payer's portal.");
+  }
+  const attachments = await attachmentRefs(db, claimId);
+  const edi = buildClaimEdi(bundle, { now, authorizationNumber, attachments, otherPayer });
   await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
-  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : institutional ? "837I" : "837P";
+  if (attachments.length) await markAttachmentsSent(db, claimId, now);
+  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : dental ? "837D" : institutional ? "837I" : "837P";
   await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `${kind} generated and sent to clearinghouse (${edi.length} bytes)` });
 
   const result = await getClearinghouse((await practiceConfig(db, bundle.claim.practiceId)).stedi?.apiKey).submit837(edi, {
@@ -222,7 +278,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     patientLast: bundle.patient.lastName, patientFirst: bundle.patient.firstName,
     chargeCents: bundle.claim.totalCents, dateOfService: bundle.encounter.dateOfService,
     billingName: bundle.practice.name, billingNpi: bundle.practice.npi,
-    claimType: institutional ? "institutional" : "professional",
+    claimType: dental ? "dental" : institutional ? "institutional" : "professional",
   });
   const ack277 = await recordAcknowledgments(db, claimId, bundle.claim.controlNumber, result);
   const status = result.status;
