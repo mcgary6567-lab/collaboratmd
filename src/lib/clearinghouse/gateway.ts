@@ -36,6 +36,8 @@ export interface SubmissionMeta {
   dateOfService?: string;
   billingName?: string;
   billingNpi?: string;
+  /** Institutional (837I) claims go to a different clearinghouse endpoint. */
+  claimType?: "professional" | "institutional";
 }
 
 export interface AdjudicationLine {

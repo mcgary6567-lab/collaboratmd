@@ -201,6 +201,8 @@ export const charges = pgTable("charges", {
   chargeCents: integer("charge_cents").notNull(),
   dxPointers: jsonb("dx_pointers").$type<number[]>().notNull().default([1]),
   description: text("description"),
+  /** Institutional lines: the revenue code (the procedure code may be blank). */
+  revenueCode: text("revenue_code"),
 });
 
 /* ------------------------------------------------------------------ */
@@ -227,6 +229,10 @@ export const claims = pgTable(
     authorizationNumber: text("authorization_number"),
     /** P primary, S secondary. A secondary claim carries the primary's adjudication. */
     payerSequence: text("payer_sequence").notNull().default("P"),
+    /** professional (837P / CMS-1500) or institutional (837I / UB-04). */
+    claimType: text("claim_type").notNull().default("professional"),
+    /** Institutional claims: type of bill, statement period, admission and discharge details. */
+    institutional: jsonb("institutional").$type<import("@/lib/edi/x837i").Institutional>(),
     /** On a secondary claim, the primary claim whose balance it bills. */
     primaryClaimId: uuid("primary_claim_id"),
     status: text("status").notNull().default("draft"),

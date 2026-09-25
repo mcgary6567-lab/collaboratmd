@@ -4,6 +4,8 @@ import { schema } from "@/db";
 import { scrubClaim, hasBlockingErrors, type ScrubClaim, type ScrubFinding } from "@/lib/scrub/rules";
 import { evaluatePayerEdits, type EditResult } from "@/lib/scrub/payer-edits";
 import { buildEdi837P } from "@/lib/edi/x837p";
+import { buildEdi837I } from "@/lib/edi/x837i";
+import { scrubInstitutional } from "@/lib/scrub/institutional";
 import { parseEdi835 } from "@/lib/edi/x835";
 import { parse999, describeSyntaxError } from "@/lib/edi/x999";
 import { parse277CA } from "@/lib/edi/x277ca";
@@ -66,6 +68,16 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
  * authorization checks do not apply to it.
  */
 export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: ScrubFinding[]; edits: EditResult }> {
+  if (b.claim.claimType === "institutional") {
+    const findings = scrubInstitutional({
+      institutional: b.claim.institutional ?? null, billingNpi: b.practice.npi, attendingNpi: b.provider.npi,
+      memberId: b.insurance.memberId, payerId: b.payer.payerId, diagnoses: b.encounter.diagnoses,
+      lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, revenueCode: l.revenueCode, hcpcs: l.cpt, units: l.units, chargeCents: l.chargeCents })),
+    });
+    const enrollment = await enrollmentFor(db, b.provider.id, b.payer.id);
+    const enrolled = enrollmentFinding(enrollment, b.encounter.dateOfService, `Dr. ${b.provider.firstName} ${b.provider.lastName}`, b.payer.name);
+    return { findings: [...findings, ...(enrolled ? [enrolled] : [])], edits: { findings: [], authorization: null, authUnits: 0 } };
+  }
   const general = scrubClaim(toScrubInput(b));
   if (b.claim.frequencyCode === "8") return { findings: general, edits: { findings: [], authorization: null, authUnits: 0 } };
   const [rules, auths, enrollment] = await Promise.all([
@@ -161,7 +173,24 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
   const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
   if (bundle.claim.payerSequence === "S" && !otherPayer) throw new Error("The primary claim has no posted remittance to send to the secondary payer");
   const now = new Date();
-  const edi = buildEdi837P({
+  const institutional = bundle.claim.claimType === "institutional";
+  if (institutional && otherPayer) throw new Error("Secondary institutional claims are not supported yet; bill the secondary payer on paper or through its portal");
+  const edi = institutional ? buildEdi837I({
+    controlNumber: bundle.claim.controlNumber,
+    interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
+    senderId: "COLLABORATMD",
+    receiverId: bundle.payer.payerId,
+    now,
+    billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip },
+    attending: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
+    payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
+    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
+    claim: {
+      totalCents: bundle.claim.totalCents, frequencyCode: bundle.claim.frequencyCode, originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber,
+      authorizationNumber, diagnoses: bundle.encounter.diagnoses, institutional: bundle.claim.institutional!,
+    },
+    lines: bundle.lines.map((l) => ({ revenueCode: l.revenueCode ?? "", hcpcs: l.cpt || null, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dateOfService: bundle.encounter.dateOfService })),
+  }) : buildEdi837P({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
     senderId: "COLLABORATMD",
@@ -180,7 +209,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     otherPayer,
   });
   await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
-  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : "837P";
+  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : institutional ? "837I" : "837P";
   await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `${kind} generated and sent to clearinghouse (${edi.length} bytes)` });
 
   const result = await getClearinghouse((await practiceConfig(db, bundle.claim.practiceId)).stedi?.apiKey).submit837(edi, {
@@ -188,6 +217,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
     patientLast: bundle.patient.lastName, patientFirst: bundle.patient.firstName,
     chargeCents: bundle.claim.totalCents, dateOfService: bundle.encounter.dateOfService,
     billingName: bundle.practice.name, billingNpi: bundle.practice.npi,
+    claimType: institutional ? "institutional" : "professional",
   });
   const ack277 = await recordAcknowledgments(db, claimId, bundle.claim.controlNumber, result);
   const status = result.status;

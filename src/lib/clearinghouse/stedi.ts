@@ -83,7 +83,10 @@ export class StediClearinghouse implements ClearinghouseGateway {
 
   async submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult> {
     // The idempotency key makes a retried request safe: Stedi will not send the claim twice.
-    const r = await this.post<StediClaimResponse>("/change/medicalnetwork/professionalclaims/v3/raw-x12-submission", { x12: edi }, `claim-${meta.controlNumber}`);
+    const path = meta.claimType === "institutional"
+      ? "/change/medicalnetwork/institutionalclaims/v1/raw-x12-submission"
+      : "/change/medicalnetwork/professionalclaims/v3/raw-x12-submission";
+    const r = await this.post<StediClaimResponse>(path, { x12: edi }, `claim-${meta.controlNumber}`);
     const clearinghouseId = r.claimReference?.correlationId ?? r.controlNumber ?? "";
     const ack = r.x12 ? parse277CA(r.x12).find((c) => c.controlNumber === meta.controlNumber) ?? parse277CA(r.x12)[0] : undefined;
     if (ack && !ack.accepted) {

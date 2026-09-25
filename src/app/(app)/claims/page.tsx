@@ -104,6 +104,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                         {claim.frequencyCode === "7" && <span className="ml-1 text-[10px] font-semibold text-amber-700">CORRECTED</span>}
                         {claim.frequencyCode === "8" && <span className="ml-1 text-[10px] font-semibold text-red-700">VOID</span>}
                         {claim.payerSequence === "S" && <span className="ml-1 text-[10px] font-semibold text-cyan-700">SECONDARY</span>}
+                        {claim.claimType === "institutional" && <span className="ml-1 text-[10px] font-semibold text-indigo-700">UB-04</span>}
                         {tasks > 0 && <span className="ml-1 rounded bg-violet-100 px-1 text-[10px] font-semibold text-violet-800">{tasks} task{tasks > 1 ? "s" : ""}</span>}
                       </td>
                       <td><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>

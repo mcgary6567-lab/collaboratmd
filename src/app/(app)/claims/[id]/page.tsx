@@ -246,13 +246,27 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             </Card>
           )}
 
+          {b.claim.claimType === "institutional" && b.claim.institutional && (
+            <Card title="Institutional claim (UB-04 / 837I)">
+              <dl className="grid gap-2 text-sm sm:grid-cols-3">
+                <div><dt className="text-xs text-slate-500">Type of bill</dt><dd className="font-mono">{b.claim.institutional.typeOfBill}</dd></div>
+                <div><dt className="text-xs text-slate-500">Statement period</dt><dd>{b.claim.institutional.statementFrom} to {b.claim.institutional.statementTo}</dd></div>
+                <div><dt className="text-xs text-slate-500">Patient status</dt><dd className="font-mono">{b.claim.institutional.patientStatus}</dd></div>
+                {b.claim.institutional.admissionDate && <div><dt className="text-xs text-slate-500">Admitted</dt><dd>{b.claim.institutional.admissionDate}{b.claim.institutional.admissionHour ? ` ${b.claim.institutional.admissionHour}` : ""} · type {b.claim.institutional.admissionType ?? "-"} · origin {b.claim.institutional.admissionSource ?? "-"}</dd></div>}
+                {b.claim.institutional.admittingDiagnosis && <div><dt className="text-xs text-slate-500">Admitting diagnosis</dt><dd className="font-mono">{b.claim.institutional.admittingDiagnosis}</dd></div>}
+                <div><dt className="text-xs text-slate-500">Attending</dt><dd>Dr. {b.provider.firstName} {b.provider.lastName}</dd></div>
+              </dl>
+            </Card>
+          )}
+
           <Card title="Service lines">
             <table className="table">
-              <thead><tr><th>#</th><th>CPT</th><th>Description</th><th>Mods</th><th>Units</th><th>Dx ptr</th><th className="text-right">Charge</th></tr></thead>
+              <thead><tr><th>#</th>{b.claim.claimType === "institutional" && <th>Revenue</th>}<th>{b.claim.claimType === "institutional" ? "HCPCS" : "CPT"}</th><th>Description</th><th>Mods</th><th>Units</th><th>Dx ptr</th><th className="text-right">Charge</th></tr></thead>
               <tbody>
                 {b.lines.map((l) => (
                   <tr key={l.id}>
                     <td>{l.lineNumber}</td>
+                    {b.claim.claimType === "institutional" && <td className="font-mono">{l.revenueCode}</td>}
                     <td className="font-mono">{l.cpt}</td>
                     <td className="text-slate-600">{l.description}</td>
                     <td className="font-mono text-xs">{l.modifiers.join(", ")}</td>
@@ -263,7 +277,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                 ))}
               </tbody>
               <tfoot>
-                <tr><td colSpan={6} className="text-right font-semibold">Total</td><td className="text-right font-semibold"><Money cents={b.claim.totalCents} /></td></tr>
+                <tr><td colSpan={b.claim.claimType === "institutional" ? 7 : 6} className="text-right font-semibold">Total</td><td className="text-right font-semibold"><Money cents={b.claim.totalCents} /></td></tr>
               </tfoot>
             </table>
             <div className="mt-3 text-sm text-slate-600">
