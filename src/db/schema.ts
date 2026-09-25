@@ -558,6 +558,29 @@ export const authRequests = pgTable("auth_requests", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** Compliance center: see migration 0025 and server/compliance.ts. */
+export const accessReviews = pgTable("access_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  usersReviewed: integer("users_reviewed").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const vendorAgreements = pgTable("vendor_agreements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  vendor: text("vendor").notNull(),
+  service: text("service").notNull(),
+  handlesPhi: boolean("handles_phi").notNull().default(true),
+  baaStatus: text("baa_status").notNull().default("not_recorded"),
+  signedOn: date("signed_on"),
+  notes: text("notes"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /**
  * Messages from the public contact form.
  *

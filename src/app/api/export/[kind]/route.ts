@@ -5,6 +5,7 @@ import { searchClaims, searchDenials } from "@/server/lists";
 import { arAging, payerPerformance } from "@/server/analytics";
 import { agencyPlacements } from "@/server/collections";
 import { getReport, runReport } from "@/server/report-builder";
+import { auditEvents } from "@/server/compliance";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     const r = await payerPerformance(db, session.practiceId, 100);
     headers = Object.keys(r[0] ?? { payer: "" });
     rows = r.map((x) => headers.map((h) => (x as Record<string, unknown>)[h]));
+  } else if (kind === "audit") {
+    // The audit trail itself: administrators only.
+    if (session.role !== "admin") return new Response("The audit log export is for administrators", { status: 403 });
+    const r = await auditEvents(db, session.practiceId, { action: q.action, userId: q.user, since: q.since, limit: MAX_ROWS });
+    headers = ["When (UTC)", "User", "Email", "Action", "Record type", "Record id", "Details"];
+    rows = r.map(({ event: e, userName, userEmail }) => [e.at.toISOString(), userName ?? "", userEmail ?? "", e.action, e.entity, e.entityId ?? "", e.details ? JSON.stringify(e.details) : ""]);
   } else if (kind === "report") {
     // A saved report-builder report, all rows.
     const report = q.id ? await getReport(db, session.practiceId, q.id) : null;
