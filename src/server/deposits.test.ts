@@ -49,10 +49,12 @@ describe("deposit matching against a migrated database", () => {
 
   it("does not count ERAs paid long before the first import as missing", async () => {
     await era("OLD-ERA-1", 999_00, "2025-01-15");
+    await era("ZERO-PAY", 0, "2026-09-05");
     await importDeposits(t.db, t.practiceId, "Date,Description,Amount\n09/10/2026,UNRELATED,1.23\n");
     const o = await depositsOverview(t.db, t.practiceId);
     expect(o.since).toBe("2026-08-31");
     expect(o.missing.some((r) => r.checkNumber === "OLD-ERA-1")).toBe(false);
+    expect(o.openRemittances.some((r) => r.checkNumber === "ZERO-PAY")).toBe(false); // a $0 ERA never produces a deposit
     await t.db.delete(schema.bankDeposits).where(eq(schema.bankDeposits.practiceId, t.practiceId));
   });
 

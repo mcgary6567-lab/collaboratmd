@@ -87,7 +87,7 @@ const dayDiff = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse
 
 const addDays = (iso: string, n: number) => new Date(Date.parse(iso) + n * 86_400_000).toISOString().slice(0, 10);
 
-/** ERAs paid on or after `since` that are not yet tied to any deposit. */
+/** ERAs paid on or after `since` that are not yet tied to any deposit. An ERA that paid nothing (all denied) never produces one. */
 async function openRemittances(db: Db, practiceId: string, since: string) {
   return db
     .select()
@@ -95,6 +95,7 @@ async function openRemittances(db: Db, practiceId: string, since: string) {
     .where(and(
       eq(remittances.practiceId, practiceId),
       sql`${remittances.paymentDate} >= ${since}`,
+      sql`${remittances.amountCents} > 0`,
       sql`NOT EXISTS (SELECT 1 FROM bank_deposits b WHERE b.remittance_id = ${remittances.id} AND b.status = 'matched')`,
     ))
     .orderBy(asc(remittances.paymentDate));
