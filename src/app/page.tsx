@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import {
   ArrowRight, BadgeCheck, CalendarDays, ChevronRight, ClipboardCheck, CreditCard, FileSearch,
-  FlaskConical, Gauge, Lock, Network, Plug, ReceiptText, ScanLine, ShieldCheck, Sparkles, Stethoscope, Zap,
+  FlaskConical, Gauge, Landmark, Lock, Network, Plug, ReceiptText, RefreshCw, ScanLine, ShieldCheck, Sparkles, Stethoscope, Wand2, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: ScanLine,
     title: "Claim scrubbing before submission",
-    body: `${RULE_IDS.length} built-in rules plus the payer-specific edits you configure (prior authorization, required modifiers and diagnoses, unit limits) run on every claim. NPI check digits, diagnosis pointers, place of service and timely filing are caught at your desk instead of on a remittance three weeks later.`,
+    body: `${RULE_IDS.length} built-in rules plus the payer-specific edits you configure (prior authorization, required modifiers and diagnoses, unit limits) run on every claim. NPI check digits, diagnosis pointers, place of service and timely filing are caught at your desk instead of on a remittance three weeks later. Each unsent claim also gets a denial-risk score from your own last 12 months with that payer, with the reasons spelled out.`,
   },
   {
     icon: ReceiptText,
@@ -34,7 +34,7 @@ const FEATURES = [
   {
     icon: FileSearch,
     title: "Denials explained in plain English",
-    body: "Every denial arrives categorized, prioritized by appeal deadline, and translated out of payer shorthand into what happened and what to do next. Nothing sits in a queue waiting for someone to decode it.",
+    body: "Every denial arrives categorized, prioritized by appeal deadline, and translated out of payer shorthand into what happened and what to do next. An appeal letter is one click away, filled in with the claim's details for you to edit and print. With an AI key configured, the draft is written from the denial and procedure codes only; patient details are added afterwards on our side.",
   },
   {
     icon: BadgeCheck,
@@ -42,14 +42,29 @@ const FEATURES = [
     body: "Standard X12 270 requests and 271 responses, one patient at a time or the whole of tomorrow's schedule at once. Copay, deductible, remaining deductible and out-of-pocket maximum are on the screen before the patient is roomed. Payer answers are simulated until a live clearinghouse is connected.",
   },
   {
+    icon: RefreshCw,
+    title: "Secondary claims and follow-up",
+    body: "When the primary payer pays, the balance bills to secondary insurance with the primary's adjudication attached (837P loop 2320). Claims that go quiet are chased with X12 276/277 status inquiries, and each answer comes with the next step.",
+  },
+  {
     icon: CreditCard,
     title: "Patient balances that actually clear",
-    body: "Patient responsibility transfers straight from the remittance. Statements follow HFMA patient-friendly principles, estimates include No Surprises Act good faith estimates, and discounts and payment plans are tracked separately from insurance A/R so neither hides the other.",
+    body: "Patient responsibility transfers straight from the remittance. Statements follow HFMA patient-friendly principles, estimates include No Surprises Act good faith estimates, and discounts and payment plans are tracked separately from insurance A/R so neither hides the other. Patients can view and pay their balance through a secure portal link (card payments run on the practice's own Stripe account), with optional autopay for plans and appointment and balance reminders by text or email once those services are connected. Accounts that still don't pay move through a final notice to a collection agency.",
   },
   {
     icon: Gauge,
     title: "Analytics measured against benchmarks",
     body: "Days in A/R, net collection rate, clean claim rate and denial rate, each shown against the industry target rather than floating without context. Paid claims are checked against your payer contracts so underpayments surface on their own.",
+  },
+  {
+    icon: Wand2,
+    title: "Coding help at charge entry",
+    body: "An office-visit level calculator that follows the AMA time and medical decision making rules for 99202-99215, and a diagnosis finder that understands everyday words. Suggesting codes from a full visit note uses AI and stays off unless the practice turns it on.",
+  },
+  {
+    icon: Landmark,
+    title: "Deposits reconciled, enrollment tracked",
+    body: "Import your bank's CSV and each deposit is matched to its ERA by trace number or amount, so a payment that never arrived stands out. Provider enrollment with each payer is tracked with revalidation dates, and the scrubber warns before billing a payer a provider is not approved with.",
   },
   {
     icon: Plug,

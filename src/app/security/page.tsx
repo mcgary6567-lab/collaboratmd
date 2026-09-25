@@ -33,13 +33,13 @@ const CONTROLS = [
   },
   {
     icon: KeyRound,
-    title: "Session security",
-    body: "Sessions are signed and stored in an HTTP-only cookie, validated against the user record on each request so a revoked account loses access immediately.",
+    title: "Sign-in and session security",
+    body: "Two-factor sign-in with any authenticator app, which an administrator can require for the whole practice, plus one-time recovery codes. Accounts lock for 15 minutes after five failed attempts. Sessions are signed, stored in an HTTP-only cookie and validated against the user record on each request, so a revoked account loses access immediately.",
   },
   {
     icon: ServerCog,
     title: "Secrets stored as hashes",
-    body: "Integration keys and patient check-in links are random tokens stored only as SHA-256 hashes, so a copy of the database does not yield working credentials. A check-in link locks after repeated wrong dates of birth.",
+    body: "Integration keys, patient check-in and portal links, and recovery codes are stored only as SHA-256 hashes, and authenticator secrets are encrypted, so a copy of the database does not yield working credentials. Patient links lock after repeated wrong dates of birth. Card numbers are entered on Stripe's hosted page and never reach our servers; only the card brand and last four digits are kept.",
   },
 ];
 
