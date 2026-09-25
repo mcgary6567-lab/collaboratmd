@@ -29,6 +29,8 @@ export type RiskInputs = {
 };
 
 const MIN_SAMPLE = 3;
+/** Below this, a code's denials are ordinary background noise, not a reason. */
+export const NOTABLE_RATE = 0.1;
 /** Pulls small samples toward a 10% baseline so 1 denial in 1 claim is not "100%". */
 export const smoothedRate = (denied: number, n: number) => (denied + 0.5) / (n + 5);
 
@@ -36,7 +38,7 @@ export function scoreRisk(i: RiskInputs): Risk {
   const reasons: string[] = [];
   let points = 0;
 
-  const known = i.history.filter((h) => h.n >= MIN_SAMPLE && h.denied > 0).sort((a, b) => smoothedRate(b.denied, b.n) - smoothedRate(a.denied, a.n));
+  const known = i.history.filter((h) => h.n >= MIN_SAMPLE && smoothedRate(h.denied, h.n) >= NOTABLE_RATE).sort((a, b) => smoothedRate(b.denied, b.n) - smoothedRate(a.denied, a.n));
   if (known.length) {
     const worst = known[0];
     points += Math.round(smoothedRate(worst.denied, worst.n) * 100);

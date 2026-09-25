@@ -14,6 +14,8 @@ describe("scoreRisk", () => {
   it("does not trust tiny samples", () => {
     expect(scoreRisk({ ...base, history: [{ kind: "cpt", code: "99214", n: 1, denied: 1, topCategory: "coding" }] }).score).toBe(0);
     expect(smoothedRate(0, 0)).toBeCloseTo(0.1);
+    // A 5% denial rate over many claims is normal, not a warning sign.
+    expect(scoreRisk({ ...base, history: [{ kind: "dx", code: "I10", n: 3656, denied: 159, topCategory: "authorization" }] })).toEqual({ score: 0, level: "low", reasons: [] });
   });
 
   it("explains each point and adds up to high for a bad claim", () => {
