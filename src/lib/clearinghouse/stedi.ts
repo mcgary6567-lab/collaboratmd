@@ -10,6 +10,8 @@
  *            the 835 arrive later.
  *   270   POST /change/medicalnetwork/eligibility/v3/raw-x12
  *         -> the 271 rendered as JSON (benefitsInformation, errors).
+ *   276   POST /change/medicalnetwork/claimstatus/v2/raw-x12
+ *         -> JSON that includes the raw 277 in its x12 field.
  *
  * Stedi replaces the ISA/GS envelope with its own and routes on the payer ID
  * in loop 2010BB (claims) or 2100A (eligibility).
@@ -100,6 +102,13 @@ export class StediClearinghouse implements ClearinghouseGateway {
   async checkEligibility(edi270: string): Promise<EligibilityAnswer> {
     const r = await this.post<StediEligibilityResponse>("/change/medicalnetwork/eligibility/v3/raw-x12", { x12: edi270 });
     return { format: "json", raw: JSON.stringify(r), response: toResponse271(r) };
+  }
+
+  /** 276 out, and the raw 277 from the x12 field of Stedi's response. */
+  async checkClaimStatus(edi276: string): Promise<string> {
+    const r = await this.post<{ x12?: string }>("/change/medicalnetwork/claimstatus/v2/raw-x12", { x12: edi276 });
+    if (!r.x12) throw new Error("Stedi returned no 277 for the status request");
+    return r.x12;
   }
 
   /** ERAs from Stedi arrive by polling or webhook, which this adapter does not implement. */

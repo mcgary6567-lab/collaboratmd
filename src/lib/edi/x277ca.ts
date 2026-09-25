@@ -33,6 +33,22 @@ const CATEGORIES: Record<string, string> = {
   A6: "Acknowledgement/Rejected for missing information",
   A7: "Acknowledgement/Rejected for invalid information",
   A8: "Acknowledgement/Rejected for relational field in error",
+  // Claim status (277 in answer to a 276).
+  P0: "Pending",
+  P1: "Pending/In process",
+  P2: "Pending/Payer review",
+  P3: "Pending/Provider requested information",
+  P4: "Pending/Patient requested information",
+  F0: "Finalized",
+  F1: "Finalized/Payment",
+  F2: "Finalized/Denial",
+  F3: "Finalized/Revised",
+  F4: "Finalized/Adjudication complete, no payment forthcoming",
+  R0: "Requests for additional information",
+  R1: "Requests for additional information/General",
+  R3: "Requests for additional information/Claim/line",
+  E0: "Response not possible, error on submitted request",
+  D0: "Data search unsuccessful",
 };
 
 const STATUS: Record<string, string> = {
@@ -43,6 +59,12 @@ const STATUS: Record<string, string> = {
   "164": "Entity's contract/member number",
   "187": "Date(s) of service",
   "562": "Entity's National Provider Identifier (NPI)",
+  "1": "For more detailed information, see remittance advice",
+  "3": "Claim has been adjudicated and is awaiting payment cycle",
+  "15": "Justification for service",
+  "65": "Claim/line has been paid",
+  "88": "Entity not eligible for benefits for submitted dates of service",
+  "294": "Supporting documentation",
 };
 
 const ENTITY: Record<string, string> = { IL: "Subscriber", QC: "Patient", "85": "Billing provider", "82": "Rendering provider", PR: "Payer" };

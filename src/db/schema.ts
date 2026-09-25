@@ -522,6 +522,22 @@ export const contactMessages = pgTable("contact_messages", {
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const claimStatusChecks = pgTable("claim_status_checks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  category: text("category"),
+  statusCode: text("status_code"),
+  entity: text("entity"),
+  message: text("message"),
+  paidCents: integer("paid_cents"),
+  nextAction: text("next_action"),
+  request276: text("request_276"),
+  response277: text("response_277"),
+  error: text("error"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /* ------------------------------------------------------------------ */
 /* Multi-practice access                                                */
 /* ------------------------------------------------------------------ */

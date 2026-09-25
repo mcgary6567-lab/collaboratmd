@@ -69,6 +69,13 @@ describe("Stedi adapter", () => {
     expect(summarize271(r)).toEqual({ status: "inactive", message: "Invalid/Missing Subscriber/Insured ID (AAA 72)" });
   });
 
+  it("sends a 276 and returns the raw 277 from Stedi's response", async () => {
+    const { http, calls } = stub(200, { x12: "ISA*277~", claims: [] });
+    expect(await new StediClearinghouse("k", http).checkClaimStatus("ISA*276~")).toBe("ISA*277~");
+    expect(calls[0].url).toBe("https://healthcare.us.stedi.com/2024-04-01/change/medicalnetwork/claimstatus/v2/raw-x12");
+    await expect(new StediClearinghouse("k", stub(200, {}).http).checkClaimStatus("ISA")).rejects.toThrow(/no 277/);
+  });
+
   it("does not pretend to fetch ERAs", async () => {
     expect(await new StediClearinghouse("k", stub(200, {}).http).fetch835([])).toBeNull();
   });

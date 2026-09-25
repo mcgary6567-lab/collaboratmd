@@ -11,6 +11,7 @@ import { build999, describeSyntaxError, validateStructure } from "@/lib/edi/x999
 import { build277CA } from "@/lib/edi/x277ca";
 import { build271, parse270, parse271, type Benefit, type Response271 } from "@/lib/edi/x270";
 import { StediClearinghouse } from "./stedi";
+import { build277, parse276 } from "@/lib/edi/x276";
 
 export interface SubmissionResult {
   clearinghouseId: string;
@@ -80,6 +81,8 @@ export interface ClearinghouseGateway {
   checkEligibility(edi270: string): Promise<EligibilityAnswer>;
   /** Simulates the payer producing an ERA for previously accepted claims. */
   fetch835(claims: RemitRequest[]): Promise<string | null>;
+  /** Sends a 276 claim status request and returns the payer's 277, both raw X12. */
+  checkClaimStatus(edi276: string): Promise<string>;
 }
 
 function hashStr(s: string): number {
@@ -176,6 +179,25 @@ export class MockClearinghouse implements ClearinghouseGateway {
         eb("G", "29", oopMax - (deductible - remaining), null),
       ],
     });
+  }
+
+  /**
+   * Answers a 276 the way a payer might for a claim that has not been paid:
+   * mostly still in process, sometimes already paid (the ERA is on its way),
+   * sometimes waiting on documentation or decided without payment.
+   */
+  async checkClaimStatus(edi276: string): Promise<string> {
+    const q = parse276(edi276);
+    const h = hashStr(q.controlNumber + "status");
+    const now = new Date();
+    const bucket = h % 10;
+    const paidDate = new Date(now.getTime() - 3 * 86_400_000).toISOString().slice(0, 10);
+    const status =
+      bucket <= 5 ? { category: "P1", statusCode: "20" }
+      : bucket <= 7 ? { category: "F1", statusCode: "65", paidCents: Math.round(q.chargeCents * 0.7), paidDate, checkNumber: `EFT${h % 100000000}` }
+      : bucket === 8 ? { category: "P3", statusCode: "294" }
+      : { category: "F2", statusCode: "88", entity: "IL" };
+    return build277({ senderId: "MOCKCH", receiverId: "COLLABORATMD", now, control: String(h % 1_000_000_000), inquiry: q, status: { ...status, payerClaimNumber: q.payerClaimNumber || `PCN${h % 1_000_000}` } });
   }
 
   async fetch835(claims: RemitRequest[]): Promise<string | null> {
