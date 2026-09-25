@@ -747,6 +747,26 @@ export const practiceMemberships = pgTable(
 /* Integrations                                                         */
 /* ------------------------------------------------------------------ */
 
+/** Outside services a practice connects: see migration 0019 and server/integrations.ts. */
+export const practiceIntegrations = pgTable(
+  "practice_integrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    practiceId: uuid("practice_id").notNull().references(() => practices.id),
+    provider: text("provider").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    settings: jsonb("settings").$type<Record<string, string | boolean>>().notNull().default({}),
+    secrets: text("secrets"),
+    secretHints: jsonb("secret_hints").$type<Record<string, string>>().notNull().default({}),
+    lastTestAt: timestamp("last_test_at", { withTimezone: true }),
+    lastTestOk: boolean("last_test_ok"),
+    lastTestMessage: text("last_test_message"),
+    updatedBy: uuid("updated_by").references(() => users.id),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("practice_integrations_provider_idx").on(t.practiceId, t.provider)],
+);
+
 export const integrationKeys = pgTable("integration_keys", {
   id: uuid("id").defaultRandom().primaryKey(),
   practiceId: uuid("practice_id").notNull().references(() => practices.id),

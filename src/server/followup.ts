@@ -13,6 +13,7 @@ import { schema } from "@/db";
 import { build276, nextStep, parse277 } from "@/lib/edi/x276";
 import { getClearinghouse } from "@/lib/clearinghouse/gateway";
 import { loadClaimBundle } from "./claims";
+import { practiceConfig } from "./integrations";
 
 const { claims, claimStatusChecks, claimEvents, patients, payers } = schema;
 
@@ -31,7 +32,7 @@ export async function checkClaimStatus(db: Db, claimId: string) {
   });
   let raw: string | null = null;
   try {
-    raw = await getClearinghouse().checkClaimStatus(edi);
+    raw = await getClearinghouse((await practiceConfig(db, b.claim.practiceId)).stedi?.apiKey).checkClaimStatus(edi);
   } catch (e) {
     const [row] = await db.insert(claimStatusChecks).values({ practiceId: b.claim.practiceId, claimId, request276: edi, error: e instanceof Error ? e.message : "No answer", nextAction: "call_payer" }).returning();
     return row;

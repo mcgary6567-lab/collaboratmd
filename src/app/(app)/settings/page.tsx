@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth";
 import { Card, PageHeader, Badge } from "@/components/ui";
 import { money } from "@/lib/utils";
 import { clearinghouseName } from "@/lib/clearinghouse/gateway";
+import { practiceConfig } from "@/server/integrations";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,10 @@ export default async function SettingsPage() {
     db.select().from(schema.users).where(eq(schema.users.practiceId, s.practiceId)).orderBy(asc(schema.users.name)),
     db.select().from(schema.cptCodes).orderBy(asc(schema.cptCodes.code)),
   ]);
+  const cfg = await practiceConfig(db, s.practiceId);
   return (
     <>
-      <PageHeader title="Settings" subtitle="Practice configuration, providers, payers, users and fee schedule" />
+      <PageHeader title="Settings" subtitle="Practice configuration, providers, payers, users and fee schedule" actions={<Link href="/settings/connections" className="btn btn-primary">Integrations and API keys</Link>} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Practice (billing provider)">
           <dl className="space-y-1 text-sm">
@@ -28,8 +30,8 @@ export default async function SettingsPage() {
             <div className="flex justify-between"><dt className="text-slate-500">Tax ID</dt><dd className="font-mono">{practice.taxId}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">NPI (Type 2)</dt><dd className="font-mono">{practice.npi}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Address</dt><dd className="text-right">{practice.address1}<br />{practice.city}, {practice.state} {practice.zip}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Clearinghouse</dt><dd>{clearinghouseName() === "Stedi" ? <Badge tone="green">Stedi (live)</Badge> : <Badge tone="amber">Simulated (set CLEARINGHOUSE=stedi)</Badge>}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">AI rejection support</dt><dd><Badge tone={process.env.ANTHROPIC_API_KEY ? "green" : "slate"}>{process.env.ANTHROPIC_API_KEY ? "Claude enabled" : "Rules-based (set ANTHROPIC_API_KEY)"}</Badge></dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Clearinghouse</dt><dd>{clearinghouseName(cfg.stedi?.apiKey) === "Stedi" ? <Badge tone="green">Stedi (live)</Badge> : <Link href="/settings/connections"><Badge tone="amber">Simulated · connect Stedi</Badge></Link>}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">AI rejection support</dt><dd><Badge tone={cfg.anthropic ? "green" : "slate"}>{cfg.anthropic ? "Claude enabled" : "Rules-based · connect Claude"}</Badge></dd></div>
           </dl>
         </Card>
         <Card title="Users" actions={<Link href="/settings/security" className="btn btn-secondary text-xs">Sign-in security</Link>}>

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { getAppeal } from "@/server/appeals";
+import { practiceConfig } from "@/server/integrations";
 import { draftAppealAction, markSentAction, saveAppealAction } from "@/app/(app)/appeal-actions";
 import { ActionForm, PrintButton, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -21,6 +22,7 @@ export default async function AppealPage({ params }: { params: Promise<{ id: str
     notFound();
   }
   const { denial, claim, patient, payer, letter } = data;
+  const aiOn = !!(await practiceConfig(db, s.practiceId)).anthropic;
 
   return (
     <>
@@ -65,9 +67,9 @@ export default async function AppealPage({ params }: { params: Promise<{ id: str
           </Card>
           <Card title="How the draft is written">
             <p className="text-sm text-slate-600">
-              {process.env.ANTHROPIC_API_KEY
+              {aiOn
                 ? "An AI model drafts the argument from the denial codes, procedure and diagnosis codes only. It never receives the patient's name, date of birth or member ID; those are filled in here, after the draft comes back."
-                : "Drafts come from a template for the denial reason. Set ANTHROPIC_API_KEY for AI drafts, which are written from the codes only and never see patient details."}
+                : "Drafts come from a template for the denial reason. Connect Claude in Settings → Integrations for AI drafts, which are written from the codes only and never see patient details."}
             </p>
             {letter && (
               <ActionForm action={draftAppealAction.bind(null, id)} className="mt-3">

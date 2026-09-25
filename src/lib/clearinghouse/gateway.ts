@@ -299,25 +299,27 @@ export class MockClearinghouse implements ClearinghouseGateway {
   }
 }
 
-let gateway: ClearinghouseGateway | null = null;
+const simulator = new MockClearinghouse();
+const stediClients = new Map<string, StediClearinghouse>();
+
 /**
- * The configured clearinghouse. CLEARINGHOUSE=stedi with STEDI_API_KEY sends
- * real transactions through Stedi; anything else uses the simulator, which is
- * never mistaken for a real payer: its acknowledgments name MOCKCH.
+ * The practice's clearinghouse: Stedi with the key it connected in Settings →
+ * Integrations (or the deployment's CLEARINGHOUSE=stedi / STEDI_API_KEY),
+ * otherwise the simulator, which is never mistaken for a real payer: its
+ * acknowledgments name MOCKCH. Callers pass the resolved key from
+ * server/integrations practiceConfig().
  */
-export function getClearinghouse(): ClearinghouseGateway {
-  if (gateway) return gateway;
-  if (process.env.CLEARINGHOUSE?.trim().toLowerCase() === "stedi") {
-    const key = process.env.STEDI_API_KEY?.trim();
-    if (!key) throw new Error("CLEARINGHOUSE=stedi needs STEDI_API_KEY");
-    gateway = new StediClearinghouse(key);
-  } else {
-    gateway = new MockClearinghouse();
+export function getClearinghouse(stediKey: string | null | undefined): ClearinghouseGateway {
+  if (!stediKey) return simulator;
+  let c = stediClients.get(stediKey);
+  if (!c) {
+    c = new StediClearinghouse(stediKey);
+    stediClients.set(stediKey, c);
   }
-  return gateway;
+  return c;
 }
 
 /** Which clearinghouse is live, for the UI and the site's claims about itself. */
-export function clearinghouseName(): "Stedi" | "Simulated" {
-  return process.env.CLEARINGHOUSE?.trim().toLowerCase() === "stedi" && process.env.STEDI_API_KEY ? "Stedi" : "Simulated";
+export function clearinghouseName(stediKey: string | null | undefined): "Stedi" | "Simulated" {
+  return stediKey ? "Stedi" : "Simulated";
 }

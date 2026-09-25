@@ -13,6 +13,7 @@ import { carcCategory } from "@/lib/codes/carc";
 import { checkClaimUnderpayment } from "./fees";
 import { authsForPatient, consumeAuthorization, rulesForPayer } from "./payer-edits";
 import { enrollmentFinding, enrollmentFor } from "./enrollment";
+import { practiceConfig } from "./integrations";
 
 const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -179,7 +180,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string) {
   const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : "837P";
   await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `${kind} generated and sent to clearinghouse (${edi.length} bytes)` });
 
-  const result = await getClearinghouse().submit837(edi, {
+  const result = await getClearinghouse((await practiceConfig(db, bundle.claim.practiceId)).stedi?.apiKey).submit837(edi, {
     controlNumber: bundle.claim.controlNumber, memberId: bundle.insurance.memberId,
     patientLast: bundle.patient.lastName, patientFirst: bundle.patient.firstName,
     chargeCents: bundle.claim.totalCents, dateOfService: bundle.encounter.dateOfService,
@@ -299,7 +300,7 @@ export async function fetchAndPostRemittances(db: Db, practiceId: string, userId
       items.push({ ...base, lines: lines.map((l) => ({ cpt: l.cpt, units: l.units, chargeCents: l.chargeCents * l.units })), secondary });
     }
     if (!items.length) continue;
-    const raw = await getClearinghouse().fetch835(items);
+    const raw = await getClearinghouse((await practiceConfig(db, practiceId)).stedi?.apiKey).fetch835(items);
     if (!raw) continue;
     const remitId = await importRemittance(db, practiceId, raw, userId);
     await postRemittance(db, remitId, userId);
@@ -416,7 +417,7 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
       const lines = await db.select().from(charges).where(eq(charges.encounterId, claim.encounterId));
       const [enc] = await db.select().from(encounters).where(eq(encounters.id, claim.encounterId)).limit(1);
       const [payer] = await db.select().from(payers).where(eq(payers.id, claim.payerId)).limit(1);
-      const exp = await explainDenial({ carc: denialAdj.reason, rarc, cpts: lines.map((l) => l.cpt), diagnoses: enc?.diagnoses ?? [], payerType: payer?.type ?? "commercial", claimAgeDays: Math.floor((Date.now() - new Date(enc?.dateOfService ?? Date.now()).getTime()) / 86_400_000) });
+      const exp = await explainDenial({ carc: denialAdj.reason, rarc, cpts: lines.map((l) => l.cpt), diagnoses: enc?.diagnoses ?? [], payerType: payer?.type ?? "commercial", claimAgeDays: Math.floor((Date.now() - new Date(enc?.dateOfService ?? Date.now()).getTime()) / 86_400_000) }, (await practiceConfig(db, remit.practiceId)).anthropic?.apiKey);
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + (payer?.appealDays ?? 60));
       await db.insert(denials).values({ practiceId: remit.practiceId, claimId: claim.id, category: carcCategory(denialAdj.reason), carc: denialAdj.reason, rarc, amountCents: denialAdj.amountCents, explanation: exp.explanation, nextSteps: exp.nextSteps, appealDeadline: deadline.toISOString().slice(0, 10) });

@@ -5,24 +5,9 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema, type Db } from "@/db";
+import { appSecret as secret } from "@/lib/app-secret";
 
 const COOKIE = "collaboratmd_session";
-
-/**
- * Key used to sign session tokens.
- *
- * Falls back to a fixed development value only outside production. A deployed
- * app running on a published default would let anyone forge a session, so
- * production refuses to start a session without AUTH_SECRET.
- */
-const secret = () => {
-  const configured = process.env.AUTH_SECRET?.trim();
-  if (configured) return new TextEncoder().encode(configured);
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SECRET must be set in production. Generate one with: openssl rand -base64 32");
-  }
-  return new TextEncoder().encode("dev-only-secret-change-me-please-0123456789");
-};
 
 /** The same key signs short-lived patient check-in tokens, under their own audience. */
 export const signingKey = secret;

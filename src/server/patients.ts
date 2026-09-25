@@ -4,6 +4,7 @@ import { schema } from "@/db";
 import { getClearinghouse } from "@/lib/clearinghouse/gateway";
 import { build270, summarize271, type EligibilitySummary } from "@/lib/edi/x270";
 import { listAppointments } from "./encounters";
+import { practiceConfig } from "./integrations";
 
 const { patients, patientInsurances, payers, eligibilityChecks, encounters, ledgerEntries } = schema;
 
@@ -105,7 +106,7 @@ export async function runEligibility(db: Db, patientInsuranceId: string, service
   let response271: string | null = null;
   let summary: EligibilitySummary;
   try {
-    const answer = await getClearinghouse().checkEligibility(request270);
+    const answer = await getClearinghouse((await practiceConfig(db, row.practice.id)).stedi?.apiKey).checkEligibility(request270);
     response271 = answer.raw;
     const parsed = answer.response;
     summary = parsed.traceNumber && parsed.traceNumber !== traceNumber

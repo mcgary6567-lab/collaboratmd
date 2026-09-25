@@ -4,7 +4,8 @@ import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { recentRuns, weeklyReportText } from "@/server/automation";
 import { emailEnabled, smsEnabled } from "@/server/messaging";
-import { stripeEnabled } from "@/lib/stripe";
+import { stripeReady } from "@/lib/stripe";
+import { practiceConfig } from "@/server/integrations";
 import { runNowAction, saveAutomationAction } from "@/app/(app)/automation-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -29,11 +30,12 @@ export default async function AutomationPage() {
     weeklyReportText(db, s.practiceId),
   ]);
   const settings = practice.automation ?? {};
+  const cfg = await practiceConfig(db, s.practiceId);
   const admin = s.role === "admin";
   const channels = [
-    { name: "Email (Resend)", on: emailEnabled(), env: "RESEND_API_KEY" },
-    { name: "Text messages (Twilio)", on: smsEnabled(), env: "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM" },
-    { name: "Card payments (Stripe)", on: stripeEnabled(), env: "STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET" },
+    { name: "Email (Resend)", on: emailEnabled(cfg), env: "Settings → Integrations" },
+    { name: "Text messages (Twilio)", on: smsEnabled(cfg), env: "Settings → Integrations" },
+    { name: "Card payments (Stripe)", on: stripeReady(cfg.stripe), env: "Settings → Integrations" },
     { name: "Daily schedule", on: !!process.env.CRON_SECRET, env: "CRON_SECRET" },
   ];
 

@@ -4,9 +4,10 @@ import Anthropic from "@anthropic-ai/sdk";
 /**
  * Clinical notes contain patient information, so sending one to an AI model
  * needs a business associate agreement with the model provider. Off unless
- * the practice's deployment sets AI_PHI_ALLOWED=1 as well as an API key.
+ * the practice confirmed that BAA when connecting Claude in Settings →
+ * Integrations (or the deployment sets AI_PHI_ALLOWED=1 with its key).
  */
-export const noteCodingEnabled = () => !!process.env.ANTHROPIC_API_KEY && process.env.AI_PHI_ALLOWED === "1";
+export const noteCodingEnabled = (ai: { apiKey: string; phiAllowed: boolean } | null) => !!ai?.apiKey && ai.phiAllowed;
 
 const SYSTEM_PROMPT = `You are a certified medical coder. From a clinical note for an office visit, suggest CPT procedure codes and ICD-10-CM diagnosis codes the documentation supports.
 Only suggest codes from the lists provided. Only suggest what the note documents; if something needed for a code is missing, say so in "gaps" instead of assuming it.
@@ -34,9 +35,9 @@ export function validateNoteCoding(raw: unknown, cptCodes: Set<string>, icdCodes
   };
 }
 
-export async function codeNoteWithAi(note: string, cpts: { code: string; description: string }[], icds: { code: string; description: string }[]): Promise<NoteCoding | null> {
-  if (!noteCodingEnabled()) return null;
-  const client = new Anthropic();
+export async function codeNoteWithAi(ai: { apiKey: string; phiAllowed: boolean } | null, note: string, cpts: { code: string; description: string }[], icds: { code: string; description: string }[]): Promise<NoteCoding | null> {
+  if (!ai || !noteCodingEnabled(ai)) return null;
+  const client = new Anthropic({ apiKey: ai.apiKey });
   const response = await client.beta.messages.create({
     model: "claude-opus-5",
     max_tokens: 4096,

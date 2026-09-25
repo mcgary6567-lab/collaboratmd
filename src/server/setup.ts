@@ -7,6 +7,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { isValidNpi } from "@/lib/scrub/rules";
 import { clearinghouseName } from "@/lib/clearinghouse/gateway";
+import { practiceConfig } from "./integrations";
 
 export interface SetupStep {
   key: string;
@@ -22,6 +23,7 @@ const count = async (db: Db, q: Promise<{ n: number }[]>) => Number((await q)[0]
 export async function setupSteps(db: Db, practiceId: string): Promise<SetupStep[]> {
   const n = sql<number>`count(*)::int`;
   const [practice] = await db.select().from(schema.practices).where(eq(schema.practices.id, practiceId)).limit(1);
+  const cfg = await practiceConfig(db, practiceId);
   const [providers, payers, schedules, contracts, users, patients, checks, submitted, keys, imports, requireMfa] = await Promise.all([
     count(db, db.select({ n }).from(schema.providers).where(and(eq(schema.providers.practiceId, practiceId), eq(schema.providers.active, true)))),
     count(db, db.select({ n }).from(schema.payers).where(eq(schema.payers.practiceId, practiceId))),
@@ -49,10 +51,12 @@ export async function setupSteps(db: Db, practiceId: string): Promise<SetupStep[
     { key: "mfa", title: "Two-factor sign-in", detail: "Require a code from an authenticator app for everyone.", done: requireMfa > 0, href: "/settings/security" },
     { key: "patients", title: "Patients", detail: "Import your patient list, connect your EHR, or add patients by hand.", done: patients > 0, href: "/import" },
     { key: "ehr", title: "EHR connection", detail: "An HL7 feed keeps patients and charges flowing in without re-keying.", done: keys > 0 || imports > 0, href: "/settings/integrations", optional: true },
-    { key: "clearinghouse", title: "Live clearinghouse", detail: "Connect Stedi so claims and eligibility checks reach real payers (CLEARINGHOUSE=stedi, STEDI_API_KEY).", done: clearinghouseName() === "Stedi", href: "/settings" },
+    { key: "clearinghouse", title: "Live clearinghouse", detail: "Connect Stedi so claims and eligibility checks reach real payers.", done: clearinghouseName(cfg.stedi?.apiKey) === "Stedi", href: "/settings/connections" },
+    { key: "payments", title: "Card payments", detail: "Connect Stripe so patients can pay online and at check-in.", done: !!cfg.stripe?.webhookSecret, href: "/settings/connections", optional: true },
+    { key: "sms", title: "Text messages", detail: "Connect Twilio for reminders and text-to-pay.", done: !!cfg.twilio, href: "/settings/connections", optional: true },
     { key: "eligibility", title: "First eligibility check", detail: "Verify a patient's coverage before a visit.", done: checks > 0, href: "/scheduling" },
     { key: "claim", title: "First claim submitted", detail: "Enter charges and send a claim.", done: submitted > 0, href: "/encounters/new" },
-    { key: "email", title: "Email delivery", detail: "Check-in links, reminders and reports by email (RESEND_API_KEY).", done: !!process.env.RESEND_API_KEY, href: "/settings", optional: true },
-    { key: "ai", title: "AI assistance", detail: "Plain-language denial explanations, appeal letters and column matching (ANTHROPIC_API_KEY).", done: !!process.env.ANTHROPIC_API_KEY, href: "/settings", optional: true },
+    { key: "email", title: "Email delivery", detail: "Check-in links, reminders and reports by email (Resend).", done: !!cfg.resend, href: "/settings/connections", optional: true },
+    { key: "ai", title: "AI assistance", detail: "Plain-language denial explanations, appeal letters and the denial agent (Claude).", done: !!cfg.anthropic, href: "/settings/connections", optional: true },
   ];
 }

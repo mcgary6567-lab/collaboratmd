@@ -7,6 +7,7 @@ import type { FormResult } from "@/components/action-form";
 import { createIntegrationKey, processHl7, revokeIntegrationKey } from "@/server/hl7";
 import { importPatients, preview, profiles, readTable, type ImportPreview } from "@/server/import";
 import { mapColumnsWithAi } from "@/lib/ai/map-columns";
+import { practiceConfig } from "@/server/integrations";
 import type { Mapping } from "@/lib/import/patients";
 
 const fail = (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : "Something went wrong" });
@@ -52,9 +53,10 @@ export async function testHl7Action(_prev: FormResult, formData: FormData): Prom
 export type PreviewResult = { ok: true; preview: ImportPreview; aiAvailable: boolean } | { ok: false; message: string };
 
 export async function previewImportAction(text: string, mapping?: Mapping): Promise<PreviewResult> {
-  await requireRole(CAN_WRITE);
+  const s = await requireRole(CAN_WRITE);
   try {
-    return { ok: true, preview: preview(readTable(text), mapping), aiAvailable: !!process.env.ANTHROPIC_API_KEY };
+    const cfg = await practiceConfig(await getDb(), s.practiceId);
+    return { ok: true, preview: preview(readTable(text), mapping), aiAvailable: !!cfg.anthropic };
   } catch (e) {
     return fail(e);
   }
@@ -62,10 +64,10 @@ export async function previewImportAction(text: string, mapping?: Mapping): Prom
 
 /** Maps columns with Claude from headers and value shapes only; no patient data is sent. */
 export async function aiMapAction(text: string): Promise<PreviewResult> {
-  await requireRole(CAN_WRITE);
+  const s = await requireRole(CAN_WRITE);
   try {
     const table = readTable(text);
-    const mapped = await mapColumnsWithAi(profiles(table));
+    const mapped = await mapColumnsWithAi(profiles(table), (await practiceConfig(await getDb(), s.practiceId)).anthropic?.apiKey);
     if (!mapped) return { ok: false, message: "AI mapping is not available right now; the rule-based mapping is unchanged" };
     return { ok: true, preview: preview(table, mapped), aiAvailable: true };
   } catch (e) {

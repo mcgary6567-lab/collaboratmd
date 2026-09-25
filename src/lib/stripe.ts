@@ -3,8 +3,9 @@
  * touch this application: patients pay on Stripe's hosted Checkout page, and
  * a card saved for autopay is held by Stripe, referenced here by id.
  *
- * Enabled with STRIPE_SECRET_KEY; payments are confirmed by the webhook
- * (STRIPE_WEBHOOK_SECRET), never by the browser returning to the site.
+ * Each practice connects its own Stripe account in Settings → Integrations
+ * (or the deployment sets STRIPE_SECRET_KEY). Payments are confirmed by the
+ * webhook, never by the browser returning to the site.
  * Built from Stripe's published API reference and tested with a stubbed HTTP
  * layer; not yet exercised against a live Stripe account.
  */
@@ -14,8 +15,11 @@ const API = "https://api.stripe.com/v1";
 
 type Http = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
-export function stripeEnabled() {
-  return !!process.env.STRIPE_SECRET_KEY?.trim();
+export type StripeKeys = { secretKey: string; webhookSecret: string | null } | null;
+
+/** Payments need both keys: the secret key starts them and the webhook secret is how they are confirmed. */
+export function stripeReady(keys: StripeKeys) {
+  return !!keys?.secretKey && !!keys.webhookSecret;
 }
 
 /** Stripe's form encoding: nested keys in brackets. */
@@ -80,10 +84,9 @@ export class Stripe {
   }
 }
 
-export function stripe(http?: Http) {
-  const key = process.env.STRIPE_SECRET_KEY?.trim();
-  if (!key) throw new Error("Online payments are not set up (STRIPE_SECRET_KEY)");
-  return new Stripe(key, http);
+export function stripeClient(keys: StripeKeys, http?: Http) {
+  if (!keys?.secretKey) throw new Error("Online payments are not set up: connect Stripe in Settings → Integrations");
+  return new Stripe(keys.secretKey, http);
 }
 
 export interface StripeEvent {

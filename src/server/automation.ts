@@ -16,7 +16,8 @@ import { patientsWithBalances, refreshPlanStatuses } from "./billing";
 import { runFollowUp, followUpSummary } from "./followup";
 import { arAging, headlineKpis } from "./analytics";
 import { sendEmail } from "./notify";
-import { stripeEnabled } from "@/lib/stripe";
+import { stripeReady } from "@/lib/stripe";
+import { practiceConfig } from "./integrations";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
 
@@ -125,7 +126,7 @@ export async function sendWeeklyReport(db: Db, practiceId: string) {
   const text = await weeklyReportText(db, practiceId);
   let sent = 0;
   for (const a of admins) {
-    const ok = await sendEmail(a.email, `Weekly revenue report: ${practice.name}`, text);
+    const ok = await sendEmail(a.email, `Weekly revenue report: ${practice.name}`, text, undefined, (await practiceConfig(db, practiceId)).resend);
     await db.insert(messageLog).values({ practiceId, channel: "email", kind: "report", recipient: a.email, status: ok ? "sent" : "failed" });
     if (ok) sent++;
   }
@@ -150,7 +151,7 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.appointmentReminders) await step("appointmentReminders", () => appointmentReminders(db, practiceId, origin, now));
   if (s.balanceReminders) await step("balanceReminders", () => balanceReminders(db, practiceId, origin));
   if (s.claimFollowUp) await step("claimFollowUp", () => runFollowUp(db, practiceId));
-  if (s.autopay && stripeEnabled()) await step("autopay", () => chargeAutopay(db, practiceId));
+  if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));
   await db.insert(automationRuns).values({ practiceId, summary, error });
   return summary;

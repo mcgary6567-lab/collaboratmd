@@ -30,13 +30,18 @@ function config() {
   };
 }
 
-/** Sends one plain-text email; false when email is not configured or the provider refuses. */
-export async function sendEmail(to: string, subject: string, text: string, replyTo?: string) {
-  return send(to, subject, text, replyTo);
+/**
+ * Sends one plain-text email; false when email is not configured or the
+ * provider refuses. `resend` is a practice's own connection from Settings →
+ * Integrations; without it the deployment's RESEND_API_KEY is used.
+ */
+export async function sendEmail(to: string, subject: string, text: string, replyTo?: string, resend?: { apiKey: string; from: string | null } | null) {
+  return send(to, subject, text, replyTo, resend);
 }
 
-async function send(to: string, subject: string, text: string, replyTo?: string) {
-  const c = config();
+async function send(to: string, subject: string, text: string, replyTo?: string, resend?: { apiKey: string; from: string | null } | null) {
+  const base = config();
+  const c = resend ? { apiKey: resend.apiKey, from: resend.from || base?.from || "CollaboratMD <notifications@collaboratmd.com>" } : base;
   if (!c) {
     console.warn(`[collaboratmd] email not sent (no RESEND_API_KEY): "${subject}" to ${to}`);
     return false;

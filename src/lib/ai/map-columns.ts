@@ -14,10 +14,10 @@ Respond with strict JSON: {"mapping": {"<field>": <column index or null>, ...}}.
  * patient data is sent. Returns null when no API key is configured or the
  * call fails; the caller then keeps the rule-based mapping.
  */
-export async function mapColumnsWithAi(profiles: ColumnProfile[]): Promise<Mapping | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+export async function mapColumnsWithAi(profiles: ColumnProfile[], apiKey?: string | null): Promise<Mapping | null> {
+  if (!apiKey) return null;
   try {
-    const client = new Anthropic();
+    const client = new Anthropic({ apiKey });
     const fields = PATIENT_FIELDS.map((f) => `${f.key}: ${f.label}`).join("\n");
     const columns = profiles
       .map((p, i) => `${i}. "${p.header}" (filled ${(p.filled * 100).toFixed(0)}%; values look like: ${p.shapes.join(", ") || "free text"})`)

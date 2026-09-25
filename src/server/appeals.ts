@@ -8,6 +8,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { draftAppealBody } from "@/lib/ai/appeal";
 import { fillPlaceholders, templateLetter, wrapBody } from "@/lib/appeals";
+import { practiceConfig } from "./integrations";
 
 const { appealLetters, denials, claims, patients, patientInsurances, payers, practices, encounters, charges, providers, claimEvents } = schema;
 
@@ -39,7 +40,7 @@ export async function getAppeal(db: Db, practiceId: string, denialId: string) {
 export async function draftAppeal(db: Db, practiceId: string, denialId: string, userId?: string) {
   const d = await loadDenial(db, practiceId, denialId);
   const cpts = d.lines.map((l) => l.cpt);
-  const body = await draftAppealBody({ carc: d.denial.carc, rarc: d.denial.rarc, category: d.denial.category, cpts, diagnoses: d.encounter.diagnoses, payerType: d.payer.type });
+  const body = await draftAppealBody({ carc: d.denial.carc, rarc: d.denial.rarc, category: d.denial.category, cpts, diagnoses: d.encounter.diagnoses, payerType: d.payer.type }, (await practiceConfig(db, practiceId)).anthropic?.apiKey);
   const template = body ? wrapBody(body) : templateLetter(d.denial.category);
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const date = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });

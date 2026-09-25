@@ -43,10 +43,10 @@ export async function explainDenial(input: {
   diagnoses: string[];
   payerType: string;
   claimAgeDays: number;
-}): Promise<DenialExplanation> {
-  if (!process.env.ANTHROPIC_API_KEY) return explainWithRules(input.carc, input.rarc);
+}, apiKey?: string | null): Promise<DenialExplanation> {
+  if (!apiKey) return explainWithRules(input.carc, input.rarc);
   try {
-    const client = new Anthropic();
+    const client = new Anthropic({ apiKey });
     const dictionary = CARC[input.carc] ? `Reference: CARC ${input.carc} = ${CARC[input.carc].description}.` : "";
     const remark = input.rarc && RARC[input.rarc] ? `RARC ${input.rarc} = ${RARC[input.rarc]}.` : "";
     const response = await client.beta.messages.create({

@@ -17,7 +17,8 @@ import { schema } from "@/db";
 import { normalizeDob } from "./checkin";
 import { buildStatementDetail, patientBalanceCents, plansForPatient, recordPlanPayment } from "./billing";
 import { createTask } from "./work";
-import { stripe, stripeEnabled, type Stripe, type StripeEvent } from "@/lib/stripe";
+import { stripeClient, stripeReady, type Stripe, type StripeEvent } from "@/lib/stripe";
+import { practiceConfig } from "./integrations";
 
 const { portalLinks, onlinePayments, savedCards, patients, practices, ledgerEntries, statements } = schema;
 
@@ -95,7 +96,8 @@ export async function portalData(db: Db, linkId: string) {
     db.select().from(savedCards).where(and(eq(savedCards.patientId, patient.id), isNull(savedCards.removedAt))),
     buildStatementDetail(db, patient.id),
   ]);
-  return { patient, practice, balance, statements: stmts, plans, payments, cards, visits: detail.visits.filter((v) => v.youOweCents > 0), onlinePayments: stripeEnabled() };
+  const onlinePayments = stripeReady((await practiceConfig(db, practice.id)).stripe);
+  return { patient, practice, balance, statements: stmts, plans, payments, cards, visits: detail.visits.filter((v) => v.youOweCents > 0), onlinePayments };
 }
 
 /**
@@ -107,10 +109,11 @@ export async function startPortalPayment(
   db: Db,
   linkId: string,
   input: { amountCents: number; planId?: string | null; autopay?: boolean; origin: string; token: string },
-  client: Pick<Stripe, "createCheckout"> = stripe(),
+  client?: Pick<Stripe, "createCheckout">,
 ) {
   const data = await portalData(db, linkId);
   if (!data) throw new Error("This link can no longer be used");
+  const stripe = client ?? stripeClient((await practiceConfig(db, data.practice.id)).stripe);
   if (!Number.isInteger(input.amountCents) || input.amountCents < 100) throw new Error("Enter at least $1.00");
   if (input.amountCents > Math.max(data.balance, 0) && !input.planId) throw new Error("That is more than you owe");
   const plan = input.planId ? data.plans.find((p) => p.plan.id === input.planId && ["active", "defaulted"].includes(p.plan.status)) : null;
@@ -120,7 +123,7 @@ export async function startPortalPayment(
     .values({ practiceId: data.practice.id, patientId: data.patient.id, planId: plan?.plan.id ?? null, amountCents: input.amountCents, source: "portal" })
     .returning();
   const back = `${input.origin}/portal/${input.token}`;
-  const session = await client.createCheckout({
+  const session = await stripe.createCheckout({
     amountCents: input.amountCents,
     description: `${data.practice.name}: payment on account`,
     successUrl: `${back}?paid=${pay.id}`,
@@ -139,12 +142,14 @@ export async function startPortalPayment(
  * session posts the payment (to its plan, if it has one) and saves the card
  * for autopay when asked; a repeated event changes nothing.
  */
-export async function handleStripeEvent(db: Db, event: StripeEvent, client: Pick<Stripe, "getPaymentIntent" | "getPaymentMethod"> = stripe()) {
+export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pick<Stripe, "getPaymentIntent" | "getPaymentMethod">, expectedPracticeId?: string) {
   if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") return { handled: false };
   const s = event.data.object as { id: string; payment_status?: string; metadata?: Record<string, string>; payment_intent?: string | null; customer?: string | null };
   if (s.payment_status !== "paid") return { handled: false };
   const [pay] = await db.select().from(onlinePayments).where(and(eq(onlinePayments.provider, "stripe"), eq(onlinePayments.providerRef, s.id))).limit(1);
   if (!pay) throw new Error(`No payment for Stripe session ${s.id}`);
+  // A practice's webhook only ever settles that practice's payments.
+  if (expectedPracticeId && pay.practiceId !== expectedPracticeId) throw new Error("Payment belongs to another practice");
   if (pay.status === "paid") return { handled: true, duplicate: true };
 
   // Claim the row first, so two deliveries of the same event cannot both post.
@@ -159,9 +164,10 @@ export async function handleStripeEvent(db: Db, event: StripeEvent, client: Pick
   }
 
   if (s.metadata?.autopay === "1" && pay.planId && s.payment_intent) {
-    const pi = await client.getPaymentIntent(s.payment_intent);
+    const stripe = client ?? stripeClient((await practiceConfig(db, pay.practiceId)).stripe);
+    const pi = await stripe.getPaymentIntent(s.payment_intent);
     if (pi.payment_method && (pi.customer ?? s.customer)) {
-      const pm = await client.getPaymentMethod(pi.payment_method);
+      const pm = await stripe.getPaymentMethod(pi.payment_method);
       await db.update(savedCards).set({ removedAt: new Date() }).where(and(eq(savedCards.patientId, pay.patientId), isNull(savedCards.removedAt)));
       await db.insert(savedCards).values({
         practiceId: pay.practiceId, patientId: pay.patientId, providerCustomer: (pi.customer ?? s.customer)!, providerMethod: pi.payment_method,
@@ -190,7 +196,8 @@ export async function reportInsurance(db: Db, linkId: string, input: { payerName
  * Autopay: charges each saved card for its plan's installments that are due
  * and unpaid. Safe to run daily; the idempotency key stops a double charge.
  */
-export async function chargeAutopay(db: Db, practiceId: string, client: Pick<Stripe, "chargeSaved"> = stripe(), today = new Date().toISOString().slice(0, 10)) {
+export async function chargeAutopay(db: Db, practiceId: string, client?: Pick<Stripe, "chargeSaved">, today = new Date().toISOString().slice(0, 10)) {
+  const stripe = client ?? stripeClient((await practiceConfig(db, practiceId)).stripe);
   const cards = await db.select().from(savedCards).where(and(eq(savedCards.practiceId, practiceId), isNull(savedCards.removedAt), sql`${savedCards.autopayPlanId} IS NOT NULL`));
   let charged = 0;
   let failed = 0;
@@ -202,7 +209,7 @@ export async function chargeAutopay(db: Db, practiceId: string, client: Pick<Str
     if (due <= 0) continue;
     const [pay] = await db.insert(onlinePayments).values({ practiceId, patientId: card.patientId, planId: plan.plan.id, amountCents: due, source: "autopay" }).returning();
     try {
-      const pi = await client.chargeSaved({
+      const pi = await stripe.chargeSaved({
         customer: card.providerCustomer, paymentMethod: card.providerMethod, amountCents: due, description: "Payment plan installment",
         metadata: { payment_id: pay.id }, idempotencyKey: `autopay-${plan.plan.id}-${today}`,
       });

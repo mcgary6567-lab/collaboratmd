@@ -8,22 +8,20 @@
  * message says who it is from and links to a page that asks for the date of
  * birth before showing anything.
  *
- * SMS uses Twilio's REST API (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
- * TWILIO_FROM); email uses Resend (RESEND_API_KEY). Built from their API
- * references and tested with stubs, not against live accounts.
+ * SMS uses Twilio's REST API and email uses Resend, each with the keys the
+ * practice connected in Settings → Integrations (or the deployment's
+ * environment variables). Built from their API references and tested with
+ * stubs, not against live accounts.
  */
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { sendEmail } from "./notify";
+import { practiceConfig, type IntegrationConfig } from "./integrations";
 
 type Http = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
 
-export function smsEnabled() {
-  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM);
-}
-export function emailEnabled() {
-  return !!process.env.RESEND_API_KEY?.trim();
-}
+export const smsEnabled = (cfg: IntegrationConfig) => !!cfg.twilio;
+export const emailEnabled = (cfg: IntegrationConfig) => !!cfg.resend;
 
 /** US numbers to E.164 (+1XXXXXXXXXX); anything else is refused. */
 export function toE164(phone: string | null | undefined): string | null {
@@ -33,15 +31,15 @@ export function toE164(phone: string | null | undefined): string | null {
   return null;
 }
 
-export async function sendSms(to: string, body: string, http: Http = fetch as unknown as Http): Promise<{ ok: boolean; detail: string }> {
-  const sid = process.env.TWILIO_ACCOUNT_SID!;
+export async function sendSms(twilio: NonNullable<IntegrationConfig["twilio"]>, to: string, body: string, http: Http = fetch as unknown as Http): Promise<{ ok: boolean; detail: string }> {
+  const sid = twilio.accountSid;
   const res = await http(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString("base64")}`,
+      Authorization: `Basic ${Buffer.from(`${sid}:${twilio.authToken}`).toString("base64")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ To: to, From: process.env.TWILIO_FROM!, Body: body }).toString(),
+    body: new URLSearchParams({ To: to, From: twilio.from, Body: body }).toString(),
   });
   const text = await res.text();
   if (!res.ok) return { ok: false, detail: `Twilio ${res.status}: ${text.slice(0, 200)}` };
@@ -77,26 +75,29 @@ export async function messagePatient(
   db: Db,
   p: PatientContact,
   m: { kind: string; entityId?: string | null; sms?: string; email?: { subject: string; text: string }; reminder?: boolean },
-  deps: { sms?: typeof sendSms; email?: typeof sendEmail } = {},
+  deps: { sms?: (to: string, body: string) => Promise<{ ok: boolean; detail: string }>; email?: (to: string, subject: string, text: string) => Promise<boolean> } = {},
 ): Promise<MessageResult> {
+  const cfg = await practiceConfig(db, p.practiceId);
+  const sms = deps.sms ?? ((to: string, body: string) => sendSms(cfg.twilio!, to, body));
+  const email = deps.email ?? ((to: string, subject: string, text: string) => sendEmail(to, subject, text, undefined, cfg.resend));
   const out: MessageResult = { sms: "skipped", email: "skipped" };
   const log = (channel: string, recipient: string, status: string, detail?: string) =>
     db.insert(schema.messageLog).values({ practiceId: p.practiceId, patientId: p.id, channel, kind: m.kind, recipient, entityId: m.entityId ?? null, status, detail: detail ?? null });
   if (m.reminder && p.remindersOptOut) return { ...out, reason: "Patient opted out of reminders" };
 
   const phone = toE164(p.phone);
-  if (m.sms && phone && p.smsConsentAt && smsEnabled()) {
-    const r = await (deps.sms ?? sendSms)(phone, m.sms);
+  if (m.sms && phone && p.smsConsentAt && smsEnabled(cfg)) {
+    const r = await sms(phone, m.sms);
     out.sms = r.ok ? "sent" : "failed";
     await log("sms", phone, out.sms, r.detail);
   }
-  if (m.email && p.email && emailEnabled()) {
-    const ok = await (deps.email ?? sendEmail)(p.email, m.email.subject, m.email.text);
+  if (m.email && p.email && emailEnabled(cfg)) {
+    const ok = await email(p.email, m.email.subject, m.email.text);
     out.email = ok ? "sent" : "failed";
     await log("email", p.email, out.email);
   }
   if (out.sms === "skipped" && out.email === "skipped") {
-    out.reason = !smsEnabled() && !emailEnabled()
+    out.reason = !smsEnabled(cfg) && !emailEnabled(cfg)
       ? "Neither texting nor email is set up"
       : !p.email && !(phone && p.smsConsentAt)
         ? "No email on file and no consent to text"

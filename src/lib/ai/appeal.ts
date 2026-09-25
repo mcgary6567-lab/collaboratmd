@@ -14,10 +14,10 @@ Write only the body: no letterhead, address block, greeting or signature. Plain 
  * only. Returns null when no API key is configured or the draft cannot be
  * used; the caller then uses the category template.
  */
-export async function draftAppealBody(input: { carc: string; rarc?: string | null; category: string; cpts: string[]; diagnoses: string[]; payerType: string }): Promise<string | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+export async function draftAppealBody(input: { carc: string; rarc?: string | null; category: string; cpts: string[]; diagnoses: string[]; payerType: string }, apiKey?: string | null): Promise<string | null> {
+  if (!apiKey) return null;
   try {
-    const client = new Anthropic();
+    const client = new Anthropic({ apiKey });
     const carc = CARC[input.carc];
     const response = await client.beta.messages.create({
       model: "claude-opus-5",

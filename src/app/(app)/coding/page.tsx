@@ -3,14 +3,16 @@ import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listCodes } from "@/server/encounters";
 import { noteCodingEnabled } from "@/lib/ai/code-note";
+import { practiceConfig } from "@/server/integrations";
 import { Card, PageHeader } from "@/components/ui";
 import { DiagnosisFinder, EmCalculator, NoteCoder } from "./tools";
 
 export const dynamic = "force-dynamic";
 
 export default async function CodingPage() {
-  await requireSession();
+  const s = await requireSession();
   const db = await getDb();
+  const ai = (await practiceConfig(db, s.practiceId)).anthropic;
   const { cpts, icds } = await listCodes(db);
   const codes = (xs: { code: string; description: string }[]) => xs.map(({ code, description }) => ({ code, description }));
 
@@ -31,7 +33,7 @@ export default async function CodingPage() {
           <DiagnosisFinder icds={codes(icds)} />
         </Card>
         <Card title="Suggest codes from a visit note (AI)">
-          <NoteCoder enabled={noteCodingEnabled()} />
+          <NoteCoder enabled={noteCodingEnabled(ai)} />
         </Card>
       </div>
     </>
