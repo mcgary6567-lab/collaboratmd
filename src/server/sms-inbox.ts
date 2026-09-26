@@ -14,6 +14,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { IntegrationConfig } from "./integrations";
 import { sendSms, toE164 } from "./messaging";
+import { notify } from "./notifications";
 
 const { smsMessages, smsOptOuts, patients, auditLog } = schema;
 
@@ -65,6 +66,8 @@ export async function receiveSms(db: Db, practiceId: string, params: Record<stri
     .onConflictDoNothing()
     .returning();
   if (!row) return { stored: false as const, reason: "duplicate" };
+  // No name or message text in the notification: titles can reach the email digest.
+  await notify(db, practiceId, { kind: "sms", title: "New text message from a patient", href: "/messages" });
 
   const word = body.trim().toUpperCase().replace(/[^A-Z]/g, "");
   let keyword: "stop" | "start" | null = null;

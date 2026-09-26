@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
+import { Bell, CheckSquare, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 import { PracticeSwitcher } from "@/components/practice-switcher";
@@ -67,6 +67,7 @@ export function Sidebar({
   current,
   tasks,
   hidden = [],
+  unread = 0,
 }: {
   user: { name: string; role: string };
   logout: () => Promise<void>;
@@ -75,6 +76,8 @@ export function Sidebar({
   tasks: { open: number; due: number };
   /** Menu items the practice has hidden. */
   hidden?: string[];
+  /** Unread notifications. */
+  unread?: number;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -99,14 +102,22 @@ export function Sidebar({
   );
 
   const bell = (
-    <Link href="/tasks" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title={`${tasks.open} open tasks, ${tasks.due} due`} aria-label={`Tasks: ${tasks.open} open, ${tasks.due} due`}>
-      <Bell className="h-4 w-4" />
-      {tasks.open > 0 && (
-        <span className={`absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full px-1 text-center text-[10px] font-bold leading-[1.1rem] text-white ${tasks.due > 0 ? "bg-red-600" : "bg-brand-600"}`}>
-          {tasks.open > 99 ? "99+" : tasks.open}
-        </span>
-      )}
-    </Link>
+    <span className="flex items-center">
+      <Link href="/tasks" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title={`${tasks.open} open tasks, ${tasks.due} due`} aria-label={`Tasks: ${tasks.open} open, ${tasks.due} due`}>
+        <CheckSquare className="h-4 w-4" />
+        {tasks.open > 0 && (
+          <span className={`absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full px-1 text-center text-[10px] font-bold leading-[1.1rem] text-white ${tasks.due > 0 ? "bg-red-600" : "bg-brand-600"}`}>
+            {tasks.open > 99 ? "99+" : tasks.open}
+          </span>
+        )}
+      </Link>
+      <Link href="/notifications" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title={`${unread} unread notifications`} aria-label={`Notifications: ${unread} unread`}>
+        <Bell className="h-4 w-4" />
+        {unread > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-[1.1rem] text-white">{unread > 99 ? "99+" : unread}</span>
+        )}
+      </Link>
+    </span>
   );
 
   const searchButton = (

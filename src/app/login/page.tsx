@@ -16,7 +16,7 @@ export default async function LoginPage() {
         </div>
         <div className="card p-6 shadow-xl">
           <LoginForm />
-          <p className="mt-4 text-center text-sm"><Link href="/login/sso" className="font-semibold text-brand-700 hover:underline">Sign in with SSO</Link></p>
+          <p className="mt-4 flex justify-center gap-4 text-sm"><Link href="/login/forgot" className="text-brand-700 hover:underline">Forgot password?</Link><Link href="/login/sso" className="font-semibold text-brand-700 hover:underline">Sign in with SSO</Link></p>
           <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
             <div className="mb-1 font-semibold">Demo accounts</div>
             <div>admin@collaboratmd.local / admin123</div>

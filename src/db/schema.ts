@@ -37,6 +37,9 @@ export const practices = pgTable("practices", {
   hiddenNav: jsonb("hidden_nav").$type<string[]>().notNull().default([]),
   /** Sessions that started before this are ended ("sign everyone out"). */
   sessionsRevokedAt: timestamp("sessions_revoked_at", { withTimezone: true }),
+  onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
+  /** The practice's own patient financing lender, offered for larger balances. */
+  financing: jsonb("financing").$type<{ lender: string; url: string; minCents: number } | null>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -95,6 +98,8 @@ export const users = pgTable(
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
     sessionsRevokedAt: timestamp("sessions_revoked_at", { withTimezone: true }),
+    passwordResetSentAt: timestamp("password_reset_sent_at", { withTimezone: true }),
+    emailDigest: boolean("email_digest").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
@@ -143,6 +148,7 @@ export const patients = pgTable(
     zip: text("zip"),
     smsConsentAt: timestamp("sms_consent_at", { withTimezone: true }),
     remindersOptOut: boolean("reminders_opt_out").notNull().default(false),
+    fhirId: text("fhir_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -199,6 +205,7 @@ export const appointments = pgTable(
     type: text("type").notNull().default("office_visit"),
     status: text("status").notNull().default("scheduled"), // scheduled | checked_in | completed | no_show | cancelled
     reason: text("reason"),
+    fhirId: text("fhir_id"),
   },
   (t) => [index("appointments_start_idx").on(t.practiceId, t.startsAt)],
 );
@@ -515,6 +522,8 @@ export const estimates = pgTable("estimates", {
   patientOwesCents: integer("patient_owes_cents").notNull(),
   basis: jsonb("basis").$type<Record<string, unknown>>().notNull(),
   validUntil: date("valid_until"),
+  appointmentId: uuid("appointment_id"),
+  depositRequestedAt: timestamp("deposit_requested_at", { withTimezone: true }),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -656,6 +665,73 @@ export const ruleSuggestionDismissals = pgTable("rule_suggestion_dismissals", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.practiceId, t.suggestionKey] })]);
 
+/* Growth round: clearinghouse polling, notifications, credentialing, legacy A/R, FHIR. See migration 0033. */
+export const clearinghousePolls = pgTable("clearinghouse_polls", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  cursor: text("cursor"),
+  lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  erasImported: integer("eras_imported").notNull().default(0),
+});
+
+export const inboundTransactions = pgTable("inbound_transactions", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  transactionId: text("transaction_id").notNull(),
+  transactionSet: text("transaction_set").notNull(),
+  remittanceId: uuid("remittance_id").references(() => remittances.id),
+  note: text("note"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.transactionId] })]);
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").references(() => users.id),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  href: text("href"),
+  dedupeKey: text("dedupe_key"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const providerCredentials = pgTable("provider_credentials", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  kind: text("kind").notNull(),
+  identifier: text("identifier"),
+  state: text("state"),
+  issuedOn: date("issued_on"),
+  expiresOn: date("expires_on"),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const legacyAr = pgTable("legacy_ar", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  payerName: text("payer_name"),
+  sourceClaimNumber: text("source_claim_number"),
+  dateOfService: date("date_of_service"),
+  billedCents: integer("billed_cents").notNull(),
+  balanceCents: integer("balance_cents").notNull(),
+  responsibility: text("responsibility").notNull(),
+  status: text("status").notNull().default("open"),
+  batch: text("batch").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const fhirConnections = pgTable("fhir_connections", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  baseUrl: text("base_url").notNull(),
+  tokenSealed: text("token_sealed"),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastResult: jsonb("last_result").$type<Record<string, unknown>>(),
+});
+
 /* Error monitoring, dental lines and claim attachments. See migration 0031. */
 export const errorEvents = pgTable("error_events", {
   fingerprint: text("fingerprint").primaryKey(),
@@ -763,9 +839,14 @@ export const customRoles = pgTable("custom_roles", {
 
 export const practiceSso = pgTable("practice_sso", {
   practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
-  issuer: text("issuer").notNull(),
-  clientId: text("client_id").notNull(),
-  clientSecretSealed: text("client_secret_sealed").notNull(),
+  /** oidc or saml. */
+  protocol: text("protocol").notNull().default("oidc"),
+  issuer: text("issuer"),
+  clientId: text("client_id"),
+  clientSecretSealed: text("client_secret_sealed"),
+  samlEntryPoint: text("saml_entry_point"),
+  samlIdpIssuer: text("saml_idp_issuer"),
+  samlIdpCert: text("saml_idp_cert"),
   domains: jsonb("domains").$type<string[]>().notNull().default([]),
   enforce: boolean("enforce").notNull().default(false),
   autoProvision: boolean("auto_provision").notNull().default(false),

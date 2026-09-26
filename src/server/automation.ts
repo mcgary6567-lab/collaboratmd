@@ -21,6 +21,9 @@ import { practiceConfig } from "./integrations";
 import { runDenialAgent } from "./denial-agent";
 import { applyRules, hasActiveRules } from "./work-rules";
 import { adjustSmallBalances } from "./policies";
+import { pollBlocker, pollRemittances } from "./era-poll";
+import { runDailyChecks } from "./daily-checks";
+import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
@@ -195,9 +198,12 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));
   if (await hasActiveRules(db, practiceId)) await step("workRules", () => applyRules(db, practiceId, { now }));
   if (practice.policies?.smallBalanceCents) await step("smallBalances", () => adjustSmallBalances(db, practiceId, { now }));
+  if (!(await pollBlocker(db, practiceId))) await step("eraPoll", () => pollRemittances(db, practiceId, { now }));
+  await step("dailyChecks", () => runDailyChecks(db, practiceId, now));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));
   const resend = (await practiceConfig(db, practiceId)).resend;
+  if (resend && (await hasDigestSubscribers(db, practiceId))) await step("digests", () => sendDigests(db, practiceId, origin, (to, subject, text) => sendEmail(to, subject, text, undefined, resend), now));
   if (resend && (await hasScheduledReports(db, practiceId))) await step("scheduledReports", () => sendScheduledReports(db, practiceId, origin, (to, subject, text) => sendEmail(to, subject, text, undefined, resend), now));
   await db.insert(automationRuns).values({ practiceId, summary, error });
   return summary;

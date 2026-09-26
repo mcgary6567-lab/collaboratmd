@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { Toaster } from "@/components/toaster";
 import { pagesFor } from "@/lib/nav";
 import { myTaskCounts } from "@/server/work";
+import { unreadCount } from "@/server/notifications";
 import { logoutAction } from "@/app/login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,12 +19,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     db.select({ mfaSecret: schema.users.mfaSecret }).from(schema.users).where(eq(schema.users.id, session.userId)).limit(1),
     myTaskCounts(db, session.practiceId, session.userId),
   ]);
+  const unread = await unreadCount(db, session.practiceId, session.userId, session.role === "admin");
   // A practice that requires two-factor gets nothing else until it is set up.
   // Single sign-on users prove a second factor at their identity provider.
   const mustEnroll = !!practice?.requireMfa && !user?.mfaSecret && !session.sso;
   return (
     <div className="app-shell flex min-h-screen">
-      <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} tasks={taskCounts} hidden={practice?.hiddenNav ?? []} />
+      <Sidebar user={{ name: session.name, role: session.role }} logout={logoutAction} practices={practices.map((p) => ({ id: p.id, name: p.name }))} current={session.practiceId} tasks={taskCounts} hidden={practice?.hiddenNav ?? []} unread={unread} />
       <main className="min-w-0 flex-1 px-4 pb-8 pt-20 md:p-6 lg:p-8">
         {mustEnroll ? (
           <div className="mx-auto max-w-2xl">

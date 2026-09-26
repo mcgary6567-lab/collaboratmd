@@ -78,12 +78,23 @@ export interface EligibilityAnswer {
   response: Response271;
 }
 
+/** One page of inbound payer transactions, with the raw X12 of each 835. */
+export interface InboundPage {
+  items: { transactionId: string; transactionSet: string; x12: string | null }[];
+  cursor: string;
+}
+
 export interface ClearinghouseGateway {
   submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult>;
   /** Sends a 270 eligibility inquiry and returns the payer's answer. */
   checkEligibility(edi270: string): Promise<EligibilityAnswer>;
   /** Simulates the payer producing an ERA for previously accepted claims. */
   fetch835(claims: RemitRequest[]): Promise<string | null>;
+  /**
+   * Payer files that arrived since the cursor (Stedi's transaction polling).
+   * Optional: gateways that return remittances through fetch835 do not have it.
+   */
+  pollInbound?(cursor: string | null, since: Date): Promise<InboundPage>;
   /** Sends a 276 claim status request and returns the payer's 277, both raw X12. */
   checkClaimStatus(edi276: string): Promise<string>;
   /** Sends a 278 prior authorization request and returns the payer's 278 response, both raw X12. */

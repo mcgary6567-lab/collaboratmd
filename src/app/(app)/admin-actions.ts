@@ -1,11 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDb } from "@/db";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { renewSession, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { revokeAllSessions, revokeUserSessions, saveProfile, savePayer, saveProvider, setHiddenNav, setProviderActive } from "@/server/admin";
 import { adjustSmallBalances, savePolicies } from "@/server/policies";
+import { requestReset } from "@/server/password-reset";
+import { listTeam } from "@/server/team";
+import { deleteCredential, saveCredential } from "@/server/credentials";
+import { siteOrigin } from "@/lib/origin";
 
 const admin = () => requireRole(["admin"]);
 const fail = (e: unknown, fallback: string): FormResult => ({ ok: false, message: e instanceof Error ? e.message : fallback });
@@ -106,4 +111,47 @@ export async function signOutUserAction(userId: string, _prev: FormResult): Prom
   if (userId === s.userId) return { ok: false, message: "Use Sign out in the menu for yourself" };
   await revokeUserSessions(await getDb(), s.practiceId, userId, s.userId);
   return { ok: true, message: "Signed out on every device" };
+}
+
+/** Emails the person a reset link; the administrator never sees it. */
+export async function sendResetAction(userId: string, _prev: FormResult): Promise<FormResult> {
+  const s = await admin();
+  const db = await getDb();
+  const member = (await listTeam(db, s.practiceId)).find((m) => m.userId === userId);
+  if (!member) return { ok: false, message: "Not on this practice's team" };
+  const r = await requestReset(db, member.email, await siteOrigin(), { requestedBy: s.userId });
+  const messages: Record<typeof r, FormResult> = {
+    sent: { ok: true, message: `Reset link emailed to ${member.email}` },
+    no_email: { ok: false, message: "Email is not connected (Settings, Integrations), so no link can be sent" },
+    sso: { ok: false, message: "They sign in with single sign-on; reset their password at your identity provider" },
+    throttled: { ok: false, message: "A link was sent in the last five minutes; ask them to check their inbox" },
+    no_account: { ok: false, message: "That account is deactivated" },
+    send_failed: { ok: false, message: "The email could not be sent; check the email connection" },
+  };
+  return messages[r];
+}
+
+export async function dismissOnboardingAction(_prev: FormResult): Promise<FormResult> {
+  const s = await admin();
+  await (await getDb()).update(schema.practices).set({ onboardingDismissedAt: new Date() }).where(eq(schema.practices.id, s.practiceId));
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Hidden. Setup health stays on the Settings page." };
+}
+
+export async function saveCredentialAction(_prev: FormResult, fd: FormData): Promise<FormResult> {
+  const s = await requireRole(["admin", "biller"]);
+  try {
+    await saveCredential(await getDb(), s.practiceId, { providerId: f(fd, "providerId"), kind: f(fd, "kind"), identifier: f(fd, "identifier"), state: f(fd, "state"), issuedOn: f(fd, "issuedOn"), expiresOn: f(fd, "expiresOn"), note: f(fd, "note") }, s.userId);
+    revalidatePath("/settings/credentials");
+    return { ok: true, message: "Saved; you will be reminded 60 days before it expires" };
+  } catch (e) {
+    return fail(e, "Could not save");
+  }
+}
+
+export async function deleteCredentialAction(id: string, _prev: FormResult): Promise<FormResult> {
+  const s = await requireRole(["admin", "biller"]);
+  await deleteCredential(await getDb(), s.practiceId, id, s.userId);
+  revalidatePath("/settings/credentials");
+  return { ok: true, message: "Removed" };
 }

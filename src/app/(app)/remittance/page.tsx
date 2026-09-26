@@ -4,6 +4,9 @@ import { requireSession } from "@/lib/auth";
 import { Card, PageHeader, Money, Empty, Badge } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { RemittanceTools } from "./tools";
+import { pollBlocker, pollStatus } from "@/server/era-poll";
+import { pollNowAction } from "@/app/(app)/era-actions";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +14,24 @@ export default async function RemittancePage() {
   const s = await requireSession();
   const db = await getDb();
   const rows = await db.select().from(schema.remittances).where(eq(schema.remittances.practiceId, s.practiceId)).orderBy(desc(schema.remittances.receivedAt)).limit(100);
+  const [blocker, poll] = await Promise.all([pollBlocker(db, s.practiceId), pollStatus(db, s.practiceId)]);
   return (
     <>
       <PageHeader title="Remittance (ERA / 835)" subtitle="Electronic remittance advice with automated payment posting" actions={<><a href="/remittance/deposits" className="btn btn-secondary">Bank deposits</a><RemittanceTools /></>} />
+      <Card title="Automatic remittances from Stedi" className="mb-6">
+        {blocker ? (
+          <p className="text-sm text-slate-600">{blocker}</p>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="text-slate-600">
+              Every morning, 835s that payers sent through Stedi are imported and posted here on their own.{" "}
+              {poll?.lastPolledAt ? <>Last checked {fmtDateTime(poll.lastPolledAt)}; {poll.erasImported} posted so far.</> : "Not checked yet."}
+              {poll?.lastError && <span className="block text-red-700">Last check failed: {poll.lastError}</span>}
+            </p>
+            <ActionForm action={pollNowAction}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="Checking Stedi...">Check now</SubmitButton></ActionForm>
+          </div>
+        )}
+      </Card>
       <Card>
         {rows.length === 0 ? (
           <Empty>No remittances yet. Fetch ERAs from the clearinghouse for accepted claims.</Empty>

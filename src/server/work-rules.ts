@@ -11,6 +11,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { WorkConditions } from "@/db/schema";
+import { notify } from "./notifications";
 
 const { workRules, tasks, auditLog } = schema;
 type Row = Record<string, string | null>;
@@ -99,6 +100,7 @@ const TITLES: Record<string, (label: string) => string> = {
 export async function applyRules(db: Db, practiceId: string, opts: { limit?: number; now?: Date } = {}) {
   const now = opts.now ?? new Date();
   const out: Record<string, number> = {};
+  const perPerson = new Map<string, number>();
   for (const rule of (await listRules(db, practiceId)).filter((r) => r.active)) {
     const items = await candidates(db, practiceId, rule, opts.limit ?? 200, now);
     let next = rule.nextIndex;
@@ -106,10 +108,14 @@ export async function applyRules(db: Db, practiceId: string, opts: { limit?: num
     for (const item of items) {
       const assigneeId = rule.assigneeIds[next % rule.assigneeIds.length];
       next++;
+      perPerson.set(assigneeId, (perPerson.get(assigneeId) ?? 0) + 1);
       await db.insert(tasks).values({ practiceId, title: TITLES[rule.kind](item.label ?? ""), entityType: item.type, entityId: item.id, assigneeId, dueDate: due, priority: rule.priority, ruleId: rule.id, note: `Assigned by the rule "${rule.name}"` });
     }
     if (items.length) await db.update(workRules).set({ nextIndex: next % Math.max(1, rule.assigneeIds.length) }).where(eq(workRules.id, rule.id));
     out[rule.name] = items.length;
+  }
+  for (const [userId, n] of perPerson) {
+    await notify(db, practiceId, { userId, kind: "tasks", title: `${n} new task${n === 1 ? "" : "s"} assigned to you by work queue rules`, href: "/tasks" });
   }
   return out;
 }

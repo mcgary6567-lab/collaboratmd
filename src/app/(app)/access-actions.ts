@@ -126,6 +126,7 @@ export async function testSsoAction(_prev: FormResult): Promise<FormResult> {
   const s = await admin();
   const cfg = await getSso(await getDb(), s.practiceId);
   if (!cfg) return { ok: false, message: "Save the settings first" };
+  if (cfg.protocol !== "oidc" || !cfg.issuer) return { ok: true, message: "SAML: the identity provider's certificate and sign-in URL are checked at the first real sign-in." };
   try {
     const doc = await discover(cfg.issuer);
     return { ok: true, message: `Found the provider: sign-in at ${new URL(doc.authorization_endpoint).host}, keys at ${new URL(doc.jwks_uri).host}. The client secret is only checked at the first real sign-in.` };

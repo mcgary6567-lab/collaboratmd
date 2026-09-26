@@ -16,19 +16,30 @@
  * Stedi replaces the ISA/GS envelope with its own and routes on the payer ID
  * in loop 2010BB (claims) or 2100A (eligibility).
  *
+ *   837I  POST /change/medicalnetwork/institutionalclaims/v1/raw-x12-submission
+ *   837D  POST /dental-claims/raw-x12-submission
+ *   835   GET  core.us.stedi.com/2023-08-01/polling/transactions, then each
+ *         inbound 835's input artifact (the raw X12 the payer sent).
+ *
  * Not built against a live account: request and response shapes follow
  * Stedi's published API reference, and the adapter is covered by tests with a
- * stubbed HTTP layer. Retrieving payer 277CAs and 835 ERAs (Stedi delivers
- * them through transaction polling or webhooks) is not implemented, so with
- * this adapter remittances must be imported as 835 files.
+ * stubbed HTTP layer.
  */
 import type { Benefit, Response271 } from "@/lib/edi/x270";
 import { parse277CA } from "@/lib/edi/x277ca";
-import type { ClearinghouseGateway, EligibilityAnswer, RemitRequest, SubmissionMeta, SubmissionResult } from "./gateway";
+import type { ClearinghouseGateway, EligibilityAnswer, InboundPage, RemitRequest, SubmissionMeta, SubmissionResult } from "./gateway";
 
 const BASE = "https://healthcare.us.stedi.com/2024-04-01";
+const CORE = "https://core.us.stedi.com/2023-08-01";
 
-type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }>;
+interface StediPolledTransaction {
+  transactionId?: string;
+  direction?: string;
+  x12?: { transactionSetIdentifier?: string };
+  artifacts?: { artifactType?: string; usage?: string; url?: string }[];
+}
+
+type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }>;
 
 interface StediClaimResponse {
   status?: string;
@@ -82,12 +93,12 @@ export class StediClearinghouse implements ClearinghouseGateway {
   }
 
   async submit837(edi: string, meta: SubmissionMeta): Promise<SubmissionResult> {
-    // Dental claims are not wired to Stedi: its dental endpoint has not been verified against this integration.
-    if (meta.claimType === "dental") throw new Error("Sending dental (837D) claims through Stedi is not enabled in this version. Download the 837D from the claim and upload it to your dental clearinghouse, or bill on the payer's portal.");
     // The idempotency key makes a retried request safe: Stedi will not send the claim twice.
     const path = meta.claimType === "institutional"
       ? "/change/medicalnetwork/institutionalclaims/v1/raw-x12-submission"
-      : "/change/medicalnetwork/professionalclaims/v3/raw-x12-submission";
+      : meta.claimType === "dental"
+        ? "/dental-claims/raw-x12-submission"
+        : "/change/medicalnetwork/professionalclaims/v3/raw-x12-submission";
     const r = await this.post<StediClaimResponse>(path, { x12: edi }, `claim-${meta.controlNumber}`);
     const clearinghouseId = r.claimReference?.correlationId ?? r.controlNumber ?? "";
     const ack = r.x12 ? parse277CA(r.x12).find((c) => c.controlNumber === meta.controlNumber) ?? parse277CA(r.x12)[0] : undefined;
@@ -125,9 +136,45 @@ export class StediClearinghouse implements ClearinghouseGateway {
     return r.x12;
   }
 
-  /** ERAs from Stedi arrive by polling or webhook, which this adapter does not implement. */
+  /** Stedi does not answer per-claim remittance requests; ERAs come from pollInbound. */
   async fetch835(_claims: RemitRequest[]): Promise<string | null> {
     return null;
+  }
+
+  private async get(url: string): Promise<{ ok: boolean; status: number; text: string }> {
+    const res = await this.http(url, { method: "GET", headers: { Authorization: this.apiKey } });
+    return { ok: res.ok, status: res.status, text: await res.text() };
+  }
+
+  /**
+   * Inbound transactions since the cursor (or since `since` on the first
+   * poll). For each 835 the raw X12 is downloaded from its input artifact;
+   * if Stedi answers with a download link instead, the link is followed.
+   */
+  async pollInbound(cursor: string | null, since: Date): Promise<InboundPage> {
+    const query = cursor ? `pageToken=${encodeURIComponent(cursor)}` : `startDateTime=${encodeURIComponent(since.toISOString())}`;
+    const page = await this.get(`${CORE}/polling/transactions?${query}&pageSize=100`);
+    if (!page.ok) throw new Error(`Stedi returned ${page.status}: ${page.text.slice(0, 200)}`);
+    const body = JSON.parse(page.text) as { items?: StediPolledTransaction[]; nextPageToken?: string };
+    const items: InboundPage["items"] = [];
+    for (const t of body.items ?? []) {
+      if (t.direction !== "INBOUND" || !t.transactionId) continue;
+      const set = t.x12?.transactionSetIdentifier ?? "";
+      if (set !== "835") { items.push({ transactionId: t.transactionId, transactionSet: set, x12: null }); continue; }
+      const artifact = t.artifacts?.find((a) => a.usage === "input" && a.artifactType === "application/edi-x12" && a.url);
+      if (!artifact?.url) { items.push({ transactionId: t.transactionId, transactionSet: set, x12: null }); continue; }
+      const file = await this.get(artifact.url);
+      if (!file.ok) throw new Error(`Stedi returned ${file.status} for 835 ${t.transactionId}`);
+      let x12 = file.text;
+      if (x12.trimStart().startsWith("{")) {
+        const link = (JSON.parse(x12) as { documentDownloadUrl?: string }).documentDownloadUrl;
+        if (!link) throw new Error(`Stedi returned no file for 835 ${t.transactionId}`);
+        const doc = await this.http(link, { method: "GET", headers: {} });
+        x12 = await doc.text();
+      }
+      items.push({ transactionId: t.transactionId, transactionSet: set, x12 });
+    }
+    return { items, cursor: body.nextPageToken ?? cursor ?? "" };
   }
 }
 

@@ -14,6 +14,7 @@ import { schema } from "@/db";
 import { patientBalanceSql } from "./billing";
 import { contractRates } from "./fees";
 import { getPolicies } from "./policies";
+import { notify } from "./notifications";
 
 const { chargeReviewDismissals, refunds, underpayments, ledgerEntries, auditLog, claims, payers, patients, practices, patientInsurances, encounters, charges } = schema;
 type Row = Record<string, string | null>;
@@ -204,12 +205,14 @@ export async function requestRefund(db: Db, practiceId: string, input: { payee: 
     if (!c) throw new Error("This patient has no credit balance");
     if (input.amountCents > c.creditCents - c.pendingCents) throw new Error(`Only ${usd(c.creditCents - c.pendingCents)} of credit is available to refund`);
     const [row] = await db.insert(refunds).values({ practiceId, patientId: c.patientId, payee: "patient", amountCents: input.amountCents, reason, requestedBy: userId ?? null }).returning();
+    await notify(db, practiceId, { kind: "refund", title: `Patient refund of ${usd(input.amountCents)} waiting for approval`, href: "/billing/credits", dedupeKey: `refund:${row.id}` });
     return row;
   }
   const o = credits.claims.find((x) => x.claimId === input.claimId);
   if (!o) throw new Error("This claim has no insurance overpayment");
   if (input.amountCents > o.overpaidCents - o.pendingCents) throw new Error(`Only ${usd(o.overpaidCents - o.pendingCents)} is overpaid on this claim`);
   const [row] = await db.insert(refunds).values({ practiceId, patientId: o.patientId, claimId: o.claimId, payerId: o.payerId, payee: "payer", amountCents: input.amountCents, reason, requestedBy: userId ?? null }).returning();
+  await notify(db, practiceId, { kind: "refund", title: `Refund of ${usd(input.amountCents)} to ${o.payerName} waiting for approval`, href: "/billing/credits", dedupeKey: `refund:${row.id}` });
   return row;
 }
 

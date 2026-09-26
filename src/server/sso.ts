@@ -96,8 +96,15 @@ export async function discover(issuer: string, http: Http = fetch as unknown as 
 
 const b64url = (b: Buffer) => b.toString("base64url");
 
+/** The OpenID Connect settings of a practice's SSO, or an error if it uses SAML or is incomplete. */
+export function oidc(cfg: SsoConfig) {
+  if (cfg.protocol !== "oidc" || !cfg.issuer || !cfg.clientId || !cfg.clientSecretSealed) throw new Error("This practice signs in with SAML, not OpenID Connect");
+  return { ...cfg, issuer: cfg.issuer, clientId: cfg.clientId, clientSecretSealed: cfg.clientSecretSealed };
+}
+
 /** Where to send the browser, and what to remember (in a signed cookie) until it comes back. */
-export async function beginSso(cfg: SsoConfig, redirectUri: string, loginHint: string, http?: Http) {
+export async function beginSso(sso: SsoConfig, redirectUri: string, loginHint: string, http?: Http) {
+  const cfg = oidc(sso);
   const doc = await discover(cfg.issuer, http);
   const state = b64url(crypto.randomBytes(24));
   const nonce = b64url(crypto.randomBytes(24));
@@ -114,8 +121,9 @@ export async function beginSso(cfg: SsoConfig, redirectUri: string, loginHint: s
 export type SsoClaims = { email: string; name: string; subject: string };
 
 /** Exchanges the code and verifies the ID token. */
-export async function completeSso(cfg: SsoConfig, code: string, redirectUri: string, pending: { nonce: string; verifier: string }, deps: { http?: Http; jwks?: JWTVerifyGetKey } = {}): Promise<SsoClaims> {
+export async function completeSso(sso: SsoConfig, code: string, redirectUri: string, pending: { nonce: string; verifier: string }, deps: { http?: Http; jwks?: JWTVerifyGetKey } = {}): Promise<SsoClaims> {
   const http = deps.http ?? (fetch as unknown as Http);
+  const cfg = oidc(sso);
   const doc = await discover(cfg.issuer, http);
   const secret = unseal(cfg.clientSecretSealed, appSecret());
   const methods = doc.token_endpoint_auth_methods_supported ?? ["client_secret_basic"];

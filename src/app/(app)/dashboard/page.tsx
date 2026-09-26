@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth";
 import { userWorkload, recentPayments, recoveredDenials, collectionsSummary } from "@/server/analytics";
 import { listAppointments } from "@/server/encounters";
 import { Card, PageHeader, Badge, Empty } from "@/components/ui";
+import { OnboardingGuide } from "./onboarding";
 import { Kpi, compactMoney, pct } from "@/components/kpi";
 import { fmtDate } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ export default async function UserDashboard() {
           </>
         }
       />
+      {s.role === "admin" && <OnboardingGuide practiceId={s.practiceId} />}
 
       {/* Collections still lead, but as a neutral card with a green rail
           rather than a green block: the accent marks the figure as money in,

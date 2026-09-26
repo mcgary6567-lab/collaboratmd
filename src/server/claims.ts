@@ -10,6 +10,7 @@ import { scrubDental } from "@/lib/scrub/dental";
 import { attachmentRefs, markAttachmentsSent } from "./attachments";
 import { blocksSubmission } from "./policies";
 import { claimRisk } from "./risk";
+import { notify } from "./notifications";
 import { scrubInstitutional } from "@/lib/scrub/institutional";
 import { parseEdi835 } from "@/lib/edi/x835";
 import { parse999, describeSyntaxError } from "@/lib/edi/x999";
@@ -267,6 +268,7 @@ export async function submitClaim(db: Db, claimId: string, userId?: string, opts
   if (policies?.riskHoldScore && opts.role && opts.role !== "admin" && bundle.claim.frequencyCode === "1") {
     const risk = await claimRisk(db, bundle.claim.practiceId, claimId);
     if (risk && risk.score >= policies.riskHoldScore) {
+      await notify(db, bundle.claim.practiceId, { kind: "claim_held", title: `Claim ${bundle.claim.controlNumber} held for review (denial risk ${risk.score})`, body: risk.reasons.slice(0, 3).join("; "), href: `/claims/${claimId}`, dedupeKey: `hold:${claimId}` });
       throw new Error(`Held for review: denial risk ${risk.score} is at or above the practice's limit of ${policies.riskHoldScore}. An administrator can send it.`);
     }
   }
@@ -277,9 +279,6 @@ export async function submitClaim(db: Db, claimId: string, userId?: string, opts
   const institutional = bundle.claim.claimType === "institutional";
   const dental = bundle.claim.claimType === "dental";
   if ((institutional || dental) && otherPayer) throw new Error(`Secondary ${dental ? "dental" : "institutional"} claims are not supported yet; bill the secondary payer on paper or through its portal`);
-  if (dental && (await practiceConfig(db, bundle.claim.practiceId)).stedi) {
-    throw new Error("Sending dental (837D) claims through Stedi is not enabled in this version. Download the 837D from the claim and upload it to your dental clearinghouse, or bill on the payer's portal.");
-  }
   const attachments = await attachmentRefs(db, claimId);
   const edi = buildClaimEdi(bundle, { now, authorizationNumber, attachments, otherPayer });
   await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
