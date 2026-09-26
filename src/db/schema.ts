@@ -40,6 +40,18 @@ export const practices = pgTable("practices", {
   onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
   /** The practice's own patient financing lender, offered for larger balances. */
   financing: jsonb("financing").$type<{ lender: string; url: string; minCents: number } | null>(),
+  /* The practice's own subscription to CollaboratMD. See server/subscription.ts. */
+  selfServe: boolean("self_serve").notNull().default(false),
+  plan: text("plan"),
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  subscriptionStatus: text("subscription_status").notNull().default("none"),
+  billingEmail: text("billing_email"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeSubscriptionItemId: text("stripe_subscription_item_id"),
+  seats: integer("seats"),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  claimsReportedThrough: timestamp("claims_reported_through", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -1489,5 +1501,20 @@ export const locations = pgTable("locations", {
   zip: text("zip").notNull(),
   placeOfService: text("place_of_service").notNull().default("11"),
   active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* Self-serve signups waiting for email confirmation. See migration 0038 and server/signup.ts. */
+export const signups = pgTable("signups", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  practiceName: text("practice_name").notNull(),
+  plan: text("plan"),
+  passwordHash: text("password_hash").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  practiceId: uuid("practice_id").references(() => practices.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

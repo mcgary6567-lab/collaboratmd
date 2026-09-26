@@ -37,6 +37,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Lab orders and results over HL7" },
       { name: "Prior authorization tracking with units" },
       { name: "Copay by card at online check-in", needs: "Stripe" },
+      { name: "Card readers at the front desk", needs: "Stripe Terminal" },
       { name: "Check-in and patient portal in English and Spanish" },
       { name: "Two-way text inbox, with STOP honored", needs: "Twilio" },
       { name: "Insurance card read from a photo", needs: "AI key + BAA" },
@@ -69,7 +70,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
     icon: ReceiptText,
     items: [
       { name: "835 remittance auto-posting by line" },
-      { name: "Underpayments checked against contracts" },
+      { name: "Underpayments checked against contracts, with multiple-procedure and modifier reductions" },
       { name: "Bank deposits matched to ERAs" },
       { name: "Denials in plain English with next steps" },
       { name: "Appeal letters in one click", needs: "AI key, optional" },
@@ -85,7 +86,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
     group: "Patient payments",
     icon: CreditCard,
     items: [
-      { name: "Patient-friendly statements" },
+      { name: "Patient-friendly statements, printed and mailed for you", needs: "Lob for mail" },
       { name: "No Surprises Act good faith estimates" },
       { name: "Payment plans and discounts" },
       { name: "Patient portal with card payments", needs: "Stripe" },
@@ -102,9 +103,11 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Reports and CSV exports" },
       { name: "Weekly report by email", needs: "Resend" },
       { name: "Task inbox, notes, saved views and bulk actions" },
-      { name: "Payer enrollment and revalidation tracking" },
+      { name: "Payer enrollment, revalidation and ERA/EFT enrollment tracking" },
+      { name: "Several locations, sent on claims as the service facility" },
+      { name: "Your whole practice as one download, any time" },
       { name: "Many practices under one login" },
-      { name: "EHR interface (HL7) and CSV patient import" },
+      { name: "EHR interface (HL7), FHIR with SMART backend services, and CSV import" },
       { name: "Ctrl+K search, shortcuts, dark mode, phone layout" },
       { name: "Report builder, and questions answered as reports" },
       { name: "8-week cash forecast and payer behavior alerts" },
@@ -534,6 +537,9 @@ export default async function LandingPage() {
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link href="/login" className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-green-700 transition-colors hover:bg-green-50">
                 Open the demo <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="/signup" className="inline-flex items-center gap-2 rounded-lg border border-white/40 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white/10">
+                Start a free trial
               </Link>
               <Link href="/contact" className="inline-flex items-center gap-2 rounded-lg border border-white/40 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white/10">
                 Talk to us

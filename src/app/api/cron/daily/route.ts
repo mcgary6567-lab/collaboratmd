@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { siteOrigin } from "@/lib/origin";
 import { runDaily } from "@/server/automation";
 import { pruneThrottle } from "@/server/throttle";
+import { platformBillingReady, reportClaimUsage, syncSeats } from "@/server/subscription";
 import { deliverPending } from "@/server/webhooks";
 
 export const dynamic = "force-dynamic";
@@ -24,5 +25,9 @@ export async function GET(req: Request) {
   // Webhook deliveries that failed are retried here as well as straight after each event.
   const webhooks = await deliverPending(db, { limit: 500 });
   await pruneThrottle(db).catch((e) => console.error("throttle prune failed", e instanceof Error ? e.message : e));
-  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks });
+  // CollaboratMD's own billing: seats follow active providers, and claims sent go to the usage meter.
+  const billing = platformBillingReady()
+    ? { seats: await syncSeats(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`), claims: await reportClaimUsage(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`) }
+    : null;
+  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing });
 }

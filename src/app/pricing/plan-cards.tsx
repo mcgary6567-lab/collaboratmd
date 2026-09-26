@@ -134,7 +134,7 @@ export function PlanCards() {
             <Price tier={tier} cycle={cycle} />
 
             <Link
-              href="/contact"
+              href={tier.cta === "Talk to sales" || tier.priceMonthly === null ? "/contact" : `/signup?plan=${tier.id}`}
               className={`btn mt-6 w-full justify-center py-2.5 ${
                 tier.featured ? "bg-green-700 text-white hover:bg-green-800" : "btn-secondary"
               }`}

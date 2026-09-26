@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
       },
       {
         // These addresses carry a secret token; send no referrer at all from them.
-        source: "/:area(portal|reset|check-in|welcome|unsubscribe)/:path*",
+        source: "/:area(portal|reset|check-in|welcome|unsubscribe|signup)/:path*",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
     ];

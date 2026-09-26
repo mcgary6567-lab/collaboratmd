@@ -52,6 +52,18 @@ With none set, nothing is sent, and errors are still listed at `/ops/errors`.
 6. **Mark resolved** in `/ops/errors` once fixed, so a return of the same error alerts again.
 7. **Write it up** within 5 business days: what happened, impact, timeline, cause, what changes. If patient data may have been exposed, follow the breach steps in `docs/legal/hipaa-policies.md` (section 9) immediately; do not wait for the write-up.
 
+## Self-serve signup and subscriptions
+
+- `/signup` emails a confirmation link through the deployment's `RESEND_API_KEY`. Without it the form says the email could not be sent, and no practice is created.
+- New practices start a trial of `TRIAL_DAYS` (default 14). After it ends, claims stop going out until an administrator subscribes (Settings → Subscription). Everything else keeps working, including the data export. Practices created by us rather than by signup are never held to this.
+- Subscriptions run on CollaboratMD's own Stripe account, separate from any practice's:
+  1. In Stripe, create a product per plan with a per-unit recurring price (one unit per provider) matching `/pricing`, monthly and, if offered, annual. For per-claim billing, create a meter and a metered price on it.
+  2. Set `PLATFORM_STRIPE_SECRET_KEY`, the `PLATFORM_PRICE_*` IDs, and optionally `PLATFORM_PRICE_CLAIMS` with `PLATFORM_CLAIM_METER_EVENT` (the meter's event name).
+  3. Add a webhook endpoint at `/api/platform/stripe/webhook` for `checkout.session.completed` and `customer.subscription.created`, `updated` and `deleted`, and set its secret as `PLATFORM_STRIPE_WEBHOOK_SECRET`.
+  4. Turn on Stripe's customer portal (Billing → Customer portal) so practices can change cards, see invoices and cancel.
+- The daily job sets each subscription's quantity to the practice's active providers and reports claims sent to the meter.
+- Try the whole flow with test-mode keys and prices first.
+
 ## Routine checks
 
 | When | What |

@@ -12,7 +12,9 @@ export const metadata: Metadata = {
 
 const SAFEGUARDS = [
   "Two-factor sign-in, which an administrator can require for every user",
-  "Account lockout for 15 minutes after five failed sign-ins",
+  "Account lockout for 15 minutes after five failed sign-ins, plus attempt limits per network across all accounts",
+  "Security headers that stop the app being framed by other sites, and no referrer sent from pages whose links carry a secret",
+  "A full export of the practice's data for its administrators, recorded in the audit log",
   "Four roles (administrator, biller, front desk, read-only), plus custom roles that can only narrow them, checked on every request",
   "Single sign-on through your identity provider (OpenID Connect or SAML 2.0) and SCIM to remove access when people leave",
   "Password resets by one-time emailed link that ends every other session",

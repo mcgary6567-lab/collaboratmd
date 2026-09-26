@@ -10,6 +10,21 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-26",
+    title: "Free trials, mailed statements, card readers, and a full data export",
+    items: [
+      "Practices can sign up on their own, confirm their email, and start a free trial; plans are bought and managed through Stripe",
+      "Settings > Data export downloads everything the practice has here as one zip",
+      "Statements printed and mailed through Lob, one at a time or as a batch",
+      "Card payments at the front desk on a Stripe Terminal reader, with a simulated reader to try it",
+      "Payer contracts load from a spreadsheet, with multiple-procedure and modifier reductions",
+      "Locations, sent on claims as the service facility",
+      "Claim acknowledgments (277CA) picked up from Stedi, and ERA/EFT enrollment tracked per payer",
+      "EHR connections sign their own token requests (SMART backend services) instead of pasted tokens",
+      "Sign-in attempt limits per network, security headers, and accessibility fixes for contrast",
+    ],
+  },
+  {
+    date: "2026-09-26",
     title: "Remittances on their own, estimates before the visit, SAML and FHIR",
     items: [
       "ERAs from Stedi are picked up and posted every morning; dental claims go to Stedi too",

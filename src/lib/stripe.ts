@@ -122,6 +122,36 @@ export class Stripe {
     return this.call<{ id: string }>("POST", "/terminal/locations", { display_name: p.displayName, address: { line1: p.line1, city: p.city, state: p.state, postal_code: p.postalCode, country: "US" } });
   }
 
+  /* Subscriptions (CollaboratMD billing its own customers, on the platform's Stripe account). */
+
+  /** Hosted Checkout for a subscription: a per-seat price, plus a metered price when given (metered prices take no quantity). */
+  createSubscriptionCheckout(p: { price: string; quantity: number; meteredPrice?: string | null; customer?: string | null; email?: string | null; reference: string; successUrl: string; cancelUrl: string; metadata: Record<string, string>; idempotencyKey: string }) {
+    return this.call<{ id: string; url: string }>("POST", "/checkout/sessions", {
+      mode: "subscription",
+      success_url: p.successUrl,
+      cancel_url: p.cancelUrl,
+      customer: p.customer || undefined,
+      customer_email: p.customer ? undefined : p.email || undefined,
+      client_reference_id: p.reference,
+      line_items: [{ price: p.price, quantity: p.quantity }, ...(p.meteredPrice ? [{ price: p.meteredPrice }] : [])],
+      metadata: p.metadata,
+      subscription_data: { metadata: p.metadata },
+    }, p.idempotencyKey);
+  }
+
+  createPortalSession(customer: string, returnUrl: string) {
+    return this.call<{ id: string; url: string }>("POST", "/billing_portal/sessions", { customer, return_url: returnUrl });
+  }
+
+  updateSubscriptionItemQuantity(itemId: string, quantity: number, idempotencyKey: string) {
+    return this.call<{ id: string; quantity: number }>("POST", `/subscription_items/${encodeURIComponent(itemId)}`, { quantity }, idempotencyKey);
+  }
+
+  /** Usage for a billing meter; `identifier` makes a retry count once. */
+  createMeterEvent(p: { eventName: string; customer: string; value: number; identifier: string; timestamp: number }) {
+    return this.call<{ identifier: string }>("POST", "/billing/meter_events", { event_name: p.eventName, identifier: p.identifier, timestamp: p.timestamp, payload: { stripe_customer_id: p.customer, value: String(p.value) } });
+  }
+
   /** Registers a reader; the code "simulated-wpe" makes a simulated WisePOS E in test mode. */
   registerReader(p: { registrationCode: string; location: string; label?: string }) {
     return this.call<TerminalReader>("POST", "/terminal/readers", { registration_code: p.registrationCode, location: p.location, label: p.label });

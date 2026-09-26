@@ -67,6 +67,12 @@ export function SiteHeader({
               >
                 Sign in
               </Link>
+              <Link
+                href="/signup"
+                className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-green-800 transition-colors hover:bg-green-50 md:block"
+              >
+                Start free trial
+              </Link>
               <Link href="/login" className="btn bg-green-700 text-white hover:bg-green-800">
                 View the demo <ArrowRight className="h-4 w-4" />
               </Link>

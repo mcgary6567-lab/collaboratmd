@@ -7,6 +7,7 @@ import { scrubDental } from "@/lib/scrub/dental";
 import { attachmentRefs, markAttachmentsSent } from "./attachments";
 import { buildClaimEdi } from "./claim-edi";
 import { blocksSubmission } from "./policies";
+import { standing } from "./subscription";
 import { claimRisk } from "./risk";
 import { notify } from "./notifications";
 import { scrubInstitutional } from "@/lib/scrub/institutional";
@@ -184,6 +185,8 @@ export async function rescrubClaim(db: Db, claimId: string) {
 export async function previewClaimEdi(db: Db, claimId: string) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
+  const account = standing(bundle.practice);
+  if (account.blocked) throw new Error(account.reason!);
   const { findings, edits } = await scrubBundle(db, bundle);
   if (blocksSubmission(findings, bundle.practice.policies)) throw new Error(bundle.practice.policies?.strictScrub && !hasBlockingErrors(findings) ? "Strict scrubbing is on: resolve the warnings first" : "Fix the scrub errors first");
   const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
@@ -201,6 +204,8 @@ export async function previewClaimEdi(db: Db, claimId: string) {
 export async function submitClaim(db: Db, claimId: string, userId?: string, opts: { role?: string } = {}) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
+  const account = standing(bundle.practice);
+  if (account.blocked) throw new Error(account.reason!);
   if (!["ready", "rejected", "scrub_errors"].includes(bundle.claim.status)) throw new Error(`Claim in status ${bundle.claim.status} cannot be submitted`);
   const { findings, edits } = await scrubBundle(db, bundle);
   const policies = bundle.practice.policies;
