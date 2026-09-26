@@ -34,7 +34,11 @@ export function ClaimBulkBar({ people }: { people: { id: string; name: string }[
           <select name="op" value={op} onChange={(e) => setOp(e.target.value)} className="input w-auto py-1 text-xs">
             <option value="submit">Submit to clearinghouse</option>
             <option value="assign">Assign to a person</option>
+            <option value="rescrub">Scrub again</option>
+            <option value="status">Ask payers for status (276)</option>
+            <option value="writeoff">Write off the balance</option>
           </select>
+          {op === "writeoff" && <input name="reason" className="input w-56 py-1 text-xs" placeholder="Reason (goes on each claim)" required />}
           {op === "assign" && (
             <>
               <select name="assigneeId" className="input w-auto py-1 text-xs" required>

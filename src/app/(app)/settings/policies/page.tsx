@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { getDb } from "@/db";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { getPolicies } from "@/server/policies";
-import { runSmallBalancesAction, savePoliciesAction } from "@/app/(app)/admin-actions";
+import { runSmallBalancesAction, saveFinancingAction, savePoliciesAction } from "@/app/(app)/admin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
 
@@ -24,7 +25,8 @@ function Rule({ title, where, children }: { title: string; where: string; childr
 
 export default async function PoliciesPage() {
   const s = await requireSession();
-  const p = await getPolicies(await getDb(), s.practiceId);
+  const db = await getDb();
+  const [p, [{ financing }]] = await Promise.all([getPolicies(db, s.practiceId), db.select({ financing: schema.practices.financing }).from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1)]);
   const admin = s.role === "admin";
 
   return (
@@ -70,6 +72,20 @@ export default async function PoliciesPage() {
         </fieldset>
         {admin ? <SubmitButton pendingLabel="Saving...">Save policies</SubmitButton> : <p className="text-sm text-slate-500">An administrator sets these.</p>}
       </ActionForm>
+      <Card title="Patient financing" className="mt-6">
+        <p className="mb-3 text-sm text-slate-600">If the practice works with a patient financing lender, the portal offers it for balances at or above the minimum. Patients apply with the lender directly; nothing about them is sent to it from here.</p>
+        <ActionForm action={saveFinancingAction} className="space-y-2 text-sm">
+          <fieldset disabled={!admin} className="space-y-2">
+            <label className="flex items-center gap-2"><input type="checkbox" name="financingOn" defaultChecked={!!financing} /> Offer financing in the patient portal</label>
+            <div className="grid gap-2 md:grid-cols-3">
+              <input name="lender" defaultValue={financing?.lender ?? ""} placeholder="Lender name" className="input" />
+              <input name="url" defaultValue={financing?.url ?? ""} placeholder="https://... application link" className="input" />
+              <div className="flex items-center gap-2">for balances of $<input name="min" inputMode="decimal" defaultValue={financing ? (financing.minCents / 100).toFixed(2) : "500.00"} className="input w-28" /> or more</div>
+            </div>
+          </fieldset>
+          {admin && <SubmitButton className="btn btn-secondary" pendingLabel="Saving...">Save financing</SubmitButton>}
+        </ActionForm>
+      </Card>
       {admin && p.smallBalanceCents != null && (
         <ActionForm action={runSmallBalancesAction} className="mt-4">
           <SubmitButton className="btn btn-secondary" pendingLabel="Adjusting...">Adjust small balances now</SubmitButton>

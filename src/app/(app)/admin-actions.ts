@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { renewSession, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
-import { revokeAllSessions, revokeUserSessions, saveProfile, savePayer, saveProvider, setHiddenNav, setProviderActive } from "@/server/admin";
+import { revokeAllSessions, revokeUserSessions, saveFinancing, saveProfile, savePayer, saveProvider, setHiddenNav, setProviderActive } from "@/server/admin";
 import { adjustSmallBalances, savePolicies } from "@/server/policies";
 import { requestReset } from "@/server/password-reset";
 import { listTeam } from "@/server/team";
@@ -154,4 +154,16 @@ export async function deleteCredentialAction(id: string, _prev: FormResult): Pro
   await deleteCredential(await getDb(), s.practiceId, id, s.userId);
   revalidatePath("/settings/credentials");
   return { ok: true, message: "Removed" };
+}
+
+export async function saveFinancingAction(_prev: FormResult, fd: FormData): Promise<FormResult> {
+  const s = await admin();
+  try {
+    const on = fd.get("financingOn") === "on";
+    await saveFinancing(await getDb(), s.practiceId, on ? { lender: f(fd, "lender"), url: f(fd, "url"), minCents: centsOrNull(f(fd, "min")) ?? 0 } : null, s.userId);
+    revalidatePath("/settings/policies");
+    return { ok: true, message: on ? "Financing is offered in the patient portal" : "Financing is off" };
+  } catch (e) {
+    return fail(e, "Could not save");
+  }
 }

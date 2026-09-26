@@ -1,7 +1,7 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   AlertTriangle, BarChart3, Building2, CalendarDays, CheckSquare, ClipboardCheck, Clock, FileText, FlaskConical, LayoutDashboard,
-  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar, MessageSquare, UserSearch, UsersRound, KeyRound, Inbox, FileSpreadsheet, ReceiptText, Smile,
+  ListChecks, Network, Receipt, Settings, Stethoscope, TrendingDown, Upload, Users, Wallet, Wand2, Landmark, Gavel, BadgeCheck, Plug, Code2, Bot, Hospital, ShieldCheck, BookCheck, SearchCheck, HandCoins, LineChart, Radar, MessageSquare, UserSearch, UsersRound, KeyRound, Inbox, FileSpreadsheet, ReceiptText, Smile, Calculator, History,
 } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; adminOnly?: boolean; multiOnly?: boolean };
@@ -22,6 +22,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Front desk",
     items: [
       { href: "/scheduling", label: "Scheduling", icon: CalendarDays },
+      { href: "/scheduling/estimates", label: "Pre-visit estimates", icon: Calculator },
       { href: "/check-ins", label: "Online check-ins", icon: ClipboardCheck },
       { href: "/patients", label: "Patients", icon: Users },
       { href: "/messages", label: "Text messages", icon: MessageSquare },
@@ -48,6 +49,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/billing/missed-charges", label: "Missed charges", icon: SearchCheck },
       { href: "/billing/credits", label: "Credits and refunds", icon: HandCoins },
       { href: "/billing/accounting", label: "Accounting", icon: FileSpreadsheet },
+      { href: "/billing/legacy", label: "Previous system balances", icon: History },
     ],
   },
   {

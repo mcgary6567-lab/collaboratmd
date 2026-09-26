@@ -133,3 +133,20 @@ export async function revokeUserSessions(db: Db, practiceId: string, targetUserI
   await db.update(users).set({ sessionsRevokedAt: new Date() }).where(eq(users.id, targetUserId));
   await log(db, practiceId, userId, "sessions_revoked", "user", targetUserId, { scope: "user" });
 }
+
+/* ------------------------------ Patient financing ------------------------------ */
+
+/** The practice's own financing lender, shown in the portal for balances at or above the minimum. Null turns it off. */
+export async function saveFinancing(db: Db, practiceId: string, input: { lender: string; url: string; minCents: number } | null, userId?: string) {
+  let value: { lender: string; url: string; minCents: number } | null = null;
+  if (input) {
+    const lender = input.lender.trim().slice(0, 80);
+    const url = input.url.trim();
+    if (!lender) throw new Error("Enter the lender's name");
+    if (!/^https:\/\/[^\s]+$/.test(url)) throw new Error("Enter the lender's application link (https)");
+    if (!Number.isInteger(input.minCents) || input.minCents < 0) throw new Error("Enter the minimum balance");
+    value = { lender, url, minCents: input.minCents };
+  }
+  await db.update(practices).set({ financing: value }).where(eq(practices.id, practiceId));
+  await log(db, practiceId, userId, "financing_changed", "practice", practiceId, { on: !!value, lender: value?.lender ?? null });
+}

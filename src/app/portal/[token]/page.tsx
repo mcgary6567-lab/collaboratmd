@@ -89,14 +89,21 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
         )}
       </div>
 
-      {d.balance > 0 && (
+      {d.depositDue > 0 && d.deposits[0] && (
+        <div className="card mb-4 border-brand-200 p-6">
+          <h2 className="mb-2 font-semibold">{t.depositTitle}</h2>
+          <p className="text-sm text-slate-600">{t.depositFor(money(d.depositDue), date(d.deposits[0].startsAt))}</p>
+        </div>
+      )}
+
+      {(d.balance > 0 || d.depositDue > 0) && (
         <div className="card mb-4 p-6">
           <h2 className="mb-3 flex items-center gap-2 font-semibold"><CreditCard className="h-4 w-4" /> {t.makePayment}</h2>
           {d.onlinePayments ? (
             <ActionForm action={payAction.bind(null, token)} className="space-y-3 text-sm">
               <label className="block">
                 <span className="label">{t.amount}</span>
-                <input name="amount" type="number" step="0.01" min="1" max={(Math.max(d.balance, 0) / 100).toFixed(2)} defaultValue={((nextDue ? nextDue.amountCents - nextDue.paidCents : d.balance) / 100).toFixed(2)} className="input max-w-xs" required />
+                <input name="amount" type="number" step="0.01" min="1" max={((Math.max(d.balance, 0) + d.depositDue) / 100).toFixed(2)} defaultValue={((nextDue ? nextDue.amountCents - nextDue.paidCents : Math.max(d.balance, 0) || d.depositDue) / 100).toFixed(2)} className="input max-w-xs" required />
               </label>
               {plan && (
                 <>
@@ -115,6 +122,14 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           ) : (
             <p className="text-sm text-slate-600">{t.noOnlinePay(d.practice.phone)}</p>
           )}
+        </div>
+      )}
+
+      {d.financing && (
+        <div className="card mb-4 p-6">
+          <h2 className="mb-2 font-semibold">{t.financingTitle}</h2>
+          <p className="text-sm text-slate-600">{t.financingBody(d.financing.lender)}</p>
+          <a href={d.financing.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary mt-3">{t.financingLink}</a>
         </div>
       )}
 

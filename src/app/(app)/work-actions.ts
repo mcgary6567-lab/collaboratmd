@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { ENTITY_TYPES, addNote, assignMany, createTask, deleteView, reassignTask, saveView, setTaskStatus, type EntityType } from "@/server/work";
-import { submitClaim } from "@/server/claims";
+import { getClaimFinancials, rescrubClaim, submitClaim, writeOffClaim } from "@/server/claims";
+import { checkClaimStatus } from "@/server/followup";
+import { assertWriteOffAllowed } from "@/server/policies";
 import { assertOwned } from "@/server/tenancy";
 
 const fail = (e: unknown): FormResult => ({ ok: false, message: e instanceof Error ? e.message : "Something went wrong" });
@@ -94,6 +96,52 @@ export async function bulkClaimsAction(_prev: FormResult, formData: FormData): P
       revalidatePath("/tasks");
       revalidatePath("/claims");
       return { ok: true, message: `Assigned ${n} claim${n === 1 ? "" : "s"}` };
+    }
+    if (op === "rescrub") {
+      let ready = 0, errors = 0;
+      for (const id of ids.slice(0, 200)) {
+        await assertOwned(db, s.practiceId, "claim", id);
+        const c = await rescrubClaim(db, id);
+        if (c.status === "ready") ready++; else errors++;
+      }
+      revalidatePath("/claims");
+      return { ok: true, message: `Rescrubbed ${ready + errors}: ${ready} ready, ${errors} with errors to fix` };
+    }
+    if (op === "status") {
+      let checked = 0, failed = 0;
+      for (const id of ids.slice(0, 50)) {
+        try {
+          await assertOwned(db, s.practiceId, "claim", id);
+          await checkClaimStatus(db, id);
+          checked++;
+        } catch {
+          failed++;
+        }
+      }
+      revalidatePath("/claims");
+      return { ok: true, message: `Asked payers about ${checked} claim${checked === 1 ? "" : "s"}${failed ? `; ${failed} could not be checked (not yet sent, or already paid)` : ""}` };
+    }
+    if (op === "writeoff") {
+      if (!(CAN_ADJUST as readonly string[]).includes(s.role)) return { ok: false, message: "Writing off needs a biller or administrator" };
+      const reason = str(formData, "reason");
+      if (!reason) return { ok: false, message: "Give a reason for the write-off" };
+      let done = 0, cents = 0;
+      const refused: string[] = [];
+      for (const id of ids.slice(0, 200)) {
+        await assertOwned(db, s.practiceId, "claim", id);
+        const balance = (await getClaimFinancials(db, id)).insuranceBalanceCents;
+        try {
+          // The practice's write-off limit applies to each claim, as it does one at a time.
+          await assertWriteOffAllowed(db, s.practiceId, s.role, balance);
+          await writeOffClaim(db, id, reason, s.userId);
+          done++;
+          cents += balance;
+        } catch (e) {
+          refused.push(e instanceof Error ? e.message : "refused");
+        }
+      }
+      revalidatePath("/claims");
+      return { ok: done > 0, message: `Wrote off ${done} claim${done === 1 ? "" : "s"} ($${(cents / 100).toFixed(2)})${refused.length ? `; ${refused.length} left for an administrator (over your write-off limit)` : ""}` };
     }
     return { ok: false, message: "Choose an action" };
   } catch (e) {

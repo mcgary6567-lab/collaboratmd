@@ -16,6 +16,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { normalizeDob } from "./checkin";
 import { buildStatementDetail, patientBalanceCents, plansForPatient, recordPlanPayment } from "./billing";
+import { openDeposits } from "./pre-visit";
 import { createTask } from "./work";
 import { stripeClient, stripeReady, type Stripe, type StripeEvent } from "@/lib/stripe";
 import { practiceConfig } from "./integrations";
@@ -98,7 +99,11 @@ export async function portalData(db: Db, linkId: string) {
     buildStatementDetail(db, patient.id),
   ]);
   const onlinePayments = stripeReady((await practiceConfig(db, practice.id)).stripe);
-  return { patient, practice, balance, statements: stmts, plans, payments, cards, visits: detail.visits.filter((v) => v.youOweCents > 0), onlinePayments };
+  const deposits = await openDeposits(db, patient.id);
+  // Deposits already paid show up as a credit; only what is still owed ahead of the visit can be paid.
+  const depositDue = Math.max(0, deposits.reduce((a, d) => a + d.amountCents, 0) - Math.max(0, -balance));
+  const financing = practice.financing && balance >= practice.financing.minCents ? practice.financing : null;
+  return { patient, practice, balance, statements: stmts, plans, payments, cards, visits: detail.visits.filter((v) => v.youOweCents > 0), onlinePayments, deposits, depositDue, financing };
 }
 
 /**
@@ -116,7 +121,7 @@ export async function startPortalPayment(
   if (!data) throw new Error("This link can no longer be used");
   const stripe = client ?? stripeClient((await practiceConfig(db, data.practice.id)).stripe);
   if (!Number.isInteger(input.amountCents) || input.amountCents < 100) throw new Error("Enter at least $1.00");
-  if (input.amountCents > Math.max(data.balance, 0) && !input.planId) throw new Error("That is more than you owe");
+  if (input.amountCents > Math.max(data.balance, 0) + data.depositDue && !input.planId) throw new Error("That is more than you owe");
   const plan = input.planId ? data.plans.find((p) => p.plan.id === input.planId && ["active", "defaulted"].includes(p.plan.status)) : null;
   if (input.planId && !plan) throw new Error("That payment plan is not active");
   const [pay] = await db
