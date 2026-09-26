@@ -665,6 +665,13 @@ export const ruleSuggestionDismissals = pgTable("rule_suggestion_dismissals", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.practiceId, t.suggestionKey] })]);
 
+/** SAML request IDs awaiting a response (see server/saml.ts). */
+export const samlRequests = pgTable("saml_requests", {
+  id: text("id").primaryKey(),
+  practiceId: uuid("practice_id").references(() => practices.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 /* Growth round: clearinghouse polling, notifications, credentialing, legacy A/R, FHIR. See migration 0033. */
 export const clearinghousePolls = pgTable("clearinghouse_polls", {
   practiceId: uuid("practice_id").primaryKey().references(() => practices.id),

@@ -41,6 +41,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Two-way text inbox, with STOP honored", needs: "Twilio" },
       { name: "Insurance card read from a photo", needs: "AI key + BAA" },
       { name: "Coverage discovery for self-pay patients", needs: "clearinghouse" },
+      { name: "Estimates before the visit, with pay-ahead links", needs: "Stripe for payment" },
     ],
   },
   {
@@ -77,6 +78,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Missed charges: visits seen but never billed" },
       { name: "Underpayment dispute letters, one per payer" },
       { name: "Credit balances refunded with approval" },
+      { name: "ERAs picked up from the clearinghouse and posted daily", needs: "Stedi" },
     ],
   },
   {
@@ -115,7 +117,8 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
     group: "Security and admin",
     icon: ShieldCheck,
     items: [
-      { name: "Single sign-on (OpenID Connect) and SCIM provisioning" },
+      { name: "Single sign-on (OpenID Connect or SAML) and SCIM provisioning" },
+      { name: "Notifications, daily digest and a setup guide" },
       { name: "Custom roles, session limits and office-network allowlists" },
       { name: "Two-factor sign-in, required per practice if you choose" },
       { name: "Team page with invites and one-click removal" },
@@ -189,7 +192,8 @@ const STANDARDS = [
   "HL7 v2.5.1 ADT, DFT, ORM, ORU",
   "ICD-10-CM · CPT · HCPCS · CDT",
   "NCCI PTP and MUE edits",
-  "OpenID Connect and SCIM 2.0",
+  "OpenID Connect, SAML 2.0 and SCIM 2.0",
+  "HL7 FHIR R4 (patients and encounters)",
   "CARC and RARC code sets",
 ];
 

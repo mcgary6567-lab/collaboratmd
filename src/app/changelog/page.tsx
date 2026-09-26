@@ -9,6 +9,29 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-09-26",
+    title: "Remittances on their own, estimates before the visit, SAML and FHIR",
+    items: [
+      "ERAs from Stedi are picked up and posted every morning; dental claims go to Stedi too",
+      "Estimates before the visit, with a link for the patient to pay ahead",
+      "Secondary claims for facility (UB-04) and dental claims",
+      "Forgot-password emails, notifications with a daily digest, and a setup guide for new practices",
+      "Credential tracking with expiry reminders, and a quarterly access review reminder",
+      "Import of open balances from a previous billing system, and patient financing links",
+      "SAML single sign-on alongside OpenID Connect, and patients and visits from an EHR over FHIR",
+      "Bulk rescrub, status checks and write-offs on the claims list; the app can be installed on a phone",
+    ],
+  },
+  {
+    date: "2026-09-25",
+    title: "Administration: settings workspace and billing policies",
+    items: [
+      "Settings home with setup health and search; edit the practice profile, providers and payers",
+      "Billing policies: write-off limits, strict scrubbing, risk holds, two-person refunds, admin-only exports, small balance adjustments",
+      "Sign everyone out, an audit log viewer, and a customizable menu",
+    ],
+  },
+  {
     date: "2026-09-25",
     title: "Recovery, forecasting, access control and dental claims",
     items: [

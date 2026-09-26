@@ -114,7 +114,12 @@ export async function saveSsoAction(_prev: FormResult, formData: FormData): Prom
     return { ok: false, message: "Sign in with SSO once yourself before requiring it, so a setup mistake cannot lock you out. Save without \"Require SSO\" first." };
   }
   try {
-    await saveSso(await getDb(), s.practiceId, { issuer: f("issuer"), clientId: f("clientId"), clientSecret: f("clientSecret"), domains: f("domains"), enforce, autoProvision: formData.get("autoProvision") === "on", defaultRole: f("defaultRole") }, s.userId);
+    await saveSso(await getDb(), s.practiceId, {
+      protocol: f("protocol") === "saml" ? "saml" : "oidc",
+      issuer: f("issuer"), clientId: f("clientId"), clientSecret: f("clientSecret"),
+      samlEntryPoint: f("samlEntryPoint"), samlIdpIssuer: f("samlIdpIssuer"), samlIdpCert: String(formData.get("samlIdpCert") ?? ""),
+      domains: f("domains"), enforce, autoProvision: formData.get("autoProvision") === "on", defaultRole: f("defaultRole"),
+    }, s.userId);
     revalidatePath("/settings/sso");
     return { ok: true, message: "Saved. Test it, then try signing in with SSO in a private window before requiring it." };
   } catch (e) {

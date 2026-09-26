@@ -4,7 +4,9 @@ import { requireSession } from "@/lib/auth";
 import { BUILT_IN_ROLES } from "@/lib/capabilities";
 import { siteOrigin } from "@/lib/origin";
 import { getSso } from "@/server/sso";
-import { removeSsoAction, rotateScimAction, saveSsoAction, testSsoAction } from "@/app/(app)/access-actions";
+import { removeSsoAction, rotateScimAction, testSsoAction } from "@/app/(app)/access-actions";
+import { samlUrls } from "@/server/saml";
+import { SsoForm } from "./sso-form";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { CopyField } from "../connections/copy-field";
@@ -22,33 +24,18 @@ export default async function SsoPage() {
     <>
       <PageHeader title="Single sign-on" subtitle="Sign in with your organization's identity provider, and add or remove people automatically" actions={<Link href="/settings" className="btn btn-secondary">Back to settings</Link>} />
       <div className="grid gap-6 lg:grid-cols-5">
-        <Card title="OpenID Connect" className="lg:col-span-3">
+        <Card title="Identity provider" className="lg:col-span-3">
           {!admin ? (
             <p className="text-sm text-slate-600">{cfg ? `Single sign-on is set up for ${cfg.domains.join(", ")}.` : "Not set up."} An administrator manages this.</p>
           ) : (
             <>
               <ol className="mb-4 list-decimal space-y-1 pl-5 text-xs text-slate-600">
-                <li>In your identity provider (Okta, Microsoft Entra ID, Google Workspace, OneLogin, JumpCloud...), create an OpenID Connect web application.</li>
+                <li>In your identity provider (Okta, Microsoft Entra ID, Google Workspace, OneLogin, JumpCloud...), create an OpenID Connect web application (or a SAML 2.0 app if OpenID Connect is not available).</li>
                 <li>Set its sign-in redirect URI to the address below, and grant the scopes openid, email and profile.</li>
                 <li>Paste the issuer, client ID and client secret here, list your email domains, and save.</li>
                 <li>Test, then sign in with SSO from a private window before requiring it for everyone.</li>
               </ol>
-              <p className="label">Redirect URI</p>
-              {origin ? <CopyField value={`${origin}/api/sso/callback`} /> : <p className="text-xs text-slate-500">Set APP_URL to see the address.</p>}
-              <ActionForm action={saveSsoAction} className="mt-4 space-y-3 text-sm">
-                <label className="block"><span className="label">Issuer</span><input name="issuer" defaultValue={cfg?.issuer ?? ""} className="input" placeholder="https://yourcompany.okta.com" required /></label>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block"><span className="label">Client ID</span><input name="clientId" defaultValue={cfg?.clientId ?? ""} className="input" required /></label>
-                  <label className="block"><span className="label">Client secret</span><input name="clientSecret" type="password" autoComplete="off" className="input" placeholder={cfg ? "Saved; enter a new one to replace it" : ""} required={!cfg} /></label>
-                </div>
-                <label className="block"><span className="label">Email domains</span><input name="domains" defaultValue={cfg?.domains.join(", ") ?? ""} className="input" placeholder="yourpractice.com" required /></label>
-                <label className="block"><span className="label">Role for people added automatically</span>
-                  <select name="defaultRole" defaultValue={cfg?.defaultRole ?? "readonly"} className="input">{Object.entries(BUILT_IN_ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-                </label>
-                <label className="flex items-start gap-2"><input type="checkbox" name="autoProvision" defaultChecked={cfg?.autoProvision ?? false} className="mt-1" /> <span>Create accounts automatically for anyone in these domains who signs in with SSO (with the role above). Off: only people already on the team can sign in.</span></label>
-                <label className="flex items-start gap-2"><input type="checkbox" name="enforce" defaultChecked={cfg?.enforce ?? false} className="mt-1" /> <span>Require SSO: refuse passwords for these domains. Keep at least one administrator outside them, or with a working SSO sign-in, so you cannot be locked out.</span></label>
-                <SubmitButton pendingLabel="Saving...">Save</SubmitButton>
-              </ActionForm>
+              <SsoForm saved={cfg ? { protocol: cfg.protocol, issuer: cfg.issuer, clientId: cfg.clientId, samlEntryPoint: cfg.samlEntryPoint, samlIdpIssuer: cfg.samlIdpIssuer, hasCert: !!cfg.samlIdpCert, hasSecret: !!cfg.clientSecretSealed, domains: cfg.domains, defaultRole: cfg.defaultRole, autoProvision: cfg.autoProvision, enforce: cfg.enforce } : null} roles={Object.entries(BUILT_IN_ROLES)} urls={origin ? { oidcRedirect: `${origin}/api/sso/callback`, samlEntityId: samlUrls(origin, s.practiceId).entityId, samlAcs: samlUrls(origin, s.practiceId).acs } : null} />
               {cfg && (
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                   <ActionForm action={testSsoAction}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="Testing...">Test connection</SubmitButton></ActionForm>

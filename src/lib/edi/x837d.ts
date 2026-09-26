@@ -13,7 +13,7 @@
  * claims before relying on it.
  */
 import { envelope } from "./x12";
-import { pwk, type ClaimAttachmentRef } from "./x837p";
+import { otherPayerLoops, pwk, type ClaimAttachmentRef, type OtherPayer } from "./x837p";
 
 export interface Edi837DInput {
   controlNumber: string;
@@ -34,6 +34,8 @@ export interface Edi837DInput {
     diagnoses: string[];
     attachments?: ClaimAttachmentRef[];
   };
+  /** Set on a secondary claim: the primary payer's adjudication (loops 2320/2330). */
+  otherPayer?: OtherPayer;
   lines: { cdt: string; chargeCents: number; units: number; dateOfService: string; tooth?: string | null; surfaces?: string | null; oralCavity?: string | null }[];
 }
 
@@ -60,7 +62,7 @@ export function buildEdi837D(input: Edi837DInput): string {
     ["REF", "EI", input.billingProvider.taxId.replace("-", "")],
     // 2000B subscriber and payer
     ["HL", "2", "1", "22", "0"],
-    ["SBR", "P", relCode[input.subscriber.relationship] ?? "18", input.subscriber.groupNumber ?? "", "", "", "", "", "", filingIndicator(input.payer.type)],
+    ["SBR", input.otherPayer ? "S" : "P", relCode[input.subscriber.relationship] ?? "18", input.subscriber.groupNumber ?? "", "", "", "", "", "", filingIndicator(input.payer.type)],
     ["NM1", "IL", "1", input.subscriber.lastName, input.subscriber.firstName, "", "", "", "MI", input.subscriber.memberId],
     ...(input.subscriber.address1 ? [["N3", input.subscriber.address1]] : []),
     ...(input.subscriber.city ? [["N4", input.subscriber.city, input.subscriber.state ?? "", (input.subscriber.zip ?? "").replace("-", "")]] : []),
@@ -79,6 +81,7 @@ export function buildEdi837D(input: Edi837DInput): string {
   // 2310B rendering dentist
   body.push(["NM1", "82", "1", input.rendering.lastName, input.rendering.firstName, "", "", "", "XX", input.rendering.npi]);
   body.push(["PRV", "PE", "PXC", input.rendering.taxonomy]);
+  if (input.otherPayer) body.push(...otherPayerLoops(input.otherPayer));
   // 2400 service lines
   input.lines.forEach((l, i) => {
     body.push(["LX", String(i + 1)]);

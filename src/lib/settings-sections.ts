@@ -37,6 +37,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     links: [
       { href: "/settings/connections", label: "Integrations", description: "Clearinghouse, payments, texting, email and AI keys", adminOnly: true, keywords: "stedi stripe twilio resend claude api key" },
       { href: "/settings/integrations", label: "EHR interfaces", description: "HL7 feeds for patients, charges, orders and results", keywords: "hl7 ehr emr lab" },
+      { href: "/settings/fhir", label: "EHR over FHIR", description: "Patients and finished visits from Epic, Oracle Health, athenahealth and others", keywords: "fhir epic cerner athena smart" },
       { href: "/settings/developers", label: "Developers", description: "API keys and webhooks", adminOnly: true, keywords: "rest api webhook" },
     ],
   },

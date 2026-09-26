@@ -23,6 +23,7 @@ import { appSecret } from "@/lib/app-secret";
 import { seal, unseal } from "@/lib/seal";
 import { BUILT_IN_ROLES } from "@/lib/capabilities";
 import { unusablePassword } from "./team";
+import { normalizeCert } from "./saml";
 
 const { practiceSso, users, practiceMemberships, auditLog } = schema;
 
@@ -41,11 +42,15 @@ export async function getSso(db: Db, practiceId: string) {
   return row ?? null;
 }
 
-export async function saveSso(db: Db, practiceId: string, input: { issuer: string; clientId: string; clientSecret?: string; domains: string; enforce: boolean; autoProvision: boolean; defaultRole: string }, userId?: string) {
-  const issuer = input.issuer.trim().replace(/\/$/, "");
-  if (!/^https:\/\/[^\s/]+/.test(issuer)) throw new Error("The issuer must be an https address, e.g. https://yourcompany.okta.com");
-  const clientId = input.clientId.trim();
-  if (!clientId) throw new Error("Enter the client ID");
+export type SsoInput = {
+  protocol?: "oidc" | "saml";
+  issuer?: string; clientId?: string; clientSecret?: string;
+  samlEntryPoint?: string; samlIdpIssuer?: string; samlIdpCert?: string;
+  domains: string; enforce: boolean; autoProvision: boolean; defaultRole: string;
+};
+
+export async function saveSso(db: Db, practiceId: string, input: SsoInput, userId?: string) {
+  const protocol = input.protocol === "saml" ? "saml" : "oidc";
   const domains = [...new Set(input.domains.split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^@/, "")).filter(Boolean))];
   if (!domains.length) throw new Error("Add at least one email domain, e.g. yourpractice.com");
   const bad = domains.find((d) => !DOMAIN.test(d));
@@ -54,14 +59,27 @@ export async function saveSso(db: Db, practiceId: string, input: { issuer: strin
   if (taken.length) throw new Error("One of those domains already signs in to another practice");
   if (!(input.defaultRole in BUILT_IN_ROLES)) throw new Error("Choose the role for people added automatically");
   const existing = await getSso(db, practiceId);
-  const secret = input.clientSecret?.trim();
-  if (!secret && !existing) throw new Error("Enter the client secret");
-  const values = {
-    issuer, clientId, domains, enforce: input.enforce, autoProvision: input.autoProvision, defaultRole: input.defaultRole,
-    clientSecretSealed: secret ? seal(secret, appSecret()) : existing!.clientSecretSealed, updatedBy: userId ?? null, updatedAt: new Date(),
-  };
+  const common = { protocol, domains, enforce: input.enforce, autoProvision: input.autoProvision, defaultRole: input.defaultRole, updatedBy: userId ?? null, updatedAt: new Date() };
+  let values;
+  if (protocol === "oidc") {
+    const issuer = (input.issuer ?? "").trim().replace(/\/$/, "");
+    if (!/^https:\/\/[^\s/]+/.test(issuer)) throw new Error("The issuer must be an https address, e.g. https://yourcompany.okta.com");
+    const clientId = (input.clientId ?? "").trim();
+    if (!clientId) throw new Error("Enter the client ID");
+    const secret = input.clientSecret?.trim();
+    const sealed = secret ? seal(secret, appSecret()) : existing?.protocol === "oidc" ? existing.clientSecretSealed : null;
+    if (!sealed) throw new Error("Enter the client secret");
+    values = { ...common, issuer, clientId, clientSecretSealed: sealed, samlEntryPoint: null, samlIdpIssuer: null, samlIdpCert: null };
+  } else {
+    const entry = (input.samlEntryPoint ?? "").trim();
+    if (!/^https:\/\/[^\s]+$/.test(entry)) throw new Error("Enter the identity provider's SSO URL (https)");
+    const certInput = (input.samlIdpCert ?? "").trim();
+    const cert = certInput ? normalizeCert(certInput) : existing?.protocol === "saml" ? existing.samlIdpCert : null;
+    if (!cert) throw new Error("Paste the identity provider's signing certificate");
+    values = { ...common, issuer: null, clientId: null, clientSecretSealed: null, samlEntryPoint: entry, samlIdpIssuer: (input.samlIdpIssuer ?? "").trim() || null, samlIdpCert: cert };
+  }
   await db.insert(practiceSso).values({ practiceId, ...values }).onConflictDoUpdate({ target: practiceSso.practiceId, set: values });
-  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "sso_saved", entity: "practice", entityId: practiceId, details: { issuer, domains, enforce: input.enforce, autoProvision: input.autoProvision } });
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "sso_saved", entity: "practice", entityId: practiceId, details: { protocol, domains, enforce: input.enforce, autoProvision: input.autoProvision } });
 }
 
 export async function removeSso(db: Db, practiceId: string, userId?: string) {

@@ -23,6 +23,7 @@ import { applyRules, hasActiveRules } from "./work-rules";
 import { adjustSmallBalances } from "./policies";
 import { pollBlocker, pollRemittances } from "./era-poll";
 import { runDailyChecks } from "./daily-checks";
+import { getFhir, syncFhir } from "./fhir";
 import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 
@@ -200,6 +201,7 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (practice.policies?.smallBalanceCents) await step("smallBalances", () => adjustSmallBalances(db, practiceId, { now }));
   if (!(await pollBlocker(db, practiceId))) await step("eraPoll", () => pollRemittances(db, practiceId, { now }));
   await step("dailyChecks", () => runDailyChecks(db, practiceId, now));
+  if (await getFhir(db, practiceId)) await step("fhirSync", () => syncFhir(db, practiceId, { now }));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));
   const resend = (await practiceConfig(db, practiceId)).resend;

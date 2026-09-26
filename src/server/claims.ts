@@ -202,6 +202,7 @@ export function buildClaimEdi(
       originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber, diagnoses: bundle.encounter.diagnoses, attachments,
     },
     lines: bundle.lines.map((l) => ({ cdt: l.cpt, chargeCents: l.chargeCents * l.units, units: l.units, dateOfService: bundle.encounter.dateOfService, tooth: l.tooth, surfaces: l.surfaces, oralCavity: l.oralCavity })),
+    otherPayer,
   }) : institutional ? buildEdi837I({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
@@ -217,6 +218,7 @@ export function buildClaimEdi(
       authorizationNumber, diagnoses: bundle.encounter.diagnoses, institutional: bundle.claim.institutional!, attachments,
     },
     lines: bundle.lines.map((l) => ({ revenueCode: l.revenueCode ?? "", hcpcs: l.cpt || null, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dateOfService: bundle.encounter.dateOfService })),
+    otherPayer,
   }) : buildEdi837P({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
@@ -278,12 +280,11 @@ export async function submitClaim(db: Db, claimId: string, userId?: string, opts
   const now = new Date();
   const institutional = bundle.claim.claimType === "institutional";
   const dental = bundle.claim.claimType === "dental";
-  if ((institutional || dental) && otherPayer) throw new Error(`Secondary ${dental ? "dental" : "institutional"} claims are not supported yet; bill the secondary payer on paper or through its portal`);
   const attachments = await attachmentRefs(db, claimId);
   const edi = buildClaimEdi(bundle, { now, authorizationNumber, attachments, otherPayer });
   await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
   if (attachments.length) await markAttachmentsSent(db, claimId, now);
-  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? "Secondary 837P" : dental ? "837D" : institutional ? "837I" : "837P";
+  const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? `Secondary ${dental ? "837D" : institutional ? "837I" : "837P"}` : dental ? "837D" : institutional ? "837I" : "837P";
   await db.insert(claimEvents).values({ claimId, status: "submitted", source: "user", message: `${kind} generated and sent to clearinghouse (${edi.length} bytes)` });
 
   const result = await getClearinghouse((await practiceConfig(db, bundle.claim.practiceId)).stedi?.apiKey).submit837(edi, {
@@ -621,6 +622,8 @@ export async function createSecondaryClaim(db: Db, primaryClaimId: string, userI
       practiceId: primary.practiceId, encounterId: primary.encounterId, patientId: primary.patientId,
       payerId: secondary.payerId, patientInsuranceId: secondary.id, controlNumber: await nextControlNumber(db, primary.practiceId),
       payerSequence: "S", primaryClaimId, totalCents: primary.totalCents, status: "draft", timelyFilingDeadline: primary.timelyFilingDeadline,
+      // A facility or dental claim's secondary is the same kind of claim.
+      claimType: primary.claimType, institutional: primary.institutional,
     })
     .returning();
   await db.update(claims).set({ status: "billed_secondary", updatedAt: new Date() }).where(eq(claims.id, primaryClaimId));
