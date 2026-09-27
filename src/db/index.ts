@@ -15,6 +15,8 @@ type Runner = {
   exec: (sql: string) => Promise<void>;
   /** True for a real Postgres server, false for the embedded dev database. */
   shared: boolean;
+  /** Runs `fn` inside one transaction on one connection (shared databases only). */
+  transaction?: (fn: (tx: Pick<Runner, "db" | "exec">) => Promise<void>) => Promise<void>;
 };
 
 const globalRef = globalThis as unknown as { __collaboratmdDb?: Promise<Runner> };
@@ -48,7 +50,20 @@ async function connect(): Promise<Runner> {
     pool.on("error", (err) => {
       console.error(`[collaboratmd] idle Postgres client error: ${err.message}`);
     });
-    return { db: drizzlePg({ client: pool, schema }), exec: async (sql) => void (await pool.query(sql)), shared: true };
+    const transaction: Runner["transaction"] = async (fn) => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await fn({ db: drizzlePg({ client, schema }), exec: async (sql) => void (await client.query(sql)) });
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw e;
+      } finally {
+        client.release();
+      }
+    };
+    return { db: drizzlePg({ client: pool, schema }), exec: async (sql) => void (await pool.query(sql)), shared: true, transaction };
   }
 
   if (isServerless) {
@@ -67,7 +82,7 @@ async function connect(): Promise<Runner> {
   return { db: drizzlePglite({ client, schema }), exec: async (sql) => void (await client.exec(sql)), shared: false };
 }
 
-async function migrate(runner: Runner) {
+async function migrate(runner: Pick<Runner, "db" | "exec">) {
   await runner.exec(
     "CREATE TABLE IF NOT EXISTS _migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());",
   );
@@ -114,7 +129,7 @@ const SEEDED_TABLES = [
  * It runs automatically on the embedded dev database. Against a real Postgres
  * it requires SEED_DEMO_DATA=true, because it deletes existing rows.
  */
-async function seed(runner: Runner) {
+async function seed(runner: Pick<Runner, "db" | "exec" | "shared">) {
   if (runner.shared && process.env.SEED_DEMO_DATA !== "true") return;
   const marker = await runner.db.execute<{ name: string }>("SELECT name FROM _migrations WHERE name = 'seed'");
   if (marker.rows.length > 0) return;
@@ -147,14 +162,34 @@ export async function environmentGuard(runner: Pick<Runner, "db" | "exec" | "sha
 }
 
 /**
- * Runs migrations and seeding under a Postgres advisory lock.
+ * Migrations still to apply on a shared database, and whether the demo seed is
+ * wanted but not loaded. Nothing pending (every start after a deploy has run
+ * once) means no lock is taken at all.
+ */
+export async function pendingWork(runner: Pick<Runner, "db">, env: Record<string, string | undefined> = process.env) {
+  const { rows: [t] } = await runner.db.execute<{ ok: boolean }>("SELECT to_regclass('_migrations') IS NOT NULL AS ok");
+  const applied = t?.ok ? new Set((await runner.db.execute<{ name: string }>("SELECT name FROM _migrations")).rows.map((r) => r.name)) : new Set<string>();
+  return { migrations: MIGRATIONS.filter((m) => !applied.has(m.name)).map((m) => m.name), seed: env.SEED_DEMO_DATA === "true" && !applied.has("seed") };
+}
+
+/**
+ * Runs migrations (and the demo seed, where asked for) on a shared database
+ * with one instance at a time.
  *
  * Serverless platforms start many instances at once, and each one bootstraps
- * on its first request. Without the lock, concurrent cold starts would race to
+ * on its first request. Without a lock, concurrent cold starts would race to
  * apply the same migration or truncate a database another instance is seeding.
- * The lock is session-scoped and released automatically if a connection drops.
+ *
+ * The lock is transaction-scoped (pg_advisory_xact_lock) and the migrations run
+ * inside that one transaction on one connection. Session-scoped locks are not
+ * safe behind a transaction-mode pooler such as PgBouncer or Neon's pooler:
+ * the lock and the unlock can land on different server connections, leaving
+ * the lock held by a pooled connection forever and every later cold start
+ * waiting on it. A transaction always stays on one server connection, and its
+ * lock ends with it. (The key differs from the old session lock's, so a lock
+ * left over from before cannot block this one.)
  */
-const BOOTSTRAP_LOCK_ID = 8_147_236; // arbitrary, must be stable across instances
+const BOOTSTRAP_TX_LOCK_ID = 8_147_237; // arbitrary, must be stable across instances
 
 async function prepare(runner: Runner) {
   if (!runner.shared) {
@@ -163,13 +198,15 @@ async function prepare(runner: Runner) {
     return;
   }
   await environmentGuard(runner);
-  await runner.exec(`SELECT pg_advisory_lock(${BOOTSTRAP_LOCK_ID})`);
-  try {
-    await migrate(runner);
-    await seed(runner);
-  } finally {
-    await runner.exec(`SELECT pg_advisory_unlock(${BOOTSTRAP_LOCK_ID})`);
-  }
+  const pending = await pendingWork(runner);
+  if (!pending.migrations.length && !pending.seed) return;
+  if (!runner.transaction) throw new Error("A shared database needs transactions to migrate");
+  await runner.transaction(async (tx) => {
+    await tx.exec(`SELECT pg_advisory_xact_lock(${BOOTSTRAP_TX_LOCK_ID})`);
+    // Another instance may have done the work while this one waited; both steps check again.
+    await migrate(tx);
+    await seed({ ...tx, shared: true });
+  });
 }
 
 async function bootstrap(): Promise<Runner> {
