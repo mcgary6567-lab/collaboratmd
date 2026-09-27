@@ -59,7 +59,7 @@ const key = (last: string, first: string, dob: string) => `${last.toLowerCase()}
 export async function importPatients(
   db: Db,
   practiceId: string,
-  input: { filename: string; text: string; mapping: Mapping; mappedBy: "rules" | "ai" | "user"; userId?: string },
+  input: { filename: string; text: string; mapping: Mapping; mappedBy: "rules" | "ai" | "user" | "template"; userId?: string },
 ) {
   const table = readTable(input.text);
   const validFields = new Set<string>(PATIENT_FIELDS.map((f) => f.key));

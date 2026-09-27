@@ -1578,3 +1578,60 @@ export const practiceDeletions = pgTable("practice_deletions", {
   rowsDeleted: integer("rows_deleted").notNull(),
   filesDeleted: integer("files_deleted").notNull(),
 });
+
+/* Import templates and online booking. See migration 0043. */
+export const importTemplates = pgTable("import_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  /** Field key to the header it came from, e.g. { dob: "Patient DOB" }. */
+  mapping: jsonb("mapping").$type<Record<string, string>>().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("import_templates_practice_id_name_key").on(t.practiceId, t.name)]);
+
+export const bookingSettings = pgTable("booking_settings", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  enabled: boolean("enabled").notNull().default(false),
+  timeZone: text("time_zone").notNull().default("America/New_York"),
+  slotMinutes: integer("slot_minutes").notNull().default(30),
+  minNoticeHours: integer("min_notice_hours").notNull().default(24),
+  horizonDays: integer("horizon_days").notNull().default(21),
+  intro: text("intro"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const providerHours = pgTable("provider_hours", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  locationId: uuid("location_id").references(() => locations.id),
+  /** 0 Sunday to 6 Saturday, in the practice's time zone. */
+  weekday: integer("weekday").notNull(),
+  startMinute: integer("start_minute").notNull(),
+  endMinute: integer("end_minute").notNull(),
+});
+
+export const bookingRequests = pgTable("booking_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  locationId: uuid("location_id").references(() => locations.id),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  dob: date("dob").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  reason: text("reason"),
+  payerName: text("payer_name"),
+  memberId: text("member_id"),
+  smsConsent: boolean("sms_consent").notNull().default(false),
+  status: text("status").notNull().default("pending"), // pending | confirmed | declined
+  appointmentId: uuid("appointment_id").references(() => appointments.id),
+  ipHash: text("ip_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedBy: uuid("decided_by").references(() => users.id),
+});

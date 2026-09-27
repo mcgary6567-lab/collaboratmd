@@ -2,21 +2,25 @@
 
 import { useState, useTransition } from "react";
 import { Sparkles, Upload } from "lucide-react";
-import { aiMapAction, previewImportAction, runImportAction, type ImportResult, type PreviewResult } from "@/app/(app)/integration-actions";
+import { aiMapAction, deleteImportTemplateAction, previewImportAction, runImportAction, saveImportTemplateAction, type ImportResult, type PreviewResult } from "@/app/(app)/integration-actions";
 import type { Mapping, PatientField } from "@/lib/import/patients";
+import { mappingFromTemplate, matchingTemplate, type Template } from "@/lib/import/templates";
 
 type Field = { key: PatientField; label: string };
 
-export function Importer({ fields, maxRows }: { fields: Field[]; maxRows: number }) {
+export function Importer({ fields, maxRows, templates: initialTemplates = [] }: { fields: Field[]; maxRows: number; templates?: Template[] }) {
+  const [templates, setTemplates] = useState(initialTemplates);
+  const [templateName, setTemplateName] = useState("");
+  const [templateNote, setTemplateNote] = useState("");
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
   const [prev, setPrev] = useState<Extract<PreviewResult, { ok: true }> | null>(null);
   const [mapping, setMapping] = useState<Mapping>({});
-  const [mappedBy, setMappedBy] = useState<"rules" | "ai" | "user">("rules");
+  const [mappedBy, setMappedBy] = useState<"rules" | "ai" | "user" | "template">("rules");
   const [error, setError] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [pending, start] = useTransition();
 
-  const apply = (r: PreviewResult, by: "rules" | "ai" | "user") => {
+  const apply = (r: PreviewResult, by: "rules" | "ai" | "user" | "template") => {
     if (!r.ok) return setError(r.message);
     setError("");
     setPrev(r);
@@ -31,7 +35,39 @@ export function Importer({ fields, maxRows }: { fields: Field[]; maxRows: number
     if (f.size > 3_900_000) return setError("That file is larger than 3.9 MB. Split it into smaller files.");
     const text = await f.text();
     setFile({ name: f.name, text });
-    start(async () => apply(await previewImportAction(text), "rules"));
+    start(async () => {
+      const first = await previewImportAction(text);
+      // A saved template whose columns are all in this file maps it the way it was mapped last time.
+      const match = first.ok ? matchingTemplate(first.preview.headers, templates) : null;
+      if (match) {
+        apply(await previewImportAction(text, match.r.mapping), "template");
+        setTemplateNote(`Mapped with your saved template "${match.t.name}".`);
+      } else {
+        apply(first, "rules");
+        setTemplateNote("");
+      }
+    });
+  };
+
+  const useTemplate = (id: string) => {
+    const t = templates.find((x) => x.id === id);
+    if (!t || !prev) return;
+    const r = mappingFromTemplate(prev.preview.headers, t);
+    setTemplateNote(r.missing.length ? `"${t.name}" expects columns this file does not have: ${r.missing.join(", ")}.` : `Mapped with "${t.name}".`);
+    start(async () => apply(await previewImportAction(file!.text, r.mapping), "template"));
+  };
+
+  const saveTemplate = () => {
+    if (!prev) return;
+    start(async () => {
+      const r = await saveImportTemplateAction(templateName, prev.preview.headers, mapping);
+      setTemplateNote(r.message);
+      if (r.ok) {
+        const byHeader = Object.fromEntries(Object.entries(mapping).filter(([, c]) => typeof c === "number").map(([f, c]) => [f, prev.preview.headers[c as number]]));
+        setTemplates((ts) => [...ts.filter((x) => x.name !== templateName.trim()), { id: `new-${Date.now()}`, name: templateName.trim(), mapping: byHeader }]);
+        setTemplateName("");
+      }
+    });
   };
 
   const remap = (field: PatientField, col: string) => {
@@ -61,7 +97,7 @@ export function Importer({ fields, maxRows }: { fields: Field[]; maxRows: number
               <div>
                 <h2 className="font-semibold">Match the columns</h2>
                 <p className="text-xs text-slate-500">
-                  {p.rowCount.toLocaleString()} rows · mapped {mappedBy === "ai" ? "with AI from column names and value types (no patient data was sent)" : mappedBy === "user" ? "by you" : "automatically"}. Check each choice.
+                  {p.rowCount.toLocaleString()} rows · mapped {mappedBy === "ai" ? "with AI from column names and value types (no patient data was sent)" : mappedBy === "user" ? "by you" : mappedBy === "template" ? "from a saved template" : "automatically"}. Check each choice.
                 </p>
               </div>
               {prev.aiAvailable && (
@@ -87,6 +123,24 @@ export function Importer({ fields, maxRows }: { fields: Field[]; maxRows: number
               })}
             </div>
             {p.unmapped.length > 0 && <p className="mt-3 text-xs text-slate-500">Not imported: {p.unmapped.join(", ")}</p>}
+            <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-4 text-sm">
+              {templates.length > 0 && (
+                <label className="block"><span className="label">Use a saved template</span>
+                  <select className="input py-1 text-xs" defaultValue="" onChange={(e) => useTemplate(e.target.value)} disabled={pending}>
+                    <option value="">Choose...</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+              )}
+              <label className="block"><span className="label">Save this mapping as</span><input className="input py-1 text-xs" value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="e.g. Monthly export from our EHR" /></label>
+              <button type="button" className="btn btn-secondary text-xs" disabled={pending || !templateName.trim()} onClick={saveTemplate}>Save template</button>
+              {templates.filter((t) => !t.id.startsWith("new-")).length > 0 && (
+                <details className="text-xs text-slate-500"><summary className="cursor-pointer">Manage templates</summary>
+                  <ul className="mt-1 space-y-1">{templates.filter((t) => !t.id.startsWith("new-")).map((t) => <li key={t.id} className="flex items-center gap-2">{t.name}<button type="button" className="text-red-700 underline" onClick={() => start(async () => { await deleteImportTemplateAction(t.id); setTemplates((ts) => ts.filter((x) => x.id !== t.id)); })}>delete</button></li>)}</ul>
+                </details>
+              )}
+            </div>
+            {templateNote && <p className="mt-2 text-xs text-slate-600">{templateNote}</p>}
           </div>
 
           <div className="card p-5">

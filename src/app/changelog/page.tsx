@@ -9,6 +9,19 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-09-27",
+    title: "Online booking, payer directory, and checks before every claim",
+    items: [
+      "Patients request open times from your booking link; staff confirm each request on the schedule",
+      "Find payers in Stedi's payer directory, with which transactions need enrollment",
+      "A report comparing your locations, and import templates so next month's patient file maps itself",
+      "Every claim file is checked for structural errors before it is sent, and claims carry the practice phone as the contact",
+      "An integration doctor that checks each connected service end to end",
+      "Help for the page you are on, from the button in the corner",
+      "Account closure with deletion of all data, trial and payment reminders, and a stricter browser security policy",
+    ],
+  },
+  {
     date: "2026-09-26",
     title: "Free trials, mailed statements, card readers, and a full data export",
     items: [

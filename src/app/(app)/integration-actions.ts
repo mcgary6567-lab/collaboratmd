@@ -9,6 +9,7 @@ import { importPatients, preview, profiles, readTable, type ImportPreview } from
 import { mapColumnsWithAi } from "@/lib/ai/map-columns";
 import { practiceConfig } from "@/server/integrations";
 import type { Mapping } from "@/lib/import/patients";
+import { deleteTemplate, saveTemplate } from "@/server/import-templates";
 
 const fail = (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : "Something went wrong" });
 
@@ -79,7 +80,7 @@ export type ImportResult =
   | { ok: true; created: number; updated: number; skipped: number; total: number; issues: { row: number; message: string }[] }
   | { ok: false; message: string };
 
-export async function runImportAction(filename: string, text: string, mapping: Mapping, mappedBy: "rules" | "ai" | "user"): Promise<ImportResult> {
+export async function runImportAction(filename: string, text: string, mapping: Mapping, mappedBy: "rules" | "ai" | "user" | "template"): Promise<ImportResult> {
   const s = await requireRole(CAN_WRITE);
   try {
     const db = await getDb();
@@ -90,4 +91,19 @@ export async function runImportAction(filename: string, text: string, mapping: M
   } catch (e) {
     return fail(e);
   }
+}
+
+export async function saveImportTemplateAction(name: string, headers: string[], mapping: Mapping): Promise<{ ok: boolean; message: string }> {
+  const s = await requireRole(CAN_WRITE);
+  try {
+    await saveTemplate(await getDb(), s.practiceId, name, headers, mapping, s.userId);
+    return { ok: true, message: `Saved "${name.trim()}". Files with the same columns will map themselves.` };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not save" };
+  }
+}
+
+export async function deleteImportTemplateAction(id: string): Promise<void> {
+  const s = await requireRole(CAN_WRITE);
+  await deleteTemplate(await getDb(), s.practiceId, id);
 }

@@ -11,17 +11,19 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { appointmentStatusAction } from "@/app/(app)/actions";
 import { Card, PageHeader, PatientLink, Badge, Empty } from "@/components/ui";
 import { AppointmentForm } from "./form";
+import { getBookingSettings, localDateLabel, localTimeLabel, pendingRequests } from "@/server/booking";
+import { confirmBookingAction, declineBookingAction } from "@/app/(app)/booking-actions";
 
 export const dynamic = "force-dynamic";
 
 const TONE: Record<string, "slate" | "green" | "red" | "amber" | "blue"> = { scheduled: "blue", checked_in: "amber", completed: "green", no_show: "red", cancelled: "slate" };
 
-export default async function SchedulingPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
-  const { date } = await searchParams;
+export default async function SchedulingPage({ searchParams }: { searchParams: Promise<{ date?: string; booked?: string; told?: string; declined?: string }> }) {
+  const { date, booked, told, declined } = await searchParams;
   const s = await requireSession();
   const db = await getDb();
   const day = date ? new Date(date + "T12:00:00") : new Date();
-  const [appts, providers] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId)]);
+  const [appts, providers, requests, booking] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId), pendingRequests(db, s.practiceId), getBookingSettings(db, s.practiceId)]);
   const iso = day.toISOString().slice(0, 10);
   const patientIds = [...new Set(appts.map((a) => a.patient.id))];
   const primaries = patientIds.length
@@ -60,6 +62,31 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
           </>
         }
       />
+      {booked && (
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900" role="status">
+          Online request booked {booked === "existing" ? "for the existing patient" : "with a new patient record"}. {told === "1" ? "The patient was told." : "Let the patient know; no message could be sent."}
+        </div>
+      )}
+      {declined && <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-800" role="status">Request declined. Contact the patient to offer another time.</div>}
+      {requests.length > 0 && (
+        <Card title={`Online requests waiting (${requests.length})`} className="mb-6">
+          <ul className="divide-y divide-slate-100 text-sm">
+            {requests.map(({ request: r, providerFirst, providerLast }) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                <div>
+                  <div className="font-medium">{r.lastName}, {r.firstName} <span className="font-normal text-slate-500">· born {r.dob}</span></div>
+                  <div className="text-slate-600">{localDateLabel(r.startsAt, booking.timeZone)} at {localTimeLabel(r.startsAt, booking.timeZone)} with Dr. {providerFirst} {providerLast}{r.reason ? ` · ${r.reason}` : ""}</div>
+                  <div className="text-xs text-slate-500">{[r.phone, r.email, r.payerName && `${r.payerName}${r.memberId ? ` ${r.memberId}` : ""}`].filter(Boolean).join(" · ")}</div>
+                </div>
+                <div className="flex gap-2">
+                  <ActionForm action={confirmBookingAction.bind(null, r.id)}><SubmitButton className="btn btn-primary text-xs" pendingLabel="Booking...">Confirm</SubmitButton></ActionForm>
+                  <ActionForm action={declineBookingAction.bind(null, r.id)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Decline</SubmitButton></ActionForm>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card
           title={`Appointments (${appts.length})`}

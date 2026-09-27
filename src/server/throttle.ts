@@ -12,6 +12,7 @@ export const LIMITS = {
   reset: { max: 5, windowSec: 60 * 60 },
   portal: { max: 20, windowSec: 15 * 60 },
   signup: { max: 5, windowSec: 60 * 60 },
+  booking: { max: 10, windowSec: 60 * 60 },
 } as const;
 export type ThrottleKind = keyof typeof LIMITS;
 

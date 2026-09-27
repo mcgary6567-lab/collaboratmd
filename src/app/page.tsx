@@ -31,6 +31,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
     icon: CalendarDays,
     items: [
       { name: "Scheduling and patient records" },
+      { name: "Online booking requests, confirmed by your staff" },
       { name: "Online check-in with insurance updates and signed notices" },
       { name: "Eligibility (270/271), single or whole schedule", needs: "clearinghouse" },
       { name: "Appointment reminders by text and email", needs: "Twilio / Resend" },

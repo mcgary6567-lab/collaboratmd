@@ -11,6 +11,7 @@ import { requestReset } from "@/server/password-reset";
 import { listTeam } from "@/server/team";
 import { deleteCredential, saveCredential } from "@/server/credentials";
 import { siteOrigin } from "@/lib/origin";
+import { addDirectoryPayer } from "@/server/payer-directory";
 
 const admin = () => requireRole(["admin"]);
 const fail = (e: unknown, fallback: string): FormResult => ({ ok: false, message: e instanceof Error ? e.message : fallback });
@@ -165,5 +166,18 @@ export async function saveFinancingAction(_prev: FormResult, fd: FormData): Prom
     return { ok: true, message: on ? "Financing is offered in the patient portal" : "Financing is off" };
   } catch (e) {
     return fail(e, "Could not save");
+  }
+}
+
+export async function addDirectoryPayerAction(_prev: FormResult, fd: FormData): Promise<FormResult> {
+  const s = await requireRole(["admin"]);
+  try {
+    const support = JSON.parse(String(fd.get("support") ?? "{}")) as Record<string, "SUPPORTED" | "NOT_SUPPORTED" | "ENROLLMENT_REQUIRED" | null>;
+    const r = await addDirectoryPayer(await getDb(), s.practiceId, { name: String(fd.get("name") ?? ""), payerId: String(fd.get("payerId") ?? ""), type: String(fd.get("type") ?? "commercial"), support }, s.userId);
+    revalidatePath("/settings/payers");
+    revalidatePath("/settings/enrollment");
+    return { ok: true, message: r.existed ? "Already in your payers; enrollment needs updated" : "Added, with its enrollment needs filled in" };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not add the payer" };
   }
 }

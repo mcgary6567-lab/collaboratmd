@@ -60,6 +60,11 @@ Written by the engineering team from the code as it stands. It is a working docu
 - Outgoing webhooks are signed; FHIR paging links to another host are refused.
 - Clinical text goes to Anthropic only when the practice has marked its BAA as signed.
 
+**Public forms (signup, online booking)**
+- Attempt limits per network, a hidden field that catches bots, and per-address limits on how many requests one person can leave.
+- Online booking requests write nothing to patient records; staff match or create the patient when they confirm. Insurance typed online is only a note for staff to check.
+- Self-serve signups create nothing until the emailed link is used, and the form never reveals whether an email already has an account.
+
 **Patient portal**
 - Links are random tokens, expire after 30 days, require date of birth, and lock after repeated wrong answers.
 

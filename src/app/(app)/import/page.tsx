@@ -5,6 +5,7 @@ import { MAX_IMPORT_ROWS, listImportJobs } from "@/server/import";
 import { Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { Importer } from "./importer";
+import { listTemplates } from "@/server/import-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function ImportPage() {
       <PageHeader title="Import patients" subtitle="Bring a patient list from any EHR or practice management system" />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Importer fields={PATIENT_FIELDS.map(({ key, label }) => ({ key, label }))} maxRows={MAX_IMPORT_ROWS} />
+          <Importer fields={PATIENT_FIELDS.map(({ key, label }) => ({ key, label }))} maxRows={MAX_IMPORT_ROWS} templates={await listTemplates(await getDb(), s.practiceId)} />
         </div>
         <Card title="Recent imports">
           {jobs.length === 0 ? (
