@@ -67,7 +67,7 @@ export default async function FeeScheduleEditor({ params }: { params: Promise<{ 
       )}
       <Card>
         <form action={saveScheduleAction.bind(null, schedule.id)}>
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr>
                 <th>Code</th>
@@ -107,7 +107,7 @@ export default async function FeeScheduleEditor({ params }: { params: Promise<{ 
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
           {admin && (
             <div className="mt-4 flex items-center justify-between gap-4">
               <p className="text-xs text-slate-500">

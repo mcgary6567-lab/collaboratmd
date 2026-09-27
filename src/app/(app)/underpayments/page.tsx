@@ -84,7 +84,7 @@ export default async function UnderpaymentsPage({ searchParams }: { searchParams
               : "No underpayments in this state."}
           </Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr>
                 <th>Claim</th><th>Patient</th><th>Payer</th><th>Detected</th>
@@ -129,7 +129,7 @@ export default async function UnderpaymentsPage({ searchParams }: { searchParams
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

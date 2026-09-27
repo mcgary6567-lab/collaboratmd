@@ -43,7 +43,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
         <Card title={`Journal entry, ${period}`} className="lg:col-span-2" actions={isClosed ? <Badge tone="green">closed</Badge> : undefined}>
           {lines.length === 0 ? <Empty>Nothing was posted in {period}.</Empty> : (
             <>
-              <table className="table">
+              <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
                 <thead><tr><th>Account</th><th>For</th><th className="text-right">Debit</th><th className="text-right">Credit</th></tr></thead>
                 <tbody>
                   {lines.map((l, i) => (
@@ -60,7 +60,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
                     <td className="text-right"><Money cents={credits} /></td>
                   </tr>
                 </tbody>
-              </table>
+              </table></div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <a href={`/api/accounting/journal?period=${period}`} className="btn btn-primary text-xs">Download CSV (debit and credit columns)</a>
                 <a href={`/api/accounting/journal?period=${period}&format=signed`} className="btn btn-secondary text-xs">Download CSV (signed amounts, for Xero)</a>

@@ -2,6 +2,15 @@
 
 `npm run load-test` builds a throwaway practice with 100,000 claims (230,000 ledger entries, 10,000 denials, two years of visits) in an embedded database under `.loadtest/`, then times the queries behind the busiest screens and jobs. It never touches `DATABASE_URL`.
 
+## In CI
+
+The "Real Postgres behind a pooler" CI job runs the same load test against a real Postgres (through PgBouncer in transaction mode) on every push, with `LOAD_TEST_BUDGETS=1`:
+
+- each query has a time budget (`BUDGET_MS` in `scripts/load-test.ts`); a query over it fails the build;
+- for queries that should touch only a few rows (list pages, one claim, one patient), Postgres is asked how it would run them (`EXPLAIN`), and a plan that reads the whole of a table with more than 20,000 rows fails the build as a probable missing index.
+
+The timings appear as an annotation on the run and in its summary. To run it against your own throwaway Postgres: `LOAD_TEST_DATABASE_URL=postgres://... LOAD_TEST_BUDGETS=1 npm run load-test`. It adds rows, and refuses a database production has used.
+
 ## How to read these numbers
 
 The embedded database is PGlite: Postgres compiled to WebAssembly, single-threaded, on a laptop. It is several times slower than a Neon compute running the same query plans, so treat these as upper bounds. They are good at showing queries whose cost grows with the data, which is what this test is for. Repeat it on a Neon branch before a large practice goes live.

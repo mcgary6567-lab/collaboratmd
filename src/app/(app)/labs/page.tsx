@@ -17,7 +17,7 @@ export default async function LabsPage() {
   const waiting = rows.filter((r) => r.resultCount === 0);
 
   const table = (list: typeof rows) => (
-    <table className="table">
+    <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
       <thead><tr><th>Order</th><th>Patient</th><th>Lab</th><th>Tests</th><th>Ordered</th><th>Status</th></tr></thead>
       <tbody>
         {list.map(({ order, patient, abnormal }) => (
@@ -34,7 +34,7 @@ export default async function LabsPage() {
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 
   return (

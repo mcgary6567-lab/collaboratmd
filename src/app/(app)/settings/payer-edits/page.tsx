@@ -68,7 +68,7 @@ export default async function PayerEditsPage() {
               allow, so the next claim is stopped at the desk instead.
             </Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 <tr><th>Payer</th><th>Code</th><th>Rule</th><th>Message</th><th /></tr>
               </thead>
@@ -95,7 +95,7 @@ export default async function PayerEditsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 

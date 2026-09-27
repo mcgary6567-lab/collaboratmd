@@ -62,16 +62,16 @@ export default async function BookingSettingsPage() {
                   {DAYS.map((d, i) => {
                     const h = mine.find((x) => x.weekday === i);
                     return (
-                      <div key={d} className="grid grid-cols-[7rem_1fr_1fr_2fr] items-center gap-2">
-                        <span className="font-medium">{d}</span>
+                      <div key={d} className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[7rem_1fr_1fr_2fr]">
+                        <span className="col-span-2 font-medium sm:col-span-1">{d}</span>
                         <input type="time" name={`start_${i}`} defaultValue={h ? hhmm(h.startMinute) : ""} className="input py-1" aria-label={`${d} start`} />
                         <input type="time" name={`end_${i}`} defaultValue={h ? hhmm(h.endMinute) : ""} className="input py-1" aria-label={`${d} end`} />
                         {locations.length > 0 ? (
-                          <select name={`loc_${i}`} defaultValue={h?.locationId ?? ""} className="input py-1" aria-label={`${d} location`}>
+                          <select name={`loc_${i}`} defaultValue={h?.locationId ?? ""} className="input col-span-2 py-1 sm:col-span-1" aria-label={`${d} location`}>
                             <option value="">Main office</option>
                             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                           </select>
-                        ) : <span />}
+                        ) : <span className="hidden sm:block" />}
                       </div>
                     );
                   })}

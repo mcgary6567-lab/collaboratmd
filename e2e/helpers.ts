@@ -9,7 +9,7 @@ export async function signIn(page: Page, who = DEMO_ADMIN) {
   await page.getByLabel("Email").fill(who.email);
   await page.getByLabel("Password").fill(who.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  // The first sign-in on a fresh server also compiles the dashboard, which can take a minute.
+  // The first sign-in on a fresh server also seeds the demo data (and, on the dev server, compiles the dashboard).
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 120_000 });
 }
 
@@ -26,8 +26,36 @@ export async function check(page: Page, path: string) {
   const axe = results.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
     .map((v) => `${path}: ${v.id} (${v.nodes.length}) e.g. ${v.nodes[0]?.target.join(" ")}`);
+  const wide = (await sidewaysOverflow(page)).map((c) => `${path}: wider than the screen: ${c}`);
   const covered = (await coveredControls(page)).map((c) => `${path}: covered control: ${c}`);
-  return [...axe, ...covered];
+  return [...axe, ...wide, ...covered];
+}
+
+/**
+ * Whether the page scrolls sideways (on a phone, the whole page sliding left
+ * and right), and if so the outermost elements that stick out past the screen.
+ * Anything inside a container that scrolls or clips sideways is fine.
+ */
+export async function sidewaysOverflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    if (document.documentElement.scrollWidth <= width + 1) return [];
+    const contained = (e: Element) => {
+      for (let n = e.parentElement; n && n !== document.body; n = n.parentElement) if (["auto", "scroll", "hidden", "clip"].includes(getComputedStyle(n).overflowX)) return true;
+      return false;
+    };
+    const out: string[] = [];
+    for (const el of document.body.querySelectorAll("*")) {
+      const r = el.getBoundingClientRect();
+      if (r.right <= width + 1 || r.width === 0 || contained(el)) continue;
+      const parent = el.parentElement;
+      if (parent && parent !== document.body && parent.getBoundingClientRect().right > width + 1) continue; // report only the outermost
+      const cls = (el.getAttribute("class") ?? "").split(/\s+/).slice(0, 3).join(".");
+      out.push(`<${el.tagName.toLowerCase()}${cls ? `.${cls}` : ""}> ${Math.round(r.right)}px wide on a ${width}px screen`);
+      if (out.length >= 3) break;
+    }
+    return out.length ? out : [`page is ${document.documentElement.scrollWidth}px wide on a ${width}px screen`];
+  });
 }
 
 /**

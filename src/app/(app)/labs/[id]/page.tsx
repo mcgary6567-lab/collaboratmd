@@ -54,7 +54,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
               {rows.length === 0 ? (
                 <Empty>Waiting on the lab.</Empty>
               ) : (
-                <table className="table">
+                <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
                   <thead><tr><th>Component</th><th className="text-right">Result</th><th>Units</th><th>Reference</th><th>Flag</th><th>LOINC</th></tr></thead>
                   <tbody>
                     {rows.map((r) => {
@@ -71,7 +71,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
                       );
                     })}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </Card>
           ))}

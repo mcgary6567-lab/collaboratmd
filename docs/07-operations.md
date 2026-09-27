@@ -52,6 +52,12 @@ With none set, nothing is sent, and errors are still listed at `/ops/errors`.
 
 Every request gets an ID (a valid incoming `X-Request-Id` is kept, otherwise a new one is made), returned in the `X-Request-Id` response header. Server errors are logged as one JSON line with `requestId`, `route`, `method` and `digest`, and `/ops/errors` shows the last request ID for each error. To trace a report, search the Vercel function logs for that ID.
 
+## Patient access log
+
+Opening a patient's chart, one of their claims, a statement or an estimate is recorded (the same person reopening the same record within 15 minutes is recorded once; link prefetches are not views). Administrators see it from the chart: **Access log**, which lists who opened what and when, what was done (links sent, statements mailed, attachments opened, changes), and the full practice exports in the same period, which include every patient.
+
+Use it to review access and to investigate a suspected snooping incident. It is the practice's internal access log (HIPAA audit controls). It is not the accounting of disclosures a patient can request, which covers disclosures outside the practice and excludes treatment, payment and operations; keep that record separately.
+
 ## Problem reports and usage
 
 - The **?** button on every screen has "Report a problem with this page". Reports go to `/ops/feedback` and alert operators through the channels above. The alert names only the practice and the page; read the report itself in `/ops/feedback`. Mark each one resolved when handled.
@@ -116,8 +122,8 @@ CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 
 - **Type check and unit tests**, with `npm audit --audit-level=high`: a known high or critical vulnerability in a dependency fails the build. Fix it by updating the package (Dependabot usually has a pull request open), or, if there is no fix and the code path is unused, record why in the pull request.
 - **Production build and performance**: builds, then measures the most used screens on the production build against budgets for JavaScript size, server time, largest paint and layout shift (`e2e-perf/budgets.spec.ts`; the numbers appear in the run's summary). If a change legitimately needs more, raise that page's budget in the same pull request and say why.
-- **End-to-end and accessibility**: the browser tests, and an accessibility check of every screen at desktop and phone width, including the screens for individual records and the patient pages. The same pass fails on any button, link or field that something else covers (a card sliding under its neighbour).
-- **Real Postgres behind a pooler**: start-up and the built app against Postgres through PgBouncer in transaction mode, the way Neon's pooler works: several starts at once, a start that cannot get the lock (it must fail within seconds), and the live check against the running app (`scripts/startup-check.ts`).
+- **End-to-end and accessibility**: the browser tests, run against a production build (`next build`, then `next start`; `E2E_DEV=1` uses the development server for quick local runs), and an accessibility check of every screen at desktop and phone width, including the screens for individual records and the patient pages. The same pass fails on any button, link or field that something else covers (a card sliding under its neighbour), and on any page wider than the screen (on a phone, the whole page sliding sideways).
+- **Real Postgres behind a pooler**: start-up and the built app against Postgres through PgBouncer in transaction mode, the way Neon's pooler works: several starts at once, a start that cannot get the lock (it must fail within seconds), the load test at 100,000 claims with time budgets and a missing-index check (`docs/10-load-test.md`), and the live check against the running app (`scripts/startup-check.ts`).
 
 CodeQL (`.github/workflows/codeql.yml`) scans the code for security problems on every push and weekly; findings appear under Security → Code scanning. Secret scanning and push protection are repository settings (Settings → Code security) and must be switched on there.
 

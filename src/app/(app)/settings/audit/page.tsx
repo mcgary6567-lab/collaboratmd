@@ -40,7 +40,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       </Card>
       <Card title={`${events.length === PAGE ? `Latest ${PAGE}` : events.length} entries`}>
         {events.length === 0 ? <Empty>Nothing matches.</Empty> : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>When</th><th>Who</th><th>What</th><th>Record</th><th>Details</th></tr></thead>
             <tbody>
               {events.map(({ event: e, userName }) => (
@@ -53,7 +53,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

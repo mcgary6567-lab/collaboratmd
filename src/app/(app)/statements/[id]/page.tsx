@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
+import { logPatientView } from "@/lib/log-view";
 import { getStatement } from "@/server/billing";
 import { mailStatementAction, markStatementSentAction, voidStatementAction } from "@/app/(app)/billing-actions";
 import { practiceConfig } from "@/server/integrations";
@@ -27,6 +28,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   const row = await getStatement(db, s.practiceId, id);
   if (!row) notFound();
   const { statement: st, patient, practice } = row;
+  await logPatientView(s, patient.id, "statement", st.id);
   const visits = st.detail.visits;
   const lob = !!(await practiceConfig(db, s.practiceId)).lob;
   const lang = langOf(patient.preferredLanguage);
@@ -123,7 +125,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
         {/* visit detail */}
         <section className="mt-8">
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">{t.visitDetail}</h2>
-          <table className="mt-3 w-full text-left text-sm">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="mt-3 w-full text-left text-sm">
             <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="py-2 pr-3">{t.visit}</th>
@@ -153,7 +155,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           {(st.detail.unappliedPaymentsCents > 0 || st.detail.discountsCents > 0) && (
             <p className="mt-2 text-xs text-slate-500">
               {st.detail.unappliedPaymentsCents > 0 && t.unapplied(money(st.detail.unappliedPaymentsCents))}

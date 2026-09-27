@@ -80,7 +80,7 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
               <input name="q" defaultValue={sp.q} className="input max-w-xs" placeholder="Find a provider by name or NPI" aria-label="Find a provider" />
               <button className="btn btn-secondary">Search</button>
             </form>
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 <tr><th>Provider</th>{grid.payers.map((p) => <th key={p.id} className="whitespace-nowrap">{p.name}</th>)}</tr>
               </thead>
@@ -102,7 +102,7 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
             {filtered.length === 0 && <Empty>No provider matches &quot;{sp.q}&quot;.</Empty>}
             <Pager page={page} pageSize={pageSize} total={filtered.length} base={BASE} params={{ ...sp, provider: undefined, payer: undefined }} />
           </div>

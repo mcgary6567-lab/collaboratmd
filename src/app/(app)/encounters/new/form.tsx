@@ -142,7 +142,7 @@ export function ChargeEntryForm({
             <option key={c.code} value={c.code}>{c.description}</option>
           ))}
         </datalist>
-        <table className="table">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
           <thead>
             <tr><th>#</th><th>CPT</th><th>Description</th><th>Modifiers</th><th>Units</th><th>Charge ($)</th><th>Dx ptr</th><th></th></tr>
           </thead>
@@ -172,7 +172,7 @@ export function ChargeEntryForm({
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <div className="mt-3 flex items-center justify-between">
           <div className="text-sm text-slate-500">Total charges: <span className="font-semibold text-slate-900">${total.toFixed(2)}</span></div>
           <button className="btn btn-primary" disabled={pending}>{pending ? "Creating claim..." : "Save encounter and build claim"}</button>

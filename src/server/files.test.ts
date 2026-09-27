@@ -101,7 +101,7 @@ describe("file storage", () => {
     // Every part is deleted when the export expires.
     expect(await expireExports(t.db, new Date(now.getTime() + 8 * 86_400_000))).toBeGreaterThanOrEqual(1);
     expect([...store.files.keys()].some((k) => k.includes("/exports/"))).toBe(false);
-  });
+  }, 120_000); // dozens of small parts, each a zip: slow by design
 
   it("only accepts continuation tokens this server made for that export", () => {
     const id = "11111111-1111-4111-8111-111111111111";

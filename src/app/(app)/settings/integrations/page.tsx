@@ -65,7 +65,7 @@ export default async function IntegrationsPage() {
             {messages.length === 0 ? (
               <Empty>No messages yet. Process a sample below to see how one is handled.</Empty>
             ) : (
-              <table className="table">
+              <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
                 <thead><tr><th>Received</th><th>Type</th><th>Control ID</th><th>Source</th><th>Result</th></tr></thead>
                 <tbody>
                   {messages.map((m) => (
@@ -81,7 +81,7 @@ export default async function IntegrationsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </Card>
 

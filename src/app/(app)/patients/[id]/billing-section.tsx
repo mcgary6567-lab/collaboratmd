@@ -41,7 +41,7 @@ export async function BillingSection({ db, practiceId, patientId }: { db: Db; pr
               </div>
               <Badge tone={PLAN_TONE[active.plan.status]}>{active.plan.status}</Badge>
             </div>
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>#</th><th>Due</th><th className="text-right">Amount</th><th className="text-right">Paid</th><th>Status</th></tr></thead>
               <tbody>
                 {active.installments.map((i) => (
@@ -54,7 +54,7 @@ export async function BillingSection({ db, practiceId, patientId }: { db: Db; pr
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
             <ActionForm action={planPaymentAction.bind(null, active.plan.id, patientId)} className="mt-4 flex flex-wrap items-end gap-2">
               <Field label="Take payment ($)"><input name="amount" type="number" step="0.01" min="0.01" className="input w-32" required /></Field>
               <Field label="Method">
@@ -120,7 +120,7 @@ export async function BillingSection({ db, practiceId, patientId }: { db: Db; pr
         {statements.length === 0 ? (
           <Empty>No statements yet.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Statement</th><th>Date</th><th>Due</th><th className="text-right">Amount due</th><th>Status</th></tr></thead>
             <tbody>
               {statements.map(({ statement: st }) => (
@@ -133,7 +133,7 @@ export async function BillingSection({ db, practiceId, patientId }: { db: Db; pr
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
 
@@ -144,7 +144,7 @@ export async function BillingSection({ db, practiceId, patientId }: { db: Db; pr
         {estimates.length === 0 ? (
           <Empty>No estimates yet. Quote the patient&apos;s cost before a planned service.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Estimate</th><th>Kind</th><th>Created</th><th className="text-right">Patient owes</th></tr></thead>
             <tbody>
               {estimates.map((e) => (
@@ -156,7 +156,7 @@ export async function BillingSection({ db, practiceId, patientId }: { db: Db; pr
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </div>

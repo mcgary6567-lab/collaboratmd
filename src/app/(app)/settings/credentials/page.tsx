@@ -47,7 +47,7 @@ export default async function CredentialsPage() {
       )}
       <Card>
         {rows.length === 0 ? <Empty>No credentials recorded yet.</Empty> : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Provider</th><th>Credential</th><th>Number</th><th>Expires</th><th>Status</th><th /></tr></thead>
             <tbody>
               {rows.map(({ c, first, last }, i) => (
@@ -61,7 +61,7 @@ export default async function CredentialsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

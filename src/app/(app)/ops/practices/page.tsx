@@ -108,10 +108,10 @@ export default async function OperatorPracticesPage() {
       </Card>
       <Card title="What gets used (last 30 days)" className="mt-6">
         {usage.overall.length === 0 ? <p className="text-sm text-slate-600">No page views recorded yet.</p> : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Page</th><th className="text-right">Views</th><th className="text-right">Practices</th></tr></thead>
             <tbody>{usage.overall.map((u) => <tr key={u.feature}><td className="font-mono text-xs">{u.feature}</td><td className="text-right">{Number(u.views).toLocaleString()}</td><td className="text-right">{u.practices}</td></tr>)}</tbody>
-          </table>
+          </table></div>
         )}
         <p className="mt-2 text-xs text-slate-500">Counts of pages opened, with ids removed from the addresses. No patient or claim is recorded.</p>
       </Card>

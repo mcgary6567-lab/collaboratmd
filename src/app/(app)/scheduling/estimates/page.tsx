@@ -34,7 +34,7 @@ export default async function PreVisitEstimatesPage() {
           Uninsured patients get a good faith estimate. Sending asks the patient to pay ahead in the portal; what they pay sits as a credit until the visit is billed.
         </p>
         {rows.length === 0 ? <Empty>No scheduled visits in the next 14 days.</Empty> : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Visit</th><th>Patient</th><th>Coverage</th><th className="text-right">Patient owes</th><th /></tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -73,7 +73,7 @@ export default async function PreVisitEstimatesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

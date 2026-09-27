@@ -43,7 +43,7 @@ export default async function DentalEntryPage() {
         </Card>
 
         <Card title="Procedures">
-          <table className="table text-sm">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table text-sm">
             <thead><tr><th>#</th><th>CDT code</th><th>Tooth</th><th>Surfaces</th><th>Area</th><th>Fee $</th></tr></thead>
             <tbody>
               {Array.from({ length: LINES }, (_, i) => (
@@ -57,7 +57,7 @@ export default async function DentalEntryPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <datalist id="cdt-codes">{COMMON_CDT.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</datalist>
           <p className="mt-2 text-xs text-slate-500">
             Teeth: 1-32 permanent, A-T primary. Surfaces: M mesial, O occlusal, D distal, B buccal, L lingual, I incisal, F facial. Area: for procedures billed by quadrant (scaling and root planing) or arch. Blank rows are ignored.

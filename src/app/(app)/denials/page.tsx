@@ -92,7 +92,7 @@ export default async function DenialsPage({ searchParams }: { searchParams: Prom
                   {deadlineDays !== null && (
                     <span className={`font-semibold ${deadlineDays < 14 ? "text-red-700" : "text-slate-600"}`}>· Appeal deadline {fmtDate(denial.appealDeadline + "T00:00:00")} ({deadlineDays < 0 ? `${-deadlineDays}d overdue` : `${deadlineDays}d left`})</span>
                   )}
-                  <span className="ml-auto flex gap-1">
+                  <span className="ml-auto flex flex-wrap gap-1">
                     {denial.status !== "in_progress" && !["resolved", "written_off"].includes(denial.status) && (
                       <form action={denialStatusAction.bind(null, denial.id, "in_progress")}><button className="btn btn-secondary text-xs">Start working</button></form>
                     )}

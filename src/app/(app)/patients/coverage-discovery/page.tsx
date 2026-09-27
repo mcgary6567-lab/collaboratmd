@@ -29,7 +29,7 @@ export default async function CoverageDiscoveryPage() {
         {rows.length === 0 ? (
           <Empty>Every patient has insurance on file.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Patient</th><th>Date of birth</th><th>Next visit</th><th>Last searched</th><th /></tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -48,7 +48,7 @@ export default async function CoverageDiscoveryPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

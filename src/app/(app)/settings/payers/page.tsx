@@ -97,7 +97,7 @@ export default async function PayersPage({ searchParams }: { searchParams: Promi
         </Card>
       )}
       <Card>
-        <table className="table">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
           <thead><tr><th>Payer</th><th>Payer ID</th><th>Type</th><th className="text-right">Timely filing</th><th className="text-right">Appeal window</th><th /></tr></thead>
           <tbody>
             {payers.map((p) => (
@@ -121,7 +121,7 @@ export default async function PayersPage({ searchParams }: { searchParams: Promi
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </>
   );

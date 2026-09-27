@@ -21,18 +21,19 @@ export default async function TeamPage() {
   return (
     <>
       <PageHeader title="Team and roles" subtitle="Who can use this practice, and what each role can do" actions={<Link href="/settings" className="btn btn-secondary">Back to settings</Link>} />
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 2xl:grid-cols-3">
         {/* min-w-0: a grid item otherwise grows to its table's width and slides under the roles card beside it. */}
-        <Card title={`People · ${team.filter((m) => !m.disabled).length} active`} className="min-w-0 xl:col-span-2">
+        <Card title={`People · ${team.filter((m) => !m.disabled).length} active`} className="min-w-0 2xl:col-span-2">
           <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
           <table className="table">
-            <thead><tr><th>Name</th><th>Role</th><th>Two-factor</th><th /></tr></thead>
+            <thead><tr><th>Name</th><th>Role</th><th /></tr></thead>
             <tbody>
               {team.map((m) => (
                 <tr key={m.userId} className={m.disabled ? "opacity-60" : ""}>
                   <td>
                     <div className="font-medium">{m.name} {m.userId === s.userId && <span className="text-xs text-slate-500">(you)</span>}</div>
                     <div className="text-xs text-slate-500">{m.email}{!m.home && " · from another practice"}</div>
+                    <div className="mt-1 text-xs text-slate-500">Two-factor {m.mfa ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}</div>
                   </td>
                   <td>
                     {admin && !m.disabled ? (
@@ -44,11 +45,10 @@ export default async function TeamPage() {
                       </ActionForm>
                     ) : m.roleLabel}
                   </td>
-                  <td>{m.mfa ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}</td>
-                  <td className="whitespace-nowrap text-right">
+                  <td className="text-right">
                     {m.disabled ? <Badge tone="red">deactivated</Badge> : null}
                     {admin && m.userId !== s.userId && (
-                      <div className="mt-1 flex justify-end gap-2">
+                      <div className="mt-1 flex min-w-[15rem] flex-wrap justify-end gap-2">
                         {m.home && !m.disabled && (
                           <details className="text-left">
                             <summary className="btn btn-secondary cursor-pointer px-2 py-1 text-xs">Invite link</summary>
@@ -95,8 +95,9 @@ export default async function TeamPage() {
           )}
         </Card>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card title="What each role can do">
+            <div tabIndex={0} role="region" aria-label="What each role can do (scrolls sideways)" className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr><th className="py-1 text-left font-semibold">Ability</th>{Object.values(BUILT_IN_ROLES).map((l) => <th key={l} className="px-1 text-center font-semibold">{l.split(" ")[0]}</th>)}</tr></thead>
               <tbody>
@@ -109,6 +110,7 @@ export default async function TeamPage() {
                 <tr className="border-t border-slate-100"><td className="py-1">Settings, team, integrations</td>{Object.keys(BUILT_IN_ROLES).map((r) => <td key={r} className="text-center">{r === "admin" ? "✓" : "–"}</td>)}</tr>
               </tbody>
             </table>
+            </div>
           </Card>
 
           <Card title="Custom roles">

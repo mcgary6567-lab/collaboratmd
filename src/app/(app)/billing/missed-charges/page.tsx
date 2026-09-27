@@ -34,7 +34,7 @@ export default async function MissedChargesPage() {
         {visits.length === 0 ? (
           <Empty>Every checked-in or completed visit older than a day has charges. Nothing slipped through.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Date</th><th>Patient</th><th>Provider</th><th>What happened</th><th className="text-right">Typical claim</th><th /></tr></thead>
             <tbody>
               {visits.map((r) => (
@@ -61,7 +61,7 @@ export default async function MissedChargesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
 
@@ -69,7 +69,7 @@ export default async function MissedChargesPage() {
         {unbilled.length === 0 ? (
           <Empty>Every encounter with charges has a claim.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Date of service</th><th>Patient</th><th>Provider</th><th className="text-right">Charges</th><th /></tr></thead>
             <tbody>
               {unbilled.map((r) => (
@@ -82,7 +82,7 @@ export default async function MissedChargesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

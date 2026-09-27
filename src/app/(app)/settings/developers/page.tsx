@@ -67,7 +67,7 @@ export default async function DevelopersPage() {
             </RevealForm>
           )}
           {keys.length === 0 ? <Empty>No API keys yet.</Empty> : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Name</th><th>Key</th><th>Access</th><th>Last used</th><th /></tr></thead>
               <tbody>
                 {keys.map((k) => (
@@ -80,7 +80,7 @@ export default async function DevelopersPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
           <p className="mt-3 text-xs text-slate-500">Keys are stored as hashes and shown only once. Each key is limited to 300 requests a minute.</p>
         </Card>
@@ -155,7 +155,7 @@ export default async function DevelopersPage() {
             JSON over HTTPS at <code className="rounded bg-slate-100 px-1">{origin}/api/v1</code>. Send the key as <code className="rounded bg-slate-100 px-1">Authorization: Bearer cmd_live_…</code>.
             Lists return <code>{`{ data, has_more, next_offset }`}</code>; errors return <code>{`{ error: { code, message } }`}</code>. Money is in cents; dates are ISO 8601.
           </p>
-          <table className="table text-xs">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table text-xs">
             <thead><tr><th>Call</th><th>Key</th><th>What it does</th></tr></thead>
             <tbody>
               {ENDPOINTS.map((e) => (
@@ -166,7 +166,7 @@ export default async function DevelopersPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <pre tabIndex={0} className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{`curl ${origin}/api/v1/encounters \\
   -H "Authorization: Bearer $CMD_KEY" -H "Content-Type: application/json" \\
   -d '{"patient_id":"…","provider_npi":"1234567893","date_of_service":"2026-09-24",

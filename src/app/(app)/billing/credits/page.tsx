@@ -62,7 +62,7 @@ export default async function CreditsPage() {
         {refunds.length === 0 ? (
           <Empty>No refunds yet. Request one from a credit below; an administrator approves it, then whoever cuts the check records it here.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Requested</th><th>To</th><th>Patient</th><th>Reason</th><th className="text-right">Amount</th><th>Status</th><th /></tr></thead>
             <tbody>
               {refunds.map(({ refund: r, patientFirst, patientLast, payerName, controlNumber }) => (
@@ -101,7 +101,7 @@ export default async function CreditsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
 
@@ -110,7 +110,7 @@ export default async function CreditsPage() {
           {credits.patients.length === 0 ? (
             <Empty>No patient has paid more than they owe.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Patient</th><th className="text-right">Credit</th><th className="text-right">In refund</th><th /></tr></thead>
               <tbody>
                 {credits.patients.map((p) => {
@@ -126,14 +126,14 @@ export default async function CreditsPage() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
         <Card title="Insurance overpayments">
           {credits.claims.length === 0 ? (
             <Empty>No claim has been paid more than its balance.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Claim</th><th>Payer</th><th className="text-right">Overpaid</th><th /></tr></thead>
               <tbody>
                 {credits.claims.map((c) => {
@@ -155,7 +155,7 @@ export default async function CreditsPage() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
           <p className="mt-3 text-xs text-slate-500">A payer may also take the money back itself by offsetting a later payment; that arrives on an 835 as a reversal and clears the overpayment without a refund here.</p>
         </Card>

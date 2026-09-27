@@ -38,7 +38,7 @@ export default async function WorkPage() {
       <div className="grid gap-6 xl:grid-cols-3">
         <Card title="Rules" className="xl:col-span-2">
           {rules.length === 0 ? <Empty>No rules yet. A rule runs every morning and assigns anything new that matches it.</Empty> : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Rule</th><th>Assigns to</th><th className="text-right">Open</th><th className="text-right">Overdue</th><th className="text-right">On time (30 days)</th><th /></tr></thead>
               <tbody>
                 {rules.map((r) => {
@@ -61,7 +61,7 @@ export default async function WorkPage() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 
@@ -92,7 +92,7 @@ export default async function WorkPage() {
 
         <Card title="Productivity, last 30 days" className="xl:col-span-3">
           {people.length === 0 ? <Empty>No assigned work yet.</Empty> : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Person</th><th className="text-right">Done (7 days)</th><th className="text-right">Done (30 days)</th><th className="text-right">Average days to finish</th><th className="text-right">Open</th><th className="text-right">Overdue</th><th className="text-right">Ledger postings</th></tr></thead>
               <tbody>
                 {people.map((p) => (
@@ -107,7 +107,7 @@ export default async function WorkPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
       </div>

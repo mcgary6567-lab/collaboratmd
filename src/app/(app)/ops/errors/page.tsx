@@ -30,7 +30,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
       <PageHeader title="Server errors" subtitle="Every server error, grouped and counted. Messages are redacted before they are stored; no headers or query strings are kept." actions={<><Link href="/ops/practices" className="btn btn-secondary">Practices</Link><Link href="/status" className="btn btn-secondary">Public status</Link><Link href={all === "1" ? "/ops/errors" : "/ops/errors?all=1"} className="btn btn-secondary">{all === "1" ? "Unresolved only" : "Include resolved"}</Link></>} />
       <Card>
         {errors.length === 0 ? <Empty>No errors recorded.</Empty> : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Error</th><th>Where</th><th className="text-right">Count</th><th>First seen</th><th>Last seen</th><th /></tr></thead>
             <tbody>
               {errors.map((e) => (
@@ -44,7 +44,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

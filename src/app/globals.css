@@ -238,3 +238,23 @@ body {
 [data-theme="dark"] .app-shell .bg-brand-100 { background-color: rgba(34,197,94,0.2); }
 [data-theme="dark"] .app-shell .text-brand-700, [data-theme="dark"] .app-shell .text-brand-800, [data-theme="dark"] .app-shell .text-brand-900, [data-theme="dark"] .app-shell .text-brand-950 { color: #86efac; }
 [data-theme="dark"] .app-shell .border-brand-200, [data-theme="dark"] .app-shell .border-brand-300 { border-color: rgba(34,197,94,0.35); }
+
+/*
+ * Grid children and cards default to min-width: auto, so one wide child (a
+ * table, a long line of code) widens its whole column and, on a phone, the
+ * page. Let them shrink; wide content scrolls inside its own container. In
+ * the base layer so explicit width utilities still win.
+ */
+@layer base {
+  .grid > :not(input, select, textarea, button),
+  .card {
+    min-width: 0;
+  }
+  /* .input sets width: 100%, so in a narrow table cell a dropdown would shrink to its arrow. Not on phones, where rows are narrower than that. */
+  @media (min-width: 640px) {
+    select.input,
+    select.select {
+      min-width: 9rem;
+    }
+  }
+}

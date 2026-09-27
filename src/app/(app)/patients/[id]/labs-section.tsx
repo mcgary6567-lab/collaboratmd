@@ -26,7 +26,7 @@ export async function LabsSection({ db, practiceId, patientId }: { db: Db; pract
         {orders.length === 0 ? (
           <Empty>No lab orders for this patient.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Order</th><th>Date</th><th>Lab</th><th>Tests</th><th>Status</th></tr></thead>
             <tbody>
               {orders.map(({ order, results }) => {
@@ -45,7 +45,7 @@ export async function LabsSection({ db, practiceId, patientId }: { db: Db; pract
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
       <Card title="Order labs">

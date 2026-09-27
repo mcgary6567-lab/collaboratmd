@@ -43,7 +43,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <p className="font-semibold">{practice.name}</p>
           <p className="text-slate-600">{practice.address1}, {practice.city}, {practice.state} {practice.zip}</p>
         </section>
-        <table className="mt-8 w-full">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="mt-8 w-full">
           <thead><tr className="border-b border-slate-300 text-left"><th className="py-2">Billing services, {monthName}</th><th className="py-2 text-right">Amount</th></tr></thead>
           <tbody>
             <tr><td className="py-1">Insurance payments collected (net of recoupments)</td><td className="text-right"><Money cents={inv.insuranceCents} /></td></tr>
@@ -52,7 +52,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <tr><td className="py-1">Rate</td><td className="text-right">{(inv.rateBps / 100).toFixed(2)}%</td></tr>
             <tr className="border-t-2 border-slate-800 text-base font-bold"><td className="py-2">Amount due</td><td className="text-right"><Money cents={inv.feeCents} /></td></tr>
           </tbody>
-        </table>
+        </table></div>
         {inv.feeCents > Math.round((inv.baseCents * inv.rateBps) / 10_000) && <p className="mt-2 text-xs text-slate-500">The monthly minimum in the billing agreement applies.</p>}
       </article>
     </>

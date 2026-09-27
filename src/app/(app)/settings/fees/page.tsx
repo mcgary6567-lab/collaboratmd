@@ -33,7 +33,7 @@ export default async function FeeSchedulesPage() {
           {schedules.length === 0 ? (
             <Empty>No schedules yet. Charges use each code&apos;s default fee until a standard schedule exists.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 <tr><th>Schedule</th><th>Kind</th><th className="text-right">Codes</th><th>Effective</th><th /></tr>
               </thead>
@@ -54,7 +54,7 @@ export default async function FeeSchedulesPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 

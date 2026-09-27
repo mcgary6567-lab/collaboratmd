@@ -1,23 +1,38 @@
 /**
- * Load test: fills a throwaway embedded database with a large practice and
- * times the queries behind the busiest screens and jobs.
+ * Load test: fills a throwaway database with a large practice and times the
+ * queries behind the busiest screens and jobs.
  *
- *   npm run load-test                     # 100,000 claims in .loadtest/pg
+ *   npm run load-test                     # 100,000 claims in .loadtest/pg (embedded)
  *   LOAD_CLAIMS=250000 npm run load-test
+ *   LOAD_TEST_DATABASE_URL=postgres://... npm run load-test   # a real Postgres (CI)
  *
- * It never touches DATABASE_URL: the embedded database (PGlite, Postgres
- * compiled to WebAssembly, single-threaded) is created under .loadtest/. Its
- * timings are an upper bound; a Neon compute runs the same plans faster.
- * The point is to find queries that grow with the data (missing indexes,
- * per-row loops), which show up here as clearly as anywhere.
+ * The embedded database (PGlite, Postgres compiled to WebAssembly, single
+ * threaded) lives under .loadtest/; its timings are an upper bound. With
+ * LOAD_TEST_DATABASE_URL it runs against a real Postgres instead. That
+ * database must be a throwaway one: rows are added to it. The app's
+ * environment guard refuses a database production has used.
+ *
+ * With LOAD_TEST_BUDGETS=1 (CI) it also fails when:
+ * - a query takes longer than its budget (BUDGET_MS below), or
+ * - on a real Postgres, a query that should touch only a few rows (a list
+ *   page, one claim, one patient) would read a whole large table, which
+ *   means a missing index. Postgres is asked how it would run each such
+ *   query (EXPLAIN), and any sequential scan of a table with more than
+ *   BIG_TABLE_ROWS rows fails the run.
+ * Results are printed as GitHub annotations and in the run summary.
  */
-process.env.DATABASE_URL = "";
-process.env.PGLITE_DIR = process.env.PGLITE_DIR || ".loadtest/pg";
+const REAL = !!process.env.LOAD_TEST_DATABASE_URL?.trim();
+process.env.DATABASE_URL = REAL ? process.env.LOAD_TEST_DATABASE_URL!.trim() : "";
+if (!REAL) process.env.PGLITE_DIR = process.env.PGLITE_DIR || ".loadtest/pg";
+const ENFORCE = process.env.LOAD_TEST_BUDGETS === "1";
+const BIG_TABLE_ROWS = 20_000;
 
+import fs from "node:fs";
 import { sql } from "drizzle-orm";
 
 const TARGET = Number(process.env.LOAD_CLAIMS ?? 100_000);
 const RUNS = 3;
+
 
 async function main() {
   const { getDb } = await import("../src/db");
@@ -73,6 +88,7 @@ async function main() {
     (SELECT count(*)::int FROM denials WHERE practice_id = ${practiceId}) AS denials`);
   console.log("Rows:", counts);
 
+
   const a = await import("../src/server/analytics");
   const lists = await import("../src/server/lists");
   const billing = await import("../src/server/billing");
@@ -80,41 +96,99 @@ async function main() {
   const alerts = await import("../src/server/payer-alerts");
   const recovery = await import("../src/server/recovery");
   const fees = await import("../src/server/fees");
+  const claims = await import("../src/server/claims");
+  const patients = await import("../src/server/patients");
   const exp = await import("../src/server/practice-export");
 
-  const cases: [string, () => Promise<unknown>][] = [
-    ["Claims list, first page", () => lists.searchClaims(db, practiceId, { offset: 0, limit: 50 })],
-    ["Claims list, search by name", () => lists.searchClaims(db, practiceId, { q: "Garc", offset: 0, limit: 50 })],
-    ["Claims list, denied, page 20", () => lists.searchClaims(db, practiceId, { status: "denied", offset: 950, limit: 50 })],
-    ["Denials list", () => lists.searchDenials(db, practiceId, { status: "open", offset: 0, limit: 50 })],
-    ["Dashboard KPIs (12 months)", () => a.headlineKpis(db, practiceId)],
-    ["Monthly trend", () => a.monthlyTrend(db, practiceId)],
-    ["A/R aging", () => a.arAging(db, practiceId)],
-    ["Payer performance", () => a.payerPerformance(db, practiceId)],
-    ["Provider productivity", () => a.providerProductivity(db, practiceId)],
-    ["Denial reasons", () => a.denialReasons(db, practiceId)],
-    ["Timely filing risk", () => a.timelyFilingRisk(db, practiceId)],
-    ["Collections summary", () => a.collectionsSummary(db, practiceId)],
-    ["Claims needing attention", () => a.claimsNeedingAttention(db, practiceId)],
-    ["Patients with balances", () => billing.patientsWithBalances(db, practiceId, 1, 50)],
-    ["Cash forecast", () => forecast.cashForecast(db, practiceId)],
-    ["Payer behavior alerts", () => alerts.payerAlerts(db, practiceId)],
-    ["Missed charges", () => recovery.missedCharges(db, practiceId)],
-    ["Credit balances", () => recovery.creditBalances(db, practiceId)],
-    ["Underpayment scan (all paid claims)", () => fees.scanUnderpayments(db, practiceId)],
+  // A sample claim and patient for the single-record screens.
+  const sample = await one<{ claim: string; patient: string }>(sql`SELECT id AS claim, patient_id AS patient FROM claims WHERE practice_id = ${practiceId} ORDER BY created_at DESC LIMIT 1`);
+
+  type Case = { name: string; run: (d: typeof db) => Promise<unknown>; selective?: boolean };
+  const cases: Case[] = [
+    { name: "Claims list, first page", run: (d) => lists.searchClaims(d, practiceId, { offset: 0, limit: 50 }), selective: true },
+    { name: "Claims list, search by name", run: (d) => lists.searchClaims(d, practiceId, { q: "Garc", offset: 0, limit: 50 }) },
+    { name: "Claims list, denied, page 20", run: (d) => lists.searchClaims(d, practiceId, { status: "denied", offset: 950, limit: 50 }), selective: true },
+    { name: "Denials list", run: (d) => lists.searchDenials(d, practiceId, { status: "open", offset: 0, limit: 50 }), selective: true },
+    { name: "One claim (claim page)", run: async (d) => Promise.all([claims.loadClaimBundle(d, sample.claim), claims.getClaimFinancials(d, sample.claim), claims.listAcknowledgments(d, sample.claim)]), selective: true },
+    { name: "One patient (patient page)", run: async (d) => Promise.all([patients.getPatient(d, practiceId, sample.patient), billing.patientBalanceCents(d, sample.patient)]), selective: true },
+    { name: "Dashboard KPIs (12 months)", run: (d) => a.headlineKpis(d, practiceId) },
+    { name: "Monthly trend", run: (d) => a.monthlyTrend(d, practiceId) },
+    { name: "A/R aging", run: (d) => a.arAging(d, practiceId) },
+    { name: "Payer performance", run: (d) => a.payerPerformance(d, practiceId) },
+    { name: "Provider productivity", run: (d) => a.providerProductivity(d, practiceId) },
+    { name: "Denial reasons", run: (d) => a.denialReasons(d, practiceId) },
+    { name: "Timely filing risk", run: (d) => a.timelyFilingRisk(d, practiceId) },
+    { name: "Collections summary", run: (d) => a.collectionsSummary(d, practiceId) },
+    { name: "Claims needing attention", run: (d) => a.claimsNeedingAttention(d, practiceId) },
+    { name: "Patients with balances", run: (d) => billing.patientsWithBalances(d, practiceId, 1, 50) },
+    { name: "Cash forecast", run: (d) => forecast.cashForecast(d, practiceId) },
+    { name: "Payer behavior alerts", run: (d) => alerts.payerAlerts(d, practiceId) },
+    { name: "Missed charges", run: (d) => recovery.missedCharges(d, practiceId) },
+    { name: "Credit balances", run: (d) => recovery.creditBalances(d, practiceId) },
+    { name: "Underpayment scan (all paid claims)", run: (d) => fees.scanUnderpayments(d, practiceId) },
   ];
 
+  /**
+   * Budgets in milliseconds, for a real Postgres at 100,000 claims (CI).
+   * Generous on purpose: they catch a query that became several times
+   * slower, not a few percent. Everything not listed gets DEFAULT_BUDGET_MS.
+   */
+  const DEFAULT_BUDGET_MS = 2_000;
+  const BUDGET_MS: Record<string, number> = {
+    "Claims list, first page": 500,
+    "Claims list, denied, page 20": 500,
+    "Denials list": 500,
+    "One claim (claim page)": 300,
+    "One patient (patient page)": 300,
+    "Cash forecast": 5_000,
+    "Underpayment scan (all paid claims)": 5_000,
+  };
+  const EXPORT_BUDGET_MS = 120_000;
+
+  const failures: string[] = [];
+  const rows: string[] = [];
   const results: { name: string; ms: number }[] = [];
-  for (const [name, run] of cases) {
+  for (const c of cases) {
     const times: number[] = [];
     for (let i = 0; i < RUNS; i++) {
       const t = performance.now();
-      await run();
+      await c.run(db);
       times.push(performance.now() - t);
     }
     times.sort((x, y) => x - y);
-    results.push({ name, ms: Math.round(times[Math.floor(RUNS / 2)]) });
-    console.log(`${name.padEnd(40)} ${String(Math.round(times[Math.floor(RUNS / 2)])).padStart(7)} ms`);
+    const ms = Math.round(times[Math.floor(RUNS / 2)]);
+    const budget = BUDGET_MS[c.name] ?? DEFAULT_BUDGET_MS;
+    results.push({ name: c.name, ms });
+    rows.push(`| ${c.name} | ${ms} | ${budget} |`);
+    console.log(`${c.name.padEnd(40)} ${String(ms).padStart(7)} ms`);
+    if (ENFORCE && ms > budget) failures.push(`${c.name}: ${ms} ms, budget ${budget} ms`);
+  }
+
+  // On a real Postgres: would a query that should touch a few rows read a whole large table?
+  if (REAL && ENFORCE) {
+    const { Pool } = await import("pg");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const schema = await import("../src/db/schema");
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+    const { rows: big } = await pool.query<{ relname: string }>(`SELECT relname FROM pg_class WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace AND reltuples > $1`, [BIG_TABLE_ROWS]);
+    const bigTables = new Set(big.map((r) => r.relname));
+    for (const c of cases.filter((x) => x.selective)) {
+      const captured: { query: string; params: unknown[] }[] = [];
+      const logged = drizzle({ client: pool, schema, logger: { logQuery: (query, params) => captured.push({ query, params }) } });
+      await c.run(logged as unknown as typeof db);
+      for (const q of captured) {
+        if (!/^\s*(select|with)\b/i.test(q.query)) continue;
+        const { rows: [plan] } = await pool.query(`EXPLAIN (FORMAT JSON) ${q.query}`, q.params as unknown[]);
+        const scans: string[] = [];
+        const walk = (node: Record<string, unknown>) => {
+          if (node["Node Type"] === "Seq Scan" && bigTables.has(String(node["Relation Name"]))) scans.push(String(node["Relation Name"]));
+          for (const child of (node.Plans as Record<string, unknown>[] | undefined) ?? []) walk(child);
+        };
+        walk((plan["QUERY PLAN"] as { Plan: Record<string, unknown> }[])[0].Plan);
+        if (scans.length) failures.push(`${c.name}: reads all of ${[...new Set(scans)].join(", ")} (missing index?) in: ${q.query.replace(/\s+/g, " ").slice(0, 160)}`);
+      }
+    }
+    await pool.end();
   }
 
   const t = performance.now();
@@ -122,7 +196,20 @@ async function main() {
   for await (const chunk of exp.practiceExport(db, practiceId)) bytes += chunk.length;
   const exportMs = Math.round(performance.now() - t);
   console.log(`${"Full practice export (zip)".padEnd(40)} ${String(exportMs).padStart(7)} ms, ${(bytes / 1e6).toFixed(1)} MB`);
-  console.log(JSON.stringify({ claims: n, counts, results, exportMs, exportMB: +(bytes / 1e6).toFixed(1) }));
+  rows.push(`| Full practice export (${(bytes / 1e6).toFixed(1)} MB) | ${exportMs} | ${EXPORT_BUDGET_MS} |`);
+  if (ENFORCE && exportMs > EXPORT_BUDGET_MS) failures.push(`Full practice export: ${exportMs} ms, budget ${EXPORT_BUDGET_MS} ms`);
+
+  console.log(JSON.stringify({ database: REAL ? "postgres" : "embedded", claims: n, counts, results, exportMs, exportMB: +(bytes / 1e6).toFixed(1) }));
+  if (process.env.GITHUB_ACTIONS) {
+    // Annotations are readable on the run page without downloading logs.
+    console.log(`::notice title=Load test (${n.toLocaleString()} claims)::${results.map((r) => `${r.name} ${r.ms} ms`).join("; ")}; export ${exportMs} ms`);
+    for (const f of failures) console.log(`::error title=Load test::${f}`);
+  }
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Load test, ${n.toLocaleString()} claims (median of ${RUNS}, ms)\n\n| Query | Measured | Budget |\n|---|---|---|\n${rows.join("\n")}\n`);
+  if (failures.length) {
+    console.error(`\nFailed:\n- ${failures.join("\n- ")}`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 

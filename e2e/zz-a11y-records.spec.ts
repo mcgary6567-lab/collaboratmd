@@ -38,7 +38,8 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   const createStandard = page.getByRole("button", { name: "Create standard schedule" });
   if (await createStandard.isVisible()) {
     await createStandard.click();
-    await expect(page.locator("a[href^='/settings/fees/']").first()).toBeVisible();
+    // Creating it opens the new schedule.
+    await page.waitForURL(new RegExp(`/settings/fees/${ID}$`));
   }
   await want("fee schedule", await firstHref(page, "/settings/fees", new RegExp(`^/settings/fees/${ID}$`)));
 

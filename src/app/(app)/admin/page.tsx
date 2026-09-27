@@ -116,7 +116,7 @@ export default async function AdminDashboard() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card title="Payer performance">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr><th>Payer</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Collected</th><th className="w-28">Realization</th></tr>
             </thead>
@@ -140,11 +140,11 @@ export default async function AdminDashboard() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </Card>
 
         <Card title="Top providers by billed charges">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr><th>Provider</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Denied</th><th className="w-24">Share</th></tr>
             </thead>
@@ -162,7 +162,7 @@ export default async function AdminDashboard() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       </div>
 
@@ -183,7 +183,7 @@ export default async function AdminDashboard() {
         </Card>
 
         <Card title="A/R aging by payer" className="xl:col-span-2">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr><th>Payer</th><th className="text-right">0-30</th><th className="text-right">31-60</th><th className="text-right">61-90</th><th className="text-right">91-120</th><th className="text-right">120+</th><th className="text-right">Total</th></tr>
             </thead>
@@ -211,12 +211,12 @@ export default async function AdminDashboard() {
                 <td className="text-right tabular-nums"><Money cents={aging.totals.total} /></td>
               </tr>
             </tfoot>
-          </table>
+          </table></div>
         </Card>
       </div>
 
       <Card title="Largest denial reasons" className="mt-6">
-        <table className="table">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
           <thead>
             <tr><th>Code</th><th>Meaning</th><th>Category</th><th className="text-right">Claims</th><th className="text-right">At risk</th></tr>
           </thead>
@@ -231,7 +231,7 @@ export default async function AdminDashboard() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </>
   );

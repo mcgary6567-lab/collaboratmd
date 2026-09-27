@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
+import { logPatientView } from "@/lib/log-view";
 import { practiceConfig } from "@/server/integrations";
 import { InsuranceTools } from "./insurance-tools";
 import { CoverageSection } from "./coverage-section";
@@ -27,6 +28,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const db = await getDb();
   const data = await getPatient(db, s.practiceId, id);
   if (!data) notFound();
+  await logPatientView(s, id, "chart");
   const { patient, insurances, checks, visits, ledger } = data;
   const fin = computeFinancials(ledger);
   const latestCheck = checks[0];
@@ -43,9 +45,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         title={`${patient.lastName}, ${patient.firstName}`}
         subtitle={`MRN ${patient.mrn} · DOB ${fmtDate(patient.dob + "T00:00:00")} · ${patient.sex}`}
         actions={
-          <Link href={`/encounters/new?patientId=${patient.id}`} className="btn btn-primary">
-            New charge
-          </Link>
+          <>
+            {s.role === "admin" && <Link href={`/patients/${patient.id}/access`} className="btn btn-secondary">Access log</Link>}
+            <Link href={`/encounters/new?patientId=${patient.id}`} className="btn btn-primary">
+              New charge
+            </Link>
+          </>
         }
       />
       <div className="grid gap-6 lg:grid-cols-3">
@@ -162,7 +167,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {visits.length === 0 ? (
             <Empty>No encounters yet.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>DOS</th><th>POS</th><th>Diagnoses</th><th>Status</th></tr></thead>
               <tbody>
                 {visits.map((v) => (
@@ -174,11 +179,11 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
         <Card title="Ledger (most recent)">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Date</th><th>Type</th><th>Note</th><th className="text-right">Amount</th></tr></thead>
             <tbody>
               {ledger.map((e) => (
@@ -190,7 +195,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       </div>
     </>

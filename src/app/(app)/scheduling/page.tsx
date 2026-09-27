@@ -89,11 +89,12 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
           </ul>
         </Card>
       )}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Side by side only on wide screens: below that the schedule needs the full width for its columns and buttons. */}
+      <div className="grid gap-6 2xl:grid-cols-3">
         <Card
           title={`Appointments (${appts.length})`}
           /* min-w-0: a grid item otherwise grows to its table width and slides under the booking card beside it. */
-          className="min-w-0 lg:col-span-2"
+          className="min-w-0 2xl:col-span-2"
           actions={
             appts.length > 0 ? (
               <ActionForm action={verifyScheduleAction.bind(null, iso)} className="flex flex-col items-end">
@@ -123,7 +124,8 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                         <div className="mt-1"><Link href="/check-ins" className="text-[11px] font-semibold text-brand-700 hover:underline">Checked in online</Link></div>
                       )}
                     </td>
-                    <td className="whitespace-nowrap">
+                    <td>
+                      <div className="flex min-w-[15rem] flex-wrap items-start gap-1">
                       {appt.status === "scheduled" && (
                         <form action={appointmentStatusAction.bind(null, appt.id, "checked_in")} className="inline">
                           <button className="btn btn-secondary text-xs">Check in</button>
@@ -135,13 +137,14 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                         </Link>
                       )}
                       {appt.status === "scheduled" && !checkins.get(appt.id)?.submission && (
-                        <span className="ml-1"><CheckinLinkButton appointmentId={appt.id} resend={!!checkins.get(appt.id)?.link} /></span>
+                        <span><CheckinLinkButton appointmentId={appt.id} resend={!!checkins.get(appt.id)?.link} /></span>
                       )}
                       {appt.status === "scheduled" && (
-                        <form action={appointmentStatusAction.bind(null, appt.id, "no_show")} className="ml-1 inline">
+                        <form action={appointmentStatusAction.bind(null, appt.id, "no_show")} className="inline">
                           <button className="btn btn-secondary text-xs">No-show</button>
                         </form>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}

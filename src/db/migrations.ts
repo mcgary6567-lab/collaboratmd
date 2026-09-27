@@ -1929,4 +1929,12 @@ ALTER TABLE practices ADD COLUMN IF NOT EXISTS time_zone text NOT NULL DEFAULT '
 UPDATE practices p SET time_zone = s.time_zone FROM booking_settings s WHERE s.practice_id = p.id AND p.time_zone <> s.time_zone;
 `,
   },
+  {
+    name: "0047_audit_indexes",
+    sql: `-- The audit log had no index but its key: the audit page, retention and the
+-- per-patient access log (server/access-log.ts) would read the whole table.
+CREATE INDEX IF NOT EXISTS audit_log_practice_at_idx ON audit_log (practice_id, at DESC);
+CREATE INDEX IF NOT EXISTS audit_log_practice_entity_idx ON audit_log (practice_id, entity_id, at DESC);
+`,
+  },
 ];

@@ -70,10 +70,10 @@ export default async function CodeSetsPage() {
       <div className="mt-6">
         <Card title="Load history">
           {status.loads.length === 0 ? <p className="text-sm text-slate-500">Nothing loaded yet.</p> : (
-            <table className="table text-sm">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table text-sm">
               <thead><tr><th>When</th><th>Code set</th><th>Label</th><th className="text-right">Rows</th><th>By</th></tr></thead>
               <tbody>{status.loads.map((l) => <tr key={l.id}><td className="text-xs">{fmtDateTime(l.createdAt)}</td><td>{LABEL[l.codeSet] ?? l.codeSet}</td><td>{l.label}</td><td className="text-right tabular-nums">{l.rows.toLocaleString("en-US")}</td><td className="text-xs">{l.loadedBy}</td></tr>)}</tbody>
-            </table>
+            </table></div>
           )}
         </Card>
       </div>

@@ -11,7 +11,8 @@ name: Live check
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Off the hour and off round minutes: GitHub delays or drops scheduled runs at busy times.
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
 
 permissions:

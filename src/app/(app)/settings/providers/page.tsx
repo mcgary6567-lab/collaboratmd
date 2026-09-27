@@ -39,7 +39,7 @@ export default async function ProvidersPage() {
         </Card>
       )}
       <Card>
-        <table className="table">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
           <thead><tr><th>Provider</th><th>NPI</th><th>Taxonomy</th><th>Specialty</th><th>Status</th><th /></tr></thead>
           <tbody>
             {providers.map((p) => (
@@ -68,7 +68,7 @@ export default async function ProvidersPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <p className="mt-3 text-xs text-slate-500">Inactive providers stay on their past claims but leave charge entry and scheduling. NPIs are checked against their check digit.</p>
       </Card>
     </>

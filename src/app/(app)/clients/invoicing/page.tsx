@@ -68,7 +68,7 @@ export default async function InvoicingPage() {
                   </div>
                   <div className="lg:col-span-3">
                     {invoices.length === 0 ? <Empty>No invoices yet.</Empty> : (
-                      <table className="table">
+                      <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
                         <thead><tr><th>Invoice</th><th>Month</th><th className="text-right">Collections</th><th className="text-right">Fee</th><th>Status</th><th /></tr></thead>
                         <tbody>
                           {invoices.map((i) => (
@@ -88,7 +88,7 @@ export default async function InvoicingPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     )}
                   </div>
                 </div>

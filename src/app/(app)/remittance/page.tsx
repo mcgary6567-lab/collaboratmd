@@ -42,7 +42,7 @@ export default async function RemittancePage() {
         {rows.length === 0 ? (
           <Empty>No remittances yet. Fetch ERAs from the clearinghouse for accepted claims.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Received</th><th>Payer</th><th>Check / EFT</th><th>Payment date</th><th className="text-right">Amount</th><th>Posting</th><th>Summary</th></tr></thead>
             <tbody>
               {rows.map((r) => {
@@ -69,7 +69,7 @@ export default async function RemittancePage() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
       {rows[0] && (

@@ -42,7 +42,7 @@ export default async function ReportsPage() {
           {ar.rows.length === 0 ? (
             <Empty>No outstanding insurance balances.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 <tr><th>Payer</th><th className="text-right">0-30</th><th className="text-right">31-60</th><th className="text-right">61-90</th><th className="text-right">91-120</th><th className="text-right">120+</th><th className="text-right">Total</th><th className="text-right">% &gt;90</th></tr>
               </thead>
@@ -72,7 +72,7 @@ export default async function ReportsPage() {
                   <td className="text-right tabular-nums text-slate-500">{share(ar.totals.b91_120 + ar.totals.b120p, ar.totals.total)}</td>
                 </tr>
               </tfoot>
-            </table>
+            </table></div>
           )}
         </Card>
         <Card title="Aging distribution">
@@ -85,7 +85,7 @@ export default async function ReportsPage() {
           <PayerMixChart data={payers} />
         </Card>
         <Card title="Payer reimbursement" className="xl:col-span-2">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr><th>Payer</th><th>Type</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Collected</th><th className="text-right">Denied</th><th className="text-right">Realization</th></tr>
             </thead>
@@ -102,13 +102,13 @@ export default async function ReportsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card title="Provider productivity">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Provider</th><th>Specialty</th><th className="text-right">Claims</th><th className="text-right">Billed</th><th className="text-right">Denied</th></tr></thead>
             <tbody>
               {providers.map((p) => (
@@ -121,10 +121,10 @@ export default async function ReportsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Card>
         <Card title="Denial reasons">
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>CARC</th><th>Category</th><th className="text-right">Claims</th><th className="text-right">At risk</th></tr></thead>
             <tbody>
               {denials.map((d) => (
@@ -136,7 +136,7 @@ export default async function ReportsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Card>
       </div>
     </>

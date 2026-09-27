@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
+import { logPatientView } from "@/lib/log-view";
 import { getEstimate } from "@/server/billing";
 import { GFE_DISPUTE_THRESHOLD_CENTS } from "@/lib/billing/estimate";
 import { PrintButton } from "@/components/action-form";
@@ -24,6 +25,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
   const row = await getEstimate(db, s.practiceId, id);
   if (!row) notFound();
   const { estimate: e, patient, practice } = row;
+  await logPatientView(s, patient.id, "estimate", e.id);
   const gfe = e.kind === "good_faith";
   const ib = e.basis as InsuredBasis;
   const sb = e.basis as SelfPayBasis;
@@ -74,7 +76,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
 
         <section className="mt-8">
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Planned services</h2>
-          <table className="mt-3 w-full text-left text-sm">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="mt-3 w-full text-left text-sm">
             <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="py-2 pr-3">Code</th><th className="py-2 pr-3">Service</th><th className="py-2 pr-3 text-right">Units</th>
@@ -92,7 +94,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </section>
 
         <section className="mt-8">

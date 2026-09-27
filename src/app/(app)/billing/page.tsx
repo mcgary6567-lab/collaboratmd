@@ -67,7 +67,7 @@ export default async function BillingPage() {
           {balances.length === 0 ? (
             <Empty>No patient balances.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Patient</th><th className="text-right">Balance</th><th>Last statement</th></tr></thead>
               <tbody>
                 {balances.map((b) => (
@@ -78,7 +78,7 @@ export default async function BillingPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 
@@ -133,7 +133,7 @@ export default async function BillingPage() {
           {plans.length === 0 ? (
             <Empty>No payment plans yet. Create one from a patient&apos;s record.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Patient</th><th className="text-right">Paid</th><th>Next due</th><th>Status</th></tr></thead>
               <tbody>
                 {plans.map((p) => (
@@ -145,7 +145,7 @@ export default async function BillingPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 
@@ -153,7 +153,7 @@ export default async function BillingPage() {
           {statements.length === 0 ? (
             <Empty>No statements yet.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Statement</th><th>Patient</th><th className="text-right">Due</th><th>Status</th></tr></thead>
               <tbody>
                 {statements.map(({ statement: st, patient }) => (
@@ -165,7 +165,7 @@ export default async function BillingPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
       </div>

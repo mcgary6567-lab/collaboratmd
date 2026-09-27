@@ -92,13 +92,13 @@ const MIX_COLORS = ["#16a34a", "#0ea5e9", "#14b8a6", "#8b5cf6", "#84cc16", "#eab
 export function PayerMixChart({ data }: { data: { payer: string; billedCents: number }[] }) {
   const rows = data.filter((d) => d.billedCents > 0).map((d) => ({ name: d.payer, value: d.billedCents / 100 }));
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={320}>
       <PieChart>
-        <Pie data={rows} dataKey="value" nameKey="name" innerRadius={62} outerRadius={104} paddingAngle={2}>
+        <Pie data={rows} dataKey="value" nameKey="name" innerRadius={56} outerRadius={92} paddingAngle={2}>
           {rows.map((_, i) => <Cell key={i} fill={MIX_COLORS[i % MIX_COLORS.length]} />)}
         </Pie>
         <Tooltip formatter={(v, n) => [full(Number(v)), String(n)]} />
-        <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" wrapperStyle={{ fontSize: 11, lineHeight: "16px" }} />
+        <Legend layout="horizontal" align="center" verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 11, lineHeight: "16px" }} />
       </PieChart>
     </ResponsiveContainer>
   );

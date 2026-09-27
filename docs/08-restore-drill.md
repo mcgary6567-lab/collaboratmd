@@ -7,6 +7,19 @@ Recovery targets to prove (adjust once the pilot shows what practices need):
 - **RPO** (data you can afford to lose): 5 minutes, which needs Neon's point-in-time history to cover the period.
 - **RTO** (time to be back up): 1 hour.
 
+## Automated monthly drill
+
+`.github/workflows/restore-drill.yml` runs `scripts/restore-drill.ts` on the 3rd of every month (and by hand from Actions → Restore drill → Run workflow):
+
+1. restores production as it was an hour ago into a temporary Neon branch;
+2. connects to it, and checks that migrations are recorded without gaps, that practices, users, patients, claims, ledger entries and audit log rows are there, that the ledger guard trigger exists, and that the copy accepts writes (rolled back);
+3. reports how long the restore took (the RTO so far) in the run's annotations and summary;
+4. deletes the branch, even when a check fails.
+
+It prints counts only, never patient data. To switch it on, create a Neon API key (Neon console → Account settings → API keys) and add it as the repository secret `NEON_API_KEY`, and add the project ID (Project settings → General) as the repository variable `NEON_PROJECT_ID`. Without them the workflow reports that it was skipped.
+
+The point in time must be inside the project's history window: 6 hours on Neon's Free plan, 1 day by default (up to 7 or 30) on paid plans. The automated drill checks that a restore works; the manual drill below also checks that a specific record you wrote down is there, and practises the steps a person would take in an incident. Keep doing the manual drill quarterly.
+
 ## Before the first drill (one time)
 
 1. In the Neon console, open the project → Settings and check the **history window** (what Neon calls the period you can restore from). Set it to at least 7 days; longer if the plan allows. The length depends on the Neon plan, so confirm it there rather than assuming.

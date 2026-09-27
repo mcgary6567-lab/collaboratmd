@@ -157,7 +157,7 @@ export default async function UserDashboard() {
           {payments.length === 0 ? (
             <Empty>No payments posted yet.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 <tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Source</th><th className="text-right">Paid</th><th>Posted</th></tr>
               </thead>
@@ -173,7 +173,7 @@ export default async function UserDashboard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 
@@ -188,7 +188,7 @@ export default async function UserDashboard() {
           {recovered.rows.length === 0 ? (
             <Empty>No appeals resolved in the last 90 days.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 <tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Overturned</th><th className="text-right">Recovered</th></tr>
               </thead>
@@ -206,7 +206,7 @@ export default async function UserDashboard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
       </div>
@@ -220,7 +220,7 @@ export default async function UserDashboard() {
           {today.length === 0 ? (
             <Empty>Nothing booked today.</Empty>
           ) : (
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Time</th><th>Patient</th><th>Provider</th><th>Reason</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {today.slice(0, 10).map(({ appt, patient, provider }) => (
@@ -240,7 +240,7 @@ export default async function UserDashboard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 

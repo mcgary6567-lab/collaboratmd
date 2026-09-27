@@ -16,7 +16,8 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Card({ title, children, className, actions }: { title?: string; children: ReactNode; className?: string; actions?: ReactNode }) {
   return (
-    <section className={cn("card p-5", className)}>
+    // min-w-0: in a grid or flex row, a card otherwise grows to its widest content and pushes the page wider than the screen.
+    <section className={cn("card min-w-0 p-5", className)}>
       {(title || actions) && (
         <div className="mb-4 flex items-center justify-between">
           {title && <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h2>}

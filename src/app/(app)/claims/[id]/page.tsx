@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { and, asc, desc, eq, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
+import { logPatientView } from "@/lib/log-view";
 import { AttachmentsSection } from "./attachments-section";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
@@ -23,6 +24,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
   const db = await getDb();
   const b = await loadClaimBundle(db, id);
   if (!b || b.claim.practiceId !== s.practiceId) notFound();
+  await logPatientView(s, b.claim.patientId, "claim", b.claim.id);
   const dental = b.claim.claimType === "dental";
   // A secondary claim's money posts to its primary, so show the primary's books.
   const ledgerClaimId = b.claim.payerSequence === "S" && b.claim.primaryClaimId ? b.claim.primaryClaimId : id;
@@ -262,7 +264,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
           )}
 
           <Card title="Service lines">
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead>
                 {dental ? (
                   <tr><th>#</th><th>CDT</th><th>Description</th><th>Tooth</th><th>Surfaces</th><th>Area</th><th className="text-right">Fee</th></tr>
@@ -297,14 +299,14 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               <tfoot>
                 <tr><td colSpan={dental ? 6 : b.claim.claimType === "institutional" ? 7 : 6} className="text-right font-semibold">Total</td><td className="text-right font-semibold"><Money cents={b.claim.totalCents} /></td></tr>
               </tfoot>
-            </table>
+            </table></div>
             <div className="mt-3 text-sm text-slate-600">
               <span className="font-semibold">Diagnoses:</span> {b.encounter.diagnoses.map((d, i) => `${i + 1}. ${d}`).join("   ")} · <span className="font-semibold">POS</span> {b.encounter.placeOfService}
             </div>
           </Card>
 
           <Card title="Ledger">
-            <table className="table">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
               <thead><tr><th>Date</th><th>Type</th><th>Code</th><th>Note</th><th className="text-right">Amount</th></tr></thead>
               <tbody>
                 {ledger.map((e) => (
@@ -317,7 +319,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </Card>
 
           <AttachmentsSection practiceId={s.practiceId} claimId={b.claim.id} submitted={!!b.claim.submittedAt} canWrite={(CAN_WRITE as readonly string[]).includes(s.role)} />

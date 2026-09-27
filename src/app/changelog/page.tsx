@@ -10,6 +10,15 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-27",
+    title: "A patient access log, and checks at the size of a large practice",
+    items: [
+      "Administrators can see who opened a patient's chart, claims, statements and estimates, and what was done with them (Patient > Access log)",
+      "Every release is tested against a practice with 100,000 claims, with time limits on the busiest screens and a check for missing database indexes",
+      "Every screen is checked for sideways scrolling on a phone",
+    ],
+  },
+  {
+    date: "2026-09-27",
     title: "Safer deploys, the practice's own time zone, and Spanish checkout",
     items: [
       "Fixed: for about 20 minutes after an update, pages that read data did not load. Updates now prepare the database before they go live and are checked the moment they do",

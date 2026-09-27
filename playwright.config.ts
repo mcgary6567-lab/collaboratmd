@@ -6,15 +6,19 @@ import { defineConfig } from "@playwright/test";
  * clearinghouse, payment, texting, email or AI keys, so nothing leaves the
  * machine. Run with `npm run e2e`. Locally this uses the installed Edge
  * (E2E_CHANNEL=msedge); in CI install Chromium with `npx playwright install chromium`.
+ *
+ * The tests run against a production build (next build, then next start),
+ * which is what patients get and does not compile pages on first visit.
+ * E2E_DEV=1 uses the development server instead, for quick local runs.
  */
 const PORT = Number(process.env.E2E_PORT ?? 3700);
+const DEV = process.env.E2E_DEV === "1";
 
 export default defineConfig({
   testDir: "e2e",
-  // The dev server compiles each page on first visit; a flow through several new pages can take minutes.
-  timeout: 240_000,
-  // The dev server compiles each page on first visit, which can take longer than the 5 s default.
-  expect: { timeout: 45_000 },
+  // The dev server (E2E_DEV=1) compiles each page on first visit, so it needs far longer limits.
+  timeout: DEV ? 240_000 : 90_000,
+  expect: { timeout: DEV ? 45_000 : 15_000 },
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
@@ -26,13 +30,15 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: `npx next dev -p ${PORT}`,
+    command: DEV ? `npx next dev -p ${PORT}` : `npx next build && npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}/api/health`,
-    timeout: 300_000,
+    timeout: 600_000,
     reuseExistingServer: false,
     env: {
       DATABASE_URL: "",
       TZ: "UTC",
+      // Production mode builds patient links from the configured address.
+      APP_URL: `http://localhost:${PORT}`,
       PGLITE_DIR: ".e2e/pg",
       AUTH_SECRET: "e2e-only-secret-0123456789abcdef0123456789",
       // The demo administrator can open the operator pages, so the accessibility crawl covers them.

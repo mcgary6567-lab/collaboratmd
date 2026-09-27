@@ -37,7 +37,7 @@ export async function AuthorizationsSection({ db, practiceId, patientId }: { db:
         {auths.length === 0 ? (
           <Empty>No authorizations on file. When a payer edit requires one, claims for that code are held until it is entered here.</Empty>
         ) : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead>
               <tr><th>Payer</th><th>Number</th><th>Codes</th><th className="text-right">Units</th><th>Valid</th><th>Status</th><th /></tr>
             </thead>
@@ -63,7 +63,7 @@ export async function AuthorizationsSection({ db, practiceId, patientId }: { db:
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
       <Card title="Add an authorization">

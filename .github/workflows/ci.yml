@@ -84,7 +84,7 @@ jobs:
   postgres:
     name: Real Postgres behind a pooler
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     # The other jobs use the embedded database. This one runs start-up and the
     # built app against Postgres through PgBouncer in transaction mode, the way
     # Neon's pooler works, where session state does not survive between
@@ -134,6 +134,11 @@ jobs:
           for i in $(seq 1 20); do pg_isready -h 127.0.0.1 -p 6432 && break; sleep 1; done
       - name: Several starts at once, a blocked start, and a start with nothing to do
         run: npx tsx --tsconfig tsconfig.scripts.json scripts/startup-check.ts
+      - name: A large practice (100,000 claims) within time budgets, with no missing indexes
+        run: npm run -s load-test
+        env:
+          LOAD_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+          LOAD_TEST_BUDGETS: "1"
       - name: The built app, served through the pooler
         run: |
           npx next build

@@ -37,14 +37,14 @@ export default async function CoverSheetPage({ params }: { params: Promise<{ id:
           {b.claim.payerClaimNumber && <><dt className="text-slate-500">Your claim number</dt><dd className="font-mono">{b.claim.payerClaimNumber}</dd></>}
           <dt className="text-slate-500">Billed</dt><dd>${(b.claim.totalCents / 100).toFixed(2)}</dd>
         </dl>
-        <table className="mt-6 w-full">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="mt-6 w-full">
           <thead><tr className="border-b border-slate-300 text-left"><th className="py-1">Attachment control number</th><th>Document</th></tr></thead>
           <tbody>
             {files.map((f) => (
               <tr key={f.id} className="border-b border-slate-100"><td className="py-1 font-mono text-base font-semibold">{f.controlNumber}</td><td>{REPORT_TYPES[f.reportType] ?? f.reportType} ({f.filename})</td></tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <p className="mt-6 text-xs text-slate-500">This transmission contains protected health information for the payer named above. If you received it in error, notify the sender and destroy it.</p>
       </article>
     </>

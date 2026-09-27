@@ -39,7 +39,7 @@ export default async function LegacyArPage() {
       )}
       <Card title="Insurance balances to work">
         {open.length === 0 ? <Empty>No open insurance balances from a previous system.</Empty> : (
-          <table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
             <thead><tr><th>Patient</th><th>Payer</th><th>Old claim</th><th>Service date</th><th className="text-right">Balance</th><th /></tr></thead>
             <tbody>
               {open.map(({ item: i, first, last }) => (
@@ -60,7 +60,7 @@ export default async function LegacyArPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
     </>

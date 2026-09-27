@@ -67,7 +67,7 @@ export default async function InstitutionalEntryPage() {
 
         <Card title="Diagnoses and revenue lines">
           <label className="block text-sm"><span className="label">Diagnoses, principal first (FL67)</span><input name="diagnoses" className="input font-mono" placeholder="I21.4, E11.9, I10" required /></label>
-          <table className="table mt-4 text-sm">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table mt-4 text-sm">
             <thead><tr><th>#</th><th>Revenue code (FL42)</th><th>HCPCS (FL44)</th><th>Units (FL46)</th><th>Unit charge $ (FL47)</th></tr></thead>
             <tbody>
               {Array.from({ length: LINES }, (_, i) => (
@@ -80,7 +80,7 @@ export default async function InstitutionalEntryPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <p className="mt-2 text-xs text-slate-500">Blank rows are ignored. Common codes: 0450 emergency room, 0300 lab, 0320 radiology, 0360 operating room, 0250 pharmacy, 0120 room and board semi-private, 0710 recovery room.</p>
         </Card>
 

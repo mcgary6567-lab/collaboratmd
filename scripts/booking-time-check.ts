@@ -5,7 +5,7 @@
  * 1:00 PM). This lists them, per practice, without patient details.
  *
  * Read-only by default. With --fix it rewrites each one to the clock time in
- * the practice's booking time zone: the request, and its appointment if the
+ * the practice's time zone: the request, and its appointment if the
  * appointment still has the time it was booked with (one staff moved since is
  * left alone and listed). Check the listing first.
  *
@@ -32,11 +32,10 @@ async function main() {
   await c.connect();
   const { rows } = await c.query<Row>(`
     SELECT r.id, r.practice_id, p.name AS practice, r.status, r.starts_at, r.ends_at, r.appointment_id,
-           a.starts_at AS appt_starts, a.ends_at AS appt_ends, s.time_zone
+           a.starts_at AS appt_starts, a.ends_at AS appt_ends, p.time_zone
     FROM booking_requests r
     JOIN practices p ON p.id = r.practice_id
     LEFT JOIN appointments a ON a.id = r.appointment_id
-    LEFT JOIN booking_settings s ON s.practice_id = r.practice_id
     WHERE r.created_at < $1 AND r.status IN ('pending', 'confirmed')
     ORDER BY p.name, r.starts_at`, [FIXED_AT]);
   if (!rows.length) {

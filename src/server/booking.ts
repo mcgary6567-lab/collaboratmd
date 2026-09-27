@@ -43,7 +43,7 @@ export async function saveBookingSettings(db: Db, practiceId: string, input: { e
   if (![10, 15, 20, 30, 40, 45, 60, 90].includes(input.slotMinutes)) throw new Error("Choose an appointment length");
   if (!(input.minNoticeHours >= 0 && input.minNoticeHours <= 168)) throw new Error("Notice is 0 to 168 hours");
   if (!(input.horizonDays >= 1 && input.horizonDays <= 90)) throw new Error("Show 1 to 90 days ahead");
-  const v = { enabled: input.enabled, timeZone: input.timeZone, slotMinutes: input.slotMinutes, minNoticeHours: Math.round(input.minNoticeHours), horizonDays: Math.round(input.horizonDays), intro: input.intro?.trim().slice(0, 500) || null, updatedAt: new Date() };
+  const v = { enabled: input.enabled, slotMinutes: input.slotMinutes, minNoticeHours: Math.round(input.minNoticeHours), horizonDays: Math.round(input.horizonDays), intro: input.intro?.trim().slice(0, 500) || null, updatedAt: new Date() };
   await db.insert(bookingSettings).values({ practiceId, ...v }).onConflictDoUpdate({ target: bookingSettings.practiceId, set: v });
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "booking_settings_saved", entity: "practice", entityId: practiceId, details: { enabled: v.enabled } });
 }
