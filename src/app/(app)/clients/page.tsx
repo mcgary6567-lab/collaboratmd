@@ -38,7 +38,7 @@ export default async function ClientsPage() {
         <Card><Empty>You have access to one practice. When you are given access to more, they appear here side by side.</Empty></Card>
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>

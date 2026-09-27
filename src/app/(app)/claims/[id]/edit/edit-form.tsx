@@ -83,7 +83,7 @@ export function ClaimEditForm({
           <button type="button" className="btn btn-secondary text-xs" onClick={() => setLines((ls) => [...ls, { cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }])}><Plus className="h-3.5 w-3.5" /> Add line</button>
         </div>
         <datalist id="cpt-edit">{cpts.map((c) => <option key={c.code} value={c.code}>{c.description}</option>)}</datalist>
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
           <table className="table">
             <thead><tr><th>#</th><th>CPT</th><th>Modifiers</th><th>Units</th><th>Charge ($)</th><th>Dx ptr</th><th /></tr></thead>
             <tbody>

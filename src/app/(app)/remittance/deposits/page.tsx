@@ -74,7 +74,7 @@ export default async function DepositsPage() {
           {o.deposits.length === 0 ? (
             <Empty>No deposits imported yet.</Empty>
           ) : (
-            <div className="overflow-x-auto">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
               <table className="table">
                 <thead><tr><th>Date</th><th>Description</th><th className="text-right">Amount</th><th>Status</th><th>ERA</th></tr></thead>
                 <tbody>

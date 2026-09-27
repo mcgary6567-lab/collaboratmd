@@ -27,7 +27,7 @@ export default async function LocationReportPage({ searchParams }: { searchParam
           <button className="btn btn-secondary">Show</button>
         </form>
         {rows.length === 0 ? <Empty>No claims for visits in this period.</Empty> : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead><tr><th>Location</th><th className="text-right">Visits</th><th className="text-right">Claims</th><th className="text-right">Charges</th><th className="text-right">Insurance paid</th><th className="text-right">Patient paid</th><th className="text-right">Adjusted</th><th className="text-right">Still open</th><th className="text-right">Denial rate</th><th className="text-right">Collected per visit</th></tr></thead>
               <tbody>

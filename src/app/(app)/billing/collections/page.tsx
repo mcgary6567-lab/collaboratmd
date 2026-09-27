@@ -42,7 +42,7 @@ export default async function CollectionsPage() {
         {candidates.length === 0 ? (
           <Empty>No accounts qualify. Accounts need a balance of $25 or more, at least two statements with the first 60 or more days ago, and no active payment plan.</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead><tr><th>Patient</th><th className="text-right">Balance</th><th>Statements</th><th>First statement</th><th /></tr></thead>
               <tbody>

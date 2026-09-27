@@ -83,7 +83,7 @@ export default async function OperatorPracticesPage() {
         {stat("Claims, 30 days", totals.claims30.toLocaleString())}
       </div>
       <Card>
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
           <table className="table">
             <thead><tr><th>Practice</th><th>Status</th><th>Plan</th><th className="text-right">Providers</th><th className="text-right">Users</th><th className="text-right">Claims (30d)</th><th>Last sign-in</th><th>Most used (30d)</th><th className="text-right">Monthly</th><th /></tr></thead>
             <tbody>

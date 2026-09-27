@@ -45,7 +45,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
         {rows.length === 0 ? (
           <Empty>No patients match.</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>

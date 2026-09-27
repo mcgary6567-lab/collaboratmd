@@ -127,7 +127,7 @@ export default async function DevelopersPage() {
       <div className="mt-6">
         <Card title="Recent webhook deliveries">
           {deliveries.length === 0 ? <Empty>Nothing sent yet. Events are sent when claims, payments, denials and patients change.</Empty> : (
-            <div className="overflow-x-auto">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
               <table className="table">
                 <thead><tr><th>When</th><th>Event</th><th>Endpoint</th><th>Status</th><th>Attempts</th><th>Last answer</th><th /></tr></thead>
                 <tbody>

@@ -75,7 +75,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         {rows.length === 0 ? (
           <Empty>No claims match. Clear a filter or search for something else.</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>

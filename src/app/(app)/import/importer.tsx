@@ -145,7 +145,7 @@ export function Importer({ fields, maxRows, templates: initialTemplates = [] }: 
 
           <div className="card p-5">
             <h2 className="mb-2 font-semibold">First rows as they will be imported</h2>
-            <div className="overflow-x-auto">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
               <table className="table">
                 <thead><tr><th>Row</th><th>Patient</th><th>DOB</th><th>Sex</th><th>Contact</th><th>Insurance</th></tr></thead>
                 <tbody>

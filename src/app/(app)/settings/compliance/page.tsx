@@ -71,7 +71,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
 
       <div className="mt-6">
         <Card title={`Access review · ${people.length} people with access`} actions={review ? <Badge tone="slate">Last review {fmtDateTime(review.createdAt)}</Badge> : <Badge tone="red">Never reviewed</Badge>}>
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table text-sm">
               <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Two-factor</th><th>Last sign-in</th><th>Status</th></tr></thead>
               <tbody>

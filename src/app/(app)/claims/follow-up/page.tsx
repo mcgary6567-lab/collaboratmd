@@ -51,7 +51,7 @@ export default async function FollowUpPage({ searchParams }: { searchParams: Pro
         {rows.length === 0 ? (
           <Empty>No unpaid claims need attention.</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead><tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Sent</th><th className="text-right">Days</th><th className="text-right">Billed</th><th>Payer says</th><th>Next step</th><th /></tr></thead>
               <tbody>

@@ -75,7 +75,7 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
         {grid.providers.length === 0 || grid.payers.length === 0 ? (
           <Empty>Add providers and payers in Settings first.</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <form action={BASE} className="mb-3 flex gap-2">
               <input name="q" defaultValue={sp.q} className="input max-w-xs" placeholder="Find a provider by name or NPI" aria-label="Find a provider" />
               <button className="btn btn-secondary">Search</button>
@@ -120,7 +120,7 @@ export default async function EnrollmentPage({ searchParams }: { searchParams: P
             </Alert>
           )}
           {txn.payers.length === 0 ? <Empty>Add payers in Settings first.</Empty> : (
-            <div className="overflow-x-auto">
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
               <table className="table">
                 <thead><tr><th>Payer</th>{TRANSACTIONS.map((t) => <th key={t.key} className="whitespace-nowrap">{t.label}</th>)}<th /></tr></thead>
                 <tbody>
