@@ -51,7 +51,8 @@ export async function deletePracticeData(db: Db, practiceId: string, now = new D
   const store = fileStore();
   const { rows: keyRows } = await db.execute(sql`
     SELECT storage_key FROM claim_attachments WHERE practice_id = ${practiceId} AND storage_key IS NOT NULL
-    UNION ALL SELECT storage_key FROM export_jobs WHERE practice_id = ${practiceId} AND storage_key IS NOT NULL`);
+    UNION SELECT storage_key FROM export_jobs WHERE practice_id = ${practiceId} AND storage_key IS NOT NULL
+    UNION SELECT p->>'key' FROM export_jobs, jsonb_array_elements(parts) p WHERE practice_id = ${practiceId}`);
   const keys = (keyRows as { storage_key: string }[]).map((r) => r.storage_key);
   if (keys.length && !store) throw new Error("This practice has files in storage, but file storage is not configured here");
   for (let i = 0; i < keys.length; i += 100) await store!.del(keys.slice(i, i + 100));

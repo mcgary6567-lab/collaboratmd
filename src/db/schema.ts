@@ -785,6 +785,7 @@ export const errorEvents = pgTable("error_events", {
   firstSeen: timestamp("first_seen", { withTimezone: true }).defaultNow().notNull(),
   lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  lastRequestId: text("last_request_id"),
 });
 
 export const claimAttachments = pgTable("claim_attachments", {
@@ -1549,7 +1550,14 @@ export const exportJobs = pgTable("export_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
+  /** Parts to build, one run each (server/export-jobs.ts); empty for a single-part export. */
+  plan: jsonb("plan").$type<ExportSegment[][]>(),
+  parts: jsonb("parts").$type<{ key: string; bytes: number }[]>().notNull().default([]),
+  nextPart: integer("next_part").notNull().default(0),
 });
+
+/** A slice of one table (rows after an id, up to a limit), or a run of attachments. */
+export type ExportSegment = { table: string; afterId: string | null; limit: number | null; label: string } | { attachments: string[] };
 
 /* Platform operations. See migration 0041. */
 export const lifecycleEmails = pgTable("lifecycle_emails", {
@@ -1635,3 +1643,24 @@ export const bookingRequests = pgTable("booking_requests", {
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decidedBy: uuid("decided_by").references(() => users.id),
 });
+
+/* Pilot operations. See migration 0044. */
+export const feedback = pgTable("feedback", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").references(() => users.id),
+  page: text("page").notNull(),
+  message: text("message").notNull(),
+  userAgent: text("user_agent"),
+  viewport: text("viewport"),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
+export const featureUsage = pgTable("feature_usage", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  feature: text("feature").notNull(),
+  day: date("day").notNull(),
+  count: integer("count").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.feature, t.day] })]);

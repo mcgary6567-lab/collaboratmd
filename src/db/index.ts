@@ -125,6 +125,28 @@ async function seed(runner: Runner) {
 }
 
 /**
+ * Keeps development servers and preview deployments off the production
+ * database. The production deployment marks its database when it starts;
+ * anything else that connects to a marked database refuses to start, before a
+ * migration or a test write can touch real data. Point DATABASE_URL at a
+ * staging branch instead (docs/11-environments.md), or set
+ * ALLOW_PRODUCTION_DATABASE=true for a deliberate one-off.
+ */
+export async function environmentGuard(runner: Pick<Runner, "db" | "exec" | "shared">, env: Record<string, string | undefined> = process.env) {
+  if (!runner.shared) return;
+  await runner.exec("CREATE TABLE IF NOT EXISTS _environment (label text PRIMARY KEY, set_at timestamptz NOT NULL DEFAULT now());");
+  if (env.VERCEL_ENV === "production") {
+    await runner.exec("INSERT INTO _environment (label) VALUES ('production') ON CONFLICT DO NOTHING");
+    return;
+  }
+  const marked = await runner.db.execute<{ label: string }>("SELECT label FROM _environment WHERE label = 'production'");
+  if (marked.rows.length && env.ALLOW_PRODUCTION_DATABASE !== "true") {
+    const who = env.VERCEL_ENV === "preview" ? "This preview deployment" : "This development server";
+    throw new Error(`${who} is connected to the production database. Point DATABASE_URL at a staging database (docs/11-environments.md), or set ALLOW_PRODUCTION_DATABASE=true if you mean to.`);
+  }
+}
+
+/**
  * Runs migrations and seeding under a Postgres advisory lock.
  *
  * Serverless platforms start many instances at once, and each one bootstraps
@@ -140,6 +162,7 @@ async function prepare(runner: Runner) {
     await seed(runner);
     return;
   }
+  await environmentGuard(runner);
   await runner.exec(`SELECT pg_advisory_lock(${BOOTSTRAP_LOCK_ID})`);
   try {
     await migrate(runner);

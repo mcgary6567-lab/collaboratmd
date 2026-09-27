@@ -49,11 +49,11 @@ export default async function DentalEntryPage() {
               {Array.from({ length: LINES }, (_, i) => (
                 <tr key={i}>
                   <td className="text-slate-500">{i + 1}</td>
-                  <td><input name="cdt" list="cdt-codes" className="input w-28 font-mono" placeholder={i === 0 ? "D2392" : ""} maxLength={5} /></td>
-                  <td><input name="tooth" className="input w-20 font-mono" placeholder={i === 0 ? "30" : ""} maxLength={2} /></td>
-                  <td><input name="surfaces" className="input w-24 font-mono" placeholder={i === 0 ? "MO" : ""} maxLength={5} /></td>
-                  <td><select name="area" className="input w-40" defaultValue="">{AREAS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></td>
-                  <td><input name="fee" className="input w-28" placeholder={i === 0 ? "210.00" : ""} inputMode="decimal" /></td>
+                  <td><input name="cdt" list="cdt-codes" aria-label={`Line ${i + 1} CDT code`} className="input w-28 font-mono" placeholder={i === 0 ? "D2392" : ""} maxLength={5} /></td>
+                  <td><input name="tooth" aria-label={`Line ${i + 1} tooth`} className="input w-20 font-mono" placeholder={i === 0 ? "30" : ""} maxLength={2} /></td>
+                  <td><input name="surfaces" aria-label={`Line ${i + 1} surfaces`} className="input w-24 font-mono" placeholder={i === 0 ? "MO" : ""} maxLength={5} /></td>
+                  <td><select name="area" aria-label={`Line ${i + 1} area`} className="input w-40" defaultValue="">{AREAS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></td>
+                  <td><input name="fee" aria-label={`Line ${i + 1} fee`} className="input w-28" placeholder={i === 0 ? "210.00" : ""} inputMode="decimal" /></td>
                 </tr>
               ))}
             </tbody>

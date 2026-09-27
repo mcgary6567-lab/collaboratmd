@@ -88,13 +88,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         <Card title="New task">
           <ActionForm action={createTaskAction} className="space-y-3 text-sm">
             <input name="title" className="input" placeholder="What needs doing?" required />
-            <select name="assigneeId" className="input" defaultValue={s.userId}>
+            <select name="assigneeId" className="input" aria-label="Assign to" defaultValue={s.userId}>
               <option value="">Unassigned</option>
               {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <div className="grid grid-cols-2 gap-2">
-              <input name="dueDate" type="date" className="input" />
-              <select name="priority" className="input" defaultValue="normal">
+              <input name="dueDate" type="date" className="input" aria-label="Due date" />
+              <select name="priority" className="input" aria-label="Priority" defaultValue="normal">
                 <option value="normal">Normal</option>
                 <option value="high">High priority</option>
               </select>

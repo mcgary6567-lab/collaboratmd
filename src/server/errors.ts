@@ -26,14 +26,15 @@ export function redact(text: string) {
     .slice(0, 500);
 }
 
-export type ErrorReport = { message: string; digest?: string; path: string; method: string; routePath?: string; routeType?: string };
+export type ErrorReport = { message: string; digest?: string; path: string; method: string; routePath?: string; routeType?: string; requestId?: string | null };
 
 export async function recordError(db: Db, r: ErrorReport, now = new Date()) {
   const message = redact(r.message.split("\n")[0] || "Unknown error");
   const path = r.path.split("?")[0].replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ":id").slice(0, 200);
   const fingerprint = crypto.createHash("sha1").update(`${r.routePath ?? path}|${message.replace(/\[\w+\]/g, "")}`).digest("hex");
-  await db.insert(errorEvents).values({ fingerprint, message, digest: r.digest ?? null, routePath: r.routePath ?? null, routeType: r.routeType ?? null, method: r.method, path, lastSeen: now, firstSeen: now })
-    .onConflictDoUpdate({ target: errorEvents.fingerprint, set: { count: sql`${errorEvents.count} + 1`, lastSeen: now, digest: r.digest ?? null, resolvedAt: null } });
+  const lastRequestId = r.requestId && /^[A-Za-z0-9-]{8,64}$/.test(r.requestId) ? r.requestId : null;
+  await db.insert(errorEvents).values({ fingerprint, message, digest: r.digest ?? null, routePath: r.routePath ?? null, routeType: r.routeType ?? null, method: r.method, path, lastSeen: now, firstSeen: now, lastRequestId })
+    .onConflictDoUpdate({ target: errorEvents.fingerprint, set: { count: sql`${errorEvents.count} + 1`, lastSeen: now, digest: r.digest ?? null, resolvedAt: null, lastRequestId } });
   return fingerprint;
 }
 

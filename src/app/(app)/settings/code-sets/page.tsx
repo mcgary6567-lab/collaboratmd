@@ -58,7 +58,7 @@ export default async function CodeSetsPage() {
               </ActionForm>
               <p className="mt-3 text-xs text-slate-500">
                 The full quarterly PTP files are far larger than an upload allows; load them from a terminal with DATABASE_URL set:
-                <code className="ml-1 rounded bg-slate-100 px-1">npm run import:code-sets -- ncci_ptp ./ccipra-v324r0-f1.txt &quot;2026 Q4 PTP part 1&quot;</code>
+                <code className="ml-1 rounded bg-slate-100 px-1 text-slate-700">npm run import:code-sets -- ncci_ptp ./ccipra-v324r0-f1.txt &quot;2026 Q4 PTP part 1&quot;</code>
               </p>
             </>
           ) : (

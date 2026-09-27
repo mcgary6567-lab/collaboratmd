@@ -30,11 +30,11 @@ export default async function CredentialsPage() {
       {canEdit && (
         <Card title="Add a credential" className="mb-6">
           <ActionForm action={saveCredentialAction} className="grid gap-2 text-sm md:grid-cols-4">
-            <select name="providerId" className="input" required defaultValue="">
+            <select name="providerId" className="input" aria-label="Provider" required defaultValue="">
               <option value="" disabled>Provider</option>
               {providers.map((p) => <option key={p.id} value={p.id}>{p.lastName}, {p.firstName}</option>)}
             </select>
-            <select name="kind" className="input" defaultValue="state_license">{Object.entries(CREDENTIAL_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            <select name="kind" aria-label="Kind of credential" className="input" defaultValue="state_license">{Object.entries(CREDENTIAL_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             <input name="identifier" className="input" placeholder="Number" />
             <input name="state" className="input" placeholder="State (licenses)" maxLength={2} />
             <label className="text-xs">Issued<input type="date" name="issuedOn" className="input mt-1" /></label>

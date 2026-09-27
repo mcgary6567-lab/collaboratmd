@@ -46,7 +46,7 @@ export default async function ConnectionsPage() {
           const Icon = st.icon;
           return (
             <a key={i.provider} href={`#${i.provider}`} className="card flex items-center gap-3 p-3 transition-shadow hover:shadow-md">
-              <Icon className={`h-5 w-5 shrink-0 ${i.connected ? "text-green-600" : "text-slate-500"}`} />
+              <Icon className={`h-5 w-5 shrink-0 ${i.connected ? "text-green-700" : "text-slate-500"}`} />
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{i.def.name}</div>
                 <div className="truncate text-xs text-slate-500">{i.def.category}</div>
@@ -75,7 +75,7 @@ export default async function ConnectionsPage() {
                     <p className="text-sm text-slate-700">{i.def.purpose}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {i.def.unlocks.map((u) => (
-                        <span key={u} className={`badge ${i.connected ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-500"}`}>{u}</span>
+                        <span key={u} className={`badge ${i.connected ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-700"}`}>{u}</span>
                       ))}
                     </div>
                     <a href={i.def.signup} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">

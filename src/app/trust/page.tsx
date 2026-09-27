@@ -61,7 +61,7 @@ export default function TrustPage() {
           <h2 className="text-xl font-bold text-slate-900">Safeguards in the product</h2>
           <ul className="mt-4 space-y-2.5">
             {SAFEGUARDS.map((s) => (
-              <li key={s} className="flex gap-2.5 text-sm text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" /> {s}</li>
+              <li key={s} className="flex gap-2.5 text-sm text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> {s}</li>
             ))}
           </ul>
           <p className="mt-4 text-sm text-slate-600">More detail on the <Link href="/security" className="font-semibold text-green-700 underline">security page</Link>.</p>
@@ -72,7 +72,7 @@ export default function TrustPage() {
           <ul className="mt-4 space-y-2.5">
             {ASSURANCE.map((a) => (
               <li key={a.text} className="flex gap-2.5 text-sm text-slate-700">
-                {a.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" /> : <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />} {a.text}
+                {a.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> : <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />} {a.text}
               </li>
             ))}
           </ul>

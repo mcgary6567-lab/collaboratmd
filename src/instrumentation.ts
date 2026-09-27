@@ -15,7 +15,11 @@ export const onRequestError: Instrumentation.onRequestError = async (err, reques
     const digest = typeof err === "object" && err !== null && "digest" in err ? String((err as { digest: unknown }).digest) : undefined;
     const [{ getDb }, { recordError, redact }, { noteError }] = await Promise.all([import("@/db"), import("@/server/errors"), import("@/server/ops-alerts")]);
     const db = await getDb();
-    const fingerprint = await recordError(db, { message, digest, path: request.path, method: request.method, routePath: context.routePath, routeType: context.routeType });
+    const header = request.headers["x-request-id"];
+    const requestId = Array.isArray(header) ? header[0] : header ?? null;
+    // One structured line per error, with the request id, so it can be found in the platform's logs.
+    console.error(JSON.stringify({ level: "error", requestId, route: context.routePath, method: request.method, digest: digest ?? null }));
+    const fingerprint = await recordError(db, { message, digest, path: request.path, method: request.method, routePath: context.routePath, routeType: context.routeType, requestId });
     // Operators hear about new errors and bursts (see server/ops-alerts.ts).
     await noteError(db, { fingerprint, message: redact(message.split("\n")[0] || "Unknown error"), routePath: context.routePath });
   } catch (e) {

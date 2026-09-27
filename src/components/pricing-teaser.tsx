@@ -32,7 +32,7 @@ export function PricingTeaser() {
     <section id="pricing" className="border-y border-slate-200 bg-slate-50 py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <span className="text-xs font-bold uppercase tracking-widest text-green-600">Pricing</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">Pricing</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             Priced per provider, not per seat
           </h2>
@@ -108,7 +108,7 @@ export function PricingTeaser() {
                 <ul className="mt-4 space-y-2.5">
                   {tier.highlights.map((h) => (
                     <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" strokeWidth={3} />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-700" strokeWidth={3} />
                       {h}
                     </li>
                   ))}

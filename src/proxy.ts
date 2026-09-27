@@ -17,6 +17,16 @@ const THEME_HASH = `'sha256-${createHash("sha256").update(THEME_SCRIPT).digest("
  * matcher below.
  */
 export function proxy(request: NextRequest) {
+  // Every request gets an id, returned as X-Request-Id and kept with any error it causes, to find it in the logs.
+  const incoming = request.headers.get("x-request-id");
+  const requestId = incoming && /^[A-Za-z0-9-]{8,64}$/.test(incoming) ? incoming : crypto.randomUUID();
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    const headers = new Headers(request.headers);
+    headers.set("x-request-id", requestId);
+    const res = NextResponse.next({ request: { headers } });
+    res.headers.set("X-Request-Id", requestId);
+    return res;
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const dev = process.env.NODE_ENV === "development";
   const csp = [
@@ -35,17 +45,19 @@ export function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("x-request-id", requestId);
   requestHeaders.set("Content-Security-Policy", csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  response.headers.set("X-Request-Id", requestId);
   return response;
 }
 
 export const config = {
   matcher: [
     {
-      // Not API routes, build assets, icons or the service worker.
-      source: "/((?!api/|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js|pwa-icon).*)",
+      // Not build assets, icons or the service worker. API routes get a request id but no CSP (see above).
+      source: "/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js|pwa-icon).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

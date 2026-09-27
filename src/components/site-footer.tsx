@@ -121,7 +121,7 @@ export function SiteFooter() {
               patient billing and EHR and lab interfaces in one system.
             </p>
             <div className="mt-5 flex items-start gap-2.5 text-sm leading-relaxed text-slate-600">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
               <address className="not-italic">
                 {addressLines()[0]}
                 <br />
@@ -133,7 +133,7 @@ export function SiteFooter() {
                 href={`mailto:${COMPANY.contact.general}`}
                 className="flex items-center gap-2.5 text-slate-600 transition-colors hover:text-green-700"
               >
-                <Mail className="h-4 w-4 shrink-0 text-green-600" />
+                <Mail className="h-4 w-4 shrink-0 text-green-700" />
                 {COMPANY.contact.general}
               </a>
               <a
@@ -142,7 +142,7 @@ export function SiteFooter() {
                 rel="noreferrer noopener"
                 className="flex items-center gap-2.5 text-slate-600 transition-colors hover:text-green-700"
               >
-                <MessageCircle className="h-4 w-4 shrink-0 text-green-600" />
+                <MessageCircle className="h-4 w-4 shrink-0 text-green-700" />
                 {COMPANY.contact.whatsappDisplay}
               </a>
             </div>
@@ -172,7 +172,7 @@ export function SiteFooter() {
         <div className="mt-12 flex flex-wrap gap-x-7 gap-y-3 border-t border-slate-200 pt-7">
           {ASSURANCES.map(({ icon: Icon, label }) => (
             <span key={label} className="flex items-center gap-2 text-xs font-medium text-slate-600">
-              <Icon className="h-4 w-4 text-green-600" />
+              <Icon className="h-4 w-4 text-green-700" />
               {label}
             </span>
           ))}

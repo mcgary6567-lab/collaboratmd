@@ -59,7 +59,7 @@ export default async function SecuritySettingsPage() {
           <p className="mb-3 text-xs text-slate-500">How long someone stays signed in, counted from when they signed in (switching practices does not restart it).</p>
           {admin ? (
             <ActionForm action={sessionHoursAction} className="flex items-center gap-2 text-sm">
-              <select name="hours" defaultValue={String(practice.sessionHours)} className="input w-auto">
+              <select name="hours" defaultValue={String(practice.sessionHours)} className="input w-auto" aria-label="Session length">
                 {SESSION_HOURS.map((h) => <option key={h} value={h}>{h} hour{h === 1 ? "" : "s"}</option>)}
               </select>
               <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Saving...">Save</SubmitButton>

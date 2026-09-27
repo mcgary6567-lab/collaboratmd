@@ -18,7 +18,7 @@ function PayerFields({ p }: { p?: P }) {
     <div className="grid gap-2 sm:grid-cols-5">
       <input name="name" defaultValue={p?.name} placeholder="Payer name" className="input sm:col-span-2" required />
       <input name="payerId" defaultValue={p?.payerId} placeholder="Payer ID" className="input font-mono" required />
-      <select name="type" defaultValue={p?.type ?? "commercial"} className="input">{PAYER_TYPES.map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}</select>
+      <select name="type" defaultValue={p?.type ?? "commercial"} className="input" aria-label="Payer type">{PAYER_TYPES.map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}</select>
       <div className="grid grid-cols-2 gap-2">
         <input name="timelyFilingDays" type="number" min={30} max={730} defaultValue={p?.timelyFilingDays ?? 90} className="input" title="Timely filing days" aria-label="Timely filing days" />
         <input name="appealDays" type="number" min={15} max={365} defaultValue={p?.appealDays ?? 60} className="input" title="Appeal window days" aria-label="Appeal window days" />

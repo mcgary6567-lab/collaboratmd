@@ -145,7 +145,7 @@ export function PlanCards() {
             <ul className="mt-7 space-y-3 border-t border-slate-100 pt-6">
               {tier.highlights.map((h) => (
                 <li key={h} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" strokeWidth={3} />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-700" strokeWidth={3} />
                   {h}
                 </li>
               ))}

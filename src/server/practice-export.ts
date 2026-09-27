@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { csvCell } from "@/lib/csv-out";
 import { attachmentBytes } from "./attachments";
+import type { ExportSegment } from "@/db/schema";
 
 /**
  * Everything a practice has in CollaboratMD, as a zip of one CSV per table plus
@@ -75,10 +76,54 @@ const enc = new TextEncoder();
 const safeName = (s: string) => s.replace(/[^\w.-]+/g, "_").slice(0, 80);
 
 /**
+ * How to split a large practice's export into parts, each small enough for one
+ * run: big tables in id-ordered slices, attachments in groups. A practice that
+ * fits in one part gets a single-element plan.
+ */
+export async function planExportParts(db: Db, practiceId: string, opts: { chunkRows?: number; partRows?: number; filesPerPart?: number } = {}): Promise<ExportSegment[][]> {
+  const chunkRows = opts.chunkRows ?? 100_000;
+  const partRows = opts.partRows ?? 250_000;
+  const filesPerPart = opts.filesPerPart ?? 300;
+  const plan = await exportPlan(db);
+  const segments: { seg: ExportSegment; rows: number }[] = [];
+  for (const s of plan.sources) {
+    const table = sql.raw(q(s.table));
+    const { rows: [c] } = await db.execute(sql`SELECT count(*)::int AS n FROM ${table} ${where(s, practiceId)}`);
+    const n = Number((c as { n: number }).n);
+    if (!plan.columns[s.table].keep.includes("id") || n <= chunkRows) {
+      segments.push({ seg: { table: s.table, afterId: null, limit: null, label: `tables/${s.table}.csv` }, rows: n });
+      continue;
+    }
+    let after: string | null = null;
+    for (let k = 1, left = n; left > 0; k++, left -= chunkRows) {
+      segments.push({ seg: { table: s.table, afterId: after, limit: chunkRows, label: `tables/${s.table}.part${k}.csv` }, rows: Math.min(chunkRows, left) });
+      const { rows: b }: { rows: unknown[] } = await db.execute(sql`SELECT id::text AS id FROM ${table} ${where(s, practiceId)} ${after === null ? sql`` : sql`AND id > ${after}`} ORDER BY id OFFSET ${chunkRows - 1} LIMIT 1`);
+      if (!b.length) break;
+      after = (b[0] as { id: string }).id;
+    }
+  }
+  const parts: ExportSegment[][] = [];
+  let current: ExportSegment[] = [];
+  let size = 0;
+  for (const { seg, rows } of segments) {
+    if (current.length && size + rows > partRows) { parts.push(current); current = []; size = 0; }
+    current.push(seg);
+    size += rows;
+  }
+  const { rows: files } = await db.execute(sql`SELECT id::text AS id FROM claim_attachments WHERE practice_id = ${practiceId} ORDER BY created_at, id`);
+  const ids = (files as { id: string }[]).map((f) => f.id);
+  if (parts.length === 0 && ids.length <= filesPerPart) return [[...current, { attachments: ids }]];
+  if (current.length) parts.push(current);
+  for (let i = 0; i < ids.length; i += filesPerPart) parts.push([{ attachments: ids.slice(i, i + filesPerPart) }]);
+  return parts;
+}
+
+/**
  * The zip, a piece at a time, so a large practice streams out instead of being
  * held in memory (and the response is not subject to the platform's body limit).
+ * With `part`, only that part's slices and files, from a plan made by planExportParts.
  */
-export async function* practiceExport(db: Db, practiceId: string, now = new Date()): AsyncGenerator<Uint8Array> {
+export async function* practiceExport(db: Db, practiceId: string, now = new Date(), part?: { segments: ExportSegment[]; index: number; total: number }): AsyncGenerator<Uint8Array> {
   const out: Uint8Array[] = [];
   let failed: Error | null = null;
   const zip = new Zip((err, chunk) => { if (err) failed = err; else out.push(chunk); });
@@ -88,20 +133,27 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
   };
   const plan = await exportPlan(db);
   const counts: string[] = [];
+  const everything = !part;
+  const segments: ExportSegment[] = part?.segments ?? plan.sources.map((s) => ({ table: s.table, afterId: null, limit: null, label: `tables/${s.table}.csv` }));
 
-  for (const s of plan.sources) {
+  for (const seg of segments) {
+    if ("attachments" in seg) continue;
+    const s = plan.sources.find((x) => x.table === seg.table);
+    if (!s) continue;
     const keep = plan.columns[s.table].keep;
-    const file = new ZipDeflate(`tables/${s.table}.csv`, { level: 6 });
+    const file = new ZipDeflate(seg.label, { level: 6 });
     zip.add(file);
     file.push(enc.encode(keep.join(",") + "\r\n"), false);
     let n = 0;
     // Keyset paging on id, so the last page costs what the first does; tables without an id fall back to offsets.
     const keyed = keep.includes("id");
-    let last: unknown = null;
+    let last: unknown = seg.afterId;
     for (let offset = 0; ; offset += PAGE) {
       const cols = sql.raw(keep.map(q).join(", "));
+      const take = seg.limit === null ? PAGE : Math.min(PAGE, seg.limit - n);
+      if (take <= 0) break;
       const { rows } = keyed
-        ? await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ${last === null ? sql`` : sql`AND id > ${last}`} ORDER BY id LIMIT ${PAGE}`)
+        ? await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ${last === null ? sql`` : sql`AND id > ${last}`} ORDER BY id LIMIT ${take}`)
         : await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ORDER BY 1 LIMIT ${PAGE} OFFSET ${offset}`);
       if (!rows.length) break;
       if (keyed) last = (rows[rows.length - 1] as Record<string, unknown>).id;
@@ -109,19 +161,23 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
       file.push(enc.encode(text), false);
       n += rows.length;
       yield* drain();
-      if (rows.length < PAGE) break;
+      if (rows.length < take) break;
     }
     file.push(new Uint8Array(0), true);
-    counts.push(`${s.table}: ${n} rows`);
+    counts.push(`${seg.label.replace(/^tables\//, "").replace(/\.csv$/, "")}: ${n} rows`);
     yield* drain();
   }
 
   // Attachments as the files themselves, one at a time.
   let files = 0;
   const missing: string[] = [];
-  const { rows: ids } = await db.execute(sql`SELECT id FROM claim_attachments WHERE practice_id = ${practiceId} ORDER BY created_at`);
-  for (const { id } of ids as { id: string }[]) {
-    const { rows } = await db.execute(sql`SELECT filename, data_base64, storage_key FROM claim_attachments WHERE id = ${id}`);
+  let ids: string[];
+  if (everything) {
+    const { rows } = await db.execute(sql`SELECT id::text AS id FROM claim_attachments WHERE practice_id = ${practiceId} ORDER BY created_at, id`);
+    ids = (rows as { id: string }[]).map((r) => r.id);
+  } else ids = segments.flatMap((x) => ("attachments" in x ? x.attachments : []));
+  for (const id of ids) {
+    const { rows } = await db.execute(sql`SELECT filename, data_base64, storage_key FROM claim_attachments WHERE id = ${id} AND practice_id = ${practiceId}`);
     const a = rows[0] as { filename: string; data_base64: string | null; storage_key: string | null } | undefined;
     if (!a) continue;
     // A file missing from storage is listed in the README rather than failing the whole export.
@@ -138,14 +194,16 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
   const readme = [
     "CollaboratMD practice export",
     `Created ${now.toISOString()}`,
+    ...(part && part.total > 1 ? [`Part ${part.index + 1} of ${part.total}. Download every part; together they are the whole export.`] : []),
     "",
     "tables/  One CSV per table, all rows that belong to this practice. Amounts are in cents.",
     "         Dates and times are UTC. JSON columns are written as JSON text.",
+    "         A large table is split into table.part1.csv, table.part2.csv and so on, in id order.",
     "attachments/  Claim attachments, named <attachment id>-<original file name>.",
     "",
     "The export is taken table by table, so a change made while it ran may appear in some files and not others.",
     "",
-    "Rows:",
+    "Rows in this file:",
     ...counts.map((c) => `  ${c}`),
     `  attachments: ${files} files`,
     ...(missing.length ? ["", "Attachments that could not be read from file storage:", ...missing.map((m) => `  ${m}`)] : []),

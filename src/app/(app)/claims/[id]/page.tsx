@@ -324,7 +324,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
 
           {b.claim.edi837 ? (
             <Card title={dental ? "837D transaction (X12 005010X224A2)" : b.claim.claimType === "institutional" ? "837I transaction (X12 005010X223A2)" : "837P transaction (X12 005010X222A1)"}>
-              <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-green-200">{b.claim.edi837}</pre>
+              <pre tabIndex={0} aria-label="Claim file (837)" className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-green-200">{b.claim.edi837}</pre>
             </Card>
           ) : b.claim.status === "ready" && (
             <p className="text-sm text-slate-600">

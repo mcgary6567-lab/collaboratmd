@@ -27,7 +27,7 @@ export function Toaster() {
     <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className={`pointer-events-auto flex items-start gap-2 rounded-lg border bg-white px-4 py-3 text-sm shadow-lg ${t.ok ? "border-green-200" : "border-red-200"}`}>
-          {t.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
+          {t.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
           <span className="text-slate-800">{t.message}</span>
         </div>
       ))}

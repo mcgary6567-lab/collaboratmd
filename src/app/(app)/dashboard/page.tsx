@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Send, Trendin
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { userWorkload, recentPayments, recoveredDenials, collectionsSummary } from "@/server/analytics";
+import { memo } from "@/lib/memo";
 import { listAppointments } from "@/server/encounters";
 import { Card, PageHeader, Badge, Empty } from "@/components/ui";
 import { OnboardingGuide } from "./onboarding";
@@ -20,7 +21,8 @@ export default async function UserDashboard() {
     recentPayments(db, s.practiceId),
     recoveredDenials(db, s.practiceId),
     listAppointments(db, s.practiceId, new Date()),
-    collectionsSummary(db, s.practiceId),
+    // Totals over months of ledger entries; a few minutes old is fine here.
+    memo(`collections:${s.practiceId}`, 5 * 60_000, () => collectionsSummary(db, s.practiceId)),
   ]);
 
   const firstName = s.name.split(" ")[0];
@@ -47,7 +49,7 @@ export default async function UserDashboard() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-center">
           <div>
             <div className="flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+              <TrendingUp className="h-3.5 w-3.5 text-green-700" />
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Collected, last 30 days</span>
             </div>
             <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-green-700">
@@ -261,7 +263,7 @@ export default async function UserDashboard() {
               <span className="font-semibold tabular-nums">{work.checkedIn.toLocaleString()}</span>
             </Link>
             <Link href="/remittance" className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <CheckCircle2 className="h-4 w-4 text-green-700" />
               <span className="flex-1">Post remittances</span>
             </Link>
           </div>

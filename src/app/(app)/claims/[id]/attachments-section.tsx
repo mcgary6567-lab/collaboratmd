@@ -27,10 +27,10 @@ export async function AttachmentsSection({ practiceId, claimId, submitted, canWr
       )}
       {canWrite && (
         <ActionForm action={addAttachmentAction.bind(null, claimId)} className="space-y-2 text-sm">
-          <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/tiff" className="block w-full text-xs" required />
+          <input type="file" name="file" aria-label="File to attach" accept="application/pdf,image/jpeg,image/png,image/tiff" className="block w-full text-xs" required />
           <div className="grid gap-2 sm:grid-cols-2">
-            <select name="reportType" defaultValue="OZ" className="input">{Object.entries(REPORT_TYPES).map(([k, v]) => <option key={k} value={k}>{k} {v}</option>)}</select>
-            <select name="transmission" defaultValue="FX" className="input">{Object.entries(TRANSMISSIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            <select name="reportType" aria-label="Report type" defaultValue="OZ" className="input">{Object.entries(REPORT_TYPES).map(([k, v]) => <option key={k} value={k}>{k} {v}</option>)}</select>
+            <select name="transmission" aria-label="How it is sent" defaultValue="FX" className="input">{Object.entries(TRANSMISSIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           </div>
           <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Uploading...">Attach</SubmitButton>
           <p className="text-xs text-slate-500">

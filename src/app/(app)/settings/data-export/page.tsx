@@ -48,7 +48,10 @@ export default async function DataExportPage() {
               {jobs.map((j) => (
                 <li key={j.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span>{fmtDateTime(j.createdAt)} <Badge tone={TONE[j.status as keyof typeof TONE] ?? "slate"}>{j.status}</Badge>{j.error ? <span className="ml-2 text-red-700">{j.error}</span> : null}</span>
-                  {j.status === "done" && <a className="font-semibold text-brand-700 hover:underline" href={`/api/export/files/${j.id}`}>Download ({((j.bytes ?? 0) / 1e6).toFixed(1)} MB)</a>}
+                  {j.status === "done" && (j.parts.length > 1 ? (
+                    <span className="flex flex-wrap gap-2">{j.parts.map((p, i) => <a key={p.key} className="font-semibold text-brand-700 hover:underline" href={`/api/export/files/${j.id}?part=${i}`}>Part {i + 1} ({(p.bytes / 1e6).toFixed(1)} MB)</a>)}</span>
+                  ) : <a className="font-semibold text-brand-700 hover:underline" href={`/api/export/files/${j.id}`}>Download ({((j.bytes ?? 0) / 1e6).toFixed(1)} MB)</a>)}
+                  {j.status === "running" && j.plan && <span className="text-xs text-slate-500">part {Math.abs(j.nextPart)} of {j.plan.length}</span>}
                 </li>
               ))}
             </ul>

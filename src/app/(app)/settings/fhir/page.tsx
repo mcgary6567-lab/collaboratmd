@@ -69,7 +69,7 @@ export default async function FhirPage() {
         <Card title="What comes in" className="lg:col-span-2">
           <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
             <li>Patients changed since the last sync, matched by FHIR id, then name and date of birth; new ones are added.</li>
-            <li>Finished encounters, as completed visits with the provider whose NPI is on the encounter. They then wait under <Link href="/billing/missed-charges" className="text-brand-700 hover:underline">Missed charges</Link> for charges to be entered.</li>
+            <li>Finished encounters, as completed visits with the provider whose NPI is on the encounter. They then wait under <Link href="/billing/missed-charges" className="text-brand-700 underline">Missed charges</Link> for charges to be entered.</li>
             <li>Syncs every morning with the daily jobs, or now with the button.</li>
           </ul>
           {conn?.lastSyncAt && (

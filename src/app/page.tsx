@@ -281,7 +281,7 @@ export default async function LandingPage() {
                 { icon: ShieldCheck, title: "Amounts never edited", body: "Corrections post as reversals" },
               ].map(({ icon: Icon, title, body }) => (
                 <div key={title} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <Icon className="h-5 w-5 shrink-0 text-green-600" />
+                  <Icon className="h-5 w-5 shrink-0 text-green-700" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-slate-900">{title}</div>
                     <div className="truncate text-xs text-slate-500">{body}</div>
@@ -298,7 +298,7 @@ export default async function LandingPage() {
       {/* -------------------------------------------------------- stats */}
       <section className="border-y border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-7xl px-6 py-12">
-          <p className="text-xs font-bold uppercase tracking-widest text-green-600">Inside the live demo environment</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-green-700">Inside the live demo environment</p>
           <div className="mt-6 grid grid-cols-2 gap-8 lg:grid-cols-4">
             {[
               { value: "$62.7M", label: "Billed charges carried in the ledger" },
@@ -318,7 +318,7 @@ export default async function LandingPage() {
       {/* ------------------------------------------------- product tour */}
       <section id="platform" className="mx-auto max-w-7xl scroll-mt-20 px-6 py-20 lg:py-28">
         <div className="max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-green-600">The platform</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">The platform</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Everything between the visit and the deposit</h2>
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
             Most billing problems are caught too late. CollaboratMD moves every check forward, to the moment
@@ -369,7 +369,7 @@ export default async function LandingPage() {
       <section id="features" className="mx-auto max-w-7xl scroll-mt-20 px-6 py-20 lg:py-28">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">Everything included</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">Everything included</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">One system instead of six</h2>
             <p className="mt-4 text-lg leading-relaxed text-slate-600">
               Eligibility, coding, claims, remittance, patient payments and reporting share one ledger, so nothing is
@@ -384,13 +384,13 @@ export default async function LandingPage() {
           {CAPABILITIES.map(({ group, icon: Icon, items }) => (
             <div key={group} className="rounded-2xl border border-slate-200 bg-white p-5">
               <div className="flex items-center gap-2">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600"><Icon className="h-4.5 w-4.5" /></span>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-700"><Icon className="h-4.5 w-4.5" /></span>
                 <h3 className="font-bold text-slate-900">{group}</h3>
               </div>
               <ul className="mt-4 space-y-2.5">
                 {items.map((c) => (
                   <li key={c.name} className="text-sm leading-snug text-slate-700">
-                    <span className="mr-1.5 text-green-600">✓</span>
+                    <span className="mr-1.5 text-green-700">✓</span>
                     {c.name}
                     {c.needs && <span className="ml-1 whitespace-nowrap rounded border border-slate-200 bg-slate-50 px-1 py-px text-[10px] font-medium text-slate-500">needs {c.needs}</span>}
                   </li>
@@ -405,7 +405,7 @@ export default async function LandingPage() {
       <section id="workflow" className="scroll-mt-20 border-y border-slate-200 bg-slate-50 py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-6">
           <div className="max-w-2xl">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">How it works</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">How it works</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">One loop, start to finish</h2>
             <p className="mt-4 text-lg leading-relaxed text-slate-600">
               Every screen sits somewhere on this path, and nothing is a dead end: a denial becomes an appeal or a
@@ -415,7 +415,8 @@ export default async function LandingPage() {
           <ol className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {WORKFLOW.map(({ icon: Icon, title, body }, i) => (
               <li key={title} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 transition-shadow hover:shadow-lg hover:shadow-slate-900/5">
-                <span aria-hidden className="absolute -right-2 -top-4 font-mono text-7xl font-black text-slate-100 transition-colors group-hover:text-green-50">{String(i + 1).padStart(2, "0")}</span>
+                {/* Drawn by CSS so it is decoration, not text that must meet contrast. */}
+                <span aria-hidden data-step={String(i + 1).padStart(2, "0")} className="absolute -right-2 -top-4 font-mono text-7xl font-black text-slate-100 transition-colors group-hover:text-green-50 before:content-[attr(data-step)]" />
                 <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white transition-colors group-hover:bg-green-700">
                   <Icon className="h-5 w-5" />
                 </span>
@@ -430,7 +431,7 @@ export default async function LandingPage() {
       {/* --------------------------------------------------- calculator */}
       <section id="calculator" className="mx-auto max-w-7xl scroll-mt-20 px-6 py-20 lg:py-28">
         <div className="max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-green-600">Denial cost calculator</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">Denial cost calculator</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">What are denials costing you?</h2>
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
             Move the sliders to your practice&apos;s numbers. The arithmetic is shown under the result, and nothing you enter leaves this page.
@@ -445,7 +446,7 @@ export default async function LandingPage() {
       <section id="benchmarks" className="border-t border-slate-200 bg-slate-50">
         <div className="mx-auto grid max-w-7xl gap-14 px-6 py-20 lg:grid-cols-2 lg:items-center lg:py-28">
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">Benchmarks</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">Benchmarks</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Numbers with a point of comparison</h2>
             <p className="mt-4 text-lg leading-relaxed text-slate-600">
               A dashboard that reports 51 days in A/R without saying whether that is good is just trivia. Every headline
@@ -510,12 +511,12 @@ export default async function LandingPage() {
                 ))}
               </ul>
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Connects to, with your own account, from one settings screen</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Connects to, with your own account, from one settings screen</p>
                 <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                   {CONNECTS.map((c) => (
                     <li key={c.name} className="rounded-xl border border-white/10 px-4 py-3">
                       <div className="text-sm font-semibold text-white">{c.name}</div>
-                      <div className="text-xs text-slate-500">{c.what}</div>
+                      <div className="text-xs text-slate-400">{c.what}</div>
                     </li>
                   ))}
                 </ul>

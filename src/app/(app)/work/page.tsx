@@ -69,7 +69,7 @@ export default async function WorkPage() {
           {!admin ? <p className="text-sm text-slate-500">An administrator sets up rules.</p> : (
             <ActionForm action={saveRuleAction} className="space-y-2 text-sm">
               <input name="name" className="input" placeholder="e.g. Aetna denials over $500" required maxLength={80} />
-              <select name="kind" className="input" defaultValue="denials">{Object.entries(RULE_KINDS).map(([k, v]) => <option key={k} value={k}>{v.label}: {v.description.toLowerCase()}</option>)}</select>
+              <select name="kind" className="input" aria-label="What the rule watches" defaultValue="denials">{Object.entries(RULE_KINDS).map(([k, v]) => <option key={k} value={k}>{v.label}: {v.description.toLowerCase()}</option>)}</select>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-xs">At least ($)<input name="min" inputMode="decimal" placeholder="0" className="input mt-1" /></label>
                 <label className="block text-xs">Unpaid days (stalled)<input name="minAgeDays" type="number" min={7} max={365} defaultValue={30} className="input mt-1" /></label>

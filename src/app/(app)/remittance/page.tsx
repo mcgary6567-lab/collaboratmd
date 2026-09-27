@@ -74,7 +74,7 @@ export default async function RemittancePage() {
       </Card>
       {rows[0] && (
         <Card title={`Latest 835 (${rows[0].checkNumber})`} className="mt-6">
-          <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-sky-200">{rows[0].raw835}</pre>
+          <pre tabIndex={0} aria-label="Raw 835 file" className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-sky-200">{rows[0].raw835}</pre>
         </Card>
       )}
     </>

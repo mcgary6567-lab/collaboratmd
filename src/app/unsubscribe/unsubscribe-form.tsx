@@ -28,7 +28,7 @@ export function UnsubscribeForm() {
   if (state?.ok) {
     return (
       <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-green-600" />
+        <CheckCircle2 className="mx-auto h-10 w-10 text-green-700" />
         <h2 className="mt-4 text-lg font-bold text-slate-900">You have been removed</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-700">
           We have recorded the request for <strong>{state.email}</strong>. It takes effect on the

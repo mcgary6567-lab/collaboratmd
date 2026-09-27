@@ -24,7 +24,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
               <WelcomeForm token={token} />
             </>
           ) : (
-            <p className="text-sm text-slate-700">This link has expired or was already used. Ask your practice administrator for a new one, or <Link href="/login" className="text-brand-700 hover:underline">sign in</Link>.</p>
+            <p className="text-sm text-slate-700">This link has expired or was already used. Ask your practice administrator for a new one, or <Link href="/login" className="text-brand-700 underline">sign in</Link>.</p>
           )}
         </div>
       </div>

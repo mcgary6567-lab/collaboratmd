@@ -5,6 +5,7 @@ import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { isPlatformOperator } from "@/server/code-sets";
 import { extendTrial, practiceOverview } from "@/server/operator";
+import { usageSummary } from "@/server/usage";
 import { moveAttachmentsToStore } from "@/server/attachments";
 import { fileStore } from "@/server/files";
 import { platformBillingReady } from "@/server/subscription";
@@ -66,13 +67,13 @@ export default async function OperatorPracticesPage() {
     return <><PageHeader title="Practices" /><Card><p className="text-sm text-slate-600">This page is for the people who operate the service.</p></Card></>;
   }
   const db = await getDb();
-  const { rows, totals } = await practiceOverview(db);
+  const [{ rows, totals }, usage] = await Promise.all([practiceOverview(db), usageSummary(db, 30)]);
   const [{ n: dbFiles }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.claimAttachments).where(isNull(schema.claimAttachments.storageKey));
   const stat = (label: string, value: string) => <div className="card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div><div className="mt-1 text-2xl font-bold">{value}</div></div>;
 
   return (
     <>
-      <PageHeader title="Practices" subtitle="Every practice on the platform: trials, subscriptions and use. Counts and dates only." actions={<Link href="/ops/errors" className="btn btn-secondary">Server errors</Link>} />
+      <PageHeader title="Practices" subtitle="Every practice on the platform: trials, subscriptions and use. Counts and dates only." actions={<><Link href="/ops/feedback" className="btn btn-secondary">Problem reports</Link><Link href="/ops/errors" className="btn btn-secondary">Server errors</Link></>} />
       <div className="mb-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {stat("Practices", String(totals.practices))}
         {stat("Self-serve", String(totals.selfServe))}
@@ -84,7 +85,7 @@ export default async function OperatorPracticesPage() {
       <Card>
         <div className="overflow-x-auto">
           <table className="table">
-            <thead><tr><th>Practice</th><th>Status</th><th>Plan</th><th className="text-right">Providers</th><th className="text-right">Users</th><th className="text-right">Claims (30d)</th><th>Last sign-in</th><th className="text-right">Monthly</th><th /></tr></thead>
+            <thead><tr><th>Practice</th><th>Status</th><th>Plan</th><th className="text-right">Providers</th><th className="text-right">Users</th><th className="text-right">Claims (30d)</th><th>Last sign-in</th><th>Most used (30d)</th><th className="text-right">Monthly</th><th /></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
@@ -95,6 +96,7 @@ export default async function OperatorPracticesPage() {
                   <td className="text-right">{r.users}</td>
                   <td className="text-right">{r.claims30.toLocaleString()}</td>
                   <td className="text-xs">{r.lastLogin ? fmtDateTime(r.lastLogin) : "never"}</td>
+                  <td className="text-xs text-slate-600">{(usage.top.get(r.id) ?? []).map((u) => `${u.feature} (${u.views})`).join(", ") || "-"}</td>
                   <td className="text-right">{r.monthlyCents !== null ? money(r.monthlyCents) : "-"}</td>
                   <td>{r.selfServe && <ActionForm action={extendAction.bind(null, r.id)} className="flex items-center gap-1"><input name="days" type="number" min={1} max={60} defaultValue={14} className="input w-16 py-1 text-xs" aria-label="Days to add" /><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Extend trial</SubmitButton></ActionForm>}</td>
                 </tr>
@@ -103,6 +105,15 @@ export default async function OperatorPracticesPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-slate-500">Monthly is estimated from the plan&apos;s list price per provider; annual plans and discounts are billed differently in Stripe.{platformBillingReady() ? "" : " Subscriptions are not set up on this deployment."}</p>
+      </Card>
+      <Card title="What gets used (last 30 days)" className="mt-6">
+        {usage.overall.length === 0 ? <p className="text-sm text-slate-600">No page views recorded yet.</p> : (
+          <table className="table">
+            <thead><tr><th>Page</th><th className="text-right">Views</th><th className="text-right">Practices</th></tr></thead>
+            <tbody>{usage.overall.map((u) => <tr key={u.feature}><td className="font-mono text-xs">{u.feature}</td><td className="text-right">{Number(u.views).toLocaleString()}</td><td className="text-right">{u.practices}</td></tr>)}</tbody>
+          </table>
+        )}
+        <p className="mt-2 text-xs text-slate-500">Counts of pages opened, with ids removed from the addresses. No patient or claim is recorded.</p>
       </Card>
       <Card title="Encryption keys" className="mt-6">
         <p className="text-sm text-slate-600">{keyRing() ? `Stored secrets are encrypted with the SEAL_KEYS ring (current key "${keyRing()!.current}"). After adding a new key at the front, re-encrypt, then remove the old key.` : "Stored secrets are encrypted with a key derived from AUTH_SECRET. Set SEAL_KEYS, then re-encrypt, so AUTH_SECRET can be rotated without losing them."}</p>

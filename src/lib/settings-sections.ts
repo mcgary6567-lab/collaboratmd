@@ -6,6 +6,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     title: "Practice",
     links: [
       { href: "/settings", label: "Overview", description: "Setup health and every setting in one place" },
+      { href: "/settings/go-live", label: "Go-live checklist", description: "From setup to real claims, step by step, checked against your data", keywords: "launch start checklist onboarding pilot ready" },
       { href: "/settings/subscription", label: "Subscription", description: "Your CollaboratMD plan, trial and invoices", adminOnly: true, keywords: "plan billing invoice trial upgrade cancel pricing" },
       { href: "/settings/profile", label: "Practice profile", description: "Legal name, NPI, tax ID and address sent on every claim", adminOnly: true, keywords: "billing provider npi ein tin address phone" },
       { href: "/settings/booking", label: "Online booking", description: "Let patients request open times from a link; staff confirm each one", adminOnly: true, keywords: "schedule appointment self booking web patient request hours" },

@@ -6,6 +6,7 @@ import { MfaSetup } from "@/components/mfa-setup";
 import { CommandPalette } from "@/components/command-palette";
 import { Toaster } from "@/components/toaster";
 import { HelpButton } from "@/components/help-button";
+import { UsageBeacon } from "@/components/usage-beacon";
 import { pagesFor } from "@/lib/nav";
 import { myTaskCounts } from "@/server/work";
 import { unreadCount } from "@/server/notifications";
@@ -61,6 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <CommandPalette pages={pagesFor(session.role, practices.length > 1)} />
       <Toaster />
       <HelpButton />
+      <UsageBeacon />
     </div>
   );
 }

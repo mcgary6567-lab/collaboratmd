@@ -53,7 +53,7 @@ export function Logo({
     <span className={`flex items-center gap-2.5 ${className}`}>
       <LogoMark className={markClassName} id={id} />
       <span className={`font-bold tracking-tight ${textClassName} ${tone === "light" ? "text-white" : "text-slate-900"}`}>
-        Collaborat<span className={tone === "light" ? "text-green-300" : "text-green-600"}>MD</span>
+        Collaborat<span className={tone === "light" ? "text-green-300" : "text-green-700"}>MD</span>
       </span>
     </span>
   );

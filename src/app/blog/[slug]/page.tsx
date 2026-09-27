@@ -48,7 +48,7 @@ function Blocks({ blocks }: { blocks: Block[] }) {
             return (
               <ul key={i} className="mt-5 space-y-2.5 pl-5">
                 {b.items.map((it) => (
-                  <li key={it} className="list-disc text-[17px] leading-[1.7] text-slate-700 marker:text-green-600">
+                  <li key={it} className="list-disc text-[17px] leading-[1.7] text-slate-700 marker:text-green-700">
                     {it}
                   </li>
                 ))}
@@ -60,7 +60,7 @@ function Blocks({ blocks }: { blocks: Block[] }) {
                 {b.items.map((it) => (
                   <li
                     key={it}
-                    className="list-decimal text-[17px] leading-[1.7] text-slate-700 marker:font-semibold marker:text-green-600"
+                    className="list-decimal text-[17px] leading-[1.7] text-slate-700 marker:font-semibold marker:text-green-700"
                   >
                     {it}
                   </li>
@@ -189,7 +189,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
       <section className="border-t border-slate-200 bg-slate-50 py-14">
         <div className="mx-auto max-w-5xl px-6">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-green-600">Keep reading</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-green-700">Keep reading</h2>
           <div className="mt-6 grid gap-6 md:grid-cols-2">
             {more.map((p) => (
               <Link

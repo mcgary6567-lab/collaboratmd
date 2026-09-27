@@ -48,7 +48,7 @@ export default async function SsoPage() {
 
         <Card title="SCIM provisioning" className="lg:col-span-2">
           <p className="mb-3 text-xs text-slate-600">
-            With SCIM your identity provider adds people when they are assigned the app and removes access when they leave, without anyone touching this page. Supported: Users (create, update name, deactivate). Roles stay in <Link href="/settings/team" className="text-brand-700 hover:underline">Team and roles</Link>.
+            With SCIM your identity provider adds people when they are assigned the app and removes access when they leave, without anyone touching this page. Supported: Users (create, update name, deactivate). Roles stay in <Link href="/settings/team" className="text-brand-700 underline">Team and roles</Link>.
           </p>
           {!cfg ? (
             <p className="text-sm text-slate-500">Set up single sign-on first.</p>

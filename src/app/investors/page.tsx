@@ -135,7 +135,7 @@ function Benchmark({
       <div className="flex items-start justify-between gap-3">
         <span
           className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${
-            pass ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
+            pass ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-600"
           }`}
         >
           <Icon className="h-5 w-5" />
@@ -214,7 +214,7 @@ export default async function InvestorsPage() {
       {m && (
         <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-600">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-700">
               <Activity className="h-3.5 w-3.5" /> Computed live from the demo environment
             </span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
@@ -327,7 +327,7 @@ export default async function InvestorsPage() {
       {TRACTION.length > 0 && (
         <section className="mx-auto max-w-7xl px-6 pt-16 lg:pt-24">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">Traction</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">Traction</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Where we are today
             </h2>
@@ -346,7 +346,7 @@ export default async function InvestorsPage() {
       {/* ---------------------------------------------------------- proof */}
       <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
-          <span className="text-xs font-bold uppercase tracking-widest text-green-600">The product</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">The product</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             What is actually built
           </h2>
@@ -362,7 +362,7 @@ export default async function InvestorsPage() {
               className="group rounded-2xl border border-slate-200 bg-white p-7 transition-shadow hover:shadow-lg hover:shadow-slate-900/5"
             >
               <div className="flex items-center gap-4">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600 transition-colors group-hover:bg-green-700 group-hover:text-white">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700 transition-colors group-hover:bg-green-700 group-hover:text-white">
                   <Icon className="h-5 w-5" />
                 </span>
                 <div>
@@ -378,7 +378,7 @@ export default async function InvestorsPage() {
         {/* engineering strip */}
         <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-7">
           <div className="flex items-center gap-2">
-            <Boxes className="h-4 w-4 text-green-600" />
+            <Boxes className="h-4 w-4 text-green-700" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
               Underneath it
             </h3>
@@ -386,7 +386,7 @@ export default async function InvestorsPage() {
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {ENGINEERING.map(({ icon: Icon, label, detail }) => (
               <div key={label} className="flex gap-3">
-                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-slate-900">{label}</div>
                   <div className="mt-0.5 text-xs leading-relaxed text-slate-600">{detail}</div>
@@ -401,7 +401,7 @@ export default async function InvestorsPage() {
       <section className="border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">The market</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">The market</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Why this segment
             </h2>
@@ -409,7 +409,7 @@ export default async function InvestorsPage() {
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {WHY_NOW.map(({ icon: Icon, title, body }) => (
               <div key={title} className="rounded-2xl border border-slate-200 bg-white p-7">
-                <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-700">
                   <Icon className="h-5 w-5" />
                 </span>
                 <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>
@@ -423,7 +423,7 @@ export default async function InvestorsPage() {
       {/* ---------------------------------------------------- market size */}
       <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
-          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-600">
+          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-700">
             <PieChart className="h-3.5 w-3.5" /> Market size
           </span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
@@ -525,7 +525,7 @@ export default async function InvestorsPage() {
       <section className="border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-600">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-700">
               <Compass className="h-3.5 w-3.5" /> Where we fit
             </span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
@@ -551,7 +551,7 @@ export default async function InvestorsPage() {
               <ul className="mt-4 space-y-2.5">
                 {DIFFERENTIATORS.map((d) => (
                   <li key={d} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
                     {d}
                   </li>
                 ))}
@@ -623,7 +623,7 @@ export default async function InvestorsPage() {
       {TEAM.length > 0 && (
         <section className="mx-auto max-w-7xl px-6 pb-16 lg:pb-24">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">The team</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">The team</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Who is building it
             </h2>
@@ -671,7 +671,7 @@ export default async function InvestorsPage() {
       <section className="mx-auto max-w-7xl px-6 pb-16 lg:pb-24">
         <div className="grid gap-8 rounded-3xl border border-slate-200 bg-white p-8 lg:grid-cols-2 lg:p-10">
           <div>
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-700">
               <Landmark className="h-5 w-5" />
             </span>
             <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-900">
@@ -686,7 +686,7 @@ export default async function InvestorsPage() {
           <ul className="space-y-3.5">
             {DATA_ROOM.map((item) => (
               <li key={item} className="flex gap-3 text-sm leading-relaxed text-slate-700">
-                <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
                 {item}
               </li>
             ))}

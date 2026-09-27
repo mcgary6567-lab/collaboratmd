@@ -42,6 +42,37 @@ Set any of these on the Vercel project:
 
 With none set, nothing is sent, and errors are still listed at `/ops/errors`.
 
+## Request IDs
+
+Every request gets an ID (a valid incoming `X-Request-Id` is kept, otherwise a new one is made), returned in the `X-Request-Id` response header. Server errors are logged as one JSON line with `requestId`, `route`, `method` and `digest`, and `/ops/errors` shows the last request ID for each error. To trace a report, search the Vercel function logs for that ID.
+
+## Problem reports and usage
+
+- The **?** button on every screen has "Report a problem with this page". Reports go to `/ops/feedback` and alert operators through the channels above. The alert names only the practice and the page; read the report itself in `/ops/feedback`. Mark each one resolved when handled.
+- Screens opened are counted per practice per day, by address pattern only (ids replaced by `:id`, no query strings). `/ops/practices` shows the most used screens over 30 days, for deciding what to improve and for spotting practices that stopped using something.
+
+## Large exports
+
+With file storage configured, the data export runs in the background. A practice too large for one run is split into parts (tables over 100,000 rows are sliced, about 250,000 rows or 300 attachments per part). Each run builds parts for up to three minutes, then starts the next run by calling `/api/export/jobs/<id>/continue` on the site's own address (`APP_URL`, else the production domain) with a signed token. The administrator downloads each part from Settings → Data export. If an export shows "failed", its error says why; start a new one.
+
+## Data retention
+
+The daily job deletes operational records past their period. Clinical and financial records (patients, claims, the ledger, remittances, statements, documents) are never deleted here; they go only when a practice closes.
+
+| Records | Kept (days) | Minimum | Variable |
+|---|---|---|---|
+| Read notifications | 365 | 30 | `RETENTION_NOTIFICATIONS_DAYS` |
+| Unread notifications | 730 | 90 | `RETENTION_UNREAD_NOTIFICATIONS_DAYS` |
+| Resolved server errors | 180 | 30 | `RETENTION_RESOLVED_ERRORS_DAYS` |
+| Integration doctor results | 365 | 30 | `RETENTION_INTEGRATION_CHECKS_DAYS` |
+| Delivered webhook attempts | 365 | 30 | `RETENTION_WEBHOOK_DELIVERIES_DAYS` |
+| Daily usage counts | 730 | 90 | `RETENTION_USAGE_DAYS` |
+| Resolved problem reports | 730 | 90 | `RETENTION_FEEDBACK_DAYS` |
+| Record of texts and emails sent | 2555 | 2190 | `RETENTION_MESSAGES_DAYS` |
+| Audit log | 2555 | 2190 | `RETENTION_AUDIT_LOG_DAYS` |
+
+A value below the minimum is ignored and the default used. The daily job's response includes how many rows each rule removed. Confirm the periods with counsel and with your BAAs before relying on them; some states and payer contracts require longer.
+
 ## When something breaks
 
 1. **Confirm.** Open `/status` and `/ops/errors`. Check the Vercel deployment list and the Neon console for incidents.
@@ -68,9 +99,9 @@ With none set, nothing is sent, and errors are still listed at `/ops/errors`.
 
 | When | What |
 |---|---|
-| Daily | Glance at `/ops/errors`; confirm the daily job ran (Vercel → Cron Jobs) |
-| Weekly | Review Vercel function errors and Neon storage growth |
-| Monthly | `npm audit` and dependency updates; review platform operator list |
+| Daily | Glance at `/ops/errors` and `/ops/feedback`; confirm the daily job ran (Vercel → Cron Jobs) |
+| Weekly | Review Vercel function errors and Neon storage growth; merge the Dependabot pull requests once CI is green |
+| Monthly | `npm audit`; review platform operator list |
 | Quarterly | Restore drill (`docs/08-restore-drill.md`); access review prompt goes to every practice admin automatically |
 | Yearly | Rotate `CRON_SECRET` and integration keys; HIPAA risk assessment |
 

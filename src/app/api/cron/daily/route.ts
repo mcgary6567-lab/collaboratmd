@@ -4,6 +4,7 @@ import { siteOrigin } from "@/lib/origin";
 import { runDaily } from "@/server/automation";
 import { pruneThrottle } from "@/server/throttle";
 import { expireExports } from "@/server/export-jobs";
+import { applyRetention } from "@/server/retention";
 import { sendLifecycleEmails } from "@/server/lifecycle";
 import { runScheduledClosures } from "@/server/offboarding";
 import { sendEmail } from "@/server/notify";
@@ -32,9 +33,10 @@ export async function GET(req: Request) {
   await expireExports(db).catch((e) => console.error("export expiry failed", e instanceof Error ? e.message : e));
   const accountEmails = await sendLifecycleEmails(db, await siteOrigin(), (to, subject, text) => sendEmail(to, subject, text)).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
   const closures = await runScheduledClosures(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
+  const retention = await applyRetention(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
   // CollaboratMD's own billing: seats follow active providers, and claims sent go to the usage meter.
   const billing = platformBillingReady()
     ? { seats: await syncSeats(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`), claims: await reportClaimUsage(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`) }
     : null;
-  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing, accountEmails, closures });
+  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing, accountEmails, closures, retention });
 }

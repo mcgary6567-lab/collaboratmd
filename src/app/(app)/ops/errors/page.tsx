@@ -35,7 +35,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
             <tbody>
               {errors.map((e) => (
                 <tr key={e.fingerprint}>
-                  <td className="max-w-md"><p className="break-words font-mono text-xs">{e.message}</p>{e.digest && <p className="text-[11px] text-slate-500">digest {e.digest}</p>}</td>
+                  <td className="max-w-md"><p className="break-words font-mono text-xs">{e.message}</p>{e.digest && <p className="text-[11px] text-slate-500">digest {e.digest}</p>}{e.lastRequestId && <p className="text-[11px] text-slate-500">last request {e.lastRequestId}</p>}</td>
                   <td className="text-xs"><span className="font-mono">{e.method} {e.path}</span><span className="block text-slate-500">{e.routePath} · {e.routeType}</span></td>
                   <td className="text-right font-semibold">{e.count}</td>
                   <td className="text-xs">{fmtDateTime(e.firstSeen)}</td>

@@ -33,7 +33,7 @@ export async function PageShell({
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(45rem_22rem_at_50%_-8rem,rgba(22,163,74,0.13),transparent)]"
         />
         <div className="relative mx-auto max-w-7xl px-6 py-14 lg:py-20">
-          <span className="text-xs font-bold uppercase tracking-widest text-green-600">{eyebrow}</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">{eyebrow}</span>
           <h1 className="mt-3 max-w-3xl text-3xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
             {title}
           </h1>
@@ -60,9 +60,9 @@ export function Prose({ children }: { children: React.ReactNode }) {
         [&>h3]:mt-8 [&>h3]:text-base [&>h3]:font-bold [&>h3]:text-slate-900
         [&>p]:mt-4
         [&>ul]:mt-4 [&>ul]:space-y-2 [&>ul]:pl-5
-        [&>ul>li]:list-disc [&>ul>li]:marker:text-green-600
+        [&>ul>li]:list-disc [&>ul>li]:marker:text-green-700
         [&>ol]:mt-4 [&>ol]:space-y-2 [&>ol]:pl-5
-        [&>ol>li]:list-decimal [&>ol>li]:marker:font-semibold [&>ol>li]:marker:text-green-600
+        [&>ol>li]:list-decimal [&>ol>li]:marker:font-semibold [&>ol>li]:marker:text-green-700
         [&_a]:font-medium [&_a]:text-green-700 [&_a]:underline [&_a]:underline-offset-2
         [&_strong]:font-semibold [&_strong]:text-slate-900
       "

@@ -10,6 +10,18 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-27",
+    title: "A go-live checklist, problem reports, and exports for the largest practices",
+    items: [
+      "Settings > Go-live checklist walks from setup to the first paid claim, ticking each step from what has actually happened",
+      "Report a problem from the help button on any screen, straight to our team",
+      "Very large practices get their data export in parts, each downloadable on its own",
+      "Old notifications and logs are cleared on a schedule; claims, payments and the audit log are kept",
+      "Every screen is checked automatically for accessibility problems before each release",
+      "Dashboard figures load faster on repeat visits",
+    ],
+  },
+  {
+    date: "2026-09-27",
     title: "Online booking, payer directory, and checks before every claim",
     items: [
       "Patients request open times from your booking link; staff confirm each request on the schedule",
@@ -120,7 +132,7 @@ export default function ChangelogPage() {
     <PageShell eyebrow="Changelog" title="What's new" lead="Every release, newest first. Features that need an outside account (a clearinghouse, card payments, texting, email or AI) work once the practice connects its own.">
       <ol className="mt-10 space-y-10">
         {RELEASES.map((r) => (
-          <li key={r.date} className="grid gap-4 md:grid-cols-[10rem_1fr]">
+          <li key={`${r.date} ${r.title}`} className="grid gap-4 md:grid-cols-[10rem_1fr]">
             <time dateTime={r.date} className="text-sm font-semibold text-slate-500">{new Date(`${r.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</time>
             <div>
               <h2 className="text-lg font-bold text-slate-900">{r.title}</h2>

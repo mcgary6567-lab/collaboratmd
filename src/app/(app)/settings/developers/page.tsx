@@ -167,7 +167,7 @@ export default async function DevelopersPage() {
               ))}
             </tbody>
           </table>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{`curl ${origin}/api/v1/encounters \\
+          <pre tabIndex={0} className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{`curl ${origin}/api/v1/encounters \\
   -H "Authorization: Bearer $CMD_KEY" -H "Content-Type: application/json" \\
   -d '{"patient_id":"…","provider_npi":"1234567893","date_of_service":"2026-09-24",
        "diagnoses":["E11.9","I10"],
@@ -178,8 +178,8 @@ export default async function DevelopersPage() {
             Each delivery is a POST with headers <code>CollaboratMD-Event</code>, <code>CollaboratMD-Delivery</code> and <code>CollaboratMD-Signature: t=…,v1=…</code>, where v1 is the HMAC-SHA256 of
             <code> t.body</code> with the endpoint&apos;s signing secret. Answer with any 2xx within 10 seconds; anything else is retried after 1, 5 and 30 minutes, then 2, 6, 12 and 24 hours.
           </p>
-          <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{VERIFY}</pre>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{`{
+          <pre tabIndex={0} className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{VERIFY}</pre>
+          <pre tabIndex={0} className="mt-3 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{`{
   "id": "evt_…",
   "type": "claim.status_changed",
   "created": "2026-09-25T14:03:11.000Z",

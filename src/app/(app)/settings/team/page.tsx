@@ -35,7 +35,7 @@ export default async function TeamPage() {
                   <td>
                     {admin && !m.disabled ? (
                       <ActionForm action={setRoleAction.bind(null, m.userId)} className="flex items-center gap-1">
-                        <select name="role" defaultValue={m.role} className="input w-auto py-1 text-xs">
+                        <select name="role" defaultValue={m.role} className="input w-auto py-1 text-xs" aria-label={`Role for ${m.name ?? m.email}`}>
                           {roleOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                         <SubmitButton className="btn btn-secondary px-2 py-1 text-xs" pendingLabel="...">Save</SubmitButton>
@@ -126,7 +126,7 @@ export default async function TeamPage() {
             {admin && (
               <ActionForm action={saveRoleAction} className="space-y-2 text-sm">
                 <input name="name" className="input" placeholder="Role name, e.g. Coder" required maxLength={60} />
-                <select name="baseRole" defaultValue="biller" className="input">
+                <select name="baseRole" aria-label="Based on role" defaultValue="biller" className="input">
                   {Object.entries(BUILT_IN_ROLES).map(([k, v]) => <option key={k} value={k}>Starts from {v}</option>)}
                 </select>
                 <fieldset className="space-y-1 text-xs">

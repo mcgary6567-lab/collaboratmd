@@ -22,7 +22,7 @@ function Cell({ value }: { value: boolean | string }) {
   if (value === true) {
     return (
       <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-50">
-        <Check className="h-3.5 w-3.5 text-green-600" strokeWidth={3} />
+        <Check className="h-3.5 w-3.5 text-green-700" strokeWidth={3} />
       </span>
     );
   }
@@ -90,7 +90,7 @@ export default async function PricingPage() {
             },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title}>
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-green-600 ring-1 ring-green-100">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-green-700 ring-1 ring-green-100">
                 <Icon className="h-5 w-5" />
               </span>
               <h3 className="mt-4 text-sm font-bold text-slate-900">{title}</h3>
@@ -104,7 +104,7 @@ export default async function PricingPage() {
       <section className="border-y border-slate-200 bg-slate-50 py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600">
+            <span className="text-xs font-bold uppercase tracking-widest text-green-700">
               Compare
             </span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">

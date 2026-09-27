@@ -57,7 +57,7 @@ export default function SecurityPage() {
             key={title}
             className="group rounded-2xl border border-slate-200 bg-white p-6 transition-shadow hover:shadow-lg hover:shadow-slate-900/5"
           >
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600 transition-colors group-hover:bg-green-700 group-hover:text-white">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-700 transition-colors group-hover:bg-green-700 group-hover:text-white">
               <Icon className="h-5 w-5" />
             </span>
             <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>

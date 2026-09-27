@@ -64,13 +64,13 @@ export default async function ContactPage({
         </div>
 
         <div className="lg:col-span-2">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-green-600">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-green-700">
             Where your message goes
           </h2>
           <div className="mt-5 space-y-5">
             {ROUTES.map(({ icon: Icon, title, body }) => (
               <div key={title} className="flex gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
                   <Icon className="h-5 w-5" />
                 </span>
                 <div>
@@ -115,7 +115,7 @@ export default async function ContactPage({
               href={`mailto:${COMPANY.contact.general}`}
               className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-green-600"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
                 <Mail className="h-5 w-5" />
               </span>
               <div className="min-w-0">
@@ -129,7 +129,7 @@ export default async function ContactPage({
               rel="noreferrer noopener"
               className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-green-600"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
                 <MessageCircle className="h-5 w-5" />
               </span>
               <div className="min-w-0">
@@ -141,7 +141,7 @@ export default async function ContactPage({
 
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex items-start gap-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
                 <MapPin className="h-5 w-5" />
               </span>
               <div>

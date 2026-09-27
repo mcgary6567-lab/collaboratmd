@@ -115,3 +115,8 @@ export async function noteError(
   }
   return { sent: null, delivered: 0 };
 }
+
+/** A plain notice to operators on every configured channel (no cooldown). Keep patient details out of `text`. */
+export async function alertOperators(subject: string, text: string, send: AlertSender = realSender) {
+  return deliver(subject, text, send);
+}

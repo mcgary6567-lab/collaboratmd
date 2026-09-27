@@ -11,7 +11,7 @@ import { fmtDateTime } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 const ICON = { pass: CheckCircle2, warn: CircleAlert, fail: CircleX };
-const TONE = { pass: "text-green-600", warn: "text-amber-500", fail: "text-red-600" };
+const TONE = { pass: "text-green-700", warn: "text-amber-500", fail: "text-red-600" };
 const BAA_LABEL: Record<string, string> = { signed: "BAA signed", pending: "BAA requested", not_needed: "No BAA needed", not_recorded: "Not recorded" };
 
 export default async function CompliancePage({ searchParams }: { searchParams: Promise<{ action?: string; user?: string; since?: string }> }) {
@@ -142,7 +142,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
             <label className="block"><span className="label">Since</span><input type="date" name="since" defaultValue={sp.since ?? ""} className="input py-1" /></label>
             <button className="btn btn-secondary">Filter</button>
           </form>
-          <div className="max-h-[28rem] overflow-auto">
+          <div tabIndex={0} role="region" aria-label="Compliance records" className="max-h-[28rem] overflow-auto">
             <table className="table text-xs">
               <thead className="sticky top-0 bg-white"><tr><th>When</th><th>Who</th><th>Action</th><th>Record</th><th>Details</th></tr></thead>
               <tbody>

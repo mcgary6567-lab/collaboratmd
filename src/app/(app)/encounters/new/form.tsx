@@ -151,17 +151,17 @@ export function ChargeEntryForm({
               <tr key={i}>
                 <td className="text-slate-500">{i + 1}</td>
                 <td className="w-32">
-                  <input list="cpt-list" className="input font-mono" value={l.cpt} onChange={(e) => {
+                  <input list="cpt-list" className="input font-mono" aria-label={`Line ${i + 1} CPT`} value={l.cpt} onChange={(e) => {
                     const code = e.target.value.toUpperCase();
                     const fee = feeFor(code);
                     updateLine(i, { cpt: code, charge: fee !== undefined ? (fee / 100).toFixed(2) : l.charge });
                   }} />
                 </td>
                 <td className="text-xs text-slate-500">{l.description || cpts.find((c) => c.code === l.cpt)?.description}</td>
-                <td className="w-28"><input className="input" placeholder="25, 59" value={l.modifiers} onChange={(e) => updateLine(i, { modifiers: e.target.value })} /></td>
-                <td className="w-20"><input type="number" min={1} className="input" value={l.units} onChange={(e) => updateLine(i, { units: Number(e.target.value) })} /></td>
-                <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} onChange={(e) => updateLine(i, { charge: e.target.value })} /></td>
-                <td className="w-24"><input className="input" value={l.dxPointers} onChange={(e) => updateLine(i, { dxPointers: e.target.value })} /></td>
+                <td className="w-28"><input className="input" placeholder="25, 59" value={l.modifiers} aria-label={`Line ${i + 1} modifiers`} onChange={(e) => updateLine(i, { modifiers: e.target.value })} /></td>
+                <td className="w-20"><input type="number" min={1} className="input" value={l.units} aria-label={`Line ${i + 1} units`} onChange={(e) => updateLine(i, { units: Number(e.target.value) })} /></td>
+                <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} aria-label={`Line ${i + 1} charge`} onChange={(e) => updateLine(i, { charge: e.target.value })} /></td>
+                <td className="w-24"><input className="input" value={l.dxPointers} aria-label={`Line ${i + 1} diagnosis pointers`} onChange={(e) => updateLine(i, { dxPointers: e.target.value })} /></td>
                 <td>
                   {lines.length > 1 && (
                     <button type="button" className="text-slate-500 hover:text-red-600" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>

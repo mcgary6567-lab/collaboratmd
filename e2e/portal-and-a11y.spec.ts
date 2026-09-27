@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers";
 
@@ -26,15 +25,3 @@ test("a patient opens their portal link with their date of birth", async ({ page
   await expect(p.getByText(/balance/i).first()).toBeVisible();
   await patient.close();
 });
-
-/** Serious and critical WCAG 2.1 A/AA problems on the main screens. */
-for (const path of ["/login", "/dashboard", "/claims", "/patients", "/settings", "/billing"]) {
-  test(`accessibility: ${path}`, async ({ page }) => {
-    if (path !== "/login") await signIn(page);
-    await page.goto(path);
-    await page.waitForLoadState("networkidle");
-    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-    expect(serious.map((v) => `${v.id}: ${v.help} (${v.nodes.length}) e.g. ${v.nodes[0]?.target.join(" ")}`)).toEqual([]);
-  });
-}

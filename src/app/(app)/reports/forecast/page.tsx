@@ -44,7 +44,7 @@ export default async function ForecastPage() {
         {f.payers.length === 0 ? (
           <Empty>No claims are awaiting payment.</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Forecast by payer" className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>
@@ -80,8 +80,8 @@ export default async function ForecastPage() {
             times what a visit with that provider has collected from insurance (about {money(f.visits.perVisitCents)} across the practice), spread by how long visits take to be paid.
           </li>
           <li>Patient payments are the average weekly patient collections of the last twelve weeks.</li>
-          <li>Visits already seen but not yet billed are not included. See <Link href="/billing/missed-charges" className="text-brand-700 hover:underline">missed charges</Link>.</li>
-          <li>This is an estimate from history, not a promise. A payer that changes how fast it pays shows up on <Link href="/reports/payer-alerts" className="text-brand-700 hover:underline">payer alerts</Link>. As of {fmtDate(new Date())}.</li>
+          <li>Visits already seen but not yet billed are not included. See <Link href="/billing/missed-charges" className="text-brand-700 underline">missed charges</Link>.</li>
+          <li>This is an estimate from history, not a promise. A payer that changes how fast it pays shows up on <Link href="/reports/payer-alerts" className="text-brand-700 underline">payer alerts</Link>. As of {fmtDate(new Date())}.</li>
         </ul>
       </Card>
     </>

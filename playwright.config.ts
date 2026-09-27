@@ -32,6 +32,8 @@ export default defineConfig({
       DATABASE_URL: "",
       PGLITE_DIR: ".e2e/pg",
       AUTH_SECRET: "e2e-only-secret-0123456789abcdef0123456789",
+      // The demo administrator can open the operator pages, so the accessibility crawl covers them.
+      PLATFORM_ADMIN_EMAILS: "admin@collaboratmd.local",
       STEDI_API_KEY: "", STRIPE_SECRET_KEY: "", RESEND_API_KEY: "", TWILIO_ACCOUNT_SID: "", ANTHROPIC_API_KEY: "",
     },
   },

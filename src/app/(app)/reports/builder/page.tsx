@@ -138,7 +138,7 @@ export default async function ReportBuilderPage({ searchParams }: { searchParams
             actions={report ? <a href={`/api/export/report?id=${report.id}`} className="btn btn-secondary text-xs">Download CSV</a> : <span className="text-xs text-slate-500">Save to download all rows</span>}
           >
             {result.rows.length === 0 ? <Empty>No data for these filters.</Empty> : (
-              <div className="max-h-[32rem] overflow-auto">
+              <div tabIndex={0} role="region" aria-label="Report results" className="max-h-[32rem] overflow-auto">
                 <table className="table text-sm">
                   <thead className="sticky top-0 bg-white"><tr>{result.headers.map((h) => <th key={h.key} className={h.kind === "money" || h.kind === "number" ? "text-right" : ""}>{h.label}</th>)}</tr></thead>
                   <tbody>

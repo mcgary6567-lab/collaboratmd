@@ -66,12 +66,12 @@ export function DenialCalculator() {
       </div>
       <div className="flex flex-col justify-center rounded-2xl bg-slate-900 p-6 text-white lg:col-span-2" aria-live="polite">
         <p className="text-sm font-semibold text-slate-300">Denials cost you about</p>
-        <p className="mt-1 text-4xl font-extrabold tracking-tight">{usd(monthly * 12)}<span className="text-lg font-semibold text-slate-500"> / year</span></p>
-        <p className="mt-1 text-sm text-slate-500">{usd(monthly)} a month: {usd(now.lostRevenue)} written off and {usd(now.reworkCost)} of rework on {Math.round(now.denied).toLocaleString("en-US")} denials</p>
+        <p className="mt-1 text-4xl font-extrabold tracking-tight">{usd(monthly * 12)}<span className="text-lg font-semibold text-slate-400"> / year</span></p>
+        <p className="mt-1 text-sm text-slate-400">{usd(monthly)} a month: {usd(now.lostRevenue)} written off and {usd(now.reworkCost)} of rework on {Math.round(now.denied).toLocaleString("en-US")} denials</p>
         <div className="my-6 h-px bg-white/10" />
         <p className="text-sm font-semibold text-slate-300">At a {target}% denial rate</p>
-        <p className="mt-1 text-3xl font-extrabold tracking-tight text-green-400">{usd(Math.max(0, monthly - monthlyThen) * 12)}<span className="text-base font-semibold text-slate-500"> / year back</span></p>
-        <p className="mt-4 text-xs leading-relaxed text-slate-500">
+        <p className="mt-1 text-3xl font-extrabold tracking-tight text-green-400">{usd(Math.max(0, monthly - monthlyThen) * 12)}<span className="text-base font-semibold text-slate-400"> / year back</span></p>
+        <p className="mt-4 text-xs leading-relaxed text-slate-400">
           Denied claims = claims × denial rate. Cost = denied claims × (average value × share never recovered + rework cost). Your own figures, not a promise of results.
         </p>
       </div>

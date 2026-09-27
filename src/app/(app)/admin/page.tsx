@@ -10,6 +10,7 @@ import { Card, PageHeader, StatusBadge, Money, Empty } from "@/components/ui";
 import { Kpi, compactMoney, pct } from "@/components/kpi";
 import { RevenueTrend, AgingChart, DenialReasonChart, PayerMixChart, MiniBar } from "@/components/charts";
 import { CARC } from "@/lib/codes/carc";
+import { memo } from "@/lib/memo";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function AdminDashboard() {
   const db = await getDb();
 
   const [k, trend, aging, statuses, payers, providers, denials, filing] = await Promise.all([
-    headlineKpis(db, s.practiceId),
+    memo(`kpis12:${s.practiceId}`, 5 * 60_000, () => headlineKpis(db, s.practiceId)),
     monthlyTrend(db, s.practiceId),
     arAging(db, s.practiceId),
     claimsByStatus(db, s.practiceId),

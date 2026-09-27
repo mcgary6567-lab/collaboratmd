@@ -37,7 +37,7 @@ export default async function PoliciesPage() {
           <Card title="Approvals and limits">
             <Rule title="Write-off limit" where="Claim write-offs and denial-agent write-offs. Administrators are not limited.">
               <label className="flex items-center gap-2"><input type="checkbox" name="writeOffLimitOn" defaultChecked={p.writeOffLimitCents != null} /> Billers may write off up to</label>
-              <div className="flex items-center gap-2"><span>$</span><input name="writeOffLimit" inputMode="decimal" defaultValue={dollars(p.writeOffLimitCents) || "500.00"} className="input w-32" /> <span className="text-slate-500">per claim; above that an administrator does it</span></div>
+              <div className="flex items-center gap-2"><span>$</span><input name="writeOffLimit" aria-label="Write-off limit in dollars" inputMode="decimal" defaultValue={dollars(p.writeOffLimitCents) || "500.00"} className="input w-32" /> <span className="text-slate-500">per claim; above that an administrator does it</span></div>
             </Rule>
             <Rule title="Two-person refunds" where="Refunds of patient credits and insurance overpayments.">
               <label className="flex items-center gap-2"><input type="checkbox" name="refundDualControl" defaultChecked={!!p.refundDualControl} /> The person who requests a refund cannot also approve it</label>
@@ -54,18 +54,18 @@ export default async function PoliciesPage() {
             </Rule>
             <Rule title="Denial risk hold" where="Submitting an original claim, by anyone but an administrator.">
               <label className="flex items-center gap-2"><input type="checkbox" name="riskHoldOn" defaultChecked={p.riskHoldScore != null} /> Hold claims whose denial risk score is</label>
-              <div className="flex items-center gap-2"><input name="riskHoldScore" type="number" min={1} max={100} defaultValue={p.riskHoldScore ?? 60} className="input w-24" /> <span className="text-slate-500">or higher, for an administrator to review and send</span></div>
+              <div className="flex items-center gap-2"><input name="riskHoldScore" aria-label="Risk score that holds a claim" type="number" min={1} max={100} defaultValue={p.riskHoldScore ?? 60} className="input w-24" /> <span className="text-slate-500">or higher, for an administrator to review and send</span></div>
             </Rule>
           </Card>
 
           <Card title="Patient balances">
             <Rule title="Statements" where="The statement batch on Patient billing.">
-              <div className="flex flex-wrap items-center gap-2">Bill balances of at least $<input name="statementMin" inputMode="decimal" defaultValue={dollars(p.statementMinCents ?? 500)} className="input w-28" /></div>
-              <div className="flex flex-wrap items-center gap-2">and no more often than every <input name="statementIntervalDays" type="number" min={7} max={90} defaultValue={p.statementIntervalDays ?? 25} className="input w-20" /> days</div>
+              <div className="flex flex-wrap items-center gap-2">Bill balances of at least $<input name="statementMin" aria-label="Smallest balance billed, in dollars" inputMode="decimal" defaultValue={dollars(p.statementMinCents ?? 500)} className="input w-28" /></div>
+              <div className="flex flex-wrap items-center gap-2">and no more often than every <input name="statementIntervalDays" aria-label="Days between statements" type="number" min={7} max={90} defaultValue={p.statementIntervalDays ?? 25} className="input w-20" /> days</div>
             </Rule>
             <Rule title="Small balance adjustments" where="Runs every morning with the daily automation, or now with the button below.">
               <label className="flex items-center gap-2"><input type="checkbox" name="smallBalanceOn" defaultChecked={p.smallBalanceCents != null} /> Adjust off patient balances under</label>
-              <div className="flex flex-wrap items-center gap-2">$<input name="smallBalance" inputMode="decimal" defaultValue={dollars(p.smallBalanceCents) || "5.00"} className="input w-24" /> with no activity for <input name="smallBalanceAgeDays" type="number" min={30} max={730} defaultValue={p.smallBalanceAgeDays ?? 90} className="input w-20" /> days</div>
+              <div className="flex flex-wrap items-center gap-2">$<input name="smallBalance" aria-label="Small balance in dollars" inputMode="decimal" defaultValue={dollars(p.smallBalanceCents) || "5.00"} className="input w-24" /> with no activity for <input name="smallBalanceAgeDays" aria-label="Days with no activity" type="number" min={30} max={730} defaultValue={p.smallBalanceAgeDays ?? 90} className="input w-20" /> days</div>
               <p className="text-xs text-slate-500">Posted as a discount with a note saying why, so the ledger shows every adjustment. Balances are never edited.</p>
             </Rule>
           </Card>
@@ -78,9 +78,9 @@ export default async function PoliciesPage() {
           <fieldset disabled={!admin} className="space-y-2">
             <label className="flex items-center gap-2"><input type="checkbox" name="financingOn" defaultChecked={!!financing} /> Offer financing in the patient portal</label>
             <div className="grid gap-2 md:grid-cols-3">
-              <input name="lender" defaultValue={financing?.lender ?? ""} placeholder="Lender name" className="input" />
-              <input name="url" defaultValue={financing?.url ?? ""} placeholder="https://... application link" className="input" />
-              <div className="flex items-center gap-2">for balances of $<input name="min" inputMode="decimal" defaultValue={financing ? (financing.minCents / 100).toFixed(2) : "500.00"} className="input w-28" /> or more</div>
+              <input name="lender" aria-label="Lender name" defaultValue={financing?.lender ?? ""} placeholder="Lender name" className="input" />
+              <input name="url" aria-label="Application link" defaultValue={financing?.url ?? ""} placeholder="https://... application link" className="input" />
+              <div className="flex items-center gap-2">for balances of $<input name="min" aria-label="Smallest balance offered financing, in dollars" inputMode="decimal" defaultValue={financing ? (financing.minCents / 100).toFixed(2) : "500.00"} className="input w-28" /> or more</div>
             </div>
           </fieldset>
           {admin && <SubmitButton className="btn btn-secondary" pendingLabel="Saving...">Save financing</SubmitButton>}

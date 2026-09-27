@@ -29,8 +29,8 @@ export default async function SetupPage() {
       </Card>
       <ol className="space-y-2">
         {steps.map((st, i) => (
-          <li key={st.key} className={`card flex items-start gap-3 p-4 ${st.done ? "opacity-75" : ""}`}>
-            {st.done ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" /> : <Circle className="mt-0.5 h-5 w-5 shrink-0 text-slate-300" />}
+          <li key={st.key} className={`card flex items-start gap-3 p-4 ${st.done ? "bg-slate-50" : ""}`}>
+            {st.done ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" /> : <Circle className="mt-0.5 h-5 w-5 shrink-0 text-slate-300" />}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 font-semibold">
                 <span className="text-xs text-slate-500">{i + 1}.</span> {st.title}

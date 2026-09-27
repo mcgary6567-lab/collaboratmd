@@ -58,7 +58,7 @@ export function ContactForm({ defaultTopic = "sales" }: { defaultTopic?: string 
   if (state?.ok) {
     return (
       <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-green-600" />
+        <CheckCircle2 className="mx-auto h-10 w-10 text-green-700" />
         <h3 className="mt-4 text-lg font-bold text-slate-900">Thank you, we have your message</h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-700">
           It has been recorded and routed to the queue for the topic you selected. We reply to
