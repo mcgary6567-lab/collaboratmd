@@ -112,7 +112,7 @@ export default async function PricingPage() {
             </h2>
           </div>
 
-          <div className="mt-12 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <div tabIndex={0} role="region" aria-label="Plan comparison (scrolls sideways)" className="mt-12 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="w-full min-w-[42rem] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">

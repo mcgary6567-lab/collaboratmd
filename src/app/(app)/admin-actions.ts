@@ -11,6 +11,7 @@ import { requestReset } from "@/server/password-reset";
 import { listTeam } from "@/server/team";
 import { deleteCredential, saveCredential } from "@/server/credentials";
 import { siteOrigin } from "@/lib/origin";
+import { dismissTip } from "@/server/tips";
 import { addDirectoryPayer } from "@/server/payer-directory";
 
 const admin = () => requireRole(["admin"]);
@@ -137,6 +138,13 @@ export async function dismissOnboardingAction(_prev: FormResult): Promise<FormRe
   await (await getDb()).update(schema.practices).set({ onboardingDismissedAt: new Date() }).where(eq(schema.practices.id, s.practiceId));
   revalidatePath("/dashboard");
   return { ok: true, message: "Hidden. Setup health stays on the Settings page." };
+}
+
+export async function dismissTipAction(tip: string, _prev: FormResult): Promise<FormResult> {
+  const s = await admin();
+  await dismissTip(await getDb(), s.practiceId, tip, s.userId);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Hidden." };
 }
 
 export async function saveCredentialAction(_prev: FormResult, fd: FormData): Promise<FormResult> {

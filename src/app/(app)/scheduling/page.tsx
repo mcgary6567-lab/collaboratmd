@@ -11,7 +11,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { appointmentStatusAction } from "@/app/(app)/actions";
 import { Card, PageHeader, PatientLink, Badge, Empty } from "@/components/ui";
 import { AppointmentForm } from "./form";
-import { getBookingSettings, localDateLabel, localTimeLabel, pendingRequests } from "@/server/booking";
+import { localDateLabel, localTimeLabel, pendingRequests } from "@/server/booking";
 import { confirmBookingAction, declineBookingAction } from "@/app/(app)/booking-actions";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
   const s = await requireSession();
   const db = await getDb();
   const day = date ? new Date(date + "T12:00:00") : new Date();
-  const [appts, providers, requests, booking] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId), pendingRequests(db, s.practiceId), getBookingSettings(db, s.practiceId)]);
+  const [appts, providers, requests] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId), pendingRequests(db, s.practiceId)]);
   const iso = day.toISOString().slice(0, 10);
   const patientIds = [...new Set(appts.map((a) => a.patient.id))];
   const primaries = patientIds.length
@@ -75,7 +75,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <div>
                   <div className="font-medium">{r.lastName}, {r.firstName} <span className="font-normal text-slate-500">· born {r.dob}</span></div>
-                  <div className="text-slate-600">{localDateLabel(r.startsAt, booking.timeZone)} at {localTimeLabel(r.startsAt, booking.timeZone)} with Dr. {providerFirst} {providerLast}{r.reason ? ` · ${r.reason}` : ""}</div>
+                  <div className="text-slate-600">{localDateLabel(r.startsAt)} at {localTimeLabel(r.startsAt)} with Dr. {providerFirst} {providerLast}{r.reason ? ` · ${r.reason}` : ""}</div>
                   <div className="text-xs text-slate-500">{[r.phone, r.email, r.payerName && `${r.payerName}${r.memberId ? ` ${r.memberId}` : ""}`].filter(Boolean).join(" · ")}</div>
                 </div>
                 <div className="flex gap-2">
@@ -90,7 +90,8 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
       <div className="grid gap-6 lg:grid-cols-3">
         <Card
           title={`Appointments (${appts.length})`}
-          className="lg:col-span-2"
+          /* min-w-0: a grid item otherwise grows to its table width and slides under the booking card beside it. */
+          className="min-w-0 lg:col-span-2"
           actions={
             appts.length > 0 ? (
               <ActionForm action={verifyScheduleAction.bind(null, iso)} className="flex flex-col items-end">
@@ -102,6 +103,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
           {appts.length === 0 ? (
             <Empty>No appointments on this day.</Empty>
           ) : (
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table">
               <thead><tr><th>Time</th><th>Patient</th><th>Provider</th><th>Type</th><th>Reason</th><th>Coverage</th><th>Status</th><th></th></tr></thead>
               <tbody>
@@ -143,6 +145,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Card>
         <Card title="Book appointment">

@@ -4,8 +4,10 @@ import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { userWorkload, recentPayments, recoveredDenials, collectionsSummary } from "@/server/analytics";
 import { memo } from "@/lib/memo";
+import { dataStamp } from "@/server/data-stamp";
 import { listAppointments } from "@/server/encounters";
 import { Card, PageHeader, Badge, Empty } from "@/components/ui";
+import { FeatureTips } from "./tips";
 import { OnboardingGuide } from "./onboarding";
 import { Kpi, compactMoney, pct } from "@/components/kpi";
 import { fmtDate } from "@/lib/utils";
@@ -21,8 +23,8 @@ export default async function UserDashboard() {
     recentPayments(db, s.practiceId),
     recoveredDenials(db, s.practiceId),
     listAppointments(db, s.practiceId, new Date()),
-    // Totals over months of ledger entries; a few minutes old is fine here.
-    memo(`collections:${s.practiceId}`, 5 * 60_000, () => collectionsSummary(db, s.practiceId)),
+    // Totals over months of ledger entries: cached, but recomputed as soon as anything is posted.
+    dataStamp(db, s.practiceId).then((v) => memo(`collections:${s.practiceId}:${v}`, 5 * 60_000, () => collectionsSummary(db, s.practiceId))),
   ]);
 
   const firstName = s.name.split(" ")[0];
@@ -41,6 +43,7 @@ export default async function UserDashboard() {
         }
       />
       {s.role === "admin" && <OnboardingGuide practiceId={s.practiceId} />}
+      {s.role === "admin" && <FeatureTips practiceId={s.practiceId} />}
 
       {/* Collections still lead, but as a neutral card with a green rail
           rather than a green block: the accent marks the figure as money in,

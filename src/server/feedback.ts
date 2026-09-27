@@ -8,6 +8,8 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { alertOperators, type AlertSender } from "./ops-alerts";
+import { notify } from "./notifications";
+import { sendEmail } from "./notify";
 
 const { feedback, practices, users } = schema;
 
@@ -29,4 +31,28 @@ export async function listFeedback(db: Db, status: "open" | "resolved" = "open")
 
 export async function resolveFeedback(db: Db, id: string) {
   await db.update(feedback).set({ status: "resolved", resolvedAt: new Date() }).where(and(eq(feedback.id, id), eq(feedback.status, "open")));
+}
+
+type Mailer = (to: string, subject: string, text: string) => Promise<boolean>;
+
+/**
+ * An operator's answer to a report. The reporter gets it as an in-app
+ * notification, where it is behind their sign-in; the email only says that an
+ * answer is waiting, because email is not a safe place for anything that might
+ * mention a patient. Returns whether the email went out.
+ */
+export async function replyToFeedback(db: Db, id: string, input: { text: string; operatorId: string; resolve: boolean; origin?: string }, mail: Mailer = sendEmail) {
+  const text = input.text.trim().slice(0, 900);
+  if (text.length < 2) throw new Error("Write a reply");
+  const [row] = await db.select({ report: feedback, email: users.email }).from(feedback).leftJoin(users, eq(users.id, feedback.userId)).where(eq(feedback.id, id)).limit(1);
+  if (!row) throw new Error("Report not found");
+  const r = row.report;
+  await db.update(feedback).set({ reply: text, repliedAt: new Date(), repliedBy: input.operatorId, ...(input.resolve ? { status: "resolved", resolvedAt: new Date() } : {}) }).where(eq(feedback.id, id));
+  if (!r.userId) return false;
+  await notify(db, r.practiceId, { userId: r.userId, kind: "feedback_reply", title: "Reply to the problem you reported", body: `About ${r.page}: ${text}`, href: "/notifications", dedupeKey: `feedback-reply:${id}:${Date.now()}` });
+  if (!row.email) return false;
+  return mail(row.email, "We replied to the problem you reported", `We answered the problem you reported on ${r.page}. Sign in to read it:
+${input.origin ?? ""}/notifications
+
+CollaboratMD support`).catch(() => false);
 }

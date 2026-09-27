@@ -10,6 +10,18 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-27",
+    title: "Spanish for booking, statements and reminders, and a fix for online booking times",
+    items: [
+      "Online booking is in Spanish too, and each patient has a language: statements, appointment reminders, confirmations and payment messages go out in it",
+      "Fixed: an appointment booked online showed on the schedule at the wrong hour (off by the practice's time zone)",
+      "Fixed: on a laptop-sized screen, the schedule's check-in and no-show buttons sat under the booking form",
+      "Dashboard figures update as soon as a payment is posted or a claim is created",
+      "Administrators see useful screens the practice has not tried yet, and can dismiss them",
+      "Replies to problem reports arrive in your notifications",
+    ],
+  },
+  {
+    date: "2026-09-27",
     title: "A go-live checklist, problem reports, and exports for the largest practices",
     items: [
       "Settings > Go-live checklist walks from setup to the first paid claim, ticking each step from what has actually happened",

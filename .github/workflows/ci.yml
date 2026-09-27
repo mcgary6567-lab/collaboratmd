@@ -15,6 +15,10 @@ concurrency:
 permissions:
   contents: read
 
+# Runners are pinned to Ubuntu 24.04: ubuntu-latest moves to 26.04 from
+# 2026-10-19, and Playwright's installed browser dependencies must support it
+# before we follow. Revisit once a Playwright release lists 26.04.
+
 env:
   NODE_VERSION: "24"
   # Test-only values; nothing here reaches a real service.
@@ -24,40 +28,45 @@ env:
 jobs:
   checks:
     name: Type check and unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - name: No known high or critical vulnerabilities in dependencies
+        run: npm audit --audit-level=high
       - run: npm run typecheck
       - name: Migrations bundle is up to date
         run: node scripts/build-migrations.mjs && git diff --exit-code src/db/migrations.ts
       - run: npx vitest run
 
   build:
-    name: Production build
-    runs-on: ubuntu-latest
+    name: Production build and performance
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
       - run: npx next build
+      - run: npx playwright install --with-deps chromium
+      - name: Performance budgets
+        run: npm run perf
 
   e2e:
     name: End-to-end and accessibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -66,7 +75,7 @@ jobs:
       - run: npx playwright test
       - name: Keep traces of failures
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results
           path: test-results/

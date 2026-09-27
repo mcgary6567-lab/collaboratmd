@@ -13,15 +13,21 @@ How to know the platform is up, hear about failures, and respond. Written for wh
 
 ## Uptime monitoring
 
-The app has no built-in uptime pinger; use an external monitor so an outage is noticed even when the app cannot send anything.
+**Built in:** the "Live check" GitHub Action (`.github/workflows/live-check.yml`) runs `scripts/live-check.mjs` every 10 minutes from outside: `/api/health` must return `{"ok":true}`, `/login` must render the sign-in form with a nonce in its Content-Security-Policy, and `/` and `/status` must load. A failing check is retried after 30 seconds, so one blip does not alert.
+
+- A failed run emails whoever last changed the workflow's schedule (GitHub's default for scheduled workflows).
+- To alert the operators' channel too, add the repository secret `OPS_ALERT_WEBHOOK_URL` (Settings → Secrets and variables → Actions). It receives `{"text": ...}`, the same as the app's own alerts.
+- To check another address, set the repository variable `LIVE_URL`.
+- Run it by hand from Actions → Live check → Run workflow, or locally: `node scripts/live-check.mjs https://collaboratmd.vercel.app`.
+
+Limits: GitHub may start scheduled runs several minutes late when busy, and turns schedules off after 60 days with no activity in the repository. It checks from GitHub's network only. For paging-grade monitoring, also use an external monitor:
 
 1. Pick any HTTP monitor (Better Stack, UptimeRobot, Pingdom, Checkly and similar all work).
 2. Monitor `GET https://<your domain>/api/health` every 1 to 5 minutes.
    - Healthy: HTTP 200 with `{"ok":true,...}`. It runs `SELECT 1` against the database, so it fails when Neon is unreachable.
    - Unhealthy: HTTP 503 `{"ok":false}`, or a timeout.
 3. Alert after 2 consecutive failures, to the same people as below.
-4. Optionally monitor `https://<your domain>/login` for a 200 to catch rendering failures the health route would miss.
-5. The public `/status` page shows the same database check plus recent error counts; link it from support replies during an incident.
+4. The public `/status` page shows the same database check plus recent error counts; link it from support replies during an incident.
 
 ## Error alerts
 
@@ -49,6 +55,8 @@ Every request gets an ID (a valid incoming `X-Request-Id` is kept, otherwise a n
 ## Problem reports and usage
 
 - The **?** button on every screen has "Report a problem with this page". Reports go to `/ops/feedback` and alert operators through the channels above. The alert names only the practice and the page; read the report itself in `/ops/feedback`. Mark each one resolved when handled.
+- Answer a report from `/ops/feedback` with "Send reply". The person who reported it reads the answer in their notifications; their email only says an answer is waiting, since email is not a safe place for anything that might mention a patient. The reply can mark the report resolved at the same time.
+- Administrators see "Not tried yet" on their dashboard: up to three useful screens nobody in the practice opened in the last 60 days, once the practice has been live for two weeks. Each can be dismissed.
 - Screens opened are counted per practice per day, by address pattern only (ids replaced by `:id`, no query strings). `/ops/practices` shows the most used screens over 30 days, for deciding what to improve and for spotting practices that stopped using something.
 
 ## Large exports
@@ -94,6 +102,18 @@ A value below the minimum is ignored and the default used. The daily job's respo
   4. Turn on Stripe's customer portal (Billing → Customer portal) so practices can change cards, see invoices and cancel.
 - The daily job sets each subscription's quantity to the practice's active providers and reports claims sent to the meter.
 - Try the whole flow with test-mode keys and prices first.
+
+## Checks on every push
+
+CI (`.github/workflows/ci.yml`) runs on every push and pull request:
+
+- **Type check and unit tests**, with `npm audit --audit-level=high`: a known high or critical vulnerability in a dependency fails the build. Fix it by updating the package (Dependabot usually has a pull request open), or, if there is no fix and the code path is unused, record why in the pull request.
+- **Production build and performance**: builds, then measures the most used screens on the production build against budgets for JavaScript size, server time, largest paint and layout shift (`e2e-perf/budgets.spec.ts`; the numbers appear in the run's summary). If a change legitimately needs more, raise that page's budget in the same pull request and say why.
+- **End-to-end and accessibility**: the browser tests, and an accessibility check of every screen at desktop and phone width, including the screens for individual records and the patient pages.
+
+CodeQL (`.github/workflows/codeql.yml`) scans the code for security problems on every push and weekly; findings appear under Security → Code scanning. Secret scanning and push protection are repository settings (Settings → Code security) and must be switched on there.
+
+The runners are pinned to Ubuntu 24.04 because `ubuntu-latest` moves to 26.04 from October 19, 2026; move to 26.04 once Playwright supports it.
 
 ## Routine checks
 

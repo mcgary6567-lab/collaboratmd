@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { testDb } from "@/test/db";
-import { listFeedback, resolveFeedback, submitFeedback } from "./feedback";
+import { listFeedback, replyToFeedback, resolveFeedback, submitFeedback } from "./feedback";
 import { featureKey, recordUsage, usageSummary } from "./usage";
 import { recordError } from "./errors";
 import { schema } from "@/db";
@@ -23,6 +24,21 @@ describe("pilot operations", () => {
     expect((await listFeedback(t.db)).some((x) => x.report.id === r.id)).toBe(true);
     await resolveFeedback(t.db, r.id);
     expect((await listFeedback(t.db)).some((x) => x.report.id === r.id)).toBe(false);
+  });
+
+  it("answers a report in the app, and only says so by email", async () => {
+    const send = { email: async () => true, sms: async () => true, webhook: async () => true };
+    const r = await submitFeedback(t.db, { practiceId: t.practiceId, userId: t.userId, page: "/patients", message: "Search misses patients with accents" }, send);
+    const mails: string[] = [];
+    await expect(replyToFeedback(t.db, r.id, { text: " ", operatorId: t.userId, resolve: true })).rejects.toThrow(/Write a reply/);
+    const emailed = await replyToFeedback(t.db, r.id, { text: "Fixed: search now ignores accents, e.g. for José.", operatorId: t.userId, resolve: true, origin: "https://app.test" }, async (to, subject, text) => { mails.push(`${to}|${subject}|${text}`); return true; });
+    expect(emailed).toBe(true);
+    expect(mails[0]).toContain("https://app.test/notifications");
+    expect(mails[0]).not.toContain("José");
+    const [n] = await t.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "feedback_reply"));
+    expect(n.userId).toBe(t.userId);
+    expect(n.body).toContain("José");
+    expect((await listFeedback(t.db, "resolved")).find((x) => x.report.id === r.id)?.report.reply).toMatch(/^Fixed/);
   });
 
   it("counts page views by pattern, never by patient or claim", async () => {

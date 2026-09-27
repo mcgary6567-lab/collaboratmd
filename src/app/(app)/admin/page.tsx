@@ -11,6 +11,7 @@ import { Kpi, compactMoney, pct } from "@/components/kpi";
 import { RevenueTrend, AgingChart, DenialReasonChart, PayerMixChart, MiniBar } from "@/components/charts";
 import { CARC } from "@/lib/codes/carc";
 import { memo } from "@/lib/memo";
+import { dataStamp } from "@/server/data-stamp";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function AdminDashboard() {
   const db = await getDb();
 
   const [k, trend, aging, statuses, payers, providers, denials, filing] = await Promise.all([
-    memo(`kpis12:${s.practiceId}`, 5 * 60_000, () => headlineKpis(db, s.practiceId)),
+    dataStamp(db, s.practiceId).then((v) => memo(`kpis12:${s.practiceId}:${v}`, 5 * 60_000, () => headlineKpis(db, s.practiceId))),
     monthlyTrend(db, s.practiceId),
     arAging(db, s.practiceId),
     claimsByStatus(db, s.practiceId),

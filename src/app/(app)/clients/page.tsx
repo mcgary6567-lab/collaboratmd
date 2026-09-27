@@ -4,6 +4,7 @@ import { arAging, headlineKpis } from "@/server/analytics";
 import { switchPracticeAction } from "@/app/(app)/practice-actions";
 import { Badge, Card, Empty, Money, PageHeader } from "@/components/ui";
 import { memo } from "@/lib/memo";
+import { dataStamp } from "@/server/data-stamp";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,9 @@ export default async function ClientsPage() {
       // Volumes for the last 90 days; rates over 12 months, because a period
       // rate over a short window counts payments on older claims against
       // fewer new charges and can pass 100%.
-      // Summaries for every client practice; cached a few minutes so the page stays quick with many clients.
-      const [k, year, aging] = await Promise.all([memo(`kpis3:${p.id}`, 5 * 60_000, () => headlineKpis(db, p.id, 3)), memo(`kpis12:${p.id}`, 5 * 60_000, () => headlineKpis(db, p.id, 12)), memo(`aging:${p.id}`, 5 * 60_000, () => arAging(db, p.id))]);
+      // Summaries for every client practice: cached so the page stays quick with many clients, and recomputed as soon as anything is posted.
+      const v = await dataStamp(db, p.id);
+      const [k, year, aging] = await Promise.all([memo(`kpis3:${p.id}:${v}`, 5 * 60_000, () => headlineKpis(db, p.id, 3)), memo(`kpis12:${p.id}:${v}`, 5 * 60_000, () => headlineKpis(db, p.id, 12)), memo(`aging:${p.id}:${v}`, 5 * 60_000, () => arAging(db, p.id))]);
       const over90 = aging.totals.b91_120 + aging.totals.b120p;
       return { p, k, year, over90, arTotal: aging.totals.total };
     }),

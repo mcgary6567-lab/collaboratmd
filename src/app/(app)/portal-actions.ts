@@ -7,6 +7,7 @@ import { CAN_WRITE, requireRole } from "@/lib/auth";
 import { siteOrigin } from "@/lib/origin";
 import { createPortalLink } from "@/server/portal";
 import { messagePatient } from "@/server/messaging";
+import { langOf, portalLink } from "@/lib/i18n/messages";
 import { assertOwned } from "@/server/tenancy";
 import type { LinkResult } from "./checkin-actions";
 
@@ -18,11 +19,9 @@ export async function sendPortalLinkAction(patientId: string, purpose: "portal" 
     const { path, patient } = await createPortalLink(db, s.practiceId, patientId, s.userId, purpose);
     const url = `${await siteOrigin()}${path}`;
     const [practice] = await db.select({ name: schema.practices.name }).from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1);
-    const what = purpose === "pay" ? "view and pay your balance" : "see your account, statements and payments";
     const r = await messagePatient(db, patient, {
       kind: purpose === "pay" ? "pay_link" : "portal_link",
-      sms: `${practice.name}: ${what} at ${url} . Reply STOP to opt out.`,
-      email: { subject: `Your account with ${practice.name}`, text: `Hi ${patient.firstName},\n\nYou can ${what} here:\n\n${url}\n\nThe link asks for your date of birth and works for 30 days.\n\n${practice.name}` },
+      ...portalLink(langOf(patient.preferredLanguage), practice, patient.firstName, purpose, url),
     });
     const sent = [r.sms === "sent" && "texted", r.email === "sent" && "emailed"].filter(Boolean).join(" and ");
     return { ok: true, url, message: sent ? `Link ${sent} to the patient.` : `Copy the link and send it to the patient (${r.reason?.toLowerCase() ?? "no channel available"}).` };
@@ -46,5 +45,14 @@ export async function remindersOptOutAction(patientId: string, optOut: boolean):
   const db = await getDb();
   await assertOwned(db, s.practiceId, "patient", patientId);
   await db.update(schema.patients).set({ remindersOptOut: optOut }).where(and(eq(schema.patients.id, patientId), eq(schema.patients.practiceId, s.practiceId)));
+  revalidatePath(`/patients/${patientId}`);
+}
+
+/** The language statements, reminders and confirmations go out in. */
+export async function preferredLanguageAction(patientId: string, lang: "en" | "es"): Promise<void> {
+  const s = await requireRole(CAN_WRITE);
+  const db = await getDb();
+  await assertOwned(db, s.practiceId, "patient", patientId);
+  await db.update(schema.patients).set({ preferredLanguage: lang === "es" ? "es" : "en" }).where(and(eq(schema.patients.id, patientId), eq(schema.patients.practiceId, s.practiceId)));
   revalidatePath(`/patients/${patientId}`);
 }

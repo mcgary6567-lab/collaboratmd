@@ -8,6 +8,8 @@ import { getDb } from "@/db";
 import type { FormResult } from "@/components/action-form";
 import { grantPortal, portalVerifiedFor } from "@/lib/portal-session";
 import { siteOrigin } from "@/lib/origin";
+import { chosenLang } from "@/lib/i18n/patient-server";
+import { rememberLanguage } from "@/server/patient-language";
 import { openPortal, reportInsurance, startPortalPayment, verifyPortalDob } from "@/server/portal";
 
 async function verifiedLink(token: string) {
@@ -24,6 +26,8 @@ export async function verifyPortalAction(token: string, _prev: FormResult, formD
   const r = await verifyPortalDob(db, token, String(formData.get("dob") ?? ""));
   if (!r.ok) return { ok: false, message: r.message };
   await grantPortal(r.linkId);
+  const o = await openPortal(db, token);
+  if (o.state === "open") await rememberLanguage(db, o.link.patientId, await chosenLang());
   redirect(`/portal/${token}`);
 }
 

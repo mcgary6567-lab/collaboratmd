@@ -17,7 +17,7 @@ import { AuthorizationsSection } from "./authorizations-section";
 import { LabsSection } from "./labs-section";
 import { WorkPanel } from "@/components/work-panel";
 import { PortalLinkButton } from "./patient-contact";
-import { remindersOptOutAction, smsConsentAction } from "@/app/(app)/portal-actions";
+import { preferredLanguageAction, remindersOptOutAction, smsConsentAction } from "@/app/(app)/portal-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +66,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
               <span>Reminders: {patient.remindersOptOut ? <span className="text-amber-700">opted out</span> : "on"}</span>
               <form action={remindersOptOutAction.bind(null, patient.id, !patient.remindersOptOut)}>
                 <button className="font-semibold text-brand-700 hover:underline">{patient.remindersOptOut ? "Turn back on" : "Opt out"}</button>
+              </form>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Language: {patient.preferredLanguage === "es" ? "Spanish" : "English"} <span className="text-slate-500">(statements and messages)</span></span>
+              <form action={preferredLanguageAction.bind(null, patient.id, patient.preferredLanguage === "es" ? "en" : "es")}>
+                <button className="font-semibold text-brand-700 hover:underline">{patient.preferredLanguage === "es" ? "Use English" : "Use Spanish"}</button>
               </form>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">

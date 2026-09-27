@@ -22,7 +22,7 @@ Until now the local `.env.local` pointed at the production database, so local te
    - **Development:** the `staging` URL, if you use `vercel env pull`.
    Give Preview its own `AUTH_SECRET` too, so a preview session can never open production.
 3. **Your computer:** in `.env.local`, set `DATABASE_URL` to the staging URL, or remove it to use the embedded database.
-4. **Branch protection (GitHub):** Settings → Branches → add a rule for `main` that requires the CI checks ("Type check and unit tests", "Production build", "End-to-end and accessibility") to pass before merging. Then work on branches and merge through pull requests; each one gets a preview deployment on staging.
+4. **Branch protection (GitHub):** Settings → Branches → add a rule for `main` that requires the CI checks ("Type check and unit tests", "Production build and performance", "End-to-end and accessibility", and CodeQL's "Analyze") to pass before merging. Then work on branches and merge through pull requests; each one gets a preview deployment on staging.
 
 ## Migrations
 

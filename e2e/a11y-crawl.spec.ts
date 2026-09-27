@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { signIn } from "./helpers";
+import { check, signIn } from "./helpers";
 
 /**
  * Every screen, checked for serious and critical WCAG 2.1 A/AA problems.
@@ -29,50 +28,48 @@ const PUBLIC = [
 const SKIP = /^\/(api|portal|check-in|reset|unsubscribe|logout|login\/verify|signup\/verify)(\/|$)/;
 const pattern = (path: string) => path.replace(/\/[0-9a-f]{8}-[0-9a-f-]{27,}(?=\/|$)/gi, "/:id").replace(/\/\d+(?=\/|$)/g, "/:n");
 
-async function check(page: Page, path: string) {
-  const res = await page.goto(path);
-  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
-  const status = res?.status() ?? 0;
-  if (status >= 500) return [`${path}: HTTP ${status}`];
-  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  return results.violations
-    .filter((v) => v.impact === "serious" || v.impact === "critical")
-    .map((v) => `${path}: ${v.id} (${v.nodes.length}) e.g. ${v.nodes[0]?.target.join(" ")}`);
-}
-
 async function links(page: Page) {
   const hrefs = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href")!));
   return hrefs.map((h) => h.split(/[?#]/)[0]).filter((h) => h && !SKIP.test(h));
 }
 
-test("accessibility: every signed-in screen", async ({ page }) => {
-  test.setTimeout(60 * 60_000);
-  await signIn(page);
-  const seen = new Set<string>();
-  const problems: string[] = [];
-  const queue = [...APP];
-  const found: string[] = [];
-  for (let path = queue.shift(); path; path = queue.shift()) {
-    const key = pattern(path);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    problems.push(...(await check(page, path)));
-    // Pages reached from a claim by buttons rather than links.
-    if (/^\/claims\/[0-9a-f-]{36}$/.test(path)) queue.push(`${path}/edit`, `${path}/cover`);
-    for (const l of await links(page)) if (!seen.has(pattern(l)) && !PUBLIC.includes(l) && !found.includes(l)) { found.push(l); queue.push(l); }
-    if (seen.size > 160) break;
-  }
-  console.log(`checked ${seen.size} signed-in screens: ${[...seen].join(" ")}`);
-  expect(problems).toEqual([]);
-});
+/** Desktop, and a phone: narrow screens hide, stack and scroll things differently. */
+const VIEWPORTS = [{ name: "desktop", width: 1280, height: 800 }, { name: "phone", width: 375, height: 812 }];
 
-test("accessibility: every public page", async ({ page }) => {
-  test.setTimeout(20 * 60_000);
-  const problems: string[] = [];
-  for (const path of PUBLIC) problems.push(...(await check(page, path)));
-  // One blog post, found from the index.
-  await page.goto("/blog");
-  const post = await page.locator("a[href^='/blog/']").first().getAttribute("href").catch(() => null);
-  if (post) problems.push(...(await check(page, post)));
-  expect(problems).toEqual([]);
-});
+for (const vp of VIEWPORTS) {
+  test.describe(vp.name, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } });
+
+    test(`accessibility (${vp.name}): every signed-in screen`, async ({ page }) => {
+      test.setTimeout(60 * 60_000);
+      await signIn(page);
+      const seen = new Set<string>();
+      const problems: string[] = [];
+      const queue = [...APP];
+      const found: string[] = [];
+      for (let path = queue.shift(); path; path = queue.shift()) {
+        const key = pattern(path);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        problems.push(...(await check(page, path)));
+        // Pages reached from a claim by buttons rather than links.
+        if (/^\/claims\/[0-9a-f-]{36}$/.test(path)) queue.push(`${path}/edit`, `${path}/cover`);
+        for (const l of await links(page)) if (!seen.has(pattern(l)) && !PUBLIC.includes(l) && !found.includes(l)) { found.push(l); queue.push(l); }
+        if (seen.size > 160) break;
+      }
+      console.log(`${vp.name}: checked ${seen.size} signed-in screens: ${[...seen].join(" ")}`);
+      expect(problems).toEqual([]);
+    });
+
+    test(`accessibility (${vp.name}): every public page`, async ({ page }) => {
+      test.setTimeout(20 * 60_000);
+      const problems: string[] = [];
+      for (const path of PUBLIC) problems.push(...(await check(page, path)));
+      // One blog post, found from the index.
+      await page.goto("/blog");
+      const post = await page.locator("a[href^='/blog/']").first().getAttribute("href").catch(() => null);
+      if (post) problems.push(...(await check(page, post)));
+      expect(problems).toEqual([]);
+    });
+  });
+}

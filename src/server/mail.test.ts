@@ -32,6 +32,17 @@ describe("mailing statements through Lob", () => {
     expect(html.length).toBeLessThan(10_000);
   });
 
+  it("writes the letter in the patient's language", async () => {
+    const st = await aStatement();
+    await t.db.update(schema.patients).set({ preferredLanguage: "es" }).where(eq(schema.patients.id, st.patientId));
+    const html = statementLetterHtml((await getStatement(t.db, t.practiceId, st.id))!);
+    expect(html).toContain('<html lang="es">');
+    expect(html).toContain("Monto a pagar");
+    expect(html).toContain("Pagado por su seguro");
+    expect(html).not.toContain("Amount due");
+    await t.db.update(schema.patients).set({ preferredLanguage: "en" }).where(eq(schema.patients.id, st.patientId));
+  });
+
   it("needs Lob, sends one letter per statement with an idempotency key, and records it", async () => {
     const st = await aStatement();
     await expect(mailStatement(t.db, t.practiceId, st.id)).rejects.toThrow(/Connect Lob/);

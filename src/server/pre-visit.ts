@@ -14,6 +14,7 @@ import { schema } from "@/db";
 import { createEstimate } from "./billing";
 import { createPortalLink } from "./portal";
 import { messagePatient } from "./messaging";
+import { depositRequest, langOf, shortDate } from "@/lib/i18n/messages";
 
 const { appointments, patients, providers, patientInsurances, estimates, auditLog } = schema;
 const DAY = 86_400_000;
@@ -84,11 +85,10 @@ export async function requestDeposit(db: Db, practiceId: string, estimateId: str
   const url = `${origin}${path}`;
   const [practice] = await db.select({ name: schema.practices.name }).from(schema.practices).where(eq(schema.practices.id, practiceId)).limit(1);
   const amount = `$${(e.est.patientOwesCents / 100).toFixed(2)}`;
-  const when = e.appt.startsAt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const lang = langOf(patient.preferredLanguage);
   const r = await messagePatient(db, patient, {
     kind: "deposit_request",
-    sms: `${practice.name}: your estimated cost for your visit on ${when} is ${amount}. See the estimate and pay ahead at ${url} . Reply STOP to opt out.`,
-    email: { subject: `Your estimated cost for your visit on ${when}`, text: `Hi ${patient.firstName},\n\nBased on your insurance, your estimated cost for your visit on ${when} is ${amount}. This is an estimate; your final bill depends on the care you receive.\n\nYou can pay it ahead of time here:\n\n${url}\n\n${practice.name}` },
+    ...depositRequest(lang, practice, patient.firstName, shortDate(lang, e.appt.startsAt), amount, url),
   });
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "deposit_requested", entity: "estimate", entityId: e.est.id, details: { amountCents: e.est.patientOwesCents } });
   return { url, sms: r.sms, email: r.email, reason: r.reason };

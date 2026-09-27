@@ -7,12 +7,16 @@ import { endCheckin, grantCheckin, verifiedFor } from "@/lib/checkin-session";
 import { openLink, submitCheckin, verifyDob } from "@/server/checkin";
 import { startCheckinCopay } from "@/server/portal";
 import { siteOrigin } from "@/lib/origin";
+import { chosenLang } from "@/lib/i18n/patient-server";
+import { rememberLanguage } from "@/server/patient-language";
 
 export async function verifyDobAction(token: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
   const db = await getDb();
   const r = await verifyDob(db, token, String(formData.get("dob") ?? ""));
   if (!r.ok) return { ok: false, message: r.message };
   await grantCheckin(r.linkId);
+  const opened = await openLink(db, token);
+  if (opened.state === "open") await rememberLanguage(db, opened.link.patientId, await chosenLang());
   redirect(`/check-in/${token}`);
 }
 

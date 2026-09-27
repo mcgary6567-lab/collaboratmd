@@ -26,10 +26,9 @@ import { runDailyChecks } from "./daily-checks";
 import { getFhir, syncFhir } from "./fhir";
 import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
+import { appointmentReminder, balanceReminder, langOf, payLink, visitTime } from "@/lib/i18n/messages";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
-
-const when = (d: Date) => d.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 
 async function alreadySent(db: Db, practiceId: string, kind: string, entityId: string, sinceDays?: number) {
   const [row] = await db
@@ -69,8 +68,7 @@ export async function sendPayLinks(db: Db, practiceId: string, origin: string, o
     const amount = `$${(o.balanceCents / 100).toFixed(2)}`;
     const r = await messagePatient(db, link.patient, {
       kind: "pay_link", entityId: o.patientId, reminder: true,
-      sms: `${practice.name}: your balance is ${amount}. Pay securely by card: ${url} . Reply STOP to opt out.`,
-      email: { subject: `Pay your balance with ${practice.name}`, text: `Hi ${link.patient.firstName},\n\nYour balance with ${practice.name} is ${amount}. You can see what it is for and pay securely by card here:\n\n${url}\n\nThe link asks for your date of birth and works for 30 days.\n\n${practice.name}` },
+      ...payLink(langOf(link.patient.preferredLanguage), practice, link.patient.firstName, amount, url),
     });
     if (r.sms === "sent" || r.email === "sent") sent++;
     else skipped++;
@@ -94,10 +92,10 @@ export async function appointmentReminders(db: Db, practiceId: string, origin: s
     if (await alreadySent(db, practiceId, "appointment_reminder", appt.id)) continue;
     const link = await createCheckinLink(db, practiceId, appt.id);
     const url = `${origin}${link.path}`;
+    const lang = langOf(patient.preferredLanguage);
     const r = await messagePatient(db, patient, {
       kind: "appointment_reminder", entityId: appt.id, reminder: true,
-      sms: `${practice.name}: reminder of your appointment ${when(appt.startsAt)}. Check in online: ${url} . Reply STOP to opt out.`,
-      email: { subject: `Your appointment with ${practice.name}`, text: `Hi ${patient.firstName},\n\nThis is a reminder of your appointment on ${when(appt.startsAt)}.\n\nSave time by checking in online:\n${url}\n\n${practice.name}${practice.phone ? `\n${practice.phone}` : ""}` },
+      ...appointmentReminder(lang, practice, patient.firstName, visitTime(lang, appt.startsAt), url),
     });
     if (r.sms === "sent" || r.email === "sent") sent++;
     else skipped++;
@@ -131,8 +129,7 @@ export async function balanceReminders(db: Db, practiceId: string, origin: strin
     const amount = `$${(o.balanceCents / 100).toFixed(2)}`;
     const r = await messagePatient(db, patient, {
       kind: "balance_reminder", entityId: o.patientId, reminder: true,
-      sms: `${practice.name}: you have a balance of ${amount}. View and pay securely: ${url} . Reply STOP to opt out.`,
-      email: { subject: `Your balance with ${practice.name}`, text: `Hi ${patient.firstName},\n\nYour balance with ${practice.name} is ${amount}. You can see what it is for and pay securely here:\n\n${url}\n\nIf you would like a payment plan, reply to this email or call the office${practice.phone ? ` at ${practice.phone}` : ""}.\n\n${practice.name}` },
+      ...balanceReminder(langOf(patient.preferredLanguage), practice, patient.firstName, amount, url),
     });
     if (r.sms === "sent" || r.email === "sent") sent++;
     else skipped++;

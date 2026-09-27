@@ -165,6 +165,8 @@ export const patients = pgTable(
     zip: text("zip"),
     smsConsentAt: timestamp("sms_consent_at", { withTimezone: true }),
     remindersOptOut: boolean("reminders_opt_out").notNull().default(false),
+    /** en | es: statements, reminders and confirmations are sent in it. See migration 0045. */
+    preferredLanguage: text("preferred_language").notNull().default("en"),
     fhirId: text("fhir_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1636,6 +1638,7 @@ export const bookingRequests = pgTable("booking_requests", {
   payerName: text("payer_name"),
   memberId: text("member_id"),
   smsConsent: boolean("sms_consent").notNull().default(false),
+  language: text("language").notNull().default("en"),
   status: text("status").notNull().default("pending"), // pending | confirmed | declined
   appointmentId: uuid("appointment_id").references(() => appointments.id),
   ipHash: text("ip_hash"),
@@ -1656,7 +1659,18 @@ export const feedback = pgTable("feedback", {
   status: text("status").notNull().default("open"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  reply: text("reply"),
+  repliedAt: timestamp("replied_at", { withTimezone: true }),
+  repliedBy: uuid("replied_by").references(() => users.id),
 });
+
+/* Feature suggestions a practice dismissed. See migration 0045. */
+export const dismissedTips = pgTable("dismissed_tips", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  tip: text("tip").notNull(),
+  dismissedBy: uuid("dismissed_by").references(() => users.id),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.tip] })]);
 
 export const featureUsage = pgTable("feature_usage", {
   practiceId: uuid("practice_id").notNull().references(() => practices.id),

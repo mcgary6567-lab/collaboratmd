@@ -2,8 +2,10 @@
  * A short-lived in-memory cache for expensive summary numbers (dashboard and
  * analytics totals) that do not need to be exact to the second. Per server
  * instance and per practice; entries expire on their own, and concurrent
- * callers share one computation. Never use it for anything a user just changed
- * and expects to see, such as a claim's status or a balance on a patient page.
+ * callers share one computation. Put dataStamp() (server/data-stamp.ts) in
+ * the key so a posting or a new claim shows at once. Never use it for anything
+ * a user just changed and expects to see exactly, such as a claim's status or
+ * a balance on a patient page.
  */
 const store = new Map<string, { until: number; value: Promise<unknown> }>();
 const MAX_ENTRIES = 500;

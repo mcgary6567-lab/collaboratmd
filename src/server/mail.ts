@@ -13,6 +13,8 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { practiceConfig } from "./integrations";
 import { getStatement } from "./billing";
+import { langOf } from "@/lib/i18n/messages";
+import { STATEMENT_TEXT, statementDay } from "@/lib/i18n/statement";
 
 const { statements, auditLog } = schema;
 const LOB_LETTERS = "https://api.lob.com/v1/letters";
@@ -28,32 +30,35 @@ type StatementRow = NonNullable<Awaited<ReturnType<typeof getStatement>>>;
 
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const usd = (cents: number) => `$${(cents / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
-const day = (iso: string | null) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "");
 
+/** The letter, in the patient's preferred language. */
 export function statementLetterHtml(row: StatementRow, maxVisits = 15): string {
   const { statement: st, patient: p, practice: pr } = row;
+  const lang = langOf(p.preferredLanguage);
+  const t = STATEMENT_TEXT[lang];
+  const day = (iso: string | null) => statementDay(lang, iso);
   const build = (n: number) => {
     const visits = st.detail.visits.slice(0, n);
     const more = st.detail.visits.length - visits.length;
-    return `<html><head><meta charset="utf-8"><style>
+    return `<html lang="${lang}"><head><meta charset="utf-8"><style>
 body{font-family:Helvetica,Arial,sans-serif;font-size:10pt;color:#111;margin:0.5in}
 h1{font-size:13pt;margin:0}table{width:100%;border-collapse:collapse;margin-top:8pt}
 td,th{padding:3pt 4pt;border-bottom:1px solid #ddd;text-align:left}th{font-size:8pt;text-transform:uppercase;color:#444}
 .r{text-align:right}.due{border:2px solid #111;padding:8pt;margin:10pt 0;text-align:center}.big{font-size:18pt;font-weight:bold}
 </style></head><body>
 <h1>${esc(pr.name)}</h1><div>${esc(pr.address1)}, ${esc(pr.city)}, ${esc(pr.state)} ${esc(pr.zip)}${pr.phone ? ` &middot; ${esc(pr.phone)}` : ""}</div>
-<p>Statement ${esc(st.statementNumber)} &middot; ${esc(day(st.statementDate))} &middot; Account ${esc(p.mrn)}<br>For ${esc(p.firstName)} ${esc(p.lastName)}</p>
-<div class="due">Amount due<div class="big">${usd(st.amountDueCents)}</div>Please pay by ${esc(day(st.dueDate))}</div>
-<table><tr><td>Charges for your visits</td><td class="r">${usd(st.chargesCents)}</td></tr>
-<tr><td>Paid by your insurance</td><td class="r">-${usd(st.insurancePaidCents)}</td></tr>
-<tr><td>Insurance adjustments and discounts</td><td class="r">-${usd(st.adjustmentsCents)}</td></tr>
-<tr><td>Payments you have made</td><td class="r">-${usd(st.patientPaidCents)}</td></tr>
-<tr><th>Your balance</th><th class="r">${usd(st.amountDueCents)}</th></tr></table>
-<table><tr><th>Visit</th><th>Services</th><th class="r">Charges</th><th class="r">Insurance paid</th><th class="r">You owe</th></tr>
+<p>${t.statement} ${esc(st.statementNumber)} &middot; ${esc(day(st.statementDate))} &middot; ${t.account} ${esc(p.mrn)}<br>${t.statementFor} ${esc(p.firstName)} ${esc(p.lastName)}</p>
+<div class="due">${t.amountDue}<div class="big">${usd(st.amountDueCents)}</div>${esc(t.payBy(day(st.dueDate)))}</div>
+<table><tr><td>${t.charges}</td><td class="r">${usd(st.chargesCents)}</td></tr>
+<tr><td>${t.insurancePaid}</td><td class="r">-${usd(st.insurancePaidCents)}</td></tr>
+<tr><td>${t.adjustments}</td><td class="r">-${usd(st.adjustmentsCents)}</td></tr>
+<tr><td>${t.youPaid}</td><td class="r">-${usd(st.patientPaidCents)}</td></tr>
+<tr><th>${t.balance}</th><th class="r">${usd(st.amountDueCents)}</th></tr></table>
+<table><tr><th>${t.visit}</th><th>${t.services}</th><th class="r">${t.chargesCol}</th><th class="r">${t.insurancePaidCol}</th><th class="r">${t.youOwe}</th></tr>
 ${visits.map((v) => `<tr><td>${esc(day(v.dateOfService))}</td><td>${esc(v.services.map((x) => x.description || x.cpt).join(", ").slice(0, 80))}</td><td class="r">${usd(v.chargesCents)}</td><td class="r">${usd(v.insurancePaidCents)}</td><td class="r">${usd(v.youOweCents)}</td></tr>`).join("")}
-${more > 0 ? `<tr><td colspan="5">and ${more} earlier visit${more === 1 ? "" : "s"}; call us for the full list</td></tr>` : ""}</table>
-<p><b>How to pay:</b> call ${esc(pr.phone ?? "our office")}, use the payment link we sent by text or email, or mail a check payable to ${esc(pr.name)} with your account number ${esc(p.mrn)}.</p>
-<p>If you cannot pay the full amount, call us about a payment plan or financial assistance. Questions about this bill: ${esc(pr.phone ?? "call our office")}.</p>
+${more > 0 ? `<tr><td colspan="5">${esc(t.moreVisits(more))}</td></tr>` : ""}</table>
+<p>${t.letterHowToPay(esc(pr.phone ?? t.ourOffice), esc(pr.name), esc(p.mrn))}</p>
+<p>${esc(t.letterHelp(pr.phone ?? t.callOffice))}</p>
 </body></html>`;
   };
   let n = maxVisits;

@@ -10,6 +10,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { notify } from "./notifications";
 import { messagePatient } from "./messaging";
+import { bookingConfirmed, langOf, visitTime } from "@/lib/i18n/messages";
 
 const { bookingSettings, providerHours, bookingRequests, appointments, providers, patients, locations, practices, auditLog } = schema;
 const MIN = 60_000;
@@ -25,23 +26,25 @@ function parts(date: Date, tz: string) {
   return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, mi: +p.minute, weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday) };
 }
 
-/** The instant when the clock in `tz` reads the given local date and minute of day (handles daylight saving). */
-export function zonedToUtc(y: number, m: number, d: number, minuteOfDay: number, tz: string): Date {
-  const want = Date.UTC(y, m - 1, d, Math.floor(minuteOfDay / 60), minuteOfDay % 60);
-  let t = want;
-  for (let i = 0; i < 2; i++) {
-    const p = parts(new Date(t), tz);
-    const shown = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi);
-    t += want - shown;
-  }
-  return new Date(t);
+/**
+ * Appointment times are kept as the practice's clock time written as UTC: a
+ * 9:00 visit is stored as 09:00Z, the way the schedule enters and shows them
+ * and reminders read them. Booking slots follow the same rule, so a time
+ * booked online sits on the schedule at the hour the patient chose. Only the
+ * current moment needs the time zone, to know what the clock at the practice
+ * reads now (daylight saving included).
+ */
+export function practiceClock(now: Date, tz: string): Date {
+  const p = parts(now, tz);
+  return new Date(Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi));
 }
 
-export function localDateLabel(date: Date, tz: string) {
-  return date.toLocaleString("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" });
+const LOCALE = { en: "en-US", es: "es-US" } as const;
+export function localDateLabel(date: Date, lang: "en" | "es" = "en") {
+  return date.toLocaleString(LOCALE[lang], { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" });
 }
-export function localTimeLabel(date: Date, tz: string) {
-  return date.toLocaleString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
+export function localTimeLabel(date: Date, lang: "en" | "es" = "en") {
+  return date.toLocaleString(LOCALE[lang], { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
 }
 
 /* ------------------------------ Settings ------------------------------ */
@@ -103,7 +106,7 @@ export type Slot = { providerId: string; locationId: string | null; startsAt: Da
 export async function availableSlots(db: Db, practiceId: string, opts: { providerId?: string; now?: Date } = {}): Promise<Slot[]> {
   const s = await getBookingSettings(db, practiceId);
   if (!s.enabled) return [];
-  const now = opts.now ?? new Date();
+  const now = practiceClock(opts.now ?? new Date(), s.timeZone);
   const earliest = new Date(now.getTime() + s.minNoticeHours * 3_600_000);
   const until = new Date(now.getTime() + (s.horizonDays + 1) * DAY);
   const hours = (await hoursFor(db, practiceId)).filter((h) => !opts.providerId || h.providerId === opts.providerId);
@@ -118,14 +121,12 @@ export async function availableSlots(db: Db, practiceId: string, opts: { provide
       .where(and(eq(bookingRequests.practiceId, practiceId), eq(bookingRequests.status, "pending"), inArray(bookingRequests.providerId, providerIds), lt(bookingRequests.startsAt, until)))),
   ];
   const out: Slot[] = [];
-  const today = parts(now, s.timeZone);
   for (let i = 0; i <= s.horizonDays; i++) {
-    const day = new Date(Date.UTC(today.y, today.m - 1, today.d + i, 12));
-    const [y, m, d] = [day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate()];
+    const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + i));
     const weekday = day.getUTCDay();
     for (const h of hours.filter((x) => x.weekday === weekday && providerIds.includes(x.providerId))) {
       for (let min = h.startMinute; min + s.slotMinutes <= h.endMinute; min += s.slotMinutes) {
-        const startsAt = zonedToUtc(y, m, d, min, s.timeZone);
+        const startsAt = new Date(day.getTime() + min * MIN);
         const endsAt = new Date(startsAt.getTime() + s.slotMinutes * MIN);
         if (startsAt < earliest || startsAt >= until) continue;
         if (busy.some((b) => b.p === h.providerId && b.a < endsAt && b.b > startsAt)) continue;
@@ -138,7 +139,7 @@ export async function availableSlots(db: Db, practiceId: string, opts: { provide
 
 /* ------------------------------ Requests ------------------------------ */
 
-export type BookingInput = { providerId: string; startsAt: string; firstName: string; lastName: string; dob: string; phone?: string; email?: string; reason?: string; payerName?: string; memberId?: string; smsConsent?: boolean };
+export type BookingInput = { providerId: string; startsAt: string; firstName: string; lastName: string; dob: string; phone?: string; email?: string; reason?: string; payerName?: string; memberId?: string; smsConsent?: boolean; language?: "en" | "es" };
 
 export async function requestBooking(db: Db, practiceId: string, input: BookingInput, opts: { now?: Date; ipHash?: string | null } = {}) {
   const now = opts.now ?? new Date();
@@ -161,7 +162,7 @@ export async function requestBooking(db: Db, practiceId: string, input: BookingI
     practiceId, providerId: slot.providerId, locationId: slot.locationId, startsAt: slot.startsAt, endsAt: slot.endsAt,
     firstName: first, lastName: last, dob: input.dob, phone: phone || null, email: email || null,
     reason: input.reason?.trim().slice(0, 300) || null, payerName: input.payerName?.trim().slice(0, 100) || null, memberId: input.memberId?.trim().slice(0, 40) || null,
-    smsConsent: !!input.smsConsent && !!phone, ipHash: opts.ipHash ?? null, createdAt: now,
+    smsConsent: !!input.smsConsent && !!phone, language: input.language === "es" ? "es" : "en", ipHash: opts.ipHash ?? null, createdAt: now,
   }).returning();
   // No patient details in the notification: titles go out in the email digest.
   await notify(db, practiceId, { kind: "booking_request", title: "New online appointment request", body: "Confirm or decline it on the schedule.", href: "/scheduling", dedupeKey: `booking:${row.id}` });
@@ -188,8 +189,11 @@ export async function confirmRequest(db: Db, practiceId: string, id: string, use
     const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(patients).where(eq(patients.practiceId, practiceId));
     [patient] = await db.insert(patients).values({
       practiceId, mrn: "P" + String(Number(n) + 1001).padStart(5, "0"), firstName: r.firstName, lastName: r.lastName, dob: r.dob, sex: "U",
-      phone: r.phone, email: r.email, smsConsentAt: r.smsConsent ? r.createdAt : null,
+      phone: r.phone, email: r.email, smsConsentAt: r.smsConsent ? r.createdAt : null, preferredLanguage: r.language,
     }).returning();
+  } else if (r.language !== patient.preferredLanguage) {
+    // They asked in this language just now; statements and reminders follow it.
+    [patient] = await db.update(patients).set({ preferredLanguage: r.language }).where(eq(patients.id, patient.id)).returning();
   }
   const [appt] = await db.insert(appointments).values({
     practiceId, patientId: patient.id, providerId: r.providerId, locationId: r.locationId, startsAt: r.startsAt, endsAt: r.endsAt,
@@ -197,13 +201,11 @@ export async function confirmRequest(db: Db, practiceId: string, id: string, use
   }).returning();
   await db.update(bookingRequests).set({ status: "confirmed", appointmentId: appt.id, decidedAt: new Date(), decidedBy: userId }).where(eq(bookingRequests.id, id));
   await db.insert(auditLog).values({ practiceId, userId, action: "booking_confirmed", entity: "appointment", entityId: appt.id, details: { matched } });
-  const s = await getBookingSettings(db, practiceId);
   const [practice] = await db.select({ name: practices.name, phone: practices.phone }).from(practices).where(eq(practices.id, practiceId)).limit(1);
-  const when = `${localDateLabel(r.startsAt, s.timeZone)} at ${localTimeLabel(r.startsAt, s.timeZone)}`;
+  const lang = langOf(patient.preferredLanguage);
   const message = await messagePatient(db, patient, {
     kind: "booking_confirmed", entityId: appt.id,
-    sms: `${practice.name}: your appointment is confirmed for ${when}. Call ${practice.phone ?? "us"} to change it. Reply STOP to opt out.`,
-    email: { subject: `Your appointment with ${practice.name}`, text: `Your appointment is confirmed for ${when}.\n\nTo change or cancel it, call ${practice.phone ?? "the office"}.\n\n${practice.name}` },
+    ...bookingConfirmed(lang, practice, visitTime(lang, r.startsAt)),
   }, deps).catch(() => null);
   return { appointmentId: appt.id, patientId: patient.id, matched, message, startsAt: r.startsAt };
 }

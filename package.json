@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit --noUnusedLocals",
     "test": "vitest run",
     "e2e": "playwright test",
+    "perf": "playwright test -c playwright.perf.config.ts",
     "load-test": "tsx --tsconfig tsconfig.scripts.json scripts/load-test.ts",
     "build:migrations": "node scripts/build-migrations.mjs",
     "seed:large": "tsx scripts/seed-large.ts",
