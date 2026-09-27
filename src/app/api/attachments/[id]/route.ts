@@ -1,6 +1,6 @@
 import { getDb, schema } from "@/db";
 import { getSession } from "@/lib/auth";
-import { getAttachmentFile } from "@/server/attachments";
+import { attachmentBytes, getAttachmentFile } from "@/server/attachments";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const file = await getAttachmentFile(db, session.practiceId, id).catch(() => null);
   if (!file) return new Response("Not found", { status: 404 });
   await db.insert(schema.auditLog).values({ practiceId: session.practiceId, userId: session.userId, action: "attachment_viewed", entity: "claim", entityId: file.claimId });
-  return new Response(Buffer.from(file.dataBase64, "base64"), {
+  const bytes = await attachmentBytes(file).catch(() => null);
+  if (!bytes) return new Response("The file could not be read", { status: 502 });
+  return new Response(new Uint8Array(bytes), {
     headers: { "Content-Type": file.contentType, "Content-Disposition": `inline; filename="${file.filename.replace(/"/g, "")}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
   });
 }

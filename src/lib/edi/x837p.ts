@@ -5,6 +5,7 @@
  * for a clearinghouse sandbox. It covers the loops a small practice needs
  * (billing provider, subscriber, payer, claim, diagnoses, service lines).
  */
+import { contactPhone } from "./x12";
 
 /** A supporting document for a claim (see server/attachments.ts). */
 export type ClaimAttachmentRef = { reportType: string; transmission: string; controlNumber: string };
@@ -66,6 +67,8 @@ export interface Edi837Input {
     city: string;
     state: string;
     zip: string;
+    /** Submitter contact number (PER in loop 1000A). */
+    phone?: string | null;
   };
   renderingProvider: { lastName: string; firstName: string; npi: string; taxonomy: string };
   serviceFacility?: ServiceFacility | null;
@@ -152,7 +155,7 @@ export function buildEdi837P(input: Edi837Input): string {
   s.push(["BHT", "0019", "00", input.controlNumber, ccyymmdd, hhmm, "CH"]);
   // 1000A submitter / 1000B receiver
   s.push(["NM1", "41", "2", input.billingProvider.name, "", "", "", "", "46", input.senderId]);
-  s.push(["PER", "IC", input.billingProvider.name, "TE", "0000000000"]);
+  s.push(["PER", "IC", input.billingProvider.name, "TE", contactPhone(input.billingProvider.phone)]);
   s.push(["NM1", "40", "2", input.payer.name, "", "", "", "", "46", input.receiverId]);
   // 2000A billing provider
   s.push(["HL", "1", "", "20", "1"]);

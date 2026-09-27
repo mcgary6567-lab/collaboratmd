@@ -7,6 +7,7 @@ import { clientIp } from "@/lib/ip";
 import { siteOrigin } from "@/lib/origin";
 import { sendEmail } from "@/server/notify";
 import { completeSignup, startSignup } from "@/server/signup";
+import { sendWelcome } from "@/server/lifecycle";
 import { hit, waitMessage } from "@/server/throttle";
 
 export type SignupState = { done?: boolean; error?: string } | undefined;
@@ -33,7 +34,9 @@ export async function signupAction(_prev: SignupState, fd: FormData): Promise<Si
 
 export async function completeSignupAction(token: string, _prev: SignupState): Promise<SignupState> {
   try {
-    await completeSignup(await getDb(), token);
+    const db = await getDb();
+    const done = await completeSignup(db, token, new Date(), clientIp(await headers()));
+    await sendWelcome(db, done.practiceId, await siteOrigin(), (to, subject, text) => sendEmail(to, subject, text)).catch(() => false);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not create the practice" };
   }

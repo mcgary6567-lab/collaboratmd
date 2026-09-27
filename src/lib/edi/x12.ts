@@ -48,6 +48,17 @@ export function tokenize(raw: string): { segments: string[][]; delimiters: Delim
   return { segments, delimiters };
 }
 
+/**
+ * The submitter contact number for PER (loop 1000A), ten digits. A claim must
+ * carry a real number the payer can call, so a missing one stops the file
+ * rather than sending a placeholder.
+ */
+export function contactPhone(phone: string | null | undefined): string {
+  const d = (phone ?? "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+  if (d.length !== 10 || /^0+$/.test(d)) throw new Error("The practice phone number is missing or invalid; add it in Settings > Practice profile");
+  return d;
+}
+
 export function d8(date: Date | string): string {
   const iso = typeof date === "string" ? date : date.toISOString().slice(0, 10);
   return iso.replace(/-/g, "").slice(0, 8);

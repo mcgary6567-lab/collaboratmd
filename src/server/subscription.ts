@@ -48,12 +48,19 @@ export function planForPrice(priceId: string): string | null {
 }
 
 export const ACTIVE = ["active", "trialing", "past_due"];
+/** Days claims keep going out after a failed payment, while the practice updates its card. */
+export const GRACE_DAYS = 7;
 
-export type Standing = { status: string; plan: string | null; trialDaysLeft: number | null; blocked: boolean; reason: string | null };
+export type Standing = { status: string; plan: string | null; trialDaysLeft: number | null; blocked: boolean; reason: string | null; graceUntil?: Date | null };
 
-export function standing(p: Pick<Practice, "selfServe" | "subscriptionStatus" | "trialEndsAt" | "plan" | "stripeSubscriptionId">, now = new Date()): Standing {
+export function standing(p: Pick<Practice, "selfServe" | "subscriptionStatus" | "trialEndsAt" | "plan" | "stripeSubscriptionId"> & { pastDueSince?: Date | null }, now = new Date()): Standing {
   const trialDaysLeft = p.trialEndsAt ? Math.max(0, Math.ceil((p.trialEndsAt.getTime() - now.getTime()) / 86_400_000)) : null;
   if (!p.selfServe) return { status: p.subscriptionStatus, plan: p.plan, trialDaysLeft: null, blocked: false, reason: null };
+  if (p.stripeSubscriptionId && p.subscriptionStatus === "past_due") {
+    const graceUntil = new Date((p.pastDueSince ?? now).getTime() + GRACE_DAYS * 86_400_000);
+    if (graceUntil <= now) return { status: "past_due", plan: p.plan, trialDaysLeft: null, blocked: true, graceUntil, reason: "A payment failed more than a week ago, so claims are paused. An administrator can update the payment method under Settings > Subscription." };
+    return { status: "past_due", plan: p.plan, trialDaysLeft: null, blocked: false, graceUntil, reason: null };
+  }
   const subscribed = !!p.stripeSubscriptionId && ACTIVE.includes(p.subscriptionStatus);
   const inTrial = p.subscriptionStatus === "trialing" && !p.stripeSubscriptionId && !!p.trialEndsAt && p.trialEndsAt > now;
   if (subscribed || inTrial) return { status: p.subscriptionStatus, plan: p.plan, trialDaysLeft: inTrial ? trialDaysLeft : null, blocked: false, reason: null };
@@ -115,10 +122,13 @@ export async function handlePlatformEvent(db: Db, event: StripeEvent) {
     if (p.stripeSubscriptionId && p.stripeSubscriptionId !== sub.id) return { handled: false };
     const seat = sub.items?.data?.find((i) => i.price?.recurring?.usage_type !== "metered");
     const periodEnd = seat?.current_period_end ?? sub.current_period_end;
+    const status = event.type === "customer.subscription.deleted" ? "canceled" : sub.status;
     await db.update(practices).set({
+      // The grace period starts the first time it goes past due and ends when it is paid.
+      pastDueSince: status === "past_due" ? p.pastDueSince ?? new Date() : null,
       stripeSubscriptionId: sub.id,
       stripeCustomerId: sub.customer,
-      subscriptionStatus: event.type === "customer.subscription.deleted" ? "canceled" : sub.status,
+      subscriptionStatus: status,
       plan: (seat?.price?.id && planForPrice(seat.price.id)) || p.plan,
       stripeSubscriptionItemId: seat?.id ?? p.stripeSubscriptionItemId,
       seats: seat?.quantity ?? p.seats,

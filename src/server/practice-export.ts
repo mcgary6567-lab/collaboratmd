@@ -2,6 +2,7 @@ import { Zip, ZipDeflate } from "fflate";
 import { sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { csvCell } from "@/lib/csv-out";
+import { attachmentBytes } from "./attachments";
 
 /**
  * Everything a practice has in CollaboratMD, as a zip of one CSV per table plus
@@ -13,10 +14,10 @@ import { csvCell } from "@/lib/csv-out";
  * tokens) and platform tables that hold no practice data.
  */
 
-const PAGE = 2000;
+const PAGE = 5000;
 const SKIP_TABLES = new Set(["auth_throttle", "ops_alerts", "saml_requests", "error_events", "__drizzle_migrations", "schema_migrations"]);
 const SECRET_COLUMN = /password|secret|sealed|token|_hash$|^key$|^mfa_|_hint$/;
-const FILE_COLUMN = "data_base64";
+const FILE_COLUMNS = new Set(["data_base64", "storage_key"]);
 const IDENT = /^[a-z_][a-z0-9_]*$/;
 
 type Source = { table: string; filter: "own" | "practice" | { column: string; parent: string } };
@@ -59,7 +60,7 @@ export async function exportPlan(db: Db): Promise<ExportPlan> {
     }
     if (!filter) continue;
     sources.push({ table, filter });
-    columns[table] = { keep: all.filter((c) => !SECRET_COLUMN.test(c) && c !== FILE_COLUMN), dropped: all.filter((c) => SECRET_COLUMN.test(c)) };
+    columns[table] = { keep: all.filter((c) => !SECRET_COLUMN.test(c) && !FILE_COLUMNS.has(c)), dropped: all.filter((c) => SECRET_COLUMN.test(c)) };
   }
   return { sources, columns };
 }
@@ -94,9 +95,16 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
     zip.add(file);
     file.push(enc.encode(keep.join(",") + "\r\n"), false);
     let n = 0;
+    // Keyset paging on id, so the last page costs what the first does; tables without an id fall back to offsets.
+    const keyed = keep.includes("id");
+    let last: unknown = null;
     for (let offset = 0; ; offset += PAGE) {
-      const { rows } = await db.execute(sql`SELECT ${sql.raw(keep.map(q).join(", "))} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ORDER BY ${sql.raw(keep.includes("id") ? "id" : "1")} LIMIT ${PAGE} OFFSET ${offset}`);
+      const cols = sql.raw(keep.map(q).join(", "));
+      const { rows } = keyed
+        ? await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ${last === null ? sql`` : sql`AND id > ${last}`} ORDER BY id LIMIT ${PAGE}`)
+        : await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ORDER BY 1 LIMIT ${PAGE} OFFSET ${offset}`);
       if (!rows.length) break;
+      if (keyed) last = (rows[rows.length - 1] as Record<string, unknown>).id;
       const text = (rows as Record<string, unknown>[]).map((r) => keep.map((c) => csvCell(typeof r[c] === "object" && r[c] !== null && !(r[c] instanceof Date) ? JSON.stringify(r[c]) : r[c])).join(",")).join("\r\n") + "\r\n";
       file.push(enc.encode(text), false);
       n += rows.length;
@@ -110,14 +118,18 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
 
   // Attachments as the files themselves, one at a time.
   let files = 0;
+  const missing: string[] = [];
   const { rows: ids } = await db.execute(sql`SELECT id FROM claim_attachments WHERE practice_id = ${practiceId} ORDER BY created_at`);
   for (const { id } of ids as { id: string }[]) {
-    const { rows } = await db.execute(sql`SELECT filename, data_base64 FROM claim_attachments WHERE id = ${id}`);
-    const a = rows[0] as { filename: string; data_base64: string } | undefined;
+    const { rows } = await db.execute(sql`SELECT filename, data_base64, storage_key FROM claim_attachments WHERE id = ${id}`);
+    const a = rows[0] as { filename: string; data_base64: string | null; storage_key: string | null } | undefined;
     if (!a) continue;
+    // A file missing from storage is listed in the README rather than failing the whole export.
+    const bytes = await attachmentBytes({ dataBase64: a.data_base64, storageKey: a.storage_key }).catch(() => null);
+    if (!bytes) { missing.push(`${id} (${a.filename})`); continue; }
     const file = new ZipDeflate(`attachments/${id}-${safeName(a.filename)}`, { level: 6 });
     zip.add(file);
-    file.push(new Uint8Array(Buffer.from(a.data_base64, "base64")), true);
+    file.push(new Uint8Array(bytes), true);
     files++;
     yield* drain();
   }
@@ -136,6 +148,7 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
     "Rows:",
     ...counts.map((c) => `  ${c}`),
     `  attachments: ${files} files`,
+    ...(missing.length ? ["", "Attachments that could not be read from file storage:", ...missing.map((m) => `  ${m}`)] : []),
     "",
     "Left out on purpose (credentials, not data):",
     ...(dropped.length ? dropped.map((d) => `  ${d}`) : ["  none"]),

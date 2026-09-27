@@ -13,6 +13,7 @@ import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { TIERS } from "@/content/pricing";
+import { recordAcceptance } from "./legal";
 
 const { signups, users, practices, auditLog } = schema;
 type Send = (to: string, subject: string, text: string) => Promise<boolean>;
@@ -73,7 +74,7 @@ export async function readSignup(db: Db, token: string, now = new Date()) {
 }
 
 /** Creates the practice and its first administrator, once per link. */
-export async function completeSignup(db: Db, token: string, now = new Date()) {
+export async function completeSignup(db: Db, token: string, now = new Date(), ip?: string | null) {
   const pending = await readSignup(db, token, now);
   if (!pending) throw new Error("This link has expired or was already used. Sign up again, or sign in if you finished before.");
   const claimed = await db.update(signups).set({ completedAt: now }).where(and(eq(signups.id, pending.id), isNull(signups.completedAt))).returning();
@@ -90,6 +91,8 @@ export async function completeSignup(db: Db, token: string, now = new Date()) {
   }).returning();
   const [user] = await db.insert(users).values({ practiceId: practice.id, email: pending.email, passwordHash: pending.passwordHash, name: pending.name, role: "admin" }).returning();
   await db.update(signups).set({ practiceId: practice.id }).where(eq(signups.id, pending.id));
+  // The terms were agreed on the signup form, so the acceptance is dated then.
+  await recordAcceptance(db, { practiceId: practice.id, userId: user.id, ip, at: pending.createdAt });
   await db.insert(auditLog).values({ practiceId: practice.id, userId: user.id, action: "practice_created", entity: "practice", entityId: practice.id, details: { selfServe: true, plan: pending.plan } });
   return { practiceId: practice.id, userId: user.id, email: pending.email };
 }

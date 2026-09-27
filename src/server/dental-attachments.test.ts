@@ -39,7 +39,7 @@ describe("837D and the dental scrubber", () => {
   it("builds SV3, TOO and line dates, with PWK for attachments", () => {
     const edi = buildEdi837D({
       controlNumber: "CMD1", interchangeControl: "123", senderId: "S", receiverId: "R", now: new Date("2026-09-25T12:00:00Z"),
-      billingProvider: { name: "Smile Dental", npi: "1234567893", taxId: "12-3456789", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201", taxonomy: "1223G0001X" },
+      billingProvider: { name: "Smile Dental", phone: "407-555-0100", npi: "1234567893", taxId: "12-3456789", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201", taxonomy: "1223G0001X" },
       rendering: { lastName: "Tooth", firstName: "Terry", npi: "1234567893", taxonomy: "1223G0001X" },
       payer: { name: "Delta", payerId: "DDX", type: "commercial" },
       subscriber: { lastName: "Doe", firstName: "Jane", memberId: "M1", dob: "1980-02-03", sex: "F", relationship: "self" },

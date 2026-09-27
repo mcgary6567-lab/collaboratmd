@@ -12,7 +12,8 @@ const PORT = Number(process.env.E2E_PORT ?? 3700);
 export default defineConfig({
   testDir: "e2e",
   timeout: 120_000,
-  expect: { timeout: 20_000 },
+  // The dev server compiles each page on first visit, which can take longer than the 5 s default.
+  expect: { timeout: 45_000 },
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

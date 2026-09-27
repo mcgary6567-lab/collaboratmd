@@ -171,20 +171,24 @@ export async function creditBalances(db: Db, practiceId: string, now = new Date(
       JOIN patients p ON p.id = b.patient_id
       WHERE b.balance <= -100
       ORDER BY b.balance LIMIT 500`),
+    // Balances per claim first, from the ledger alone; names are joined only for the few that are overpaid.
     db.execute<Row>(sql`
-      SELECT x.* FROM (
-        SELECT c.id, c.control_number, c.patient_id, pt.first_name || ' ' || pt.last_name AS patient, c.payer_id, py.name AS payer, py.type AS payer_type,
-          (COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'charge'), 0)
-            - COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'insurance_payment'), 0)
-            + COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'reversal'), 0)
-            - COALESCE(sum(l.amount_cents) FILTER (WHERE l.type IN ('adjustment', 'write_off')), 0)
-            - COALESCE(sum(l.amount_cents) FILTER (WHERE l.type = 'transfer_to_patient'), 0))::bigint AS balance,
-          max(l.posted_at) FILTER (WHERE l.type = 'insurance_payment')::date::text AS last_paid,
-          (SELECT COALESCE(sum(r.amount_cents), 0) FROM refunds r WHERE r.claim_id = c.id AND r.payee = 'payer' AND r.status IN ('requested', 'approved'))::text AS pending
-        FROM claims c JOIN ledger_entries l ON l.claim_id = c.id JOIN patients pt ON pt.id = c.patient_id JOIN payers py ON py.id = c.payer_id
-        WHERE c.practice_id = ${practiceId}
-        GROUP BY c.id, pt.first_name, pt.last_name, py.name, py.type
-      ) x WHERE x.balance <= -100 ORDER BY x.balance LIMIT 500`),
+      WITH bal AS (
+        SELECT claim_id,
+          (COALESCE(sum(amount_cents) FILTER (WHERE type = 'charge'), 0)
+            - COALESCE(sum(amount_cents) FILTER (WHERE type = 'insurance_payment'), 0)
+            + COALESCE(sum(amount_cents) FILTER (WHERE type = 'reversal'), 0)
+            - COALESCE(sum(amount_cents) FILTER (WHERE type IN ('adjustment', 'write_off')), 0)
+            - COALESCE(sum(amount_cents) FILTER (WHERE type = 'transfer_to_patient'), 0))::bigint AS balance,
+          max(posted_at) FILTER (WHERE type = 'insurance_payment')::date::text AS last_paid
+        FROM ledger_entries WHERE practice_id = ${practiceId} AND claim_id IS NOT NULL
+        GROUP BY claim_id
+      )
+      SELECT c.id, c.control_number, c.patient_id, pt.first_name || ' ' || pt.last_name AS patient, c.payer_id, py.name AS payer, py.type AS payer_type, bal.balance, bal.last_paid,
+        (SELECT COALESCE(sum(r.amount_cents), 0) FROM refunds r WHERE r.claim_id = c.id AND r.payee = 'payer' AND r.status IN ('requested', 'approved'))::text AS pending
+      FROM bal JOIN claims c ON c.id = bal.claim_id JOIN patients pt ON pt.id = c.patient_id JOIN payers py ON py.id = c.payer_id
+      WHERE bal.balance <= -100 AND c.practice_id = ${practiceId}
+      ORDER BY bal.balance LIMIT 500`),
   ]);
   const patientsOut: PatientCredit[] = pc.map((r) => ({ patientId: r.patient_id!, name: `${r.last_name}, ${r.first_name}`, mrn: r.mrn!, creditCents: Number(r.credit), pendingCents: Number(r.pending) }));
   const claimsOut: ClaimOverpayment[] = co.map((r) => ({

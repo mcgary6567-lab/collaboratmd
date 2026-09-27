@@ -10,7 +10,7 @@ import { checkClaimStatus, followUpList, runFollowUp } from "./followup";
 
 const inquiry = {
   senderId: "COLLABORATMD", receiverId: "60054", now: new Date("2026-09-24T12:00:00Z"), control: "9",
-  payer: { name: "Aetna", payerId: "60054" }, billingProvider: { name: "Summit", npi: "1234567893" },
+  payer: { name: "Aetna", payerId: "60054" }, billingProvider: { name: "Summit", phone: "407-555-0100", npi: "1234567893" },
   subscriber: { lastName: "Doe", firstName: "Jane", memberId: "W1", dob: "1980-01-01", sex: "F" },
   claim: { controlNumber: "CMD000777", payerClaimNumber: "PCN1", chargeCents: 15_000, serviceFrom: "2026-08-01", serviceTo: "2026-08-01" },
 };

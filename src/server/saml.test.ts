@@ -77,7 +77,7 @@ describe("secondary facility claims", () => {
   it("send the primary payer's adjudication in 2320/2330 and mark the claim secondary", () => {
     const edi = buildEdi837I({
       controlNumber: "CMD9", interchangeControl: "1", senderId: "S", receiverId: "R", now: new Date("2026-09-25T12:00:00Z"),
-      billingProvider: { name: "General Hospital", npi: "1234567893", taxId: "12-3456789", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201" },
+      billingProvider: { name: "General Hospital", phone: "407-555-0100", npi: "1234567893", taxId: "12-3456789", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201" },
       attending: { lastName: "Doc", firstName: "A", npi: "1234567893", taxonomy: "207Q00000X" },
       payer: { name: "Medigap Co", payerId: "MG1", type: "commercial" },
       subscriber: { lastName: "Doe", firstName: "Jane", memberId: "S1", dob: "1950-01-01", sex: "F", relationship: "self" },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageShell, Prose } from "@/components/page-shell";
 import { COMPANY, addressLine } from "@/content/company";
+import { LEGAL_VERSIONS, versionLabel } from "@/content/legal";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default function PrivacyPage() {
       eyebrow="Legal"
       title="Privacy Policy"
       lead="What we collect, why we collect it, how long we keep it, and the choices you have."
-      meta="Last updated September 23, 2026"
+      meta={`Last updated ${versionLabel(LEGAL_VERSIONS.privacy)}`}
     >
       <Prose>
         <h2>1. Who we are</h2>

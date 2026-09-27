@@ -52,6 +52,11 @@ export const practices = pgTable("practices", {
   seats: integer("seats"),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   claimsReportedThrough: timestamp("claims_reported_through", { withTimezone: true }),
+  /** When the subscription first went past due; claims keep going out for a grace period after it. */
+  pastDueSince: timestamp("past_due_since", { withTimezone: true }),
+  /** Scheduled deletion of all the practice's data (Settings > Close account). */
+  closingAt: timestamp("closing_at", { withTimezone: true }),
+  closingRequestedBy: uuid("closing_requested_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -793,7 +798,9 @@ export const claimAttachments = pgTable("claim_attachments", {
   contentType: text("content_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
   sha256: text("sha256").notNull(),
-  dataBase64: text("data_base64").notNull(),
+  /** The file itself, unless it lives in the external store under storageKey (server/files.ts). */
+  dataBase64: text("data_base64"),
+  storageKey: text("storage_key"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1517,4 +1524,57 @@ export const signups = pgTable("signups", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   practiceId: uuid("practice_id").references(() => practices.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/* Integration doctor results. See migration 0039 and server/doctor.ts. */
+export const integrationChecks = pgTable("integration_checks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  checkId: text("check_id").notNull(),
+  status: text("status").notNull(), // pass | warn | fail | skip
+  detail: text("detail").notNull(),
+  ranAt: timestamp("ran_at", { withTimezone: true }).defaultNow().notNull(),
+  ranBy: uuid("ran_by").references(() => users.id),
+});
+
+/* Background practice exports. See migration 0040. */
+export const exportJobs = pgTable("export_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  requestedBy: uuid("requested_by").references(() => users.id),
+  status: text("status").notNull().default("queued"), // queued | running | done | failed | expired
+  storageKey: text("storage_key"),
+  bytes: bigint("bytes", { mode: "number" }),
+  error: text("error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+});
+
+/* Platform operations. See migration 0041. */
+export const lifecycleEmails = pgTable("lifecycle_emails", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  kind: text("kind").notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.kind] })]);
+
+export const legalAcceptances = pgTable("legal_acceptances", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  document: text("document").notNull(),
+  version: text("version").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+  ipHash: text("ip_hash"),
+});
+
+export const practiceDeletions = pgTable("practice_deletions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull(),
+  practiceName: text("practice_name").notNull(),
+  requestedByEmail: text("requested_by_email"),
+  requestedAt: timestamp("requested_at", { withTimezone: true }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }).defaultNow().notNull(),
+  rowsDeleted: integer("rows_deleted").notNull(),
+  filesDeleted: integer("files_deleted").notNull(),
 });

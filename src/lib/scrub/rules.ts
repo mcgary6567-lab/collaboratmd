@@ -10,7 +10,7 @@ export interface ScrubClaim {
   patient: { firstName: string; lastName: string; dob: string; sex: string; address1?: string | null; zip?: string | null };
   insurance: { memberId: string; payerId: string; relationship: string };
   provider: { npi: string; taxonomy: string };
-  practice: { npi: string; taxId: string };
+  practice: { npi: string; taxId: string; phone?: string | null };
   encounter: { dateOfService: string; placeOfService: string; diagnoses: string[] };
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[] }[];
   payer: { timelyFilingDays: number };
@@ -83,6 +83,10 @@ const rules: Record<string, Rule> = {
   BILLING_NPI: (c) =>
     !isValidNpi(c.practice.npi)
       ? [{ rule: "BILLING_NPI", severity: "error", message: `Billing provider NPI ${c.practice.npi} fails check-digit validation`, field: "practice.npi" }]
+      : [],
+  BILLING_PHONE: (c) =>
+    c.practice.phone !== undefined && !/^1?\d{10}$/.test((c.practice.phone ?? "").replace(/\D/g, ""))
+      ? [{ rule: "BILLING_PHONE", severity: "error", message: "The practice phone number is missing or invalid; claims carry it as the contact for the payer", field: "practice.phone" }]
       : [],
   TAX_ID: (c) =>
     !/^\d{2}-?\d{7}$/.test(c.practice.taxId)

@@ -97,7 +97,7 @@ export default async function BillingPage() {
                   <p className="text-slate-600">Print and mail every generated statement that has not gone out, through Lob. Patients without a complete address are skipped.</p>
                   <SubmitButton className="btn btn-secondary" pendingLabel="Sending to Lob...">Mail unsent statements</SubmitButton>
                 </ActionForm>
-              ) : <p className="text-slate-600">To print and mail statements automatically, connect Lob under <Link href="/settings/integrations" className="font-semibold text-brand-700 hover:underline">Integrations</Link>.</p>}
+              ) : <p className="text-slate-600">To print and mail statements automatically, connect Lob under <Link href="/settings/connections" className="font-semibold text-brand-700 hover:underline">Integrations</Link>.</p>}
             </div>
           </Card>
 

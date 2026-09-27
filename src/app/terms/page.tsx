@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageShell, Prose } from "@/components/page-shell";
 import { COMPANY, addressLine } from "@/content/company";
+import { LEGAL_VERSIONS, versionLabel } from "@/content/legal";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default function TermsPage() {
       eyebrow="Legal"
       title="Terms & Conditions"
       lead="The agreement between CollaboratMD and the organizations that use the platform."
-      meta="Last updated September 23, 2026"
+      meta={`Last updated ${versionLabel(LEGAL_VERSIONS.terms)}`}
     >
       <Prose>
         <h2>1. Agreement to these terms</h2>

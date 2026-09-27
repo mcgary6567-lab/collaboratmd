@@ -64,7 +64,7 @@ Written by the engineering team from the code as it stands. It is a working docu
 | Gap | Risk | Plan |
 |---|---|---|
 | No Content-Security-Policy for scripts | An injected script would run. React escapes output and no user HTML is rendered, which limits this. | Nonce-based CSP once third-party scripts are settled |
-| Attachments stored in Postgres rather than an object store with its own access logs | Database size and backup time grow | Move to object storage with signed URLs when volume warrants |
+| Attachments stored in Postgres by default | Database size and backup time grow | Private Vercel Blob storage is built (`FILE_STORAGE=blob`); turn it on once the Vercel BAA covers Blob, and move existing files from the operator console |
 | Per-address budgets are shared by everyone behind one office NAT | A busy office could hit the sign-in budget (30 per 15 minutes) | Raise the budget or key it on address plus email if support tickets show it |
 | Ledger immutability is enforced by the application, not the database | A database-level attacker could edit history | Revoke UPDATE/DELETE on `ledger_entries` from the application role |
 | `AUTH_SECRET` is one key for sessions and sealing | Rotation signs everyone out and needs a re-seal | Separate keys with key IDs |

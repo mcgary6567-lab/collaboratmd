@@ -12,7 +12,7 @@
  * project's structural tests, not certified by a clearinghouse. Send test
  * claims before relying on it.
  */
-import { envelope } from "./x12";
+import { contactPhone, envelope } from "./x12";
 import { otherPayerLoops, pwk, serviceFacilityLoop, type ClaimAttachmentRef, type OtherPayer, type ServiceFacility } from "./x837p";
 
 export interface Edi837DInput {
@@ -21,7 +21,7 @@ export interface Edi837DInput {
   senderId: string;
   receiverId: string;
   now: Date;
-  billingProvider: { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; taxonomy: string };
+  billingProvider: { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; taxonomy: string; phone?: string | null };
   rendering: { lastName: string; firstName: string; npi: string; taxonomy: string };
   payer: { name: string; payerId: string; type: string };
   subscriber: { lastName: string; firstName: string; memberId: string; groupNumber?: string | null; dob: string; sex: string; address1?: string | null; city?: string | null; state?: string | null; zip?: string | null; relationship: string };
@@ -52,7 +52,7 @@ export function buildEdi837D(input: Edi837DInput): string {
   const body: string[][] = [
     ["BHT", "0019", "00", input.controlNumber, d8(input.now.toISOString().slice(0, 10)), hhmm, "CH"],
     ["NM1", "41", "2", input.billingProvider.name, "", "", "", "", "46", input.senderId],
-    ["PER", "IC", input.billingProvider.name, "TE", "0000000000"],
+    ["PER", "IC", input.billingProvider.name, "TE", contactPhone(input.billingProvider.phone)],
     ["NM1", "40", "2", input.payer.name, "", "", "", "", "46", input.receiverId],
     // 2000A billing provider
     ["HL", "1", "", "20", "1"],

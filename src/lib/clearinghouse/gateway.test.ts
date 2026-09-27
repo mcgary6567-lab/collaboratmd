@@ -63,7 +63,7 @@ describe("MockClearinghouse adjudication", () => {
     const edi = (control: string, memberId: string) =>
       buildEdi837P({
         controlNumber: control, interchangeControl: "1", senderId: "COLLABORATMD", receiverId: "60054", now: new Date("2026-09-24T12:00:00Z"),
-        billingProvider: { name: "Summit", npi: "1234567893", taxId: "84-2917465", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201" },
+        billingProvider: { name: "Summit", phone: "407-555-0100", npi: "1234567893", taxId: "84-2917465", address1: "1 Main", city: "Dallas", state: "TX", zip: "75201" },
         renderingProvider: { lastName: "King", firstName: "Jacob", npi: "1234567893", taxonomy: "207Q00000X" },
         payer: { name: "Aetna", payerId: "60054" },
         subscriber: { lastName: "Doe", firstName: "Jane", memberId, groupNumber: null, dob: "1980-01-01", sex: "F", relationship: "self" },

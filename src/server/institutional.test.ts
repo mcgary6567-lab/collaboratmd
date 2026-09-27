@@ -12,7 +12,7 @@ import { fetchAndPostRemittances, getClaimFinancials, submitClaim } from "./clai
 
 const input = (over: Partial<Edi837IInput["claim"]["institutional"]> = {}): Edi837IInput => ({
   controlNumber: "CMD000777", interchangeControl: "123456789", senderId: "COLLABORATMD", receiverId: "00430", now: new Date("2026-09-25T10:00:00Z"),
-  billingProvider: { name: "Summit Health", npi: "1234567893", taxId: "74-1234567", address1: "1 Main", city: "Austin", state: "TX", zip: "78701" },
+  billingProvider: { name: "Summit Health", phone: "407-555-0100", npi: "1234567893", taxId: "74-1234567", address1: "1 Main", city: "Austin", state: "TX", zip: "78701" },
   attending: { lastName: "Reyes", firstName: "Hannah", npi: "1234567893", taxonomy: "207R00000X" },
   payer: { name: "Medicare Part A", payerId: "00430", type: "medicare" },
   subscriber: { lastName: "Nguyen", firstName: "Linh", memberId: "1EG4TE5MK73", dob: "1950-04-05", sex: "F", relationship: "self" },

@@ -8,7 +8,7 @@
  * (DTP*435, CL1), principal and admitting diagnoses, an attending provider
  * (NM1*71), and service lines that carry a revenue code (SV2).
  */
-import { envelope } from "./x12";
+import { contactPhone, envelope } from "./x12";
 import { otherPayerLoops, pwk, type ClaimAttachmentRef, type OtherPayer } from "./x837p";
 
 export interface Institutional {
@@ -34,7 +34,7 @@ export interface Edi837IInput {
   senderId: string;
   receiverId: string;
   now: Date;
-  billingProvider: { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string };
+  billingProvider: { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; phone?: string | null };
   attending: { lastName: string; firstName: string; npi: string; taxonomy: string };
   payer: { name: string; payerId: string; type: string };
   subscriber: { lastName: string; firstName: string; memberId: string; groupNumber?: string | null; dob: string; sex: string; address1?: string | null; city?: string | null; state?: string | null; zip?: string | null; relationship: string };
@@ -72,7 +72,7 @@ export function buildEdi837I(input: Edi837IInput): string {
   const body: string[][] = [
     ["BHT", "0019", "00", input.controlNumber, d8(input.now.toISOString().slice(0, 10)), hhmm, "CH"],
     ["NM1", "41", "2", input.billingProvider.name, "", "", "", "", "46", input.senderId],
-    ["PER", "IC", input.billingProvider.name, "TE", "0000000000"],
+    ["PER", "IC", input.billingProvider.name, "TE", contactPhone(input.billingProvider.phone)],
     ["NM1", "40", "2", input.payer.name, "", "", "", "", "46", input.receiverId],
     // 2000A billing provider (the facility)
     ["HL", "1", "", "20", "1"],

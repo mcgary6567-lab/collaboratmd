@@ -92,12 +92,13 @@ export async function cashForecast(db: Db, practiceId: string, now = new Date())
     db.execute<Row>(sql`
       SELECT c.payer_id, GREATEST(0, fp.paid_at::date - c.submitted_at::date)::text AS lag, count(*)::text AS n, sum(c.total_cents)::text AS billed, sum(fp.paid)::text AS paid
       FROM claims c
-      JOIN (SELECT claim_id, min(posted_at) AS paid_at, sum(amount_cents) AS paid FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' GROUP BY claim_id) fp ON fp.claim_id = c.id
+      JOIN (SELECT claim_id, min(posted_at) AS paid_at, sum(amount_cents) AS paid FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' AND posted_at >= ${yearAgo} GROUP BY claim_id) fp ON fp.claim_id = c.id
       WHERE c.practice_id = ${practiceId} AND c.submitted_at >= ${yearAgo} AND c.frequency_code = '1'
       GROUP BY 1, 2`),
     db.execute<Row>(sql`
-      SELECT c.payer_id, count(*)::text AS decided, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM ledger_entries l WHERE l.claim_id = c.id AND l.type = 'insurance_payment'))::text AS paid
+      SELECT c.payer_id, count(*)::text AS decided, count(p.claim_id)::text AS paid
       FROM claims c
+      LEFT JOIN (SELECT DISTINCT claim_id FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' AND posted_at >= ${yearAgo}) p ON p.claim_id = c.id
       WHERE c.practice_id = ${practiceId} AND c.submitted_at >= ${yearAgo} AND c.submitted_at < ${ninetyAgo} AND c.frequency_code = '1' AND c.status NOT IN ('voided', 'draft')
       GROUP BY 1`),
     db.execute<Row>(sql`
@@ -128,14 +129,14 @@ export async function cashForecast(db: Db, practiceId: string, now = new Date())
     db.execute<Row>(sql`
       SELECT e.provider_id, count(*)::text AS n, COALESCE(sum(p.paid), 0)::text AS paid
       FROM claims c JOIN encounters e ON e.id = c.encounter_id
-      LEFT JOIN (SELECT claim_id, sum(amount_cents) AS paid FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' GROUP BY 1) p ON p.claim_id = c.id
+      LEFT JOIN (SELECT claim_id, sum(amount_cents) AS paid FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' AND posted_at >= ${new Date(today.getTime() - 240 * DAY)} GROUP BY 1) p ON p.claim_id = c.id
       WHERE c.practice_id = ${practiceId} AND c.frequency_code = '1' AND c.payer_sequence = 'P'
         AND e.date_of_service >= ${new Date(today.getTime() - 240 * DAY).toISOString().slice(0, 10)} AND e.date_of_service < ${new Date(today.getTime() - 60 * DAY).toISOString().slice(0, 10)}
       GROUP BY 1`),
     db.execute<Row>(sql`
       SELECT GREATEST(0, fp.paid_at::date - e.date_of_service)::text AS lag, count(*)::text AS n
       FROM claims c JOIN encounters e ON e.id = c.encounter_id
-      JOIN (SELECT claim_id, min(posted_at) AS paid_at FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' GROUP BY 1) fp ON fp.claim_id = c.id
+      JOIN (SELECT claim_id, min(posted_at) AS paid_at FROM ledger_entries WHERE practice_id = ${practiceId} AND type = 'insurance_payment' AND posted_at >= ${yearAgo} GROUP BY 1) fp ON fp.claim_id = c.id
       WHERE c.practice_id = ${practiceId} AND c.frequency_code = '1' AND e.date_of_service >= ${yearAgo.toISOString().slice(0, 10)}
       GROUP BY 1`),
   ]);

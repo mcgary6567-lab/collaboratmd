@@ -27,7 +27,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
   const errors = await listErrors(await getDb(), all === "1");
   return (
     <>
-      <PageHeader title="Server errors" subtitle="Every server error, grouped and counted. Messages are redacted before they are stored; no headers or query strings are kept." actions={<><Link href="/status" className="btn btn-secondary">Public status</Link><Link href={all === "1" ? "/ops/errors" : "/ops/errors?all=1"} className="btn btn-secondary">{all === "1" ? "Unresolved only" : "Include resolved"}</Link></>} />
+      <PageHeader title="Server errors" subtitle="Every server error, grouped and counted. Messages are redacted before they are stored; no headers or query strings are kept." actions={<><Link href="/ops/practices" className="btn btn-secondary">Practices</Link><Link href="/status" className="btn btn-secondary">Public status</Link><Link href={all === "1" ? "/ops/errors" : "/ops/errors?all=1"} className="btn btn-secondary">{all === "1" ? "Unresolved only" : "Include resolved"}</Link></>} />
       <Card>
         {errors.length === 0 ? <Empty>No errors recorded.</Empty> : (
           <table className="table">

@@ -36,7 +36,7 @@ export default async function ConnectionsPage() {
       <PageHeader
         title="Integrations"
         subtitle="Paste a service's keys, test the connection, and the features that depend on it switch on for this practice"
-        actions={<Link href="/settings" className="btn btn-secondary">Settings</Link>}
+        actions={<><Link href="/settings/connections/doctor" className="btn btn-secondary">Integration doctor</Link><Link href="/settings" className="btn btn-secondary">Settings</Link></>}
       />
       {!admin && <Alert kind="info">Only administrators can change integrations. You can see what is connected.</Alert>}
 

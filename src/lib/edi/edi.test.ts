@@ -10,7 +10,7 @@ describe("837P generator", () => {
       senderId: "COLLABORATMD",
       receiverId: "00590",
       now: new Date("2026-09-21T14:30:00Z"),
-      billingProvider: { name: "Lakeside Family Medicine", npi: "1234567893", taxId: "12-3456789", address1: "410 Lakeside Ave", city: "Orlando", state: "FL", zip: "32801" },
+      billingProvider: { name: "Lakeside Family Medicine", phone: "407-555-0100", npi: "1234567893", taxId: "12-3456789", address1: "410 Lakeside Ave", city: "Orlando", state: "FL", zip: "32801" },
       renderingProvider: { lastName: "Chen", firstName: "Sarah", npi: "1234567893", taxonomy: "207Q00000X" },
       payer: { name: "BCBS FL", payerId: "00590" },
       subscriber: { lastName: "Garcia", firstName: "Maria", memberId: "ABC123", groupNumber: "GRP1", dob: "1980-04-12", sex: "F", address1: "1 Main St", city: "Orlando", state: "FL", zip: "32801", relationship: "self" },

@@ -6,6 +6,7 @@ import { evaluatePayerEdits, type EditResult } from "@/lib/scrub/payer-edits";
 import { scrubDental } from "@/lib/scrub/dental";
 import { attachmentRefs, markAttachmentsSent } from "./attachments";
 import { buildClaimEdi } from "./claim-edi";
+import { validateX12 } from "@/lib/edi/validate";
 import { blocksSubmission } from "./policies";
 import { standing } from "./subscription";
 import { claimRisk } from "./risk";
@@ -63,7 +64,7 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     patient: { firstName: b.patient.firstName, lastName: b.patient.lastName, dob: b.patient.dob, sex: b.patient.sex, address1: b.patient.address1, zip: b.patient.zip },
     insurance: { memberId: b.insurance.memberId, payerId: b.payer.payerId, relationship: b.insurance.relationship },
     provider: { npi: b.provider.npi, taxonomy: b.provider.taxonomy },
-    practice: { npi: b.practice.npi, taxId: b.practice.taxId },
+    practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null },
     encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses },
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers })),
     payer: { timelyFilingDays: b.payer.timelyFilingDays },
@@ -192,6 +193,8 @@ export async function previewClaimEdi(db: Db, claimId: string) {
   const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
   const edi = buildClaimEdi(bundle, { now: new Date(), authorizationNumber: edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null, attachments: await attachmentRefs(db, claimId), otherPayer });
   const kind = bundle.claim.claimType === "dental" ? "837D" : bundle.claim.claimType === "institutional" ? "837I" : "837P";
+  const check = validateX12(edi);
+  if (check.errors.length) throw new Error(`The claim file failed its self-check: ${check.errors.slice(0, 3).join("; ")}`);
   return { edi, filename: `${bundle.claim.controlNumber}-${kind}.x12`, practiceId: bundle.claim.practiceId };
 }
 
@@ -228,6 +231,9 @@ export async function submitClaim(db: Db, claimId: string, userId?: string, opts
   const dental = bundle.claim.claimType === "dental";
   const attachments = await attachmentRefs(db, claimId);
   const edi = buildClaimEdi(bundle, { now, authorizationNumber, attachments, otherPayer });
+  // A file that fails our own structural checks would only come back as a 999 rejection.
+  const check = validateX12(edi);
+  if (check.errors.length) throw new Error(`The claim file failed its self-check, so it was not sent: ${check.errors.slice(0, 3).join("; ")}`);
   await db.update(claims).set({ edi837: edi, status: "submitted", submittedAt: now, scrubResults: findings, authorizationNumber, updatedAt: now }).where(eq(claims.id, claimId));
   if (attachments.length) await markAttachmentsSent(db, claimId, now);
   const kind = bundle.claim.frequencyCode === "8" ? "Void" : bundle.claim.frequencyCode === "7" ? "Replacement" : bundle.claim.payerSequence === "S" ? `Secondary ${dental ? "837D" : institutional ? "837I" : "837P"}` : dental ? "837D" : institutional ? "837I" : "837P";

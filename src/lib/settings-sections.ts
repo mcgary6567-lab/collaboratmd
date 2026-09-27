@@ -37,6 +37,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
   {
     title: "Connections",
     links: [
+      { href: "/settings/connections/doctor", label: "Integration doctor", description: "Check every connected service end to end before going live", adminOnly: true, keywords: "test health diagnose stedi stripe lob twilio fhir" },
       { href: "/settings/connections", label: "Integrations", description: "Clearinghouse, payments, texting, email and AI keys", adminOnly: true, keywords: "stedi stripe twilio resend claude api key" },
       { href: "/settings/integrations", label: "EHR interfaces", description: "HL7 feeds for patients, charges, orders and results", keywords: "hl7 ehr emr lab" },
       { href: "/settings/fhir", label: "EHR over FHIR", description: "Patients and finished visits from Epic, Oracle Health, athenahealth and others", keywords: "fhir epic cerner athena smart" },
@@ -47,6 +48,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     title: "Oversight",
     links: [
       { href: "/settings/audit", label: "Audit log", description: "Every sign-in, change, export and payment, searchable", adminOnly: true, keywords: "history activity who changed" },
+      { href: "/settings/close", label: "Close account", description: "Schedule deletion of all of this practice's data", adminOnly: true, keywords: "cancel delete close offboard leave terminate" },
       { href: "/settings/data-export", label: "Data export", description: "Download everything the practice has here, as one zip", adminOnly: true, keywords: "backup download leave csv zip portability" },
       { href: "/settings/compliance", label: "Compliance", description: "HIPAA control checks, access reviews and BAAs", adminOnly: true, keywords: "hipaa soc 2 baa" },
       { href: "/settings/menu", label: "Menu", description: "Hide the modules your practice does not use", adminOnly: true, keywords: "navigation sidebar hide modules" },
