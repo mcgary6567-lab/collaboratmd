@@ -50,7 +50,7 @@ export default async function UnderpaymentsPage({ searchParams }: { searchParams
         <Stat label="Recovered" value={money(recovered.varianceCents)} hint={`${recovered.count.toLocaleString("en-US")} paid correctly on review`} tone="good" />
       </div>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <Link
             key={t.status}

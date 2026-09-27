@@ -14,11 +14,14 @@
  *
  * With LOAD_TEST_BUDGETS=1 (CI) it also fails when:
  * - a query takes longer than its budget (BUDGET_MS below), or
- * - on a real Postgres, a query that should touch only a few rows (a list
- *   page, one claim, one patient) would read a whole large table, which
+ * - on a real Postgres, a query behind a list page, one claim or one
+ *   patient would read a whole large table to find a handful of rows, which
  *   means a missing index. Postgres is asked how it would run each such
- *   query (EXPLAIN), and any sequential scan of a table with more than
- *   BIG_TABLE_ROWS rows fails the run.
+ *   query (EXPLAIN); a sequential scan of a table with more than
+ *   BIG_TABLE_ROWS rows that is expected to keep under 1% of them fails the
+ *   run. (Reading most of a table, such as counting every claim for a page
+ *   total, is what a sequential scan is for; this test database holds one
+ *   practice, so "the practice's claims" is the whole table.)
  * Results are printed as GitHub annotations and in the run summary.
  */
 const REAL = !!process.env.LOAD_TEST_DATABASE_URL?.trim();
@@ -170,8 +173,8 @@ async function main() {
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const schema = await import("../src/db/schema");
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
-    const { rows: big } = await pool.query<{ relname: string }>(`SELECT relname FROM pg_class WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace AND reltuples > $1`, [BIG_TABLE_ROWS]);
-    const bigTables = new Set(big.map((r) => r.relname));
+    const { rows: big } = await pool.query<{ relname: string; reltuples: number }>(`SELECT relname, reltuples FROM pg_class WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace AND reltuples > $1`, [BIG_TABLE_ROWS]);
+    const bigTables = new Map(big.map((r) => [r.relname, Number(r.reltuples)]));
     for (const c of cases.filter((x) => x.selective)) {
       const captured: { query: string; params: unknown[] }[] = [];
       const logged = drizzle({ client: pool, schema, logger: { logQuery: (query, params) => captured.push({ query, params }) } });
@@ -181,7 +184,10 @@ async function main() {
         const { rows: [plan] } = await pool.query(`EXPLAIN (FORMAT JSON) ${q.query}`, q.params as unknown[]);
         const scans: string[] = [];
         const walk = (node: Record<string, unknown>) => {
-          if (node["Node Type"] === "Seq Scan" && bigTables.has(String(node["Relation Name"]))) scans.push(String(node["Relation Name"]));
+          const table = String(node["Relation Name"]);
+          const size = bigTables.get(table);
+          // A whole large table read to keep a small fraction of it: an index would find those rows directly.
+          if (node["Node Type"] === "Seq Scan" && size && Number(node["Plan Rows"]) < size * 0.01) scans.push(`${table} (to keep about ${node["Plan Rows"]} of ${Math.round(size).toLocaleString()} rows)`);
           for (const child of (node.Plans as Record<string, unknown>[] | undefined) ?? []) walk(child);
         };
         walk((plan["QUERY PLAN"] as { Plan: Record<string, unknown> }[])[0].Plan);

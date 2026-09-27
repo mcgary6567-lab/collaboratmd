@@ -7,7 +7,7 @@
 The "Real Postgres behind a pooler" CI job runs the same load test against a real Postgres (through PgBouncer in transaction mode) on every push, with `LOAD_TEST_BUDGETS=1`:
 
 - each query has a time budget (`BUDGET_MS` in `scripts/load-test.ts`); a query over it fails the build;
-- for queries that should touch only a few rows (list pages, one claim, one patient), Postgres is asked how it would run them (`EXPLAIN`), and a plan that reads the whole of a table with more than 20,000 rows fails the build as a probable missing index.
+- for the queries behind list pages, one claim and one patient, Postgres is asked how it would run them (`EXPLAIN`); a plan that reads the whole of a table with more than 20,000 rows to keep under 1% of it fails the build as a probable missing index. Reading most of a table (counting every claim for a page total, say) is not flagged: that is what a full scan is for, and the test database holds a single practice.
 
 The timings appear as an annotation on the run and in its summary. To run it against your own throwaway Postgres: `LOAD_TEST_DATABASE_URL=postgres://... LOAD_TEST_BUDGETS=1 npm run load-test`. It adds rows, and refuses a database production has used.
 

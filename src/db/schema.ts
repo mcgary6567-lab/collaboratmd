@@ -1605,7 +1605,7 @@ export const importTemplates = pgTable("import_templates", {
 export const bookingSettings = pgTable("booking_settings", {
   practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
   enabled: boolean("enabled").notNull().default(false),
-  // time_zone moved to practices (migration 0046); the column is dropped by migration 0047.
+  // time_zone moved to practices (migration 0046) and was dropped by migration 0048.
   slotMinutes: integer("slot_minutes").notNull().default(30),
   minNoticeHours: integer("min_notice_hours").notNull().default(24),
   horizonDays: integer("horizon_days").notNull().default(21),

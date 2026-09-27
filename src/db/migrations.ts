@@ -1937,4 +1937,11 @@ CREATE INDEX IF NOT EXISTS audit_log_practice_at_idx ON audit_log (practice_id, 
 CREATE INDEX IF NOT EXISTS audit_log_practice_entity_idx ON audit_log (practice_id, entity_id, at DESC);
 `,
   },
+  {
+    name: "0048_drop_booking_time_zone",
+    sql: `-- The time zone moved to practices (0046); since 2026-09-27 nothing reads or
+-- writes this column (the release before this one stopped using it).
+ALTER TABLE booking_settings DROP COLUMN IF EXISTS time_zone;
+`,
+  },
 ];
