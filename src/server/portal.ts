@@ -23,6 +23,9 @@ import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
 import { settleTerminalPayment } from "./terminal";
 
+/** Stripe Checkout in the patient's language: Latin American Spanish for Spanish; otherwise the browser's. */
+const checkoutLocale = (lang: string | null | undefined) => (lang === "es" ? "es-419" : undefined);
+
 const { portalLinks, onlinePayments, savedCards, patients, practices, ledgerEntries, statements } = schema;
 
 export const MAX_ATTEMPTS = 5;
@@ -132,7 +135,8 @@ export async function startPortalPayment(
   const back = `${input.origin}/portal/${input.token}`;
   const session = await stripe.createCheckout({
     amountCents: input.amountCents,
-    description: `${data.practice.name}: payment on account`,
+    description: `${data.practice.name}: ${data.patient.preferredLanguage === "es" ? "pago a su cuenta" : "payment on account"}`,
+    locale: checkoutLocale(data.patient.preferredLanguage),
     successUrl: `${back}?paid=${pay.id}`,
     cancelUrl: back,
     email: data.patient.email,
@@ -219,7 +223,8 @@ export async function startCheckinCopay(
   const back = `${input.origin}/check-in/${input.token}`;
   const session = await stripe.createCheckout({
     amountCents: data.copayCents,
-    description: `${data.practiceName}: copay for your visit`,
+    description: `${data.practiceName}: ${data.patient.preferredLanguage === "es" ? "copago de su cita" : "copay for your visit"}`,
+    locale: checkoutLocale(data.patient.preferredLanguage),
     successUrl: `${back}?paid=1`,
     cancelUrl: `${back}?paid=0`,
     email: data.patient.email,

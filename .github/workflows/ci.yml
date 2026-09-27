@@ -80,3 +80,68 @@ jobs:
           name: playwright-results
           path: test-results/
           retention-days: 7
+
+  postgres:
+    name: Real Postgres behind a pooler
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The other jobs use the embedded database. This one runs start-up and the
+    # built app against Postgres through PgBouncer in transaction mode, the way
+    # Neon's pooler works, where session state does not survive between
+    # transactions (see scripts/startup-check.ts).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:6432/app
+      DIRECT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Start PgBouncer in transaction mode
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq pgbouncer
+          # The package starts its own service on 6432; this job runs its own configuration instead.
+          sudo systemctl stop pgbouncer || true
+          mkdir -p "$RUNNER_TEMP/pgb"
+          echo '"postgres" "postgres"' > "$RUNNER_TEMP/pgb/users.txt"
+          cat > "$RUNNER_TEMP/pgb/pgbouncer.ini" <<INI
+          [databases]
+          app = host=127.0.0.1 port=5432 dbname=app user=postgres password=postgres
+          [pgbouncer]
+          listen_addr = 127.0.0.1
+          listen_port = 6432
+          auth_type = plain
+          auth_file = $RUNNER_TEMP/pgb/users.txt
+          pool_mode = transaction
+          default_pool_size = 4
+          max_client_conn = 200
+          ignore_startup_parameters = extra_float_digits,options
+          logfile = $RUNNER_TEMP/pgb/pgbouncer.log
+          pidfile = $RUNNER_TEMP/pgb/pgbouncer.pid
+          INI
+          /usr/sbin/pgbouncer -d "$RUNNER_TEMP/pgb/pgbouncer.ini"
+          for i in $(seq 1 20); do pg_isready -h 127.0.0.1 -p 6432 && break; sleep 1; done
+      - name: Several starts at once, a blocked start, and a start with nothing to do
+        run: npx tsx --tsconfig tsconfig.scripts.json scripts/startup-check.ts
+      - name: The built app, served through the pooler
+        run: |
+          npx next build
+          npx next start -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/api/health && break; sleep 2; done
+          node scripts/live-check.mjs http://localhost:3000
+      - name: Logs
+        if: failure()
+        run: |
+          tail -n 50 "$RUNNER_TEMP/pgb/pgbouncer.log" || true
+          tail -n 100 "$RUNNER_TEMP/next.log" || true

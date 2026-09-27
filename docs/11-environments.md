@@ -22,13 +22,13 @@ Until now the local `.env.local` pointed at the production database, so local te
    - **Development:** the `staging` URL, if you use `vercel env pull`.
    Give Preview its own `AUTH_SECRET` too, so a preview session can never open production.
 3. **Your computer:** in `.env.local`, set `DATABASE_URL` to the staging URL, or remove it to use the embedded database.
-4. **Branch protection (GitHub):** Settings → Branches → add a rule for `main` that requires the CI checks ("Type check and unit tests", "Production build and performance", "End-to-end and accessibility", and CodeQL's "Analyze") to pass before merging. Then work on branches and merge through pull requests; each one gets a preview deployment on staging.
+4. **Branch protection (GitHub):** Settings → Branches → add a rule for `main` that requires the CI checks ("Type check and unit tests", "Production build and performance", "End-to-end and accessibility", "Real Postgres behind a pooler", and CodeQL's "Analyze") to pass before merging. Then work on branches and merge through pull requests; each one gets a preview deployment on staging.
 
 ## Migrations
 
-The app applies pending migrations on start, under a lock. The order that keeps production safe:
+Each deployment applies pending migrations in its build (`npm run build` runs `scripts/migrate.ts` first). The order that keeps production safe:
 
-1. The change merges and deploys to previews first, which migrates `staging`.
-2. When it is merged to `main`, production applies the same migrations on its first request.
+1. The change deploys to previews first, whose builds migrate `staging`.
+2. When it is merged to `main`, the production build applies the same migrations before the new code goes live; if they fail, the build fails and production is untouched.
 
 Migrations are written to be additive (new tables and columns) so the old code keeps working while the new one rolls out. A migration that removes or renames something needs two releases: stop using it first, remove it later.

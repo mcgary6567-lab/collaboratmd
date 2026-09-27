@@ -10,6 +10,17 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-27",
+    title: "Safer deploys, the practice's own time zone, and Spanish checkout",
+    items: [
+      "Fixed: for about 20 minutes after an update, pages that read data did not load. Updates now prepare the database before they go live and are checked the moment they do",
+      "Each practice has a time zone (Settings > Practice profile): today's schedule and tomorrow's reminders follow the practice's clock",
+      "Patients who read Spanish see Stripe's payment page in Spanish",
+      "Find patients by language on the Patients list",
+      "Fixed: on a laptop-sized screen, the Team page's reset and sign-out buttons sat under the roles table",
+    ],
+  },
+  {
+    date: "2026-09-27",
     title: "Spanish for booking, statements and reminders, and a fix for online booking times",
     items: [
       "Online booking is in Spanish too, and each patient has a language: statements, appointment reminders, confirmations and payment messages go out in it",

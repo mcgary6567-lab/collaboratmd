@@ -8,6 +8,8 @@ import { STATEMENT_TEXT } from "@/lib/i18n/statement";
 import { PATIENT_TEXT } from "@/lib/i18n/patient";
 import { confirmRequest, requestBooking, saveBookingSettings, saveProviderHours } from "./booking";
 import { rememberLanguage } from "./patient-language";
+import { createPortalLink, startPortalPayment, verifyPortalDob } from "./portal";
+import { searchPatients } from "./lists";
 
 /** Every key present in English is present in Spanish, and no Spanish text is left empty. */
 function sameShape(en: Record<string, unknown>, es: Record<string, unknown>) {
@@ -59,5 +61,24 @@ describe("Spanish for patients", () => {
     expect(await rememberLanguage(t.db, p.id, "en")).toBe(true);
     const [after] = await t.db.select().from(schema.patients).where(eq(schema.patients.id, p.id));
     expect(after.preferredLanguage).toBe("en");
+  });
+
+  it("opens Stripe's payment page in Spanish for a Spanish-speaking patient, and lets staff find them", async () => {
+    const [p] = await t.db.select().from(schema.patients).where(eq(schema.patients.practiceId, t.practiceId)).limit(1);
+    await t.db.update(schema.patients).set({ preferredLanguage: "es" }).where(eq(schema.patients.id, p.id));
+    await t.db.insert(schema.ledgerEntries).values({ practiceId: t.practiceId, patientId: p.id, type: "transfer_to_patient", amountCents: 5_000, note: "test balance" });
+    const { token } = await createPortalLink(t.db, t.practiceId, p.id, t.userId);
+    const v = await verifyPortalDob(t.db, token, p.dob);
+    const calls: { locale?: string; description: string }[] = [];
+    const client = { createCheckout: async (x: { locale?: string; description: string }) => { calls.push(x); return { id: "cs_test_es", url: "https://checkout.stripe.com/c/cs_test_es" }; } };
+    await startPortalPayment(t.db, (v as { linkId: string }).linkId, { amountCents: 1_000, origin: "http://x", token }, client);
+    expect(calls[0]).toMatchObject({ locale: "es-419" });
+    expect(calls[0].description).toContain("pago a su cuenta");
+
+    const spanish = await searchPatients(t.db, t.practiceId, { language: "es", offset: 0, limit: 100 });
+    expect(spanish.rows.every((r) => r.preferredLanguage === "es")).toBe(true);
+    expect(spanish.rows.some((r) => r.id === p.id)).toBe(true);
+    const all = await searchPatients(t.db, t.practiceId, { offset: 0, limit: 1 });
+    expect(all.total).toBeGreaterThan(spanish.total);
   });
 });

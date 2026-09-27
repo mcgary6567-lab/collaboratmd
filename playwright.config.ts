@@ -32,6 +32,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       DATABASE_URL: "",
+      TZ: "UTC",
       PGLITE_DIR: ".e2e/pg",
       AUTH_SECRET: "e2e-only-secret-0123456789abcdef0123456789",
       // The demo administrator can open the operator pages, so the accessibility crawl covers them.

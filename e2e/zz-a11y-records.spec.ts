@@ -36,7 +36,10 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   // A fee schedule, from Settings.
   await page.goto("/settings/fees");
   const createStandard = page.getByRole("button", { name: "Create standard schedule" });
-  if (await createStandard.isVisible()) await createStandard.click();
+  if (await createStandard.isVisible()) {
+    await createStandard.click();
+    await expect(page.locator("a[href^='/settings/fees/']").first()).toBeVisible();
+  }
   await want("fee schedule", await firstHref(page, "/settings/fees", new RegExp(`^/settings/fees/${ID}$`)));
 
   // An estimate for the first patient.
@@ -51,17 +54,19 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
 
   // A client invoice: agree terms with the practice, then invoice last month.
   await page.goto("/clients/invoicing");
+  const invoiceLink = page.locator("a[href^='/clients/invoicing/']").first();
+  const invoice = page.getByRole("button", { name: /^Invoice / }).first();
   const issuer = page.locator('input[name="issuerName"]').first();
   if (await issuer.isVisible()) {
     await issuer.fill("Accessibility Test Billing LLC");
     await page.locator('input[name="ratePct"]').first().fill("6.5");
     await page.getByRole("button", { name: "Save agreement" }).first().click();
-    await page.waitForLoadState("networkidle").catch(() => undefined);
+    // Saving the terms is what brings up the invoice button.
+    await expect(invoice).toBeVisible();
   }
-  const invoice = page.getByRole("button", { name: /^Invoice / }).first();
   if (await invoice.isVisible()) {
     await invoice.click();
-    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await expect(invoiceLink).toBeVisible();
   }
   await want("client invoice", await firstHref(page, "/clients/invoicing", new RegExp(`^/clients/invoicing/${ID}$`)));
 

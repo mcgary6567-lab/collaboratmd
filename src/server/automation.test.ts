@@ -5,6 +5,7 @@ import { testDb } from "@/test/db";
 import { csvCell, toCsv } from "@/lib/csv-out";
 import { createAppointment } from "./encounters";
 import { appointmentReminders, runDailyForPractice, weeklyReportText } from "./automation";
+import { clockDay, DEFAULT_TIME_ZONE, practiceClock } from "./practice-time";
 
 describe("CSV export encoding", () => {
   it("quotes where needed and defuses spreadsheet formulas", () => {
@@ -16,6 +17,9 @@ describe("CSV export encoding", () => {
   });
 });
 
+/** 10:00 tomorrow on the practice's clock (the demo practice is on the default Eastern time). */
+const tomorrowAt10 = () => new Date(clockDay(practiceClock(new Date(), DEFAULT_TIME_ZONE)).getTime() + 34 * 3_600_000);
+
 describe("daily automation against a migrated database", () => {
   let t: Awaited<ReturnType<typeof testDb>>;
   let apptId: string;
@@ -26,7 +30,7 @@ describe("daily automation against a migrated database", () => {
     const [p] = await t.db.select().from(schema.patients).where(eq(schema.patients.practiceId, t.practiceId)).limit(1);
     await t.db.update(schema.patients).set({ email: "patient@example.com" }).where(eq(schema.patients.id, p.id));
     const [provider] = await t.db.select().from(schema.providers).where(eq(schema.providers.practiceId, t.practiceId)).limit(1);
-    const appt = await createAppointment(t.db, t.practiceId, { patientId: p.id, providerId: provider.id, startsAt: new Date(Date.now() + 26 * 3_600_000), minutes: 20, type: "office_visit" });
+    const appt = await createAppointment(t.db, t.practiceId, { patientId: p.id, providerId: provider.id, startsAt: tomorrowAt10(), minutes: 20, type: "office_visit" });
     apptId = appt.id;
     process.env.RESEND_API_KEY = "re_test";
     vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {

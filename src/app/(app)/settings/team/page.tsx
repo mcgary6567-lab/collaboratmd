@@ -22,7 +22,9 @@ export default async function TeamPage() {
     <>
       <PageHeader title="Team and roles" subtitle="Who can use this practice, and what each role can do" actions={<Link href="/settings" className="btn btn-secondary">Back to settings</Link>} />
       <div className="grid gap-6 xl:grid-cols-3">
-        <Card title={`People · ${team.filter((m) => !m.disabled).length} active`} className="xl:col-span-2">
+        {/* min-w-0: a grid item otherwise grows to its table's width and slides under the roles card beside it. */}
+        <Card title={`People · ${team.filter((m) => !m.disabled).length} active`} className="min-w-0 xl:col-span-2">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
           <table className="table">
             <thead><tr><th>Name</th><th>Role</th><th>Two-factor</th><th /></tr></thead>
             <tbody>
@@ -75,6 +77,7 @@ export default async function TeamPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {admin && (
             <div className="mt-5 border-t border-slate-200 pt-4">
               <h3 className="mb-2 text-sm font-semibold">Add someone</h3>

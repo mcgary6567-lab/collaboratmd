@@ -5,7 +5,8 @@
   "description": "CollaboratMD - cloud medical billing and revenue cycle management platform",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx --tsconfig tsconfig.scripts.json scripts/migrate.ts && next build",
+    "db:migrate": "tsx --tsconfig tsconfig.scripts.json scripts/migrate.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit --noUnusedLocals",
     "test": "vitest run",

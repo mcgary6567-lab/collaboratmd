@@ -1,0 +1,45 @@
+# Checks each production deployment as soon as Vercel reports it live, with
+# the same checks as the scheduled live check (scripts/live-check.mjs).
+#
+# On failure:
+# - GitHub emails the person who pushed the change;
+# - with the repository secret OPS_ALERT_WEBHOOK_URL, the operators' channel
+#   is told too;
+# - with the repository secret VERCEL_TOKEN and the repository variables
+#   VERCEL_ORG_ID and VERCEL_PROJECT_ID, production is rolled back to the
+#   previous deployment. After a rollback Vercel stops moving production to
+#   new deployments until someone promotes one (Vercel > Deployments >
+#   Promote, or `vercel promote <url>`), so fix forward and promote the fix.
+name: After deploy
+
+on: deployment_status
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAN_ROLL_BACK: ${{ secrets.VERCEL_TOKEN != '' && vars.VERCEL_PROJECT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Check the new production deployment
+        run: node scripts/live-check.mjs "${LIVE_URL:-https://collaboratmd.vercel.app}"
+        env:
+          LIVE_URL: ${{ vars.LIVE_URL }}
+          OPS_ALERT_WEBHOOK_URL: ${{ secrets.OPS_ALERT_WEBHOOK_URL }}
+      - name: Roll production back to the previous deployment
+        if: failure() && env.CAN_ROLL_BACK == 'true'
+        run: npx --yes vercel@latest rollback --token "$VERCEL_TOKEN" --non-interactive --timeout 3m
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}

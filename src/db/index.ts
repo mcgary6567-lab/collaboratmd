@@ -191,7 +191,15 @@ export async function pendingWork(runner: Pick<Runner, "db">, env: Record<string
  */
 const BOOTSTRAP_TX_LOCK_ID = 8_147_237; // arbitrary, must be stable across instances
 
-async function prepare(runner: Runner) {
+/**
+ * How long start-up may wait. Normally migrations run in the build
+ * (scripts/migrate.ts) and a request never waits on them; these limits make a
+ * start-up that is stuck anyway fail with an error in seconds, so the health
+ * check answers 503 and alerts fire, instead of every request hanging.
+ */
+export const STARTUP_LIMITS = { lockWaitMs: 15_000, requestMs: 25_000 };
+
+export async function prepare(runner: Runner, limits: { lockWaitMs: number } = STARTUP_LIMITS) {
   if (!runner.shared) {
     await migrate(runner);
     await seed(runner);
@@ -202,16 +210,36 @@ async function prepare(runner: Runner) {
   if (!pending.migrations.length && !pending.seed) return;
   if (!runner.transaction) throw new Error("A shared database needs transactions to migrate");
   await runner.transaction(async (tx) => {
+    // SET LOCAL lasts only for this transaction, so it is safe behind a pooler.
+    await tx.exec(`SET LOCAL lock_timeout = '${Math.round(limits.lockWaitMs)}ms'`);
     await tx.exec(`SELECT pg_advisory_xact_lock(${BOOTSTRAP_TX_LOCK_ID})`);
+    await tx.exec("SET LOCAL lock_timeout = 0");
     // Another instance may have done the work while this one waited; both steps check again.
     await migrate(tx);
     await seed({ ...tx, shared: true });
   });
 }
 
+/** Rejects if `p` has not settled within `ms`, naming what was slow. */
+export function within<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} did not finish within ${Math.round(ms / 1000)} s`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function bootstrap(): Promise<Runner> {
   const runner = await connect();
-  await prepare(runner);
+  // Only a request waits on this limit; the build-time migration (scripts/migrate.ts) calls prepare() without it.
+  await (runner.shared ? within(prepare(runner), STARTUP_LIMITS.requestMs, "Database start-up") : prepare(runner));
+  return runner;
+}
+
+/** For scripts/migrate.ts: connect and run start-up work with no request-time limit. */
+export async function migrateNow(lockWaitMs = 120_000) {
+  const runner = await connect();
+  await prepare(runner, { lockWaitMs });
   return runner;
 }
 

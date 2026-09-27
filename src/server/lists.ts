@@ -69,8 +69,9 @@ export async function searchClaims(db: Db, practiceId: string, p: ClaimQuery) {
   return { rows, total: Number(n) };
 }
 
-export async function searchPatients(db: Db, practiceId: string, p: { q?: string; sort?: string; dir?: string; offset: number; limit: number }) {
+export async function searchPatients(db: Db, practiceId: string, p: { q?: string; language?: string; sort?: string; dir?: string; offset: number; limit: number }) {
   const where: SQL[] = [eq(patients.practiceId, practiceId)];
+  if (p.language === "es" || p.language === "en") where.push(eq(patients.preferredLanguage, p.language));
   const q = p.q?.trim();
   if (q) {
     const like = `${escapeLike(q)}%`;

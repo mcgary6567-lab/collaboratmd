@@ -54,12 +54,14 @@ export class Stripe {
   }
 
   /** A hosted Checkout page for one payment; optionally saves the card for later off-session charges. */
-  createCheckout(p: { amountCents: number; description: string; successUrl: string; cancelUrl: string; metadata: Record<string, string>; email?: string | null; saveCard?: boolean; idempotencyKey: string }) {
+  /** `locale` is one of Stripe's Checkout locales (e.g. "es-419"); unset, Checkout follows the browser. */
+  createCheckout(p: { amountCents: number; description: string; successUrl: string; cancelUrl: string; metadata: Record<string, string>; email?: string | null; saveCard?: boolean; idempotencyKey: string; locale?: string }) {
     return this.call<{ id: string; url: string }>("POST", "/checkout/sessions", {
       mode: "payment",
       success_url: p.successUrl,
       cancel_url: p.cancelUrl,
       customer_email: p.email || undefined,
+      locale: p.locale,
       customer_creation: p.saveCard ? "always" : undefined,
       line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: p.amountCents, product_data: { name: p.description } } }],
       metadata: p.metadata,

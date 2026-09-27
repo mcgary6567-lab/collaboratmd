@@ -14,13 +14,14 @@ import { schema } from "@/db";
 import { createEstimate } from "./billing";
 import { createPortalLink } from "./portal";
 import { messagePatient } from "./messaging";
+import { clockDay, practiceNow } from "./practice-time";
 import { depositRequest, langOf, shortDate } from "@/lib/i18n/messages";
 
 const { appointments, patients, providers, patientInsurances, estimates, auditLog } = schema;
 const DAY = 86_400_000;
 
 export async function upcomingVisits(db: Db, practiceId: string, days = 14, now = new Date()) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const start = clockDay(await practiceNow(db, practiceId, now));
   const rows = await db
     .select({ appt: appointments, patient: patients, provider: providers })
     .from(appointments)
@@ -79,7 +80,7 @@ export async function requestDeposit(db: Db, practiceId: string, estimateId: str
   const [e] = await db.select({ est: estimates, appt: appointments }).from(estimates).innerJoin(appointments, eq(appointments.id, estimates.appointmentId)).where(and(eq(estimates.id, estimateId), eq(estimates.practiceId, practiceId))).limit(1);
   if (!e) throw new Error("Estimate not found");
   if (e.est.patientOwesCents < 100) throw new Error("Nothing to collect in advance: the estimate is under $1");
-  if (e.appt.startsAt < new Date()) throw new Error("The visit has already happened");
+  if (e.appt.startsAt < (await practiceNow(db, practiceId))) throw new Error("The visit has already happened");
   await db.update(estimates).set({ depositRequestedAt: new Date() }).where(eq(estimates.id, e.est.id));
   const { path, patient } = await createPortalLink(db, practiceId, e.est.patientId, userId, "pay");
   const url = `${origin}${path}`;
@@ -96,10 +97,12 @@ export async function requestDeposit(db: Db, practiceId: string, estimateId: str
 
 /** Deposits a patient has been asked for, for visits still ahead. The portal lets them pay up to this on top of their balance. */
 export async function openDeposits(db: Db, patientId: string, now = new Date()) {
+  const [p] = await db.select({ practiceId: patients.practiceId }).from(patients).where(eq(patients.id, patientId)).limit(1);
+  const clockNow = p ? await practiceNow(db, p.practiceId, now) : now;
   return db
     .select({ id: estimates.id, amountCents: estimates.patientOwesCents, startsAt: appointments.startsAt })
     .from(estimates)
     .innerJoin(appointments, eq(appointments.id, estimates.appointmentId))
-    .where(and(eq(estimates.patientId, patientId), isNotNull(estimates.depositRequestedAt), gte(appointments.startsAt, now), eq(appointments.status, "scheduled")));
+    .where(and(eq(estimates.patientId, patientId), isNotNull(estimates.depositRequestedAt), gte(appointments.startsAt, clockNow), eq(appointments.status, "scheduled")));
 }
 

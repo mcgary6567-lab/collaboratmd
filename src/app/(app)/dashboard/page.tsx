@@ -7,6 +7,7 @@ import { memo } from "@/lib/memo";
 import { dataStamp } from "@/server/data-stamp";
 import { listAppointments } from "@/server/encounters";
 import { Card, PageHeader, Badge, Empty } from "@/components/ui";
+import { practiceNow } from "@/server/practice-time";
 import { FeatureTips } from "./tips";
 import { OnboardingGuide } from "./onboarding";
 import { Kpi, compactMoney, pct } from "@/components/kpi";
@@ -22,7 +23,7 @@ export default async function UserDashboard() {
     userWorkload(db, s.practiceId, s.userId),
     recentPayments(db, s.practiceId),
     recoveredDenials(db, s.practiceId),
-    listAppointments(db, s.practiceId, new Date()),
+    practiceNow(db, s.practiceId).then((today) => listAppointments(db, s.practiceId, today)),
     // Totals over months of ledger entries: cached, but recomputed as soon as anything is posted.
     dataStamp(db, s.practiceId).then((v) => memo(`collections:${s.practiceId}:${v}`, 5 * 60_000, () => collectionsSummary(db, s.practiceId))),
   ]);

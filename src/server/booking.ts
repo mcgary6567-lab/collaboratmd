@@ -11,33 +11,15 @@ import { schema } from "@/db";
 import { notify } from "./notifications";
 import { messagePatient } from "./messaging";
 import { bookingConfirmed, langOf, visitTime } from "@/lib/i18n/messages";
+import { practiceClock, practiceTimeZone, US_TIME_ZONES, validTimeZone } from "./practice-time";
 
 const { bookingSettings, providerHours, bookingRequests, appointments, providers, patients, locations, practices, auditLog } = schema;
 const MIN = 60_000;
 const DAY = 86_400_000;
 
-export const US_TIME_ZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "America/Puerto_Rico"];
-
-/* ------------------------------ Time zones ------------------------------ */
-
-function parts(date: Date, tz: string) {
-  const f = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", weekday: "short" });
-  const p = Object.fromEntries(f.formatToParts(date).map((x) => [x.type, x.value]));
-  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, mi: +p.minute, weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday) };
-}
-
-/**
- * Appointment times are kept as the practice's clock time written as UTC: a
- * 9:00 visit is stored as 09:00Z, the way the schedule enters and shows them
- * and reminders read them. Booking slots follow the same rule, so a time
- * booked online sits on the schedule at the hour the patient chose. Only the
- * current moment needs the time zone, to know what the clock at the practice
- * reads now (daylight saving included).
- */
-export function practiceClock(now: Date, tz: string): Date {
-  const p = parts(now, tz);
-  return new Date(Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi));
-}
+// Slots are clock times like every appointment (see practice-time.ts), so a
+// time booked online sits on the schedule at the hour the patient chose.
+export { US_TIME_ZONES, practiceClock };
 
 const LOCALE = { en: "en-US", es: "es-US" } as const;
 export function localDateLabel(date: Date, lang: "en" | "es" = "en") {
@@ -49,17 +31,15 @@ export function localTimeLabel(date: Date, lang: "en" | "es" = "en") {
 
 /* ------------------------------ Settings ------------------------------ */
 
+/** The time zone is the practice's (Settings > Practice profile); it is edited here too. */
 export async function getBookingSettings(db: Db, practiceId: string) {
-  const [row] = await db.select().from(bookingSettings).where(eq(bookingSettings.practiceId, practiceId)).limit(1);
-  return row ?? { practiceId, enabled: false, timeZone: "America/New_York", slotMinutes: 30, minNoticeHours: 24, horizonDays: 21, intro: null, updatedAt: new Date(0) };
+  const [[row], timeZone] = await Promise.all([db.select().from(bookingSettings).where(eq(bookingSettings.practiceId, practiceId)).limit(1), practiceTimeZone(db, practiceId)]);
+  return { ...(row ?? { practiceId, enabled: false, slotMinutes: 30, minNoticeHours: 24, horizonDays: 21, intro: null, updatedAt: new Date(0) }), timeZone };
 }
 
 export async function saveBookingSettings(db: Db, practiceId: string, input: { enabled: boolean; timeZone: string; slotMinutes: number; minNoticeHours: number; horizonDays: number; intro?: string | null }, userId?: string) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: input.timeZone });
-  } catch {
-    throw new Error("Choose a valid time zone");
-  }
+  if (!validTimeZone(input.timeZone)) throw new Error("Choose a valid time zone");
+  await db.update(practices).set({ timeZone: input.timeZone }).where(eq(practices.id, practiceId));
   if (![10, 15, 20, 30, 40, 45, 60, 90].includes(input.slotMinutes)) throw new Error("Choose an appointment length");
   if (!(input.minNoticeHours >= 0 && input.minNoticeHours <= 168)) throw new Error("Notice is 0 to 168 hours");
   if (!(input.horizonDays >= 1 && input.horizonDays <= 90)) throw new Error("Show 1 to 90 days ahead");

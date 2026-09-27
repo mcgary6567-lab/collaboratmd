@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth";
 import { saveProfileAction } from "@/app/(app)/admin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
+import { US_TIME_ZONES } from "@/server/practice-time";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,13 @@ export default async function ProfilePage() {
               {field("zip", "ZIP", { maxLength: 10, placeholder: "75201 or 75201-1234" })}
             </div>
             {field("phone", "Billing phone")}
+            <label className="block text-sm">
+              <span className="label">Time zone</span>
+              <select name="timeZone" defaultValue={p.timeZone} className="input" disabled={!admin}>
+                {[...new Set([p.timeZone, ...US_TIME_ZONES])].map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+              </select>
+              <span className="mt-1 block text-xs text-slate-500">Decides which day is today on the schedule, when reminders go out for tomorrow, and online booking times.</span>
+            </label>
           </div>
           {admin ? (
             <div className="flex items-center gap-3">

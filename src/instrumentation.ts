@@ -1,6 +1,16 @@
 import type { Instrumentation } from "next";
 
 /**
+ * Appointment times are clock times stored as UTC (server/practice-time.ts),
+ * shown and compared with the server's local time. Production servers run in
+ * UTC; this makes development and test servers do the same, so a 9:00 visit
+ * reads 9:00 everywhere.
+ */
+export function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") process.env.TZ = "UTC";
+}
+
+/**
  * Records server errors (pages, route handlers, server actions) in the
  * error_events table; see server/errors.ts for what is kept and what is
  * redacted. Reporting must never cause a second failure, so it swallows its

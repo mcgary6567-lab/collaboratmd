@@ -27,6 +27,7 @@ import { getFhir, syncFhir } from "./fhir";
 import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 import { appointmentReminder, balanceReminder, langOf, payLink, visitTime } from "@/lib/i18n/messages";
+import { clockDay, practiceNow } from "./practice-time";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
 
@@ -76,10 +77,10 @@ export async function sendPayLinks(db: Db, practiceId: string, origin: string, o
   return { candidates: owing.length, sent, skipped, excluded };
 }
 
-/** Tomorrow's appointments, each reminded once, with an online check-in link. */
+/** Tomorrow's appointments (tomorrow on the practice's clock), each reminded once, with an online check-in link. */
 export async function appointmentReminders(db: Db, practiceId: string, origin: string, now = new Date()) {
-  const from = new Date(now.getTime() + 18 * 3_600_000);
-  const to = new Date(now.getTime() + 42 * 3_600_000);
+  const from = new Date(clockDay(await practiceNow(db, practiceId, now)).getTime() + 86_400_000);
+  const to = new Date(from.getTime() + 86_400_000);
   const [practice] = await db.select().from(practices).where(eq(practices.id, practiceId)).limit(1);
   const rows = await db
     .select({ appt: appointments, patient: patients })

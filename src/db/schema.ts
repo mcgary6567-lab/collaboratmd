@@ -28,6 +28,8 @@ export const practices = pgTable("practices", {
   state: text("state").notNull(),
   zip: text("zip").notNull(),
   phone: text("phone"),
+  /** For "today", "tomorrow" and online booking; see server/practice-time.ts and migration 0046. */
+  timeZone: text("time_zone").notNull().default("America/New_York"),
   requireMfa: boolean("require_mfa").notNull().default(false),
   sessionHours: integer("session_hours").notNull().default(12),
   ipAllowlist: jsonb("ip_allowlist").$type<string[]>().notNull().default([]),

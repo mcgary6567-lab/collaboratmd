@@ -12,6 +12,7 @@ import { appointmentStatusAction } from "@/app/(app)/actions";
 import { Card, PageHeader, PatientLink, Badge, Empty } from "@/components/ui";
 import { AppointmentForm } from "./form";
 import { localDateLabel, localTimeLabel, pendingRequests } from "@/server/booking";
+import { practiceNow } from "@/server/practice-time";
 import { confirmBookingAction, declineBookingAction } from "@/app/(app)/booking-actions";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,8 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
   const { date, booked, told, declined } = await searchParams;
   const s = await requireSession();
   const db = await getDb();
-  const day = date ? new Date(date + "T12:00:00") : new Date();
+  // A clock time on the day shown: the date asked for, or today on the practice's clock.
+  const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + "T12:00:00Z") : await practiceNow(db, s.practiceId);
   const [appts, providers, requests] = await Promise.all([listAppointments(db, s.practiceId, day), listProviders(db, s.practiceId), pendingRequests(db, s.practiceId)]);
   const iso = day.toISOString().slice(0, 10);
   const patientIds = [...new Set(appts.map((a) => a.patient.id))];

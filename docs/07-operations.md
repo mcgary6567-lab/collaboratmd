@@ -103,13 +103,21 @@ A value below the minimum is ignored and the default used. The daily job's respo
 - The daily job sets each subscription's quantity to the practice's active providers and reports claims sent to the meter.
 - Try the whole flow with test-mode keys and prices first.
 
+## Deploys
+
+1. **Migrations run in the build.** Vercel runs `npm run build`, which applies pending migrations (`scripts/migrate.ts`) before `next build`. A failed migration fails the build, and the running deployment stays live. A preview build against the production database skips migrating (the preview refuses that database anyway). Migrations must work with the code already live: add tables and columns; never rename or drop in the same deploy.
+2. **Start-up cannot hang.** If a server instance still finds migrations pending, it takes a transaction-scoped lock. It gives up after 15 s waiting for the lock and 25 s overall, so `/api/health` answers 503 and alerts fire. Behind the pooler, never use session locks or plain `SET`; see `docs/incidents/2026-09-27-startup-lock.md`.
+3. **Every production deploy is checked when it goes live** (`.github/workflows/after-deploy.yml`): the same checks as the scheduled live check. On failure GitHub emails whoever pushed, and `OPS_ALERT_WEBHOOK_URL` (repository secret) alerts the operators' channel.
+4. **Automatic rollback (optional).** Add the repository secret `VERCEL_TOKEN` (vercel.com/account/tokens) and the repository variables `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` (Vercel → Project → Settings → General), and a failed check rolls production back to the previous deployment. After a rollback, Vercel does not move production to new deployments until one is promoted (Deployments → ⋯ → Promote), so fix forward and promote the fix.
+
 ## Checks on every push
 
 CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 
 - **Type check and unit tests**, with `npm audit --audit-level=high`: a known high or critical vulnerability in a dependency fails the build. Fix it by updating the package (Dependabot usually has a pull request open), or, if there is no fix and the code path is unused, record why in the pull request.
 - **Production build and performance**: builds, then measures the most used screens on the production build against budgets for JavaScript size, server time, largest paint and layout shift (`e2e-perf/budgets.spec.ts`; the numbers appear in the run's summary). If a change legitimately needs more, raise that page's budget in the same pull request and say why.
-- **End-to-end and accessibility**: the browser tests, and an accessibility check of every screen at desktop and phone width, including the screens for individual records and the patient pages.
+- **End-to-end and accessibility**: the browser tests, and an accessibility check of every screen at desktop and phone width, including the screens for individual records and the patient pages. The same pass fails on any button, link or field that something else covers (a card sliding under its neighbour).
+- **Real Postgres behind a pooler**: start-up and the built app against Postgres through PgBouncer in transaction mode, the way Neon's pooler works: several starts at once, a start that cannot get the lock (it must fail within seconds), and the live check against the running app (`scripts/startup-check.ts`).
 
 CodeQL (`.github/workflows/codeql.yml`) scans the code for security problems on every push and weekly; findings appear under Security → Code scanning. Secret scanning and push protection are repository settings (Settings → Code security) and must be switched on there.
 

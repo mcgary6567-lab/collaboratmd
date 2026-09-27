@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { createClaimForEncounter } from "./claims";
@@ -52,17 +52,16 @@ export async function listCodes(db: Db, practiceId?: string) {
   return { cpts: cpts.map((c) => ({ ...c, defaultFeeCents: fees.get(c.code) ?? c.defaultFeeCents })), icds };
 }
 
+/** One day's appointments. `day` is any clock time on that day (appointment times are clock times; see practice-time.ts). */
 export async function listAppointments(db: Db, practiceId: string, day: Date) {
-  const start = new Date(day);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
+  const start = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()));
+  const end = new Date(start.getTime() + 86_400_000);
   return db
     .select({ appt: appointments, patient: patients, provider: providers })
     .from(appointments)
     .innerJoin(patients, eq(patients.id, appointments.patientId))
     .innerJoin(providers, eq(providers.id, appointments.providerId))
-    .where(and(eq(appointments.practiceId, practiceId), gte(appointments.startsAt, start), lte(appointments.startsAt, end)))
+    .where(and(eq(appointments.practiceId, practiceId), gte(appointments.startsAt, start), lt(appointments.startsAt, end)))
     .orderBy(asc(appointments.startsAt));
 }
 

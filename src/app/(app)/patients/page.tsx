@@ -16,7 +16,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
   const db = await getDb();
   const { page, pageSize, offset } = pageArgs(params);
   const [{ rows, total }, views] = await Promise.all([
-    searchPatients(db, s.practiceId, { q: params.q, sort: params.sort, dir: params.dir, offset, limit: pageSize }),
+    searchPatients(db, s.practiceId, { q: params.q, language: params.language, sort: params.sort, dir: params.dir, offset, limit: pageSize }),
     listViews(db, s.userId, s.practiceId, "patients"),
   ]);
   const query = new URLSearchParams(Object.entries(params).filter(([k, v]) => v && k !== "page") as [string, string][]).toString();
@@ -25,7 +25,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader
         title="Patients"
-        subtitle={`${total.toLocaleString()} patient${total === 1 ? "" : "s"}${params.q ? ` matching "${params.q}"` : ""}`}
+        subtitle={`${total.toLocaleString()} patient${total === 1 ? "" : "s"}${params.q ? ` matching "${params.q}"` : ""}${params.language === "es" ? ", Spanish" : params.language === "en" ? ", English" : ""}`}
         actions={
           <>
             <Link href="/import" className="btn btn-secondary">Import</Link>
@@ -36,6 +36,9 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
       <Card>
         <form className="mb-3 flex flex-wrap gap-2" action="/patients">
           <input name="q" defaultValue={params.q} placeholder="Name, MRN or phone" className="input max-w-md flex-1" />
+          <select name="language" defaultValue={params.language ?? ""} className="input w-40" aria-label="Language">
+            <option value="">Any language</option><option value="es">Spanish</option><option value="en">English</option>
+          </select>
           <select name="size" defaultValue={String(pageSize)} className="input w-24" title="Rows per page">
             <option value="25">25</option><option value="50">50</option><option value="100">100</option>
           </select>

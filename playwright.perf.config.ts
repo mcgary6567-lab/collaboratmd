@@ -26,6 +26,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       DATABASE_URL: "",
+      TZ: "UTC",
       PGLITE_DIR: ".e2e/perf-pg",
       AUTH_SECRET: "e2e-only-secret-0123456789abcdef0123456789",
       STEDI_API_KEY: "", STRIPE_SECRET_KEY: "", RESEND_API_KEY: "", TWILIO_ACCOUNT_SID: "", ANTHROPIC_API_KEY: "",

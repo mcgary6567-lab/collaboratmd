@@ -8,6 +8,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { isValidNpi } from "@/lib/scrub/rules";
 import { NAV_GROUPS } from "@/lib/nav";
+import { validTimeZone } from "./practice-time";
 
 const { practices, providers, payers, users, auditLog } = schema;
 
@@ -27,13 +28,15 @@ function diff(before: Record<string, unknown>, after: Record<string, unknown>) {
 
 /* ------------------------------ Practice profile ------------------------------ */
 
-export type ProfileInput = { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; phone: string };
+export type ProfileInput = { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; phone: string; timeZone?: string };
 
 export async function saveProfile(db: Db, practiceId: string, input: ProfileInput, userId?: string) {
   const v = {
     name: input.name.trim().slice(0, 120), npi: input.npi.replace(/\D/g, ""), taxId: input.taxId.trim(), address1: input.address1.trim().slice(0, 120),
     city: input.city.trim().slice(0, 60), state: input.state.trim().toUpperCase(), zip: input.zip.trim(), phone: input.phone.trim() || null,
+    ...(input.timeZone ? { timeZone: input.timeZone } : {}),
   };
+  if (input.timeZone && !validTimeZone(input.timeZone)) throw new Error("Choose a valid time zone");
   if (!v.name) throw new Error("Enter the practice's legal name");
   if (!isValidNpi(v.npi)) throw new Error("That NPI fails its check digit; claims would be rejected");
   if (!TAX_ID.test(v.taxId)) throw new Error("Enter the tax ID as nine digits, e.g. 12-3456789");
