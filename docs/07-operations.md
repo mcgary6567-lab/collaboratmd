@@ -79,5 +79,6 @@ With none set, nothing is sent, and errors are still listed at `/ops/errors`.
 Never commit `.env.local`. To rotate:
 
 - `CRON_SECRET`: set a new value in Vercel and redeploy. Vercel Cron picks it up automatically.
-- `AUTH_SECRET`: signs everyone out **and** makes sealed practice secrets (integration keys, MFA secrets) unreadable. Do not rotate it without a re-seal plan (see the threat model's known gaps).
+- `AUTH_SECRET`: signs everyone out. Before the first rotation, set `SEAL_KEYS` and press "Re-encrypt stored secrets" in /ops/practices; otherwise integration keys and second-factor secrets become unreadable.
+- `SEAL_KEYS` (encryption of stored secrets): put a new `id=key` at the front, deploy, re-encrypt from /ops/practices, then remove the old key and deploy again.
 - Integration keys: replace them in the provider, then in Settings → Integrations or the Vercel env.

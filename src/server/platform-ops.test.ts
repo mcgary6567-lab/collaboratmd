@@ -74,7 +74,8 @@ describe("platform operations", () => {
 
     const [p] = await t.db.select().from(schema.practices).where(eq(schema.practices.id, t.practiceId));
     await expect(scheduleClosure(t.db, t.practiceId, { confirmName: "wrong", userId: t.userId })).rejects.toThrow(/exactly/);
-    const now = new Date("2026-10-01T00:00:00Z");
+    // The ledger guard compares against the database clock, so the closure date must really have passed.
+    const now = new Date(Date.now() - 45 * DAY);
     const when = await scheduleClosure(t.db, t.practiceId, { confirmName: p.name, userId: t.userId }, now);
     expect(when.getTime() - now.getTime()).toBe(30 * DAY);
     await cancelClosure(t.db, t.practiceId, t.userId);

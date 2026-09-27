@@ -231,9 +231,12 @@ export async function seedDemoData(db: Db) {
   for (const p of patientRows.slice(0, 6)) await postPatientPayment(db, practice.id, p.id, 2500, "card", admin.id);
 
   // Back-date ledger and claim timestamps to the encounter dates so trends and aging are realistic.
+  // Posted entries are otherwise immutable (migration 0042); only this demo seed rewrites their dates.
+  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER ledger_entries_guard`);
   await db.execute(sql`
     UPDATE ledger_entries le SET posted_at = (e.date_of_service::timestamptz + CASE WHEN le.type = 'charge' THEN interval '0 day' ELSE interval '18 day' END)
     FROM claims c JOIN encounters e ON e.id = c.encounter_id WHERE le.claim_id = c.id`);
+  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_guard`);
   await db.execute(sql`UPDATE claims c SET created_at = e.date_of_service::timestamptz, submitted_at = CASE WHEN submitted_at IS NULL THEN NULL ELSE e.date_of_service::timestamptz + interval '1 day' END, updated_at = e.date_of_service::timestamptz + interval '2 day' FROM encounters e WHERE e.id = c.encounter_id`);
   await db.execute(sql`UPDATE claim_events ev SET at = c.created_at + (interval '1 hour' * (SELECT count(*) FROM claim_events x WHERE x.claim_id = ev.claim_id AND x.at <= ev.at)) FROM claims c WHERE c.id = ev.claim_id`);
   await db.execute(sql`UPDATE denials d SET created_at = c.created_at + interval '19 day' FROM claims c WHERE c.id = d.claim_id`);

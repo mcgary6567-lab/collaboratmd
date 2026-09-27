@@ -8,6 +8,8 @@ import { extendTrial, practiceOverview } from "@/server/operator";
 import { moveAttachmentsToStore } from "@/server/attachments";
 import { fileStore } from "@/server/files";
 import { platformBillingReady } from "@/server/subscription";
+import { resealAll } from "@/server/reseal";
+import { keyRing } from "@/lib/seal";
 import { ActionForm, SubmitButton, type FormResult } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime, money } from "@/lib/utils";
@@ -42,6 +44,17 @@ async function moveFilesAction(_prev: FormResult): Promise<FormResult> {
     return { ok: true, message: `Moved ${r.moved}; ${r.left} still in the database${r.left ? ". Run it again to continue." : "."}` };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not move files" };
+  }
+}
+
+async function resealAction(_prev: FormResult): Promise<FormResult> {
+  "use server";
+  try {
+    await operator();
+    const r = await resealAll(await getDb());
+    return { ok: r.unreadable.length === 0, message: `${r.resealed} re-encrypted, ${r.current} already current${r.unreadable.length ? `; could not read ${r.unreadable.length}: ${r.unreadable.slice(0, 3).join(", ")}` : ""}` };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not re-encrypt" };
   }
 }
 
@@ -90,6 +103,10 @@ export default async function OperatorPracticesPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-slate-500">Monthly is estimated from the plan&apos;s list price per provider; annual plans and discounts are billed differently in Stripe.{platformBillingReady() ? "" : " Subscriptions are not set up on this deployment."}</p>
+      </Card>
+      <Card title="Encryption keys" className="mt-6">
+        <p className="text-sm text-slate-600">{keyRing() ? `Stored secrets are encrypted with the SEAL_KEYS ring (current key "${keyRing()!.current}"). After adding a new key at the front, re-encrypt, then remove the old key.` : "Stored secrets are encrypted with a key derived from AUTH_SECRET. Set SEAL_KEYS, then re-encrypt, so AUTH_SECRET can be rotated without losing them."}</p>
+        {keyRing() && <ActionForm action={resealAction} className="mt-3"><SubmitButton pendingLabel="Re-encrypting...">Re-encrypt stored secrets with the current key</SubmitButton></ActionForm>}
       </Card>
       <Card title="File storage" className="mt-6">
         <p className="text-sm text-slate-600">{fileStore() ? `${dbFiles} claim attachment${dbFiles === 1 ? " is" : "s are"} still in the database.` : "File storage is not configured (FILE_STORAGE=blob); attachments stay in the database."}</p>

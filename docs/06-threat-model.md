@@ -39,6 +39,9 @@ Written by the engineering team from the code as it stands. It is a working docu
 - Two-person rules where policy asks for them: refunds approved by a second person; write-off limits by role; risk holds on high-risk claims.
 - Audit log of sign-ins, exports, adjustments and settings changes, viewable by administrators.
 
+**Money**
+- Posted ledger entries cannot be changed or deleted, enforced by a database trigger (migration 0042) as well as the application; corrections post new entries.
+
 **Data in transit and at rest**
 - TLS everywhere (Vercel), with HSTS.
 - Neon encrypts storage at rest. Practice secrets are additionally sealed in the application.
@@ -46,6 +49,7 @@ Written by the engineering team from the code as it stands. It is a working docu
 - Notification titles and email digests carry no patient details.
 
 **Browser**
+- A strict Content-Security-Policy on every page (`src/proxy.ts`): scripts run only with the request's nonce, so injected scripts and inline handlers do not execute. A production-build crawl of the main pages found no violations.
 - Security headers (`next.config.ts`): HSTS, `nosniff`, framing denied (`X-Frame-Options` and `frame-ancestors`), a restrictive `Permissions-Policy`, `Cross-Origin-Opener-Policy`.
 - Referrer-Policy `strict-origin-when-cross-origin`, and `no-referrer` on pages whose address carries a secret token (portal, reset, check-in, welcome, unsubscribe).
 - Session cookie is `httpOnly`, `secure` in production, `sameSite=lax`; server actions carry Next.js origin checks.
@@ -63,11 +67,11 @@ Written by the engineering team from the code as it stands. It is a working docu
 
 | Gap | Risk | Plan |
 |---|---|---|
-| No Content-Security-Policy for scripts | An injected script would run. React escapes output and no user HTML is rendered, which limits this. | Nonce-based CSP once third-party scripts are settled |
+| Styles may still be inline (CSP allows inline style attributes) | Injected CSS could restyle a page, not run code | Accepted; charts and layout rely on style attributes |
 | Attachments stored in Postgres by default | Database size and backup time grow | Private Vercel Blob storage is built (`FILE_STORAGE=blob`); turn it on once the Vercel BAA covers Blob, and move existing files from the operator console |
 | Per-address budgets are shared by everyone behind one office NAT | A busy office could hit the sign-in budget (30 per 15 minutes) | Raise the budget or key it on address plus email if support tickets show it |
-| Ledger immutability is enforced by the application, not the database | A database-level attacker could edit history | Revoke UPDATE/DELETE on `ledger_entries` from the application role |
-| `AUTH_SECRET` is one key for sessions and sealing | Rotation signs everyone out and needs a re-seal | Separate keys with key IDs |
+| The ledger guard is a trigger the database owner could disable | Someone with owner access could still rewrite history | Run the application under a role that does not own the tables, so it cannot drop the trigger |
+| Secrets stay under the AUTH_SECRET-derived key until SEAL_KEYS is set and the operator re-encrypts | Rotating AUTH_SECRET before that makes them unreadable | Set SEAL_KEYS and re-encrypt from /ops/practices before the first rotation |
 | No independent penetration test yet | Unknown unknowns | Commission before the first paying practice goes live |
 | Point-in-time recovery depends on Neon plan settings | Data loss window | Configure PITR and run the restore drill in `docs/08-restore-drill.md` |
 

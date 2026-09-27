@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { schema } from "@/db";
 import { testDb } from "@/test/db";
 import {
@@ -19,7 +19,10 @@ beforeAll(async () => {
   const [claim] = await t.db.select().from(schema.claims).where(eq(schema.claims.practiceId, t.practiceId)).limit(1);
   claimId = claim.id;
   patientId = claim.patientId;
+  // Test setup only: the ledger guard (migration 0042) blocks deletes in normal use.
+  await t.db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER ledger_entries_guard`);
   await t.db.delete(schema.ledgerEntries).where(and(eq(schema.ledgerEntries.patientId, patientId), eq(schema.ledgerEntries.type, "patient_payment")));
+  await t.db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_guard`);
   const current = await patientBalanceCents(t.db, patientId);
   await t.db.insert(schema.ledgerEntries).values({
     practiceId: t.practiceId, patientId, claimId, type: "transfer_to_patient", amountCents: 30_000 - current, groupCode: "PR", reasonCode: "1", note: "Deductible",
