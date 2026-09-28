@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -9,6 +10,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { RevealForm } from "./reveal-form";
+
+export const metadata: Metadata = { title: "Developers" };
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +82,7 @@ export default async function DevelopersPage() {
                     <td>{k.name}</td>
                     <td className="font-mono text-xs">{k.prefix}…</td>
                     <td><Badge tone={k.scope === "write" ? "amber" : "slate"}>{k.scope}</Badge>{k.restrictedAccess && <> <Badge tone="red">restricted patients</Badge></>}</td>
-                    <td className="text-xs">{k.revokedAt ? `revoked ${fmtDateTime(k.revokedAt)}` : k.lastUsedAt ? fmtDateTime(k.lastUsedAt) : "never"}</td>
+                    <td className="text-xs">{k.revokedAt ? `revoked ${fmtDateTime(k.revokedAt, s.timeZone)}` : k.lastUsedAt ? fmtDateTime(k.lastUsedAt, s.timeZone) : "never"}</td>
                     <td>{admin && !k.revokedAt && <ActionForm action={revokeApiKeyAction.bind(null, k.id)}><SubmitButton className="text-xs text-red-700 underline" pendingLabel="...">Revoke</SubmitButton></ActionForm>}</td>
                   </tr>
                 ))}
@@ -137,7 +140,7 @@ export default async function DevelopersPage() {
                 <tbody>
                   {deliveries.map(({ delivery: d, url }) => (
                     <tr key={d.id}>
-                      <td className="whitespace-nowrap text-xs">{fmtDateTime(d.createdAt)}</td>
+                      <td className="whitespace-nowrap text-xs">{fmtDateTime(d.createdAt, s.timeZone)}</td>
                       <td className="font-mono text-xs">{d.eventType}</td>
                       <td className="max-w-[14rem] truncate font-mono text-xs">{url}</td>
                       <td><Badge tone={d.status === "delivered" ? "green" : d.status === "failed" ? "red" : "amber"}>{d.status}</Badge></td>

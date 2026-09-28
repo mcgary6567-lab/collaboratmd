@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -8,6 +9,8 @@ import { disputeGroups, LETTER_MAX } from "@/server/recovery";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Underpayments" };
 
 export const dynamic = "force-dynamic";
 

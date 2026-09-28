@@ -5,7 +5,7 @@ import { COMPANY, addressLine } from "@/content/company";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "GDPR — CollaboratMD",
+  title: "GDPR (EU and UK visitors)",
   description:
     "How CollaboratMD meets the General Data Protection Regulation: lawful bases, data subject rights, transfers and sub-processors.",
 };
@@ -24,7 +24,7 @@ export default function GdprPage() {
   return (
     <PageShell
       eyebrow="Legal"
-      title="GDPR compliance"
+      title="GDPR: visitors in the EU and UK"
       lead="How we meet the General Data Protection Regulation, what we rely on to process data, and how to exercise your rights."
       meta="Last updated September 23, 2026"
     >

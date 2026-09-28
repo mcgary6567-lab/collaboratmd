@@ -1,13 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listPayers } from "@/server/encounters";
-import { PAYER_TYPES } from "@/server/admin";
+import { PAYER_TYPE_LABEL, PAYER_TYPES } from "@/server/admin";
 import { addDirectoryPayerAction, savePayerAction } from "@/app/(app)/admin-actions";
 import { searchPayerDirectory, SUPPORT_LABEL, type DirectoryPayer } from "@/server/payer-directory";
 import { practiceConfig } from "@/server/integrations";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Payers" };
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +21,10 @@ function PayerFields({ p }: { p?: P }) {
     <div className="grid gap-2 sm:grid-cols-5">
       <input name="name" defaultValue={p?.name} placeholder="Payer name" className="input sm:col-span-2" required />
       <input name="payerId" defaultValue={p?.payerId} placeholder="Payer ID" className="input font-mono" required />
-      <select name="type" defaultValue={p?.type ?? "commercial"} className="input" aria-label="Payer type">{PAYER_TYPES.map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}</select>
+      <select name="type" defaultValue={p?.type ?? "commercial"} className="input" aria-label="Payer type">{PAYER_TYPES.map((t) => <option key={t} value={t}>{PAYER_TYPE_LABEL[t] ?? t}</option>)}</select>
       <div className="grid grid-cols-2 gap-2">
-        <input name="timelyFilingDays" type="number" min={30} max={730} defaultValue={p?.timelyFilingDays ?? 90} className="input" title="Timely filing days" aria-label="Timely filing days" />
-        <input name="appealDays" type="number" min={15} max={365} defaultValue={p?.appealDays ?? 60} className="input" title="Appeal window days" aria-label="Appeal window days" />
+        <input name="timelyFilingDays" type="number" min={30} max={730} defaultValue={p?.timelyFilingDays} className="input" title="Days to file from the date of service. Empty: 365 for Medicare, 90 otherwise" aria-label="Timely filing days" />
+        <input name="appealDays" type="number" min={15} max={365} defaultValue={p?.appealDays} className="input" title="Days to appeal a denial. Empty: 120 for Medicare, 60 otherwise" aria-label="Appeal window days" />
       </div>
     </div>
   );
@@ -71,7 +74,7 @@ export default async function PayersPage({ searchParams }: { searchParams: Promi
                                 <input type="hidden" name="name" value={f.name} />
                                 <input type="hidden" name="payerId" value={f.payerId} />
                                 <input type="hidden" name="support" value={JSON.stringify({ claims: f.claims, era: f.era, eligibility: f.eligibility, eft: f.eft, claim_status: f.claimStatus })} />
-                                <select name="type" defaultValue={/medicare/i.test(f.name) ? "medicare" : /medicaid/i.test(f.name) ? "medicaid" : "commercial"} className="input py-1 text-xs" aria-label="Payer type">{PAYER_TYPES.filter((t) => t !== "self_pay").map((t) => <option key={t} value={t}>{t}</option>)}</select>
+                                <select name="type" defaultValue={/medicare/i.test(f.name) ? "medicare" : /medicaid/i.test(f.name) ? "medicaid" : "commercial"} className="input py-1 text-xs" aria-label="Payer type">{PAYER_TYPES.filter((t) => t !== "self_pay").map((t) => <option key={t} value={t}>{PAYER_TYPE_LABEL[t]}</option>)}</select>
                                 <SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Add</SubmitButton>
                               </ActionForm>
                             )}
@@ -91,7 +94,7 @@ export default async function PayersPage({ searchParams }: { searchParams: Promi
         <Card title="Add a payer" className="mb-6">
           <ActionForm action={savePayerAction.bind(null, null)} className="space-y-3">
             <PayerFields />
-            <p className="text-xs text-slate-500">Last two boxes: timely filing days and appeal window days. Use the payer ID your clearinghouse lists for this payer.</p>
+            <p className="text-xs text-slate-500">Last two boxes: days to file and days to appeal. Leave them empty for the usual: 365 and 120 for Medicare, 90 and 60 otherwise. Use the payer ID your clearinghouse lists for this payer.</p>
             <SubmitButton pendingLabel="Adding...">Add payer</SubmitButton>
           </ActionForm>
         </Card>
@@ -104,7 +107,7 @@ export default async function PayersPage({ searchParams }: { searchParams: Promi
               <tr key={p.id}>
                 <td className="font-medium">{p.name}</td>
                 <td className="font-mono">{p.payerId}</td>
-                <td className="capitalize">{p.type.replace("_", " ")}</td>
+                <td>{PAYER_TYPE_LABEL[p.type] ?? p.type}</td>
                 <td className="text-right">{p.timelyFilingDays} days</td>
                 <td className="text-right">{p.appealDays} days</td>
                 <td className="text-right">

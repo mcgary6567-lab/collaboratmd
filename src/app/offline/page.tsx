@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { LogoMark } from "@/components/logo";
+
+export const metadata: Metadata = { title: "Offline" };
 
 /** Shown by the service worker when the app is opened without a connection. */
 export default function OfflinePage() {

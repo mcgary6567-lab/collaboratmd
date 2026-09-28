@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { fmtDate } from "@/lib/utils";
 
 export interface PatientOption {
   id: string;
@@ -100,7 +101,7 @@ export function PatientPicker({
                   >
                     <span className="font-medium">{p.label}</span>
                     <span className="font-mono text-xs text-slate-500">{p.mrn}</span>
-                    <span className="ml-auto text-xs text-slate-500">{p.dob}</span>
+                    <span className="ml-auto text-xs text-slate-500">{fmtDate(p.dob)}</span>
                   </button>
                 </li>
               ))}

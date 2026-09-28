@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -8,6 +9,8 @@ import { draftAppealAction, markSentAction, saveAppealAction } from "@/app/(app)
 import { ActionForm, PrintButton, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Appeal letter" };
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +39,7 @@ export default async function AppealPage({ params }: { params: Promise<{ id: str
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {letter ? (
-            <Card title="Letter" actions={<span className="no-print flex items-center gap-2">{letter.status === "sent" ? <Badge tone="green">Sent {fmtDateTime(letter.sentAt)}</Badge> : <Badge>Draft</Badge>}<Badge tone={letter.source === "ai" ? "blue" : "slate"}>{letter.source === "ai" ? "AI draft" : "Template"}</Badge></span>}>
+            <Card title="Letter" actions={<span className="no-print flex items-center gap-2">{letter.status === "sent" ? <Badge tone="green">Sent {fmtDateTime(letter.sentAt, s.timeZone)}</Badge> : <Badge>Draft</Badge>}<Badge tone={letter.source === "ai" ? "blue" : "slate"}>{letter.source === "ai" ? "AI draft" : "Template"}</Badge></span>}>
               <ActionForm action={saveAppealAction.bind(null, id, letter.id)} className="space-y-3">
                 <textarea name="body" defaultValue={letter.body} rows={30} className="input font-serif text-sm leading-relaxed print:border-0 print:p-0" />
                 <div className="no-print flex flex-wrap gap-2">

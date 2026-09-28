@@ -19,7 +19,7 @@ export async function OnboardingGuide({ practiceId }: { practiceId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-bold text-slate-900">Finish setting up · {done} of {checks.length} done</h2>
-          <p className="text-sm text-slate-600">Each step takes a few minutes. Only administrators see this.</p>
+          <p className="text-sm text-slate-600">Each step takes a few minutes. Only administrators see this. <Link href="/setup" className="font-medium text-brand-700 hover:underline">See the full checklist</Link></p>
         </div>
         <ActionForm action={dismissOnboardingAction}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Hide the guide</SubmitButton></ActionForm>
       </div>

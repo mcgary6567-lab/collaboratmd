@@ -273,3 +273,22 @@ body {
     }
   }
 }
+
+/*
+ * Lists that read better as cards on a phone: add .table-stack to the table.
+ * Each row becomes a card and each cell shows its column's name (data-label,
+ * written on each cell). Wider screens keep the table.
+ */
+@media (max-width: 639px) {
+  /* The header stays, as a row of its controls (sorting, select all), since the cards cannot show them. */
+  .table-stack, .table-stack thead, .table-stack tbody, .table-stack tbody tr, .table-stack td { display: block; width: 100%; }
+  .table-stack thead tr { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-bottom: 0.5rem; }
+  .table-stack thead th { border: 0; padding: 0.25rem 0; }
+  .table-stack thead th:empty { display: none; }
+  .table-stack tbody tr { border: 1px solid var(--border); border-radius: 0.75rem; margin: 0 0 0.75rem; padding: 0.35rem 0.25rem; background: var(--surface); }
+  .table-stack td { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 0; padding: 0.3rem 0.6rem; text-align: right; }
+  .table-stack td::before { content: attr(data-label); flex-shrink: 0; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); }
+  .table-stack td[data-label=""]::before, .table-stack td:not([data-label])::before { content: none; }
+  .table-stack td:empty { display: none; }
+  .table-stack tr:hover td { background: transparent; }
+}

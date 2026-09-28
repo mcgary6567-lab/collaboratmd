@@ -6,7 +6,7 @@ import { LEGAL_VERSIONS, versionLabel } from "@/content/legal";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — CollaboratMD",
+  title: "Terms of Service",
   description:
     "The agreement that governs access to and use of the CollaboratMD revenue cycle management platform.",
 };
@@ -15,7 +15,7 @@ export default function TermsPage() {
   return (
     <PageShell
       eyebrow="Legal"
-      title="Terms & Conditions"
+      title="Terms of Service"
       lead="The agreement between CollaboratMD and the organizations that use the platform."
       meta={`Last updated ${versionLabel(LEGAL_VERSIONS.terms)}`}
     >

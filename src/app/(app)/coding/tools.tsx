@@ -90,8 +90,7 @@ export function NoteCoder({ enabled }: { enabled: boolean }) {
   if (!enabled) {
     return (
       <p className="text-sm text-slate-600">
-        Off. A visit note contains patient information, so it is only sent to an AI model when the deployment sets <code>ANTHROPIC_API_KEY</code> and{" "}
-        <code>AI_PHI_ALLOWED=1</code>, which should be done only once a business associate agreement with the model provider is in place.
+        Off. A visit note contains patient information, so it is sent to an AI model only once CollaboratMD has a business associate agreement with the model provider covering it. Ask support to switch it on.
       </p>
     );
   }

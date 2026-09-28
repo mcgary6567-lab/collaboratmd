@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -8,6 +9,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { sendResetAction, signOutUserAction } from "@/app/(app)/admin-actions";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { RevealForm } from "../developers/reveal-form";
+
+export const metadata: Metadata = { title: "Team" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -11,6 +12,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { CopyField } from "../connections/copy-field";
 import { RevealForm } from "../developers/reveal-form";
+
+export const metadata: Metadata = { title: "Single sign-on" };
 
 export const dynamic = "force-dynamic";
 

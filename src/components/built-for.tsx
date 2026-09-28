@@ -1,4 +1,4 @@
-import { Building2, HeartPulse, Stethoscope, Users } from "lucide-react";
+import { BuildingComplex, HeartPulse, Stethoscope, Users } from "lucide-react";
 
 /**
  * The band below the hero, where a SaaS landing page usually puts a customer
@@ -27,7 +27,7 @@ const SEGMENTS = [
     body: "Different fee schedules, authorization rules and denial patterns per specialty, in one ledger.",
   },
   {
-    icon: Building2,
+    icon: BuildingComplex,
     title: "Billing companies",
     body: "Many practices side by side, each needing its own reporting and its own reconciliation.",
   },

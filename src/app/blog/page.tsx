@@ -8,7 +8,7 @@ import { sortedPosts, formatPostDate } from "@/content/blog";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Blog — CollaboratMD",
+  title: "Blog",
   description:
     "Practical writing on medical billing and revenue cycle management: days in A/R, denial codes, clean claim rate, X12 remittances and eligibility.",
 };

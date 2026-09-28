@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { Receipt } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -8,6 +10,8 @@ import { pollBlocker, pollStatus } from "@/server/era-poll";
 import { eraGaps } from "@/server/transaction-enrollment";
 import { pollNowAction } from "@/app/(app)/era-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+
+export const metadata: Metadata = { title: "Remittance" };
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +35,7 @@ export default async function RemittancePage() {
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <p className="text-slate-600">
               Every morning, 835s that payers sent through Stedi are imported and posted here on their own, and claim acknowledgments (277CA) update their claims.{" "}
-              {poll?.lastPolledAt ? <>Last checked {fmtDateTime(poll.lastPolledAt)}; {poll.erasImported} posted so far.</> : "Not checked yet."}
+              {poll?.lastPolledAt ? <>Last checked {fmtDateTime(poll.lastPolledAt, s.timeZone)}; {poll.erasImported} posted so far.</> : "Not checked yet."}
               {poll?.lastError && <span className="block text-red-700">Last check failed: {poll.lastError}</span>}
             </p>
             <ActionForm action={pollNowAction}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="Checking Stedi...">Check now</SubmitButton></ActionForm>
@@ -40,22 +44,22 @@ export default async function RemittancePage() {
       </Card>
       <Card>
         {rows.length === 0 ? (
-          <Empty>No remittances yet. Fetch ERAs from the clearinghouse for accepted claims.</Empty>
+          <Empty icon={Receipt}>No remittances yet. Payments posted from the clearinghouse (ERAs) appear here.</Empty>
         ) : (
-          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table table-stack">
             <thead><tr><th>Received</th><th>Payer</th><th>Check / EFT</th><th>Payment date</th><th className="text-right">Amount</th><th>Posting</th><th>Summary</th></tr></thead>
             <tbody>
               {rows.map((r) => {
                 const sum = r.postingSummary as { matched?: number; unmatched?: string[]; paidCents?: number; patientRespCents?: number; adjustedCents?: number; denials?: number } | null;
                 return (
                   <tr key={r.id}>
-                    <td className="whitespace-nowrap">{fmtDateTime(r.receivedAt)}</td>
-                    <td>{r.payerName}</td>
-                    <td className="font-mono text-xs">{r.checkNumber}</td>
-                    <td>{fmtDate(r.paymentDate + "T00:00:00")}</td>
-                    <td className="text-right"><Money cents={r.amountCents} /></td>
-                    <td><Badge tone={r.posted ? "green" : "amber"}>{r.posted ? "auto-posted" : "pending"}</Badge></td>
-                    <td className="text-xs text-slate-600">
+                    <td data-label="Received" className="whitespace-nowrap">{fmtDateTime(r.receivedAt, s.timeZone)}</td>
+                    <td data-label="Payer">{r.payerName}</td>
+                    <td data-label="Check / EFT" className="font-mono text-xs">{r.checkNumber}</td>
+                    <td data-label="Payment date">{fmtDate(r.paymentDate + "T00:00:00")}</td>
+                    <td data-label="Amount" className="text-right"><Money cents={r.amountCents} /></td>
+                    <td data-label="Posting"><Badge tone={r.posted ? "green" : "amber"}>{r.posted ? "auto-posted" : "pending"}</Badge></td>
+                    <td data-label="Summary" className="text-xs text-slate-600">
                       {sum ? (
                         <>
                           {sum.matched} claims · adj <Money cents={sum.adjustedCents ?? 0} /> · patient <Money cents={sum.patientRespCents ?? 0} /> · {sum.denials ?? 0} denials

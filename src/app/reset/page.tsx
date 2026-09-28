@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { readResetToken } from "@/server/password-reset";
 import { LogoMark } from "@/components/logo";
 import { ResetForm } from "./reset-form";
+
+export const metadata: Metadata = { title: "Choose a new password" };
 
 export const dynamic = "force-dynamic";
 

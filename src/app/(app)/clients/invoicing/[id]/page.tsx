@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -6,6 +7,8 @@ import { getInvoice } from "@/server/client-billing";
 import { PrintButton } from "@/components/action-form";
 import { Badge, Money } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Client invoice" };
 
 export const dynamic = "force-dynamic";
 

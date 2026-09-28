@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { renewSession, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
-import { revokeAllSessions, revokeUserSessions, saveFinancing, saveProfile, savePayer, saveProvider, setHiddenNav, setProviderActive } from "@/server/admin";
+import { payerDefaults, revokeAllSessions, revokeUserSessions, saveFinancing, saveProfile, savePayer, saveProvider, setHiddenNav, setProviderActive } from "@/server/admin";
 import { adjustSmallBalances, savePolicies } from "@/server/policies";
 import { requestReset } from "@/server/password-reset";
 import { listTeam } from "@/server/team";
@@ -23,7 +23,8 @@ const centsOrNull = (v: string) => (v === "" ? null : Math.round(Number(v.replac
 export async function saveProfileAction(_prev: FormResult, fd: FormData): Promise<FormResult> {
   const s = await admin();
   try {
-    await saveProfile(await getDb(), s.practiceId, { name: f(fd, "name"), npi: f(fd, "npi"), taxId: f(fd, "taxId"), address1: f(fd, "address1"), city: f(fd, "city"), state: f(fd, "state"), zip: f(fd, "zip"), phone: f(fd, "phone"), timeZone: f(fd, "timeZone") || undefined }, s.userId);
+    await saveProfile(await getDb(), s.practiceId, { name: f(fd, "name"), npi: f(fd, "npi"), taxId: f(fd, "taxId"), address1: f(fd, "address1"), city: f(fd, "city"), state: f(fd, "state"), zip: f(fd, "zip"), phone: f(fd, "phone"), timeZone: f(fd, "timeZone") || undefined,
+      billingEntity: f(fd, "billingEntity") === "individual" ? "individual" : "organization", billingFirstName: f(fd, "billingFirstName"), billingLastName: f(fd, "billingLastName"), cliaNumber: f(fd, "cliaNumber") }, s.userId);
     revalidatePath("/settings", "layout");
     return { ok: true, message: "Saved. Claims sent from now on carry these details." };
   } catch (e) {
@@ -56,7 +57,7 @@ export async function providerActiveAction(id: string, active: boolean, _prev: F
 export async function savePayerAction(id: string | null, _prev: FormResult, fd: FormData): Promise<FormResult> {
   const s = await admin();
   try {
-    await savePayer(await getDb(), s.practiceId, id, { name: f(fd, "name"), payerId: f(fd, "payerId"), type: f(fd, "type"), timelyFilingDays: Number(f(fd, "timelyFilingDays")), appealDays: Number(f(fd, "appealDays")) }, s.userId);
+    await savePayer(await getDb(), s.practiceId, id, { name: f(fd, "name"), payerId: f(fd, "payerId"), type: f(fd, "type"), timelyFilingDays: Number(f(fd, "timelyFilingDays") || payerDefaults(f(fd, "type")).timelyFilingDays), appealDays: Number(f(fd, "appealDays") || payerDefaults(f(fd, "type")).appealDays) }, s.userId);
     revalidatePath("/settings/payers");
     return { ok: true, message: id ? "Payer updated" : "Payer added" };
   } catch (e) {

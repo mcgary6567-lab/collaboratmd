@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -10,6 +11,8 @@ import { stripeReady } from "@/lib/stripe";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Patient billing" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  ArrowRight, BadgeCheck, Brain, CalendarDays, CreditCard, EyeOff, FileSearch, Gauge, KeyRound, Landmark, LineChart, Lock,
-  Radar, ReceiptText, ScanLine, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Wand2, Zap,
+  ArrowRight, BadgeCheck, Brain, CalendarDays, CreditCard, EyeOff, FileSearch, Gauge, KeyRound, Landmark, ChartLine, Lock,
+  Radar, ReceiptText, ScanLine, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, WandSparkles, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -17,7 +17,7 @@ import { DenialCalculator } from "@/components/landing/denial-calculator";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "CollaboratMD — Medical billing and revenue cycle management",
+  title: { absolute: "CollaboratMD: medical billing and revenue cycle management" },
   description:
     "Get paid faster with fewer denials. Eligibility, coding help, NCCI-checked claims with denial risk scores, 837P/I/D and 835, appeals, missed-charge and underpayment recovery, cash forecasting, a patient payment portal, SSO and analytics in one platform.",
 };
@@ -151,12 +151,12 @@ const SMART = [
     body: "A letter for the denial reason, filled with the claim, patient and practice details. With AI on, the argument is written from codes only and patient details are added afterwards on our side.",
   },
   {
-    icon: Wand2,
+    icon: WandSparkles,
     title: "Coding help at charge entry",
     body: "Visit level by the AMA time and medical decision making rules, and a diagnosis finder that understands everyday words. AI coding of full visit notes stays off until the practice has a BAA with the AI provider.",
   },
   {
-    icon: LineChart,
+    icon: ChartLine,
     title: "A cash forecast from your own history",
     body: "Every claim in flight is projected from how that payer has actually paid you: how often, how much and how fast, adjusted for the claim's age. Scheduled visits and patient payments are added, and the method is on the page.",
   },
@@ -251,7 +251,7 @@ export default async function LandingPage() {
               match deposits, recover what was missed or underpaid, forecast cash and let patients pay from their phone.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/login" className="btn bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
+              <Link href="/demo" className="btn bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
                 Explore the live demo <ArrowRight className="h-4 w-4" />
               </Link>
               <a href="#calculator" className="btn btn-secondary px-6 py-3 text-base">
@@ -452,7 +452,7 @@ export default async function LandingPage() {
               A dashboard that reports 51 days in A/R without saying whether that is good is just trivia. Every headline
               metric is shown against the industry target and colored accordingly. With email connected, a summary arrives every Monday.
             </p>
-            <Link href="/login" className="btn mt-8 bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
+            <Link href="/demo" className="btn mt-8 bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
               See it on a full-size demo practice <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -537,7 +537,7 @@ export default async function LandingPage() {
               scrubbed, submitted, adjudicated by a simulated payer, denied and appealed, with bank deposits and collection accounts to work through.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/login" className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-green-700 transition-colors hover:bg-green-50">
+              <Link href="/demo" className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-green-700 transition-colors hover:bg-green-50">
                 Open the demo <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href="/signup" className="inline-flex items-center gap-2 rounded-lg border border-white/40 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white/10">

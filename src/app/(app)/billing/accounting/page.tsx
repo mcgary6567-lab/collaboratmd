@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { accountNamesAction, closePeriodAction, reopenPeriodAction } from "@/app
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Accounting" };
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +75,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
             <div className="mt-4 border-t border-slate-200 pt-4">
               {isClosed ? (
                 <div className="flex flex-wrap items-center gap-3 text-sm">
-                  <span>Closed {fmtDateTime(isClosed.closedAt)}.</span>
+                  <span>Closed {fmtDateTime(isClosed.closedAt, s.timeZone)}.</span>
                   {isClosed.changes.length > 0 && <Badge tone="amber">changed since close</Badge>}
                   <ActionForm action={closePeriodAction.bind(null, period)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Close again with today&apos;s figures</SubmitButton></ActionForm>
                   {s.role === "admin" && <ActionForm action={reopenPeriodAction.bind(null, period)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Reopen</SubmitButton></ActionForm>}

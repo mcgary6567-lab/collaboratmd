@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { addInsuranceAction, readCardAction, type CardState } from "@/app/(app)/front-desk-actions";
+import { SubscriberFields } from "@/components/subscriber-fields";
 
 /**
  * Adds a policy by hand, or from a photo of the card when card reading is on.
@@ -50,13 +51,9 @@ export function InsuranceTools({ patientId, payers, cardReading }: { patientId: 
         <div className="grid grid-cols-2 gap-2">
           <label className="block text-xs">Member ID<input name="memberId" defaultValue={f?.memberId ?? ""} className="input mt-1" required /></label>
           <label className="block text-xs">Group<input name="groupNumber" defaultValue={f?.groupNumber ?? ""} className="input mt-1" /></label>
-          <label className="block text-xs">Relationship
-            <select name="relationship" defaultValue="self" className="input mt-1">
-              <option value="self">Self</option><option value="spouse">Spouse</option><option value="child">Child</option><option value="other">Other</option>
-            </select>
-          </label>
           <label className="block text-xs">Copay<input name="copay" inputMode="decimal" placeholder="0.00" className="input mt-1" /></label>
         </div>
+        <div className="grid gap-2 text-xs sm:grid-cols-2"><SubscriberFields className="sm:col-span-2" /></div>
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="makePrimary" /> Make this the primary insurance</label>
         <SubmitButton className="btn btn-primary text-xs" pendingLabel="Saving...">Save insurance</SubmitButton>
       </ActionForm>

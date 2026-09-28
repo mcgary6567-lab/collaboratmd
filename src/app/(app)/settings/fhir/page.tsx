@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -9,6 +10,8 @@ import { CopyButton } from "@/components/copy-button";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "EHR connection (FHIR)" };
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +77,7 @@ export default async function FhirPage() {
           </ul>
           {conn?.lastSyncAt && (
             <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-semibold">Last sync {fmtDateTime(conn.lastSyncAt)}</p>
+              <p className="font-semibold">Last sync {fmtDateTime(conn.lastSyncAt, s.timeZone)}</p>
               <p>{last?.patientsCreated ?? 0} new patients, {last?.patientsUpdated ?? 0} updated, {last?.visits ?? 0} visits{last?.skippedCount ? `, ${last.skippedCount} skipped` : ""}</p>
               {last?.skipped?.slice(0, 5).map((x) => <p key={x} className="font-mono text-[11px]">{x}</p>)}
             </div>

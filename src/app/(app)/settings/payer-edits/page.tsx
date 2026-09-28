@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -9,6 +10,8 @@ import { EDIT_KINDS } from "@/lib/scrub/payer-edits";
 import { createPayerEditAction, setPayerEditActiveAction } from "@/app/(app)/claim-control-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Payer edits" };
 
 export const dynamic = "force-dynamic";
 

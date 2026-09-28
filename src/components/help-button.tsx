@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, X } from "lucide-react";
+import { CircleQuestionMark, X } from "lucide-react";
 import { guideFor } from "@/content/help";
 import { submitFeedbackAction } from "@/app/(app)/feedback-actions";
 
@@ -69,7 +69,7 @@ export function HelpButton() {
         </div>
       )}
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Help for this page" className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-700 shadow-lg ring-1 ring-slate-200 hover:text-brand-700">
-        <CircleHelp className="h-5 w-5" />
+        <CircleQuestionMark className="h-5 w-5" />
       </button>
     </div>
   );

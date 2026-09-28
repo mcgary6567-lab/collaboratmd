@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { isNull, sql } from "drizzle-orm";
@@ -15,6 +16,8 @@ import { ActionForm, SubmitButton, type FormResult } from "@/components/action-f
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime, money } from "@/lib/utils";
 
+export const metadata: Metadata = { title: "Practices" };
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
@@ -30,7 +33,7 @@ async function extendAction(practiceId: string, _prev: FormResult, fd: FormData)
     const s = await operator();
     const until = await extendTrial(await getDb(), practiceId, Number(fd.get("days") ?? 14), s.email);
     revalidatePath("/ops/practices");
-    return { ok: true, message: `Trial now ends ${until.toUTCString().slice(0, 16)}` };
+    return { ok: true, message: `Trial now ends ${fmtDate(until, s.timeZone)}` };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not extend" };
   }
@@ -95,7 +98,7 @@ export default async function OperatorPracticesPage() {
                   <td className="text-right">{r.providers}</td>
                   <td className="text-right">{r.users}</td>
                   <td className="text-right">{r.claims30.toLocaleString()}</td>
-                  <td className="text-xs">{r.lastLogin ? fmtDateTime(r.lastLogin) : "never"}</td>
+                  <td className="text-xs">{r.lastLogin ? fmtDateTime(r.lastLogin, s.timeZone) : "never"}</td>
                   <td className="text-xs text-slate-600">{(usage.top.get(r.id) ?? []).map((u) => `${u.feature} (${u.views})`).join(", ") || "-"}</td>
                   <td className="text-right">{r.monthlyCents !== null ? money(r.monthlyCents) : "-"}</td>
                   <td>{r.selfServe && <ActionForm action={extendAction.bind(null, r.id)} className="flex items-center gap-1"><input name="days" type="number" min={1} max={60} defaultValue={14} className="input w-16 py-1 text-xs" aria-label="Days to add" /><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Extend trial</SubmitButton></ActionForm>}</td>

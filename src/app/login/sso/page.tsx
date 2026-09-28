@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/components/logo";
+
+export const metadata: Metadata = { title: "Sign in with single sign-on" };
 
 export const dynamic = "force-dynamic";
 

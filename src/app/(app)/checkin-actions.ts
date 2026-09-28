@@ -24,7 +24,7 @@ export async function createCheckinLinkAction(appointmentId: string, _prev: Link
       const [appt] = await db.select({ startsAt: schema.appointments.startsAt }).from(schema.appointments).where(eq(schema.appointments.id, appointmentId)).limit(1);
       sent = await sendCheckinLink(created.patient.email, {
         firstName: created.patient.firstName, practiceName: practice.name, url,
-        when: appt.startsAt.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }),
+        when: appt.startsAt.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }),
       });
     }
     revalidatePath("/scheduling");

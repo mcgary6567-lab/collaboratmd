@@ -1,5 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, CircleAlert, CircleX } from "lucide-react";
+import { CircleCheck, CircleAlert, CircleX } from "lucide-react";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { auditActions, auditEvents, BAA_STATUSES, evaluateControls, lastAccessReview, listVendors, practiceUsers, type Control } from "@/server/compliance";
@@ -8,9 +9,11 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 
+export const metadata: Metadata = { title: "Compliance" };
+
 export const dynamic = "force-dynamic";
 
-const ICON = { pass: CheckCircle2, warn: CircleAlert, fail: CircleX };
+const ICON = { pass: CircleCheck, warn: CircleAlert, fail: CircleX };
 const TONE = { pass: "text-green-700", warn: "text-amber-500", fail: "text-red-600" };
 const BAA_LABEL: Record<string, string> = { signed: "BAA signed", pending: "BAA requested", not_needed: "No BAA needed", not_recorded: "Not recorded" };
 
@@ -70,7 +73,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
       </div>
 
       <div className="mt-6">
-        <Card title={`Access review · ${people.length} people with access`} actions={review ? <Badge tone="slate">Last review {fmtDateTime(review.createdAt)}</Badge> : <Badge tone="red">Never reviewed</Badge>}>
+        <Card title={`Access review · ${people.length} people with access`} actions={review ? <Badge tone="slate">Last review {fmtDateTime(review.createdAt, s.timeZone)}</Badge> : <Badge tone="red">Never reviewed</Badge>}>
           <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
             <table className="table text-sm">
               <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Two-factor</th><th>Last sign-in</th><th>Status</th></tr></thead>
@@ -85,7 +88,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
                       <td className="text-xs">{u.email}</td>
                       <td className="capitalize">{u.role.replace("_", " ")}</td>
                       <td>{u.mfaEnabledAt ? <Badge tone="green">on</Badge> : <Badge tone="red">off</Badge>}</td>
-                      <td className="text-xs">{u.lastLogin ? fmtDateTime(u.lastLogin) : "never"}</td>
+                      <td className="text-xs">{u.lastLogin ? fmtDateTime(u.lastLogin, s.timeZone) : "never"}</td>
                       <td>{u.lockedUntil && u.lockedUntil > new Date() ? <Badge tone="red">locked</Badge> : dormant ? <Badge tone="amber">dormant</Badge> : <Badge tone="green">active</Badge>}</td>
                     </tr>
                   );
@@ -150,7 +153,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
               <tbody>
                 {events.map(({ event: e, userName }) => (
                   <tr key={e.id}>
-                    <td className="whitespace-nowrap">{fmtDateTime(e.at)}</td>
+                    <td className="whitespace-nowrap">{fmtDateTime(e.at, s.timeZone)}</td>
                     <td>{userName ?? "System or patient"}</td>
                     <td className="font-mono">{e.action}</td>
                     <td>{e.entity}{e.entityId ? ` ${e.entityId.slice(0, 8)}` : ""}</td>

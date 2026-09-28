@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -17,6 +18,9 @@ import { confirmBookingAction, declineBookingAction } from "@/app/(app)/booking-
 import { offerSlotAction, removeFromWaitlistAction } from "@/app/(app)/waitlist-actions";
 import { listWaitlist, offersFor, windowLabel } from "@/server/waitlist";
 import { undeliveredReminders } from "@/server/sms-delivery";
+import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Schedule" };
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +90,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
             {requests.map(({ request: r, providerFirst, providerLast }) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <div>
-                  <div className="font-medium">{r.lastName}, {r.firstName} <span className="font-normal text-slate-500">· born {r.dob}</span></div>
+                  <div className="font-medium">{r.lastName}, {r.firstName} <span className="font-normal text-slate-500">· born {fmtDate(r.dob)}</span></div>
                   <div className="text-slate-600">
                     {r.kind === "waitlist" || !r.startsAt
                       ? <>Wants to join the waitlist: {providerLast ? `Dr. ${providerFirst} ${providerLast}` : "any provider"}, {windowLabel(r.fromHour, r.untilHour)}{r.smsConsent ? "" : " (no texting consent: call when a time opens)"}</>
@@ -127,7 +131,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
               <tbody>
                 {appts.map(({ appt, patient, provider }) => (
                   <tr key={appt.id}>
-                    <td className="whitespace-nowrap font-medium">{appt.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</td>
+                    <td className="whitespace-nowrap font-medium">{appt.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}</td>
                     <td><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
                     <td>Dr. {provider.lastName}</td>
                     <td>{appt.type.replace(/_/g, " ")}</td>

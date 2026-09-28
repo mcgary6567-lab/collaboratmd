@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { BASELINE_DAYS, MIN_CLAIMS, payerAlerts, RECENT_DAYS, type PayerAlert } from "@/server/payer-alerts";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Payer alerts" };
 
 export const dynamic = "force-dynamic";
 

@@ -7,7 +7,7 @@ import { TIERS } from "@/content/pricing";
 import { SELF_SERVE_PLANS, trialDays } from "@/server/signup";
 import { SignupForm } from "./signup-form";
 
-export const metadata: Metadata = { title: "Start a free trial | CollaboratMD" };
+export const metadata: Metadata = { title: "Start a free trial" };
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
   if (await getSession()) redirect("/dashboard");

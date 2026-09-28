@@ -6,7 +6,7 @@ import { UnsubscribeForm } from "./unsubscribe-form";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Unsubscribe — CollaboratMD",
+  title: "Unsubscribe",
   description: "Remove your email address from CollaboratMD mailings.",
   robots: { index: false, follow: false },
 };

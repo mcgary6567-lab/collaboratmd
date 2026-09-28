@@ -68,6 +68,26 @@ Lists (patients, claims, the schedule) still show the name so the account can be
 
 **Chart access review** (Settings → Chart access review, and a notification each morning): each person's charts opened in the last 24 hours against their usual, flagged at 40 or more charts in a day, at least 15 and over three times their usual, or 10 or more patients with no appointment within 30 days, no claim or payment in six months, and not new. Administrators set the limits on the same page to what is normal for their staff (the change is audited), and record what they found for each flag ("Record the review"); reviews stay in the audit log and the last 90 days are listed there. A flag is a prompt to ask, not a finding. It is not the accounting of disclosures a patient can request, which covers disclosures outside the practice and excludes treatment, payment and operations; keep that record separately.
 
+## The demo practice
+
+Lakeside Family Medicine is seeded with fictional patients and published sign-ins (they are in the seed and the public repository), and is marked as the demo (`practices.is_demo`). Visitors try it from **/demo** in one click, as a biller, the front desk or an administrator; the sign-in page never shows or pre-fills demo passwords. The public investors page reads figures only from the demo practice, never a customer's.
+
+On the production deployment (`VERCEL_ENV=production`) the demo is **closed** unless the Vercel environment variable `DEMO_LOGINS=on` is set: the demo accounts cannot sign in at all, so their published passwords open nothing, and /demo offers a walkthrough and the free trial instead. Everywhere else (local, CI, preview deployments) it is open unless `DEMO_LOGINS=off`. A demo account is never a platform operator on production, whatever `PLATFORM_ADMIN_EMAILS` says. Better still, run the demo as its own Vercel project with its own database, and keep the production site for customers only.
+
+## Claims for dependents and Medicare
+
+When the patient is not the insured person (a child on a parent's plan, a spouse), the insurance records the insured person's name, date of birth, sex and, if different, address. Claims (837P, 837I, 837D) then send the insured person as the subscriber and the patient in loop 2000C, and eligibility checks (270) ask under the insured person with the patient as the dependent. The scrubber stops a dependent's claim that lacks the insured person. Professional claims carry the right filing indicator (SBR09: MB for Medicare Part B, MC for Medicaid, CI otherwise), and a traditional Medicare member ID must be an MBI (11 characters, like 1EG4-TE5-MK73). Self-pay patients can be registered without insurance.
+
+**Solo providers, labs and referrals.** Settings → Practice profile says who bills: the practice (Type 2 group NPI, the default) or a solo provider under their own Type 1 NPI, whose name then goes in the billing provider loop (NM1\*85\*1). The CLIA number there is sent (2300 REF\*X4) on claims with a lab code (CPT 80000–89999); the scrubber stops a Medicare lab claim without a valid one and warns for other payers. Charge entry takes an optional referring provider (name and NPI, checked), sent in loop 2310A (NM1\*DN). Modifier GZ on a Medicare claim gets a warning (no ABN on file). Places of service come from the full CMS list; locations can only use codes on it. A Medicare payer defaults to 365 days to file and 120 to appeal, and more than 365 days is refused.
+
+## Times and formats
+
+Times are shown on the practice's clock with its zone ("Sep 28, 2026, 9:05 AM EDT"): the session carries the practice's time zone, and `fmtDateTime(date, s.timeZone)` formats with it. Appointment times are stored as clock times, so they go through `fmtClock` (no zone conversion). Calendar dates (date of service, birth) go through `fmtDate`, which never shifts them a day. Money is always `money()`. Phone numbers are stored as (407) 555-0100 and ZIP codes as 32801 or 32801-1234.
+
+## Setup checklist
+
+`/setup` is the one checklist: the go-live phases (practice, connections, first claims, what to confirm yourself) and then the rest of a full setup (fees, team, patients, EHR, payments, texts). The dashboard shows the steps still to do to administrators, with a link to it. `/settings/go-live` redirects there.
+
 ## Two-factor sign-in
 
 Settings → Sign-in security has two rules: two-factor for everyone, and two-factor for administrators and anyone whose role can export (billers and read-only by default; a custom role without exports is left out). New self-serve practices start with the second on; existing practices choose. Someone the rule covers is asked to set it up before they can use the app, and the export routes refuse them until they do. People who sign in with single sign-on are not asked here: their identity provider is where their second factor belongs. The demo practice has both rules off, so the demo can be tried without a phone.

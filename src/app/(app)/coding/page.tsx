@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -6,6 +7,8 @@ import { noteCodingEnabled } from "@/lib/ai/code-note";
 import { practiceConfig } from "@/server/integrations";
 import { Card, PageHeader } from "@/components/ui";
 import { DiagnosisFinder, EmCalculator, NoteCoder } from "./tools";
+
+export const metadata: Metadata = { title: "Coding assistant" };
 
 export const dynamic = "force-dynamic";
 

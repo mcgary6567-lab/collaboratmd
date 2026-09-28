@@ -1,10 +1,16 @@
+import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { saveProfileAction } from "@/app/(app)/admin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
-import { US_TIME_ZONES } from "@/server/practice-time";
+import { timeZoneName, US_TIME_ZONES } from "@/server/practice-time";
+import { PhoneInput, StateSelect, ZipInput } from "@/components/us-fields";
+import { fmtPhone } from "@/lib/us";
+import { BillingEntityFields } from "./billing-entity";
+
+export const metadata: Metadata = { title: "Practice profile" };
 
 export const dynamic = "force-dynamic";
 
@@ -25,19 +31,34 @@ export default async function ProfilePage() {
         <ActionForm action={saveProfileAction} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             {field("name", "Legal name, as enrolled with payers", { className: "md:col-span-2" })}
-            {field("npi", "Group NPI (Type 2)", { maxLength: 10, inputMode: "numeric", placeholder: "10 digits" })}
+            <BillingEntityFields entity={p.billingEntity} firstName={p.billingFirstName} lastName={p.billingLastName} disabled={!admin} />
+            {field("npi", p.billingEntity === "individual" ? "Billing NPI" : "Group NPI (Type 2)", { maxLength: 10, inputMode: "numeric", placeholder: "10 digits" })}
             {field("taxId", "Tax ID (EIN)", { placeholder: "12-3456789", maxLength: 10 })}
             {field("address1", "Street address (not a PO box)", { className: "md:col-span-2" })}
             {field("city", "City")}
             <div className="grid grid-cols-2 gap-4">
-              {field("state", "State", { maxLength: 2, placeholder: "TX" })}
-              {field("zip", "ZIP", { maxLength: 10, placeholder: "75201 or 75201-1234" })}
+              <label className="block text-sm">
+                <span className="label">State</span>
+                <StateSelect defaultValue={p.state} required disabled={!admin} className="input" />
+              </label>
+              <label className="block text-sm">
+                <span className="label">ZIP</span>
+                <ZipInput defaultValue={p.zip} required disabled={!admin} />
+              </label>
             </div>
-            {field("phone", "Billing phone")}
+            <label className="block text-sm">
+              <span className="label">Billing phone</span>
+              <PhoneInput defaultValue={fmtPhone(p.phone)} disabled={!admin} />
+            </label>
+            <label className="block text-sm">
+              <span className="label">CLIA number</span>
+              <input name="cliaNumber" defaultValue={p.cliaNumber ?? ""} className="input" placeholder="10D1234567" maxLength={10} pattern="\d{2}[Dd]\d{7}" title="Two digits, the letter D, then seven digits" disabled={!admin} />
+              <span className="mt-1 block text-xs text-slate-500">Only if you bill lab tests (CPT 80000-89999). Sent with those claims; Medicare rejects them without it.</span>
+            </label>
             <label className="block text-sm">
               <span className="label">Time zone</span>
               <select name="timeZone" defaultValue={p.timeZone} className="input" disabled={!admin}>
-                {[...new Set([p.timeZone, ...US_TIME_ZONES])].map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+                {[...new Set([p.timeZone, ...US_TIME_ZONES])].map((z) => <option key={z} value={z}>{timeZoneName(z)}</option>)}
               </select>
               <span className="mt-1 block text-xs text-slate-500">Decides which day is today on the schedule, when reminders go out for tomorrow, and online booking times.</span>
             </label>

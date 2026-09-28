@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -6,6 +7,8 @@ import { importCodeSetAction } from "@/app/(app)/code-set-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader, Stat } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Code sets" };
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +65,7 @@ export default async function CodeSetsPage() {
               </p>
             </>
           ) : (
-            <p className="text-sm text-slate-600">National code sets are shared by every practice and loaded by the platform operator (the emails in PLATFORM_ADMIN_EMAILS).</p>
+            <p className="text-sm text-slate-600">National code sets are shared by every practice and kept current by CollaboratMD each quarter.</p>
           )}
         </Card>
       </div>
@@ -72,7 +75,7 @@ export default async function CodeSetsPage() {
           {status.loads.length === 0 ? <p className="text-sm text-slate-500">Nothing loaded yet.</p> : (
             <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table text-sm">
               <thead><tr><th>When</th><th>Code set</th><th>Label</th><th className="text-right">Rows</th><th>By</th></tr></thead>
-              <tbody>{status.loads.map((l) => <tr key={l.id}><td className="text-xs">{fmtDateTime(l.createdAt)}</td><td>{LABEL[l.codeSet] ?? l.codeSet}</td><td>{l.label}</td><td className="text-right tabular-nums">{l.rows.toLocaleString("en-US")}</td><td className="text-xs">{l.loadedBy}</td></tr>)}</tbody>
+              <tbody>{status.loads.map((l) => <tr key={l.id}><td className="text-xs">{fmtDateTime(l.createdAt, s.timeZone)}</td><td>{LABEL[l.codeSet] ?? l.codeSet}</td><td>{l.label}</td><td className="text-right tabular-nums">{l.rows.toLocaleString("en-US")}</td><td className="text-xs">{l.loadedBy}</td></tr>)}</tbody>
             </table></div>
           )}
         </Card>

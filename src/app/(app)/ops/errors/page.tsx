@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
@@ -6,6 +7,8 @@ import { isPlatformOperator } from "@/server/code-sets";
 import { listErrors, resolveError } from "@/server/errors";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Server errors" };
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +41,8 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
                   <td className="max-w-md"><p className="break-words font-mono text-xs">{e.message}</p>{e.digest && <p className="text-[11px] text-slate-500">digest {e.digest}</p>}{e.lastRequestId && <p className="text-[11px] text-slate-500">last request {e.lastRequestId}</p>}</td>
                   <td className="text-xs"><span className="font-mono">{e.method} {e.path}</span><span className="block text-slate-500">{e.routePath} · {e.routeType}</span></td>
                   <td className="text-right font-semibold">{e.count}</td>
-                  <td className="text-xs">{fmtDateTime(e.firstSeen)}</td>
-                  <td className="text-xs">{fmtDateTime(e.lastSeen)}</td>
+                  <td className="text-xs">{fmtDateTime(e.firstSeen, s.timeZone)}</td>
+                  <td className="text-xs">{fmtDateTime(e.lastSeen, s.timeZone)}</td>
                   <td className="text-right">{e.resolvedAt ? <Badge tone="green">resolved</Badge> : <form action={resolveAction.bind(null, e.fingerprint)}><button className="btn btn-secondary px-2 py-1 text-xs">Resolve</button></form>}</td>
                 </tr>
               ))}

@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { LoginForm } from "./login-form";
 import { LogoMark } from "@/components/logo";
+import { demoOpen } from "@/lib/demo";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ created?: string }> }) {
   if (await getSession()) redirect("/dashboard");
@@ -20,12 +24,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <LoginForm />
           <p className="mt-4 flex justify-center gap-4 text-sm"><Link href="/login/forgot" className="text-brand-700 hover:underline">Forgot password?</Link><Link href="/login/sso" className="font-semibold text-brand-700 hover:underline">Sign in with SSO</Link></p>
           <p className="mt-2 text-center text-sm text-slate-600">New practice? <Link href="/signup" className="font-semibold text-brand-700 hover:underline">Start a free trial</Link></p>
-          <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-            <div className="mb-1 font-semibold">Demo accounts</div>
-            <div>admin@collaboratmd.local / admin123</div>
-            <div>biller@collaboratmd.local / biller123</div>
-            <div>frontdesk@collaboratmd.local / front123</div>
-          </div>
+          {demoOpen() && (
+            <p className="mt-5 rounded-lg bg-slate-50 p-3 text-center text-sm text-slate-600">
+              Just looking? <Link href="/demo" className="font-semibold text-brand-700 hover:underline">Try the demo practice</Link>, no account needed.
+            </p>
+          )}
         </div>
       </div>
     </main>

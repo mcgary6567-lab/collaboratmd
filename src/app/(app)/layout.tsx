@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 import { accessiblePractices, requireSession } from "@/lib/auth";
 import { getDb, schema } from "@/db";
@@ -34,9 +35,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Self-serve practices see their trial ending, and why claims stopped after it.
   const account = practice ? standing(practice) : null;
   const notice = practice?.closingAt
-    ? `This practice is scheduled to close on ${practice.closingAt.toUTCString().slice(0, 16)}; all its data will then be deleted.`
+    ? `This practice is scheduled to close on ${fmtDate(practice.closingAt, session.timeZone)}; all its data will then be deleted.`
     : account?.blocked ? account.reason
-    : account?.graceUntil ? `A payment failed. Claims keep going out until ${account.graceUntil.toUTCString().slice(0, 16)}; update the payment method before then.`
+    : account?.graceUntil ? `A payment failed. Claims keep going out until ${fmtDate(account.graceUntil, session.timeZone)}; update the payment method before then.`
     : account?.trialDaysLeft !== null && account?.trialDaysLeft !== undefined && account.trialDaysLeft <= 7 ? `Your free trial ends in ${account.trialDaysLeft} day${account.trialDaysLeft === 1 ? "" : "s"}.` : null;
   return (
     <div className="app-shell flex min-h-screen">

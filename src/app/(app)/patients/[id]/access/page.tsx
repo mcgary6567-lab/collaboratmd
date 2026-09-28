@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -7,6 +8,8 @@ import { patientAccessLog } from "@/server/access-log";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { PrintButton } from "@/components/action-form";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Chart access" };
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +39,7 @@ export default async function PatientAccessPage({ params }: { params: Promise<{ 
               <thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead>
               <tbody>
                 {log.entries.map((e, i) => (
-                  <tr key={i}><td className="whitespace-nowrap">{fmtDateTime(e.at)}</td><td>{e.who}</td><td>{e.what}</td></tr>
+                  <tr key={i}><td className="whitespace-nowrap">{fmtDateTime(e.at, s.timeZone)}</td><td>{e.who}</td><td>{e.what}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -48,7 +51,7 @@ export default async function PatientAccessPage({ params }: { params: Promise<{ 
         <p className="mb-3 text-xs text-slate-500">A full export contains every patient, this one included.</p>
         {log.exports.length === 0 ? <Empty>None.</Empty> : (
           <ul className="space-y-1 text-sm">
-            {log.exports.map((x, i) => <li key={i}>{fmtDateTime(x.at)} · {x.name ?? "Unknown"}{x.email ? ` <${x.email}>` : ""} · {x.action === "export" ? "prepared an export" : "downloaded an export"}</li>)}
+            {log.exports.map((x, i) => <li key={i}>{fmtDateTime(x.at, s.timeZone)} · {x.name ?? "Unknown"}{x.email ? ` <${x.email}>` : ""} · {x.action === "export" ? "prepared an export" : "downloaded an export"}</li>)}
           </ul>
         )}
       </Card>

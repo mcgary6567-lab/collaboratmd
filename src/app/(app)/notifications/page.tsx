@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -7,6 +8,8 @@ import { digestAction, markAllReadAction, markOneReadAction } from "@/app/(app)/
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Notifications" };
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +42,7 @@ export default async function NotificationsPage() {
                 <div className="min-w-0">
                   <p className={`text-sm ${n.readAt ? "text-slate-700" : "font-semibold text-slate-900"}`}>{!n.readAt && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-brand-600" />}{n.href ? <Link href={n.href} className="hover:underline">{n.title}</Link> : n.title}</p>
                   {n.body && <p className="mt-0.5 text-sm text-slate-600">{n.body}</p>}
-                  <p className="mt-0.5 text-xs text-slate-500">{fmtDateTime(n.createdAt)}{n.userId ? "" : " · to administrators"}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{fmtDateTime(n.createdAt, s.timeZone)}{n.userId ? "" : " · to administrators"}</p>
                 </div>
                 {!n.readAt && <form action={markOneReadAction.bind(null, n.id)}><button className="text-xs font-semibold text-brand-700 hover:underline">Mark read</button></form>}
               </li>

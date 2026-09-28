@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { Users } from "lucide-react";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +9,9 @@ import { Card, PageHeader, PatientLink, Empty } from "@/components/ui";
 import { Pager, SortHeader, pageArgs, type Params } from "@/components/data-table";
 import { SavedViews } from "@/components/list-tools";
 import { fmtDate } from "@/lib/utils";
+import { fmtPhone } from "@/lib/us";
+
+export const metadata: Metadata = { title: "Patients" };
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +51,10 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
         </form>
         <div className="mb-3"><SavedViews page="patients" query={query} views={views} /></div>
         {rows.length === 0 ? (
-          <Empty>No patients match.</Empty>
+          <Empty icon={Users} action={<Link href="/patients/new" className="btn btn-primary">Add a patient</Link>}>No patients match. Check the spelling, or search by date of birth or MRN.</Empty>
         ) : (
           <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
-            <table className="table">
+            <table className="table table-stack">
               <thead>
                 <tr>
                   <SortHeader label="Patient" field="name" base="/patients" params={params} />
@@ -64,13 +69,13 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
               <tbody>
                 {rows.map((p) => (
                   <tr key={p.id}>
-                    <td><PatientLink id={p.id} first={p.firstName} last={p.lastName} /></td>
-                    <td className="font-mono text-xs">{p.mrn}</td>
-                    <td className="whitespace-nowrap">{fmtDate(p.dob + "T00:00:00")}</td>
-                    <td>{p.sex}</td>
-                    <td className="whitespace-nowrap">{p.phone}</td>
-                    <td>{p.city}{p.state ? `, ${p.state}` : ""}</td>
-                    <td className="whitespace-nowrap text-xs text-slate-500">{fmtDate(p.createdAt)}</td>
+                    <td data-label="Patient"><PatientLink id={p.id} first={p.firstName} last={p.lastName} /></td>
+                    <td data-label="MRN" className="font-mono text-xs">{p.mrn}</td>
+                    <td data-label="DOB" className="whitespace-nowrap">{fmtDate(p.dob + "T00:00:00")}</td>
+                    <td data-label="Sex">{p.sex}</td>
+                    <td data-label="Phone" className="whitespace-nowrap">{fmtPhone(p.phone)}</td>
+                    <td data-label="City">{p.city}{p.state ? `, ${p.state}` : ""}</td>
+                    <td data-label="Added" className="whitespace-nowrap text-xs text-slate-500">{fmtDate(p.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>

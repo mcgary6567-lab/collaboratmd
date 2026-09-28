@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
@@ -8,6 +9,8 @@ import { discoverCoverageAction } from "@/app/(app)/front-desk-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Coverage discovery" };
 
 export const dynamic = "force-dynamic";
 

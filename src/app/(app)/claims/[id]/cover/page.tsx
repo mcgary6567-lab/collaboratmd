@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -5,7 +6,9 @@ import { requireSession } from "@/lib/auth";
 import { loadClaimBundle } from "@/server/claims";
 import { listAttachments, REPORT_TYPES } from "@/server/attachments";
 import { PrintButton } from "@/components/action-form";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Claim cover sheet" };
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +38,7 @@ export default async function CoverSheetPage({ params }: { params: Promise<{ id:
           <dt className="text-slate-500">Date of service</dt><dd>{fmtDate(`${b.encounter.dateOfService}T00:00:00`)}</dd>
           <dt className="text-slate-500">Our claim number</dt><dd className="font-mono">{b.claim.controlNumber}</dd>
           {b.claim.payerClaimNumber && <><dt className="text-slate-500">Your claim number</dt><dd className="font-mono">{b.claim.payerClaimNumber}</dd></>}
-          <dt className="text-slate-500">Billed</dt><dd>${(b.claim.totalCents / 100).toFixed(2)}</dd>
+          <dt className="text-slate-500">Billed</dt><dd>{money(b.claim.totalCents)}</dd>
         </dl>
         <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="mt-6 w-full">
           <thead><tr className="border-b border-slate-300 text-left"><th className="py-1">Attachment control number</th><th>Document</th></tr></thead>

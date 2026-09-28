@@ -1,3 +1,6 @@
+import { claimParties } from "./claim-edi";
+import { checkUsAddress } from "@/lib/us";
+import type { SubscriberInput } from "@/lib/subscriber-form";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
@@ -48,14 +51,31 @@ export interface NewPatientInput {
   city?: string;
   state?: string;
   zip?: string;
-  payerId: string;
+  /** Null for a self-pay patient: no insurance row. */
+  payerId: string | null;
   memberId: string;
   groupNumber?: string;
   relationship: string;
   copayCents: number;
+  /** The insured person, required when relationship is not "self" (lib/edi/subscriber.ts). */
+  subscriber?: SubscriberInput;
+}
+
+/** The insured person's columns for an insurance row: required for a dependent, empty for "self". */
+export function subscriberColumns(relationship: string, s: SubscriberInput | undefined) {
+  if (relationship === "self") return {};
+  if (!s?.firstName || !s.lastName || !s.dob) throw new Error("Enter the insured person's name and date of birth: the claim names them as the subscriber");
+  if (!["M", "F", "U"].includes(s.sex ?? "")) throw new Error("Choose the insured person's sex");
+  const addr = checkUsAddress({ state: s.state, zip: s.zip });
+  return {
+    subscriberFirstName: s.firstName.slice(0, 60), subscriberLastName: s.lastName.slice(0, 60), subscriberDob: s.dob, subscriberSex: s.sex!,
+    subscriberAddress1: s.address1?.slice(0, 120) ?? null, subscriberCity: s.city?.slice(0, 60) ?? null, subscriberState: addr.state, subscriberZip: addr.zip,
+  };
 }
 
 export async function createPatient(db: Db, practiceId: string, input: NewPatientInput) {
+  const addr = checkUsAddress(input);
+  const subscriber = input.payerId ? subscriberColumns(input.relationship, input.subscriber) : {};
   const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(patients).where(eq(patients.practiceId, practiceId));
   const [p] = await db
     .insert(patients)
@@ -66,15 +86,17 @@ export async function createPatient(db: Db, practiceId: string, input: NewPatien
       lastName: input.lastName.trim(),
       dob: input.dob,
       sex: input.sex,
-      phone: input.phone || null,
+      phone: addr.phone,
       email: input.email || null,
       address1: input.address1 || null,
       city: input.city || null,
-      state: input.state || null,
-      zip: input.zip || null,
+      state: addr.state,
+      zip: addr.zip,
     })
     .returning();
-  await db.insert(patientInsurances).values({ patientId: p.id, payerId: input.payerId, memberId: input.memberId.trim(), groupNumber: input.groupNumber || null, rank: 1, relationship: input.relationship, copayCents: input.copayCents });
+  if (input.payerId) {
+    await db.insert(patientInsurances).values({ patientId: p.id, payerId: input.payerId, memberId: input.memberId.trim(), groupNumber: input.groupNumber || null, rank: 1, relationship: input.relationship, copayCents: input.copayCents, ...subscriber });
+  }
   await emit(db, practiceId, "patient.created", { patient_id: p.id, mrn: p.mrn, source: "staff" });
   return p;
 }
@@ -101,7 +123,15 @@ export async function runEligibility(db: Db, patientInsuranceId: string, service
     senderId: "COLLABORATMD", receiverId: row.payer.payerId, now, control: String(now.getTime() % 1_000_000_000), traceNumber,
     payer: { name: row.payer.name, payerId: row.payer.payerId },
     provider: { name: row.practice.name, npi: row.practice.npi },
-    subscriber: { lastName: row.patient.lastName, firstName: row.patient.firstName, memberId: row.ins.memberId, dob: row.patient.dob, sex: row.patient.sex },
+    // A dependent (a child on a parent's plan) is asked about under the insured person's name.
+    ...(() => {
+      const { subscriber, patient } = claimParties(row.patient, row.ins);
+      const dependent = row.ins.relationship !== "self" && subscriber.relationship !== "self";
+      return {
+        subscriber: { lastName: subscriber.lastName, firstName: subscriber.firstName, memberId: row.ins.memberId, dob: subscriber.dob, sex: subscriber.sex },
+        dependent: dependent ? { lastName: patient.lastName, firstName: patient.firstName, dob: patient.dob, sex: patient.sex } : null,
+      };
+    })(),
     serviceDate: date,
   });
 

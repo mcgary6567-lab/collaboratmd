@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -6,6 +7,8 @@ import { LABS } from "@/lib/labs/catalog";
 import { Badge, Card, Empty, PageHeader, PatientLink } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { LAB_STATUS_TONE } from "@/app/(app)/patients/[id]/labs-section";
+
+export const metadata: Metadata = { title: "Labs" };
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +29,7 @@ export default async function LabsPage() {
             <td><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
             <td className="text-xs">{LABS.find((l) => l.code === order.labCode)?.name}</td>
             <td className="text-xs">{order.tests.map((t) => t.code).join(", ")}</td>
-            <td className="whitespace-nowrap text-xs">{fmtDateTime(order.createdAt)}</td>
+            <td className="whitespace-nowrap text-xs">{fmtDateTime(order.createdAt, s.timeZone)}</td>
             <td>
               <Badge tone={LAB_STATUS_TONE[order.status] ?? "slate"}>{order.status}</Badge>
               {abnormal > 0 && <span className="ml-1"><Badge tone="red">{abnormal} abnormal</Badge></span>}

@@ -14,10 +14,12 @@ import { schema } from "@/db";
 import { build270, summarize271 } from "@/lib/edi/x270";
 import { getClearinghouse } from "@/lib/clearinghouse/gateway";
 import { practiceConfig } from "./integrations";
+import { subscriberColumns } from "./patients";
+import type { SubscriberInput } from "@/lib/subscriber-form";
 
 const { patients, patientInsurances, payers, practices, coverageSearches, auditLog } = schema;
 
-export type NewInsurance = { payerId: string; memberId: string; groupNumber?: string | null; relationship?: string; copayCents?: number | null; makePrimary?: boolean };
+export type NewInsurance = { payerId: string; memberId: string; groupNumber?: string | null; relationship?: string; copayCents?: number | null; makePrimary?: boolean; subscriber?: SubscriberInput };
 
 /** Adds a policy to a patient. A new primary pushes the others down one rank. */
 export async function addInsurance(db: Db, practiceId: string, patientId: string, input: NewInsurance, userId?: string) {
@@ -30,13 +32,14 @@ export async function addInsurance(db: Db, practiceId: string, patientId: string
   const current = await db.select().from(patientInsurances).where(and(eq(patientInsurances.patientId, patientId), eq(patientInsurances.active, true))).orderBy(asc(patientInsurances.rank));
   if (current.some((c) => c.payerId === payer.id && c.memberId.toUpperCase() === memberId)) throw new Error("This policy is already on file");
   const relationship = ["self", "spouse", "child", "other"].includes(input.relationship ?? "") ? input.relationship! : "self";
+  const subscriber = subscriberColumns(relationship, input.subscriber);
   let rank = (current.at(-1)?.rank ?? 0) + 1;
   if (input.makePrimary || !current.length) {
     for (const c of current.reverse()) await db.update(patientInsurances).set({ rank: c.rank + 1 }).where(eq(patientInsurances.id, c.id));
     rank = 1;
   }
   const [row] = await db.insert(patientInsurances).values({
-    patientId, payerId: payer.id, memberId, groupNumber: input.groupNumber?.trim().slice(0, 40) || null, rank, relationship, copayCents: input.copayCents ?? 0,
+    patientId, payerId: payer.id, memberId, groupNumber: input.groupNumber?.trim().slice(0, 40) || null, rank, relationship, copayCents: input.copayCents ?? 0, ...subscriber,
   }).returning();
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "insurance_added", entity: "patient", entityId: patientId, details: { payerId: payer.id, rank } });
   return row;

@@ -1,5 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Bot, FileText, PenLine, Trash2, UserRound } from "lucide-react";
+import { Bot, FileText, PenLine, Trash, UserRound } from "lucide-react";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { ACTION_LABEL, agentCounts, agentQueue, type AgentAction } from "@/server/denial-agent";
@@ -9,9 +10,11 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader, PatientLink } from "@/components/ui";
 import { fmtDateTime, money } from "@/lib/utils";
 
+export const metadata: Metadata = { title: "Denial agent" };
+
 export const dynamic = "force-dynamic";
 
-const ICON: Record<AgentAction, typeof Bot> = { appeal: FileText, correct_claim: PenLine, write_off: Trash2, update_insurance: UserRound };
+const ICON: Record<AgentAction, typeof Bot> = { appeal: FileText, correct_claim: PenLine, write_off: Trash, update_insurance: UserRound };
 const TONE: Record<AgentAction, "blue" | "amber" | "red" | "slate"> = { appeal: "blue", correct_claim: "amber", write_off: "red", update_insurance: "slate" };
 
 export default async function DenialAgentPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
@@ -63,7 +66,7 @@ export default async function DenialAgentPage({ searchParams }: { searchParams: 
                       <p className="text-xs text-slate-500">
                         <PatientLink id={claim.patientId} first={patientFirst} last={patientLast} /> · {payerName} · {money(denial.amountCents)} ·{" "}
                         <Link className="underline" href={`/claims/${claim.id}`}>{claim.controlNumber}</Link>
-                        {item.decidedAt && <> · {status} {fmtDateTime(item.decidedAt)}</>}
+                        {item.decidedAt && <> · {status} {fmtDateTime(item.decidedAt, s.timeZone)}</>}
                       </p>
                     </div>
                   </div>

@@ -43,6 +43,14 @@ export const practices = pgTable("practices", {
   /** Sessions that started before this are ended ("sign everyone out"). */
   sessionsRevokedAt: timestamp("sessions_revoked_at", { withTimezone: true }),
   onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
+  /** The seeded demo practice (published sign-ins): the only one public pages read from. Migration 0052. */
+  isDemo: boolean("is_demo").notNull().default(false),
+  /** Who bills: "organization" (Type 2 NPI) or "individual", a solo provider under their Type 1 NPI and name. Migration 0053. */
+  billingEntity: text("billing_entity").notNull().default("organization"),
+  billingLastName: text("billing_last_name"),
+  billingFirstName: text("billing_first_name"),
+  /** CLIA certificate number, sent on claims with laboratory tests (REF*X4). */
+  cliaNumber: text("clia_number"),
   /** The practice's own patient financing lender, offered for larger balances. */
   financing: jsonb("financing").$type<{ lender: string; url: string; minCents: number } | null>(),
   /* The practice's own subscription to CollaboratMD. See server/subscription.ts. */
@@ -197,6 +205,15 @@ export const patientInsurances = pgTable("patient_insurances", {
   relationship: text("relationship").notNull().default("self"), // self | spouse | child | other
   copayCents: integer("copay_cents").notNull().default(0),
   active: boolean("active").notNull().default(true),
+  /** The insured person when relationship is not "self" (migration 0052; lib/edi/subscriber.ts). The address may be left empty when it is the patient's. */
+  subscriberFirstName: text("subscriber_first_name"),
+  subscriberLastName: text("subscriber_last_name"),
+  subscriberDob: date("subscriber_dob"),
+  subscriberSex: text("subscriber_sex"),
+  subscriberAddress1: text("subscriber_address1"),
+  subscriberCity: text("subscriber_city"),
+  subscriberState: text("subscriber_state"),
+  subscriberZip: text("subscriber_zip"),
 });
 
 export const eligibilityChecks = pgTable("eligibility_checks", {
@@ -241,7 +258,7 @@ export const appointments = pgTable(
     fhirId: text("fhir_id"),
     locationId: uuid("location_id").references(() => locations.id),
   },
-  (t) => [index("appointments_start_idx").on(t.practiceId, t.startsAt)],
+  (t) => [index("appointments_start_idx").on(t.practiceId, t.startsAt), index("appointments_patient_idx").on(t.patientId, t.startsAt)],
 );
 
 /* ------------------------------------------------------------------ */
@@ -258,6 +275,10 @@ export const encounters = pgTable("encounters", {
   placeOfService: text("place_of_service").notNull().default("11"),
   locationId: uuid("location_id").references(() => locations.id),
   diagnoses: jsonb("diagnoses").$type<string[]>().notNull().default([]),
+  /** The referring provider, when the payer needs one (2310A NM1*DN). Migration 0053. */
+  referringLastName: text("referring_last_name"),
+  referringFirstName: text("referring_first_name"),
+  referringNpi: text("referring_npi"),
   status: text("status").notNull().default("open"), // open | billed
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

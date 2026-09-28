@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { PrintButton } from "@/components/action-form";
 import { compactMoney, pct } from "@/components/kpi";
 import { AgingChart, PayerMixChart } from "@/components/charts";
 import { appointmentOutcomes } from "@/server/appointment-outcomes";
+
+export const metadata: Metadata = { title: "Reports" };
 
 export const dynamic = "force-dynamic";
 

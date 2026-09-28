@@ -6,7 +6,7 @@ import { LEGAL_VERSIONS, versionLabel } from "@/content/legal";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — CollaboratMD",
+  title: "Privacy Policy",
   description:
     "How CollaboratMD collects, uses, stores and protects personal information and protected health information.",
 };

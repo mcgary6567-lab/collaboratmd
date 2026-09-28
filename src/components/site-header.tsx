@@ -73,7 +73,7 @@ export function SiteHeader({
               >
                 Start free trial
               </Link>
-              <Link href="/login" className="btn bg-green-700 text-white hover:bg-green-800">
+              <Link href="/demo" className="btn bg-green-700 text-white hover:bg-green-800">
                 View the demo <ArrowRight className="h-4 w-4" />
               </Link>
             </>

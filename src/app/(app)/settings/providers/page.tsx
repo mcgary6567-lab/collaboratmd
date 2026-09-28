@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listProviders } from "@/server/encounters";
 import { providerActiveAction, saveProviderAction } from "@/app/(app)/admin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
+import { TaxonomyInput } from "@/components/code-pickers";
+
+export const metadata: Metadata = { title: "Providers" };
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +19,7 @@ function ProviderFields({ p }: { p?: P }) {
       <input name="firstName" defaultValue={p?.firstName} placeholder="First name" className="input" required />
       <input name="lastName" defaultValue={p?.lastName} placeholder="Last name" className="input" required />
       <input name="npi" defaultValue={p?.npi} placeholder="NPI (Type 1)" className="input font-mono" maxLength={10} inputMode="numeric" required />
-      <input name="taxonomy" defaultValue={p?.taxonomy} placeholder="Taxonomy, e.g. 207Q00000X" className="input font-mono" maxLength={10} required />
+      <TaxonomyInput defaultValue={p?.taxonomy} className="input font-mono" required id={`taxonomy-${p?.npi ?? "new"}`} placeholder="Taxonomy: type a specialty or code" />
       <input name="specialty" defaultValue={p?.specialty} placeholder="Specialty" className="input" required />
     </div>
   );

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { auditActions, auditEvents, practiceUsers } from "@/server/compliance";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Audit log" };
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +48,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
             <tbody>
               {events.map(({ event: e, userName }) => (
                 <tr key={e.id}>
-                  <td className="whitespace-nowrap text-xs">{fmtDateTime(e.at)}</td>
+                  <td className="whitespace-nowrap text-xs">{fmtDateTime(e.at, s.timeZone)}</td>
                   <td className="text-sm">{userName ?? <span className="text-slate-500">system</span>}</td>
                   <td className="text-sm font-medium">{label(e.action)}</td>
                   <td className="text-xs text-slate-500">{e.entity}{e.entityId ? <span className="block font-mono">{e.entityId.slice(0, 8)}</span> : null}</td>

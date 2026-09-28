@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { readInvite } from "@/server/team";
 import { LogoMark } from "@/components/logo";
 import { WelcomeForm } from "./welcome-form";
+
+export const metadata: Metadata = { title: "Welcome" };
 
 export const dynamic = "force-dynamic";
 

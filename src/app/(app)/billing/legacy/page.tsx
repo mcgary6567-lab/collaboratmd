@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { legacySummary, listLegacy } from "@/server/legacy-ar";
@@ -5,6 +6,8 @@ import { closeLegacyAction, importLegacyAction } from "@/app/(app)/legacy-action
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Legacy A/R" };
 
 export const dynamic = "force-dynamic";
 

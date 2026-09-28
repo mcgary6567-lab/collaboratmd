@@ -1,13 +1,17 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { siteOrigin } from "@/lib/origin";
 import { getBookingSettings, hoursFor, US_TIME_ZONES } from "@/server/booking";
+import { timeZoneName } from "@/server/practice-time";
 import { listProviders } from "@/server/encounters";
 import { listLocations } from "@/server/locations";
 import { saveBookingSettingsAction, saveProviderHoursAction } from "@/app/(app)/booking-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
 import { Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Online booking" };
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +31,7 @@ export default async function BookingSettingsPage() {
           <ActionForm action={saveBookingSettingsAction} className="space-y-3 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" name="enabled" defaultChecked={settings.enabled} /> Accept online requests</label>
             <label className="block"><span className="label">Time zone of your hours</span>
-              <select name="timeZone" defaultValue={settings.timeZone} className="input">{US_TIME_ZONES.map((z) => <option key={z} value={z}>{z.replace("_", " ")}</option>)}</select></label>
+              <select name="timeZone" defaultValue={settings.timeZone} className="input">{US_TIME_ZONES.map((z) => <option key={z} value={z}>{timeZoneName(z)}</option>)}</select></label>
             <div className="grid grid-cols-3 gap-3">
               <label className="block"><span className="label">Visit length</span><select name="slotMinutes" defaultValue={settings.slotMinutes} className="input">{[10, 15, 20, 30, 40, 45, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}</select></label>
               <label className="block"><span className="label">Notice (hours)</span><input name="minNoticeHours" type="number" min={0} max={168} defaultValue={settings.minNoticeHours} className="input" /></label>

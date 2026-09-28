@@ -5,15 +5,17 @@
  * unit-tested without a database and evaluated in under a millisecond.
  * "error" blocks submission; "warning" allows submission with a note.
  */
+import { POS_CODES } from "@/lib/codes/pos";
+import { CLIA_RE, isLabCode } from "@/lib/codes/lab";
 
 export interface ScrubClaim {
   patient: { firstName: string; lastName: string; dob: string; sex: string; address1?: string | null; zip?: string | null };
-  insurance: { memberId: string; payerId: string; relationship: string };
+  insurance: { memberId: string; payerId: string; relationship: string; subscriber?: { firstName: string | null; lastName: string | null; dob: string | null } | null };
   provider: { npi: string; taxonomy: string };
-  practice: { npi: string; taxId: string; phone?: string | null };
-  encounter: { dateOfService: string; placeOfService: string; diagnoses: string[] };
+  practice: { npi: string; taxId: string; phone?: string | null; cliaNumber?: string | null };
+  encounter: { dateOfService: string; placeOfService: string; diagnoses: string[]; referringNpi?: string | null };
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[] }[];
-  payer: { timelyFilingDays: number };
+  payer: { timelyFilingDays: number; type?: string | null };
   /** Frequency and replacement reference; absent means an original claim. */
   claim?: { frequencyCode: string; originalPayerClaimNumber?: string | null };
   today?: Date;
@@ -27,6 +29,15 @@ export interface ScrubFinding {
 }
 
 type Rule = (c: ScrubClaim) => ScrubFinding[];
+
+/**
+ * The Medicare Beneficiary Identifier's shape (CMS): 11 characters, dashes
+ * optional; digits and letters by position, the letters never S, L, O, I, B or Z.
+ */
+export function isValidMbi(id: string): boolean {
+  const L = "[AC-HJKMNP-RT-Y]";
+  return new RegExp(`^[1-9]${L}[0-9AC-HJKMNP-RT-Y][0-9]${L}[0-9AC-HJKMNP-RT-Y][0-9]${L}${L}[0-9][0-9]$`).test(id.replace(/-/g, "").toUpperCase());
+}
 
 /** NPI check digit (Luhn with 80840 prefix). */
 export function isValidNpi(npi: string): boolean {
@@ -47,7 +58,8 @@ export function isValidNpi(npi: string): boolean {
 const ICD10_RE = /^[A-TV-Z][0-9][0-9AB](\.?[0-9A-TV-Z]{1,4})?$/i;
 const CPT_RE = /^(\d{5}|[A-V]\d{4})$/; // CPT or HCPCS level II
 const MODIFIER_RE = /^[A-Z0-9]{2}$/;
-const VALID_POS = new Set(["02", "10", "11", "12", "19", "20", "21", "22", "23", "24", "31", "32", "34", "49", "50", "53", "62", "65", "71", "72", "81"]);
+// The full CMS list (lib/codes/pos.ts): what charge entry offers is what the scrubber accepts.
+const VALID_POS = POS_CODES;
 
 const rules: Record<string, Rule> = {
   PAT_REQUIRED: (c) => {
@@ -71,6 +83,33 @@ const rules: Record<string, Rule> = {
   INS_MEMBER_ID: (c) =>
     !c.insurance.memberId?.trim()
       ? [{ rule: "INS_MEMBER_ID", severity: "error", message: "Subscriber member ID is required", field: "insurance.memberId" }]
+      : [],
+  // A dependent's claim names the insured person as the subscriber (lib/edi/subscriber.ts): without them the payer rejects it.
+  SUBSCRIBER_DEPENDENT: (c) =>
+    c.insurance.relationship !== "self" && !(c.insurance.subscriber?.firstName?.trim() && c.insurance.subscriber?.lastName?.trim() && c.insurance.subscriber?.dob)
+      ? [{ rule: "SUBSCRIBER_DEPENDENT", severity: "error", message: `The patient is the insured's ${c.insurance.relationship === "other" ? "dependent" : c.insurance.relationship}: enter the insured person's name and date of birth on the insurance`, field: "insurance.subscriber" }]
+      : [],
+  // Laboratory tests go out with the lab's CLIA certificate number; Medicare denies them without it.
+  CLIA: (c) => {
+    if (!c.lines.some((l) => isLabCode(l.cpt))) return [];
+    const clia = c.practice.cliaNumber?.trim().toUpperCase();
+    if (clia && CLIA_RE.test(clia)) return [];
+    const message = clia ? `CLIA number ${clia} is not valid (2 digits, D, 7 digits)` : "The claim has laboratory tests but the practice has no CLIA number (Settings > Practice profile)";
+    return [{ rule: "CLIA", severity: c.payer.type === "medicare" || clia ? "error" : "warning", message, field: "practice.cliaNumber" }];
+  },
+  REFERRING_NPI: (c) =>
+    c.encounter.referringNpi && !isValidNpi(c.encounter.referringNpi)
+      ? [{ rule: "REFERRING_NPI", severity: "error", message: `Referring provider NPI ${c.encounter.referringNpi} fails check-digit validation`, field: "encounter.referringNpi" }]
+      : [],
+  // GZ: the provider expects Medicare to deny the service and has no signed ABN, so the patient cannot be billed for it.
+  MEDICARE_GZ: (c) =>
+    c.payer.type === "medicare" && c.lines.some((l) => l.modifiers.includes("GZ"))
+      ? [{ rule: "MEDICARE_GZ", severity: "warning", message: "A line has modifier GZ: Medicare will likely deny it and, without a signed ABN, the patient cannot be billed. Use GA when an ABN is on file.", field: "lines.modifiers" }]
+      : [],
+  // Traditional Medicare takes the Medicare Beneficiary Identifier; the old SSN-based HICN is refused.
+  MEDICARE_MBI: (c) =>
+    c.payer.type === "medicare" && c.insurance.memberId?.trim() && !isValidMbi(c.insurance.memberId)
+      ? [{ rule: "MEDICARE_MBI", severity: "error", message: `Medicare member ID ${c.insurance.memberId} is not an MBI (11 characters, like 1EG4-TE5-MK73)`, field: "insurance.memberId" }]
       : [],
   PAYER_ID: (c) =>
     !c.insurance.payerId?.trim()

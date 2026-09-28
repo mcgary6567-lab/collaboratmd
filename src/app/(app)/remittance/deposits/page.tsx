@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -5,7 +6,9 @@ import { candidatesFor, depositsOverview } from "@/server/deposits";
 import { autoMatchAction, depositStatusAction, importDepositsAction, matchDepositAction } from "@/app/(app)/deposit-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, Stat } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Deposits" };
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +32,7 @@ export default async function DepositsPage() {
         <Stat label="Matched deposits" value={o.counts.matched.toLocaleString()} />
         <Stat label="Deposits to review" value={o.counts.unmatched.toLocaleString()} hint="Not matched to an ERA yet" />
         <Stat label="ERAs with no deposit after 7 days" value={o.missing.length.toLocaleString()} tone={o.missing.length ? "bad" : undefined} />
-        <Stat label="Amount not yet seen in the bank" value={`$${(missingCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+        <Stat label="Amount not yet seen in the bank" value={money(missingCents)} />
       </div>
 
       {canEdit && (
@@ -99,7 +102,7 @@ export default async function DepositsPage() {
                               <select name="remittanceId" className="input py-1 text-xs" defaultValue="" aria-label="ERA to match">
                                 <option value="" disabled>Pick an ERA</option>
                                 {candidatesFor(dep, o.openRemittances).map((c) => (
-                                  <option key={c.id} value={c.id}>{c.amountCents === dep.amountCents ? "= " : ""}{c.payerName} · {c.checkNumber} · ${(c.amountCents / 100).toFixed(2)} · {c.paymentDate}</option>
+                                  <option key={c.id} value={c.id}>{c.amountCents === dep.amountCents ? "= " : ""}{c.payerName} · {c.checkNumber} · {money(c.amountCents)} · {fmtDate(c.paymentDate)}</option>
                                 ))}
                               </select>
                               <SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Match</SubmitButton>

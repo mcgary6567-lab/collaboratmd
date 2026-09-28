@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -8,6 +9,8 @@ import { billingPortalAction, subscribeAction } from "@/app/(app)/subscription-a
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Subscription" };
 
 export const dynamic = "force-dynamic";
 

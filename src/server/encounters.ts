@@ -3,6 +3,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { createClaimForEncounter } from "./claims";
 import { standardCharges } from "./fees";
+import { isValidNpi } from "@/lib/scrub/rules";
 
 const { encounters, charges, appointments, patients, providers, cptCodes, icd10Codes } = schema;
 
@@ -15,9 +16,14 @@ export interface NewEncounterInput {
   locationId?: string | null;
   diagnoses: string[];
   lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string }[];
+  /** The provider who referred the patient, when the payer needs one on the claim. */
+  referring?: { lastName: string; firstName?: string; npi: string } | null;
 }
 
 export async function createEncounterWithClaim(db: Db, practiceId: string, input: NewEncounterInput, userId?: string) {
+  const ref = input.referring?.npi?.trim() ? { ...input.referring, npi: input.referring.npi.replace(/\D/g, "") } : null;
+  if (ref && !isValidNpi(ref.npi)) throw new Error("The referring provider's NPI fails its check digit");
+  if (ref && !ref.lastName.trim()) throw new Error("Enter the referring provider's last name");
   const [enc] = await db
     .insert(encounters)
     .values({
@@ -29,6 +35,9 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
       placeOfService: input.placeOfService,
       locationId: input.locationId ?? null,
       diagnoses: input.diagnoses.map((d) => d.toUpperCase().trim()).filter(Boolean),
+      referringLastName: ref?.lastName.trim().slice(0, 60) ?? null,
+      referringFirstName: ref?.firstName?.trim().slice(0, 35) || null,
+      referringNpi: ref?.npi ?? null,
     })
     .returning();
   let n = 1;

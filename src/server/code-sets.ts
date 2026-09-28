@@ -14,6 +14,7 @@
  * Nothing here is typed in from memory: with no data loaded, these checks
  * simply do not fire.
  */
+import { isDemoEmail, onProduction } from "@/lib/demo";
 import { and, desc, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
@@ -28,6 +29,8 @@ export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage";
 /** Platform operators, by email: the only people who can replace national code sets. */
 export function isPlatformOperator(email: string | null | undefined) {
   const list = (process.env.PLATFORM_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  // A demo account's password is published: it is never an operator on the production deployment.
+  if (isDemoEmail(email) && onProduction()) return false;
   return !!email && list.includes(email.toLowerCase());
 }
 

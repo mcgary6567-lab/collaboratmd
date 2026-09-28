@@ -1,10 +1,13 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listCheckins } from "@/server/checkin";
 import { applyCheckinAction, dismissCheckinAction } from "@/app/(app)/checkin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader, PatientLink } from "@/components/ui";
-import { fmtDateTime } from "@/lib/utils";
+import { fmtClock, fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Check-ins" };
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +31,8 @@ export default async function CheckInsPage() {
             return (
               <Card
                 key={submission.id}
-                title={`${fmtDateTime(appt.startsAt)} visit`}
-                actions={<span className="text-xs text-slate-500">Submitted {fmtDateTime(submission.createdAt)}</span>}
+                title={`${fmtClock(appt.startsAt)} visit`}
+                actions={<span className="text-xs text-slate-500">Submitted {fmtDateTime(submission.createdAt, s.timeZone)}</span>}
               >
                 <div className="grid gap-4 text-sm md:grid-cols-3">
                   <div>
@@ -68,7 +71,7 @@ export default async function CheckInsPage() {
                       <Badge tone={c.financialPolicy ? "green" : "red"}>Financial policy</Badge>
                       <Badge tone={c.assignmentOfBenefits ? "green" : "red"}>Assignment of benefits</Badge>
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">Signed “{c.signature}” at {fmtDateTime(c.signedAt)}</div>
+                    <div className="mt-1 text-xs text-slate-500">Signed “{c.signature}” at {fmtDateTime(c.signedAt, s.timeZone)}</div>
                   </div>
                 </div>
                 <div className="mt-4 flex items-start gap-2 border-t pt-3">

@@ -115,6 +115,28 @@ async function main() {
     }
   };
 
+  // Patients in proportion to claims (about eight claims each over two years), each with primary
+  // insurance, so per-patient queries see a real practice's spread rather than a few demo patients
+  // with thousands of rows each.
+  const PATIENTS = Math.round(TARGET / 8);
+  {
+    const { n: have } = await one<{ n: number }>(sql`SELECT count(*)::int AS n FROM patients WHERE practice_id = ${practiceId}`);
+    if (have < PATIENTS) {
+      const t0 = Date.now();
+      await db.execute(sql`INSERT INTO patients (practice_id, mrn, first_name, last_name, dob, sex, phone, address1, city, state, zip)
+        SELECT ${practiceId}, 'LTP' || lpad(g::text, 7, '0'),
+          (ARRAY['Maria','James','Aisha','Wei','Olivia','Noah','Sofia','Liam','Grace','Mateo'])[1 + g % 10],
+          'Loadtest' || g, (date '1940-01-01' + (g * 37 % 25000))::date, (ARRAY['F','M'])[1 + g % 2],
+          '555010' || lpad((g % 10000)::text, 4, '0'), g || ' Test St', 'Orlando', 'FL', '32801'
+        FROM generate_series(1, ${PATIENTS - have}) g`);
+      await db.execute(sql`INSERT INTO patient_insurances (patient_id, payer_id, member_id, rank, relationship)
+        SELECT p.id, pay.ids[1 + abs(hashtext(p.id::text)) % pay.n], 'LTM' || substr(p.id::text, 1, 8), 1, 'self'
+        FROM patients p, (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM payers WHERE practice_id = ${practiceId}) pay
+        WHERE p.practice_id = ${practiceId} AND p.mrn LIKE 'LTP%' AND NOT EXISTS (SELECT 1 FROM patient_insurances i WHERE i.patient_id = p.id)`);
+      console.log(`Added ${PATIENTS - have} patients in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    }
+  }
+
   if (n < TARGET) {
     const t0 = Date.now();
     await load(practiceId, TARGET - n, "LT");

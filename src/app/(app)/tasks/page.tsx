@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { SquareCheckBig } from "lucide-react";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -6,6 +8,8 @@ import { createTaskAction, reassignTaskAction, setTaskStatusAction } from "@/app
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Tasks" };
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +44,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             ))}
           </div>
           {rows.length === 0 ? (
-            <Empty>{view === "mine" ? "Nothing assigned to you. Nice." : "No tasks here."}</Empty>
+            <Empty icon={SquareCheckBig}>{view === "mine" ? "Nothing assigned to you." : "No tasks here."}</Empty>
           ) : (
             <ul className="divide-y divide-slate-200">
               {rows.map(({ task, assignee }) => {
@@ -65,8 +69,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                         {task.priority === "high" && <Badge tone="red">High</Badge>}
                         {task.dueDate && <span className={late ? "font-semibold text-red-700" : ""}>Due {fmtDate(task.dueDate + "T00:00:00")}{late ? " (overdue)" : ""}</span>}
-                        <span>Created {fmtDateTime(task.createdAt)}</span>
-                        {task.completedAt && <span>Done {fmtDateTime(task.completedAt)}</span>}
+                        <span>Created {fmtDateTime(task.createdAt, s.timeZone)}</span>
+                        {task.completedAt && <span>Done {fmtDateTime(task.completedAt, s.timeZone)}</span>}
                       </div>
                     </div>
                     {task.status === "open" && (

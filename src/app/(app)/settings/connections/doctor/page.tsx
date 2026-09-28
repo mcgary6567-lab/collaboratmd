@@ -1,5 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, CircleAlert, CircleMinus, CircleX } from "lucide-react";
+import { CircleCheck, CircleAlert, CircleMinus, CircleX } from "lucide-react";
 import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { CHECKS, latestChecks } from "@/server/doctor";
@@ -8,10 +9,12 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 
+export const metadata: Metadata = { title: "Connection check" };
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const ICON = { pass: CheckCircle2, warn: CircleAlert, fail: CircleX, skip: CircleMinus };
+const ICON = { pass: CircleCheck, warn: CircleAlert, fail: CircleX, skip: CircleMinus };
 const TONE = { pass: "text-green-700", warn: "text-amber-600", fail: "text-red-700", skip: "text-slate-500" };
 
 export default async function DoctorPage() {
@@ -31,7 +34,7 @@ export default async function DoctorPage() {
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <p className="text-slate-600">
-            {ran.length ? <>Last run {fmtDateTime(new Date(Math.max(...ran)))}. {failing ? <b className="text-red-700">{failing} failing.</b> : "Nothing failing."}</> : "Not run yet. Run it after connecting a service, and before going live."}
+            {ran.length ? <>Last run {fmtDateTime(new Date(Math.max(...ran)), s.timeZone)}. {failing ? <b className="text-red-700">{failing} failing.</b> : "Nothing failing."}</> : "Not run yet. Run it after connecting a service, and before going live."}
           </p>
           <ActionForm action={runDoctorAction}><SubmitButton pendingLabel="Checking everything...">Run all checks</SubmitButton></ActionForm>
         </div>
@@ -51,8 +54,8 @@ export default async function DoctorPage() {
                       <div className="text-slate-600">{r?.detail ?? "Not run yet"}</div>
                     </div>
                     <div className="shrink-0 text-right text-xs text-slate-500">
-                      {r && <div>{fmtDateTime(r.ranAt)}</div>}
-                      {r && r.status !== "pass" && r.lastPass && <div>last passed {fmtDateTime(r.lastPass)}</div>}
+                      {r && <div>{fmtDateTime(r.ranAt, s.timeZone)}</div>}
+                      {r && r.status !== "pass" && r.lastPass && <div>last passed {fmtDateTime(r.lastPass, s.timeZone)}</div>}
                     </div>
                   </li>
                 );

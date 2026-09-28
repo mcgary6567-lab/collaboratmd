@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { PATIENT_FIELDS } from "@/lib/import/patients";
@@ -6,6 +7,8 @@ import { Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { Importer } from "./importer";
 import { listTemplates } from "@/server/import-templates";
+
+export const metadata: Metadata = { title: "Import patients" };
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +33,7 @@ export default async function ImportPage() {
                 <li key={j.id} className="border-b border-slate-100 pb-2 last:border-0">
                   <div className="truncate font-medium" title={j.filename}>{j.filename}</div>
                   <div className="text-xs text-slate-500">
-                    {fmtDateTime(j.createdAt)} · {j.created} created, {j.updated} updated, {j.skipped} skipped · mapped by {j.mappedBy === "ai" ? "AI" : j.mappedBy}
+                    {fmtDateTime(j.createdAt, s.timeZone)} · {j.created} created, {j.updated} updated, {j.skipped} skipped · mapped by {j.mappedBy === "ai" ? "AI" : j.mappedBy}
                   </div>
                 </li>
               ))}

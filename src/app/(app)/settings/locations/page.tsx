@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { listLocations } from "@/server/locations";
 import { saveLocationAction, setLocationActiveAction } from "@/app/(app)/location-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { PosOptions } from "@/components/code-pickers";
+import { StateSelect, ZipInput } from "@/components/us-fields";
+
+export const metadata: Metadata = { title: "Locations" };
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +17,13 @@ type Loc = Awaited<ReturnType<typeof listLocations>>[number];
 function LocationFields({ l }: { l?: Loc }) {
   return (
     <div className="grid gap-3 sm:grid-cols-6">
-      <label className="block sm:col-span-3"><span className="label">Name</span><input name="name" defaultValue={l?.name} className="input" required placeholder="Northside Clinic" /></label>
+      <label className="block sm:col-span-2"><span className="label">Name</span><input name="name" defaultValue={l?.name} className="input" required placeholder="Northside Clinic" /></label>
       <label className="block sm:col-span-2"><span className="label">Facility NPI (if it has its own)</span><input name="npi" defaultValue={l?.npi ?? ""} className="input" inputMode="numeric" /></label>
-      <label className="block sm:col-span-1"><span className="label">Place of service</span><input name="placeOfService" defaultValue={l?.placeOfService ?? "11"} className="input" maxLength={2} /></label>
+      <label className="block sm:col-span-2"><span className="label">Place of service</span><select name="placeOfService" defaultValue={l?.placeOfService ?? "11"} className="select"><PosOptions /></select></label>
       <label className="block sm:col-span-3"><span className="label">Street address</span><input name="address1" defaultValue={l?.address1} className="input" required /></label>
       <label className="block sm:col-span-1"><span className="label">City</span><input name="city" defaultValue={l?.city} className="input" required /></label>
-      <label className="block sm:col-span-1"><span className="label">State</span><input name="state" defaultValue={l?.state} className="input" maxLength={2} required /></label>
-      <label className="block sm:col-span-1"><span className="label">ZIP (9 digits preferred)</span><input name="zip" defaultValue={l?.zip} className="input" required /></label>
+      <label className="block sm:col-span-1"><span className="label">State</span><StateSelect defaultValue={l?.state} required className="select" /></label>
+      <label className="block sm:col-span-1"><span className="label">ZIP (9 digits preferred)</span><ZipInput defaultValue={l?.zip} required /></label>
     </div>
   );
 }

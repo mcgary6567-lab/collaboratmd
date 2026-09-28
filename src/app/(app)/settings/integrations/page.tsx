@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -8,6 +9,8 @@ import { ADT_A04, DFT_P03 } from "@/lib/hl7/fixtures";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { CreateKeyForm, TestMessageForm } from "./forms";
+
+export const metadata: Metadata = { title: "EHR integrations" };
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +73,7 @@ export default async function IntegrationsPage() {
                 <tbody>
                   {messages.map((m) => (
                     <tr key={m.id}>
-                      <td className="whitespace-nowrap text-xs">{fmtDateTime(m.receivedAt)}</td>
+                      <td className="whitespace-nowrap text-xs">{fmtDateTime(m.receivedAt, s.timeZone)}</td>
                       <td className="font-mono text-xs">{m.messageType}</td>
                       <td className="font-mono text-xs">{m.controlId || "none"}</td>
                       <td className="text-xs">{m.source === "api" ? "API" : "Test"}</td>
@@ -103,7 +106,7 @@ export default async function IntegrationsPage() {
                     {k.revokedAt ? <Badge>Revoked</Badge> : <Badge tone="green">Active</Badge>}
                   </div>
                   <div className="font-mono text-xs text-slate-500">{k.prefix}…</div>
-                  <div className="text-xs text-slate-500">Last used {k.lastUsedAt ? fmtDateTime(k.lastUsedAt) : "never"}</div>
+                  <div className="text-xs text-slate-500">Last used {k.lastUsedAt ? fmtDateTime(k.lastUsedAt, s.timeZone) : "never"}</div>
                   {!k.revokedAt && admin && (
                     <form action={revokeKeyAction.bind(null, k.id)} className="mt-1">
                       <button className="text-xs font-semibold text-red-700 hover:underline">Revoke</button>

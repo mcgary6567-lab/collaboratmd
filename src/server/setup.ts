@@ -42,12 +42,12 @@ export async function setupSteps(db: Db, practiceId: string): Promise<SetupStep[
   ]);
   const practiceOk = !!practice && isValidNpi(practice.npi) && /^\d{2}-?\d{7}$/.test(practice.taxId) && !!practice.address1 && !!practice.zip;
   return [
-    { key: "practice", title: "Practice details", detail: "Group NPI, tax ID and billing address, as they appear on payer enrollments.", done: practiceOk, href: "/settings" },
-    { key: "providers", title: "Providers", detail: "Each rendering provider with an individual NPI and taxonomy.", done: providers > 0, href: "/settings" },
-    { key: "payers", title: "Payers", detail: "The insurers you bill, with their clearinghouse payer IDs and filing limits.", done: payers > 0, href: "/settings" },
+    { key: "practice", title: "Practice details", detail: "Group NPI, tax ID and billing address, as they appear on payer enrollments.", done: practiceOk, href: "/settings/profile" },
+    { key: "providers", title: "Providers", detail: "Each rendering provider with an individual NPI and taxonomy.", done: providers > 0, href: "/settings/providers" },
+    { key: "payers", title: "Payers", detail: "The insurers you bill, with their clearinghouse payer IDs and filing limits.", done: payers > 0, href: "/settings/payers" },
     { key: "fees", title: "Standard fee schedule", detail: "What the practice charges for each code.", done: schedules > 0, href: "/settings/fees" },
     { key: "contracts", title: "Payer contracts", detail: "Contracted rates, so underpayments are caught.", done: contracts > 0, href: "/settings/fees", optional: true },
-    { key: "team", title: "Team", detail: "Front desk, billers and administrators, each with the right role.", done: users > 1, href: "/settings" },
+    { key: "team", title: "Team", detail: "Front desk, billers and administrators, each with the right role.", done: users > 1, href: "/settings/team" },
     { key: "mfa", title: "Two-factor sign-in", detail: "Require a code from an authenticator app for everyone.", done: requireMfa > 0, href: "/settings/security" },
     { key: "patients", title: "Patients", detail: "Import your patient list, connect your EHR, or add patients by hand.", done: patients > 0, href: "/import" },
     { key: "ehr", title: "EHR connection", detail: "An HL7 feed keeps patients and charges flowing in without re-keying.", done: keys > 0 || imports > 0, href: "/settings/integrations", optional: true },

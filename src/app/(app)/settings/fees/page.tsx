@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -6,6 +7,8 @@ import { listSchedules } from "@/server/fees";
 import { createContractAction } from "@/app/(app)/fees-actions";
 import { Badge, Card, Empty, Field, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Fee schedules" };
 
 export const dynamic = "force-dynamic";
 

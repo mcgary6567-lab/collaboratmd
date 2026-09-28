@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { locationSummary } from "@/server/location-report";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Locations report" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import {
@@ -15,6 +16,8 @@ import { FeatureTips } from "./tips";
 import { OnboardingGuide } from "./onboarding";
 import { compactMoney, pct } from "@/components/kpi";
 import { cn, fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export const dynamic = "force-dynamic";
 

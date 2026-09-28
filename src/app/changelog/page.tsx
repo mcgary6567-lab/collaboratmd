@@ -2,12 +2,36 @@ import type { Metadata } from "next";
 import { PageShell } from "@/components/page-shell";
 
 export const metadata: Metadata = {
-  title: "Changelog — CollaboratMD",
+  title: "Changelog",
   description: "What changed in CollaboratMD, release by release.",
 };
 
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
+  {
+    date: "2026-09-28",
+    title: "Claims for dependents, Medicare filing, and a separate demo",
+    items: [
+      "Fixed: a claim for a patient on someone else's plan (a child, a spouse) now names the insured person as the subscriber and the patient separately, as payers require; eligibility checks do the same",
+      "Fixed: Medicare Part B and Medicaid claims carry their own filing indicator instead of the commercial one",
+      "Insurance records the insured person when it is not the patient, and Medicare member IDs are checked as MBIs",
+      "Register self-pay patients without insurance; states chosen from a list, and phone numbers and ZIP codes checked",
+      "Try the demo practice in one click from /demo; the sign-in page no longer shows demo accounts",
+      "Solo providers can bill under their own NPI; lab claims carry the practice's CLIA number, and a referring provider can be entered at charge entry",
+      "The full CMS place-of-service list, a taxonomy code picker, and Medicare's one-year filing limit by default",
+    ],
+  },
+  {
+    date: "2026-09-28",
+    title: "Times on your clock, and a tidier app",
+    items: [
+      "Every time shown in the app is on the practice's clock, with its time zone (9:05 AM EDT), and dates read the US way",
+      "One setup checklist, from an empty practice to the first paid claim, with a link to each step",
+      "Tab titles on every page, loading and error screens, clearer claim statuses, and lists that turn into cards on a phone",
+      "A shorter menu: settings pages live under Settings, and search finds every one of them",
+      "New Business Associate Agreement and Accessibility pages",
+    ],
+  },
   {
     date: "2026-09-28",
     title: "Reminders at the practice's own hour, and a waitlist that keeps asking",

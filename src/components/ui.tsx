@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { Inbox, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn, CLAIM_STATUS_COLORS, money } from "@/lib/utils";
+import { cn, CLAIM_STATUS_COLORS, money, statusLabel } from "@/lib/utils";
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
@@ -30,7 +31,7 @@ export function Card({ title, children, className, actions }: { title?: string; 
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  return <span className={cn("badge", CLAIM_STATUS_COLORS[status] ?? "bg-slate-100 text-slate-700")}>{status.replace(/_/g, " ")}</span>;
+  return <span className={cn("badge", CLAIM_STATUS_COLORS[status] ?? "bg-slate-100 text-slate-700")}>{statusLabel(status)}</span>;
 }
 
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: "slate" | "green" | "red" | "amber" | "blue" }) {
@@ -54,8 +55,15 @@ export function Stat({ label, value, hint, tone }: { label: string; value: strin
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{children}</div>;
+/** Nothing to show yet: what that means, and (when there is one) the next thing to do. */
+export function Empty({ children, icon: Icon = Inbox, action }: { children: ReactNode; icon?: LucideIcon; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center rounded-lg border border-dashed border-slate-300 px-6 py-8 text-center text-sm text-slate-500 dark:border-slate-700">
+      <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"><Icon className="h-5 w-5" aria-hidden /></span>
+      <div className="max-w-md">{children}</div>
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
 }
 
 export function Money({ cents, className }: { cents: number; className?: string }) {

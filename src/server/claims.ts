@@ -5,7 +5,7 @@ import { scrubClaim, hasBlockingErrors, type ScrubClaim, type ScrubFinding } fro
 import { evaluatePayerEdits, type EditResult } from "@/lib/scrub/payer-edits";
 import { scrubDental } from "@/lib/scrub/dental";
 import { attachmentRefs, markAttachmentsSent } from "./attachments";
-import { buildClaimEdi } from "./claim-edi";
+import { buildClaimEdi, claimParties } from "./claim-edi";
 import { validateX12 } from "@/lib/edi/validate";
 import { blocksSubmission } from "./policies";
 import { standing } from "./subscription";
@@ -62,12 +62,12 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
   return {
     claim: { frequencyCode: b.claim.frequencyCode, originalPayerClaimNumber: b.claim.originalPayerClaimNumber },
     patient: { firstName: b.patient.firstName, lastName: b.patient.lastName, dob: b.patient.dob, sex: b.patient.sex, address1: b.patient.address1, zip: b.patient.zip },
-    insurance: { memberId: b.insurance.memberId, payerId: b.payer.payerId, relationship: b.insurance.relationship },
+    insurance: { memberId: b.insurance.memberId, payerId: b.payer.payerId, relationship: b.insurance.relationship, subscriber: { firstName: b.insurance.subscriberFirstName, lastName: b.insurance.subscriberLastName, dob: b.insurance.subscriberDob } },
     provider: { npi: b.provider.npi, taxonomy: b.provider.taxonomy },
-    practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null },
-    encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses },
+    practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null, cliaNumber: b.practice.cliaNumber },
+    encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi },
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers })),
-    payer: { timelyFilingDays: b.payer.timelyFilingDays },
+    payer: { timelyFilingDays: b.payer.timelyFilingDays, type: b.payer.type },
     today,
   };
 }
@@ -568,7 +568,8 @@ async function primaryAdjudication(db: Db, primaryClaimId: string) {
   return {
     name: bundle.payer.name,
     payerId: bundle.payer.payerId,
-    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, relationship: bundle.insurance.relationship },
+    type: bundle.payer.type,
+    subscriber: (({ lastName, firstName, memberId, groupNumber, relationship }) => ({ lastName, firstName, memberId, groupNumber, relationship }))(claimParties(bundle.patient, bundle.insurance).subscriber),
     paidCents,
     adjudicatedOn: rows[rows.length - 1].paymentDate,
     adjustments: [...grouped.values()],

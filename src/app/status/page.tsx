@@ -4,11 +4,12 @@ import { getDb } from "@/db";
 import { recentErrorCount } from "@/server/errors";
 import { lastBeat } from "@/server/heartbeats";
 import { PageShell } from "@/components/page-shell";
+import { fmtDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "System status — CollaboratMD",
+  title: "System status",
   description: "Whether CollaboratMD is up right now: the application, its database, background jobs, checks from outside and server errors, checked live.",
 };
 
@@ -58,7 +59,7 @@ export default async function StatusPage() {
   const { components, days } = await check();
   const worst: State = components.some((c) => c.state === "down") ? "down" : components.some((c) => c.state === "degraded") ? "degraded" : "up";
   return (
-    <PageShell eyebrow="Status" title={worst === "up" ? "All systems operational" : worst === "down" ? "Some systems are down" : "Some systems are degraded"} lead={`Checked live at ${new Date().toUTCString()}. Reload to check again.`}>
+    <PageShell eyebrow="Status" title={worst === "up" ? "All systems operational" : worst === "down" ? "Some systems are down" : "Some systems are degraded"} lead={`Checked live at ${fmtDateTime(new Date(), "America/New_York")}. Reload to check again.`}>
       <ul className="mt-8 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
         {components.map((c) => (
           <li key={c.name} className="flex items-center justify-between gap-4 p-4">

@@ -27,7 +27,8 @@ export async function publicMetrics(): Promise<PublicMetrics | null> {
     const db = await getDb();
 
     const { rows: practices } = await db.execute<Record<string, string>>(
-      sql`SELECT id FROM practices ORDER BY created_at NULLS LAST LIMIT 1`,
+      // Only the demo practice (seeded, published sign-ins): never a customer's figures on a public page.
+      sql`SELECT id FROM practices WHERE is_demo ORDER BY created_at NULLS LAST LIMIT 1`,
     );
     const practiceId = practices[0]?.id;
     if (!practiceId) return null;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -5,6 +6,8 @@ import { cashForecast, WEEKS } from "@/server/forecast";
 import { ForecastChart } from "@/components/charts";
 import { Card, Empty, Money, PageHeader, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Cash forecast" };
 
 export const dynamic = "force-dynamic";
 

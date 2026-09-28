@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
@@ -5,7 +6,9 @@ import { upcomingVisits } from "@/server/pre-visit";
 import { estimateAllAction, estimateAppointmentAction, requestDepositAction } from "@/app/(app)/pre-visit-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, PatientLink } from "@/components/ui";
-import { fmtDateTime } from "@/lib/utils";
+import { fmtClock } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Visit estimates" };
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +42,7 @@ export default async function PreVisitEstimatesPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.appt.id}>
-                  <td className="whitespace-nowrap text-sm">{fmtDateTime(r.appt.startsAt)}<span className="block text-xs text-slate-500">{r.appt.type.replace(/_/g, " ")} · Dr. {r.provider.lastName}</span></td>
+                  <td className="whitespace-nowrap text-sm">{fmtClock(r.appt.startsAt)}<span className="block text-xs text-slate-500">{r.appt.type.replace(/_/g, " ")} · Dr. {r.provider.lastName}</span></td>
                   <td><PatientLink id={r.patient.id} first={r.patient.firstName} last={r.patient.lastName} /></td>
                   <td className="text-xs">
                     {r.insurance ? (r.insurance.status === "active" ? <Badge tone="green">verified</Badge> : r.insurance.status ? <Badge tone="red">{r.insurance.status}</Badge> : <Badge tone="amber">not checked</Badge>) : <Badge>self-pay</Badge>}

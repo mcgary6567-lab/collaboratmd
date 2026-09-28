@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { fmtPhone } from "@/lib/us";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -13,6 +15,8 @@ import { Badge } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
 import { langOf } from "@/lib/i18n/messages";
 import { STATEMENT_TEXT, statementDay } from "@/lib/i18n/statement";
+
+export const metadata: Metadata = { title: "Statement" };
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +79,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
             <div className="text-lg font-bold text-slate-900">{practice.name}</div>
             <div className="mt-1 text-slate-600">
               {practice.address1}<br />{practice.city}, {practice.state} {practice.zip}
-              {practice.phone && <><br />{practice.phone}</>}
+              {practice.phone && <><br />{fmtPhone(practice.phone)}</>}
             </div>
           </div>
           <div className="text-right">

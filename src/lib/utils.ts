@@ -10,23 +10,36 @@ export function money(cents: number | null | undefined): string {
   return v.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-export function fmtDate(d: string | Date | null | undefined): string {
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * "Sep 21, 2026". A calendar date ("2026-09-21": a date of service or birth)
+ * is that day everywhere; a moment is shown on the given time zone's day.
+ */
+export function fmtDate(d: string | Date | null | undefined, timeZone?: string): string {
+  if (!d) return "";
+  const day = typeof d === "string" && CALENDAR_DAY.test(d);
+  const date = typeof d === "string" ? new Date(day ? `${d}T12:00:00Z` : d) : d;
+  if (Number.isNaN(date.getTime())) return String(d);
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: day ? "UTC" : timeZone });
+}
+
+/**
+ * When something happened, on the practice's clock: "Sep 21, 2026, 9:05 AM EDT".
+ * Pass the practice's time zone (the session has it); the server runs in UTC.
+ */
+export function fmtDateTime(d: string | Date | null | undefined, timeZone?: string): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return String(d);
-  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+  return date.toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone, timeZoneName: timeZone ? "short" : undefined });
 }
 
-export function fmtDateTime(d: string | Date | null | undefined): string {
+/** An appointment's time, which is stored as the practice's clock time: "Sep 21, 2026, 9:05 AM". */
+export function fmtClock(d: string | Date | null | undefined): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return date.toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 }
 
 /** Days between a date and now (positive when in the past). */
@@ -56,3 +69,13 @@ export const CLAIM_STATUS_COLORS: Record<string, string> = {
   voided: "bg-slate-200 text-slate-500 line-through",
   reversed: "bg-orange-100 text-orange-800",
 };
+
+/** How a claim status reads to staff. */
+export const CLAIM_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft", scrub_errors: "Scrub errors", ready: "Ready", submitted: "Submitted", accepted: "Accepted", rejected: "Rejected",
+  pending: "In process", paid: "Paid", partially_paid: "Partially paid", denied: "Denied", closed: "Closed", void_pending: "Void requested",
+  billed_secondary: "At secondary", voided: "Voided", reversed: "Reversed",
+};
+
+/** Any stored status as words: "partially_paid" to "Partially paid". */
+export const statusLabel = (s: string) => CLAIM_STATUS_LABEL[s] ?? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");

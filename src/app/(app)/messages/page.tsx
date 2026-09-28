@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { CAN_WRITE, can, requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { linkThreadAction, replySmsAction } from "@/app/(app)/front-desk-actions
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Text messages" };
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +49,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
                       {t.unread > 0 && <span className="rounded-full bg-brand-700 px-2 text-xs font-bold text-white">{t.unread}</span>}
                     </div>
                     <p className="truncate text-xs text-slate-500">{t.lastDirection === "out" ? "You: " : ""}{t.lastBody}</p>
-                    <p className="text-[11px] text-slate-500">{fmtDateTime(t.lastAt)}{t.optedOut ? " · opted out" : ""}</p>
+                    <p className="text-[11px] text-slate-500">{fmtDateTime(t.lastAt, s.timeZone)}{t.optedOut ? " · opted out" : ""}</p>
                   </Link>
                 </li>
               ))}
@@ -79,7 +82,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
                   <div key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.direction === "out" ? "bg-brand-700 text-white" : "bg-white text-slate-900 ring-1 ring-slate-200"}`}>
                       <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                      <p className={`mt-1 text-[10px] ${m.direction === "out" ? "text-brand-100" : "text-slate-500"}`}>{fmtDateTime(m.createdAt)}{m.status === "failed" ? " · not delivered" : ""}</p>
+                      <p className={`mt-1 text-[10px] ${m.direction === "out" ? "text-brand-100" : "text-slate-500"}`}>{fmtDateTime(m.createdAt, s.timeZone)}{m.status === "failed" ? " · not delivered" : ""}</p>
                     </div>
                   </div>
                 ))}

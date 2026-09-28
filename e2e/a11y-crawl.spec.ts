@@ -17,12 +17,12 @@ const APP = [
   "/clients", "/clients/invoicing", "/admin", "/ops/errors", "/ops/feedback", "/ops/practices",
   "/settings", "/settings/access-review", "/settings/audit", "/settings/automation", "/settings/booking", "/settings/close", "/settings/code-sets", "/settings/compliance",
   "/settings/connections", "/settings/connections/doctor", "/settings/credentials", "/settings/data-export", "/settings/developers",
-  "/settings/enrollment", "/settings/fees", "/settings/fhir", "/settings/go-live", "/settings/integrations", "/settings/locations", "/settings/menu",
+  "/settings/enrollment", "/settings/fees", "/settings/fhir", "/settings/integrations", "/settings/locations", "/settings/menu",
   "/settings/payer-edits", "/settings/payers", "/settings/policies", "/settings/profile", "/settings/providers", "/settings/security",
   "/settings/sso", "/settings/subscription", "/settings/team",
 ];
 const PUBLIC = [
-  "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/contact", "/status", "/switch", "/changelog",
+  "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/contact", "/status", "/switch", "/changelog", "/demo",
   "/blog", "/investors", "/login", "/login/forgot", "/login/sso", "/signup", "/offline",
 ];
 const SKIP = /^\/(api|portal|check-in|reset|unsubscribe|logout|login\/verify|signup\/verify)(\/|$)/;

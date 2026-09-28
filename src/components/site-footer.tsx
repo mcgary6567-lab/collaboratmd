@@ -3,38 +3,16 @@ import { ArrowRight, Lock, Mail, MapPin, MessageCircle, ScrollText, ShieldCheck 
 import { Logo } from "@/components/logo";
 import { COMPANY, addressLines, whatsappLink } from "@/content/company";
 
-/**
- * Brand glyphs are drawn here rather than pulled from the icon set: the icon
- * set ships a generic bird and a close-cross, neither of which is the mark
- * people recognize.
- */
-function FacebookIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.49-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z" />
-    </svg>
-  );
-}
-
-function XIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      <path d="M17.53 3h3.14l-6.86 7.84L22 21h-6.31l-4.95-6.47L5.08 21H1.93l7.34-8.39L2 3h6.47l4.47 5.91L17.53 3Zm-1.1 16.13h1.74L7.65 4.78H5.79l10.64 14.35Z" />
-    </svg>
-  );
-}
-
 const PRODUCT = [
   { href: "/#platform", label: "Platform" },
   { href: "/pricing", label: "Pricing" },
   { href: "/#workflow", label: "How it works" },
   { href: "/#benchmarks", label: "Benchmarks" },
-  { href: "/login", label: "Live demo" },
+  { href: "/demo", label: "Live demo" },
 ];
 
 const COMPANY_LINKS = [
   { href: "/about", label: "About" },
-  { href: "/investors", label: "Investors" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -50,18 +28,10 @@ const RESOURCES = [
 
 const LEGAL = [
   { href: "/privacy", label: "Privacy Policy" },
-  { href: "/terms", label: "Terms & Conditions" },
-  { href: "/gdpr", label: "GDPR" },
-];
-
-/**
- * Replace these with the company profiles once the accounts exist. They point
- * at the platforms themselves for now, because a wrong handle sends visitors
- * to somebody else's page.
- */
-const SOCIAL = [
-  { href: "https://www.facebook.com/", label: "Facebook", Icon: FacebookIcon },
-  { href: "https://x.com/", label: "X", Icon: XIcon },
+  { href: "/terms", label: "Terms of Service" },
+  { href: "/baa", label: "Business Associate Agreement" },
+  { href: "/accessibility", label: "Accessibility" },
+  { href: "/gdpr", label: "GDPR (EU visitors)" },
 ];
 
 const ASSURANCES = [
@@ -101,7 +71,7 @@ export function SiteFooter() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3 sm:ml-auto sm:shrink-0">
-            <Link href="/login" className="btn bg-green-700 text-white hover:bg-green-800">
+            <Link href="/demo" className="btn bg-green-700 text-white hover:bg-green-800">
               Open the demo <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href="/contact" className="btn btn-secondary">
@@ -147,20 +117,6 @@ export function SiteFooter() {
               </a>
             </div>
 
-            <div className="mt-5 flex items-center gap-2.5">
-              {SOCIAL.map(({ href, label, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:border-green-600 hover:bg-green-700 hover:text-white"
-                >
-                  <Icon />
-                </a>
-              ))}
-            </div>
           </div>
 
           <Column title="Product" links={PRODUCT} />
@@ -185,14 +141,6 @@ export function SiteFooter() {
           <div className="flex gap-6 text-sm font-medium text-slate-600 sm:ml-auto">
             <Link href="/login" className="hover:text-green-700">Sign in</Link>
             <Link href="/unsubscribe" className="hover:text-green-700">Unsubscribe</Link>
-            <a
-              href="https://github.com/mcgary6567-lab/collaboratmd"
-              className="hover:text-green-700"
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              GitHub
-            </a>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ import { readSignup, trialDays } from "@/server/signup";
 import { ConfirmSignup } from "./confirm";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Confirm your signup | CollaboratMD" };
+export const metadata: Metadata = { title: "Confirm your signup" };
 
 /** Opening the link changes nothing; the button does, so a mail scanner that follows links cannot create the practice. */
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {

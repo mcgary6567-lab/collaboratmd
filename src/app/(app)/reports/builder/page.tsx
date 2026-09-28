@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -8,6 +9,8 @@ import { practiceConfig } from "@/server/integrations";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Report builder" };
 
 export const dynamic = "force-dynamic";
 
@@ -166,7 +169,7 @@ export default async function ReportBuilderPage({ searchParams }: { searchParams
                 <div className="flex flex-wrap items-center gap-3 md:col-span-3">
                   <SubmitButton pendingLabel="Saving...">{report ? "Save changes" : "Save report"}</SubmitButton>
                   <span className="text-xs text-slate-500">Scheduled emails carry the totals and a sign-in link, never patient rows. They need email connected in Integrations.</span>
-                  {report?.lastSentAt && <Badge tone="green">Last emailed {fmtDateTime(report.lastSentAt)}</Badge>}
+                  {report?.lastSentAt && <Badge tone="green">Last emailed {fmtDateTime(report.lastSentAt, s.timeZone)}</Badge>}
                 </div>
               </ActionForm>
               {report && (

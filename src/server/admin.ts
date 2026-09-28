@@ -9,10 +9,11 @@ import { schema } from "@/db";
 import { isValidNpi } from "@/lib/scrub/rules";
 import { NAV_GROUPS } from "@/lib/nav";
 import { validTimeZone } from "./practice-time";
+import { isUsState, normalizePhone, normalizeZip } from "@/lib/us";
+import { CLIA_RE } from "@/lib/codes/lab";
 
 const { practices, providers, payers, users, auditLog } = schema;
 
-const STATE = /^[A-Z]{2}$/;
 const ZIP = /^\d{5}(-?\d{4})?$/;
 const TAX_ID = /^\d{2}-?\d{7}$/;
 const TAXONOMY = /^\d{3}[0-9A-Z]{6}X$/;
@@ -28,13 +29,28 @@ function diff(before: Record<string, unknown>, after: Record<string, unknown>) {
 
 /* ------------------------------ Practice profile ------------------------------ */
 
-export type ProfileInput = { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; phone: string; timeZone?: string };
+export type ProfileInput = {
+  name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; phone: string; timeZone?: string;
+  /** A solo provider billing under their own (Type 1) NPI, whose name then goes on claims. */
+  billingEntity?: "organization" | "individual"; billingFirstName?: string; billingLastName?: string;
+  /** The CLIA certificate, sent on claims with lab tests. */
+  cliaNumber?: string;
+};
 
 export async function saveProfile(db: Db, practiceId: string, input: ProfileInput, userId?: string) {
+  const individual = input.billingEntity === "individual";
+  const taxDigits = input.taxId.replace(/\D/g, "");
   const v = {
-    name: input.name.trim().slice(0, 120), npi: input.npi.replace(/\D/g, ""), taxId: input.taxId.trim(), address1: input.address1.trim().slice(0, 120),
-    city: input.city.trim().slice(0, 60), state: input.state.trim().toUpperCase(), zip: input.zip.trim(), phone: input.phone.trim() || null,
+    name: input.name.trim().slice(0, 120), npi: input.npi.replace(/\D/g, ""), taxId: taxDigits.length === 9 ? `${taxDigits.slice(0, 2)}-${taxDigits.slice(2)}` : input.taxId.trim(),
+    address1: input.address1.trim().slice(0, 120), city: input.city.trim().slice(0, 60), state: input.state.trim().toUpperCase(),
+    zip: normalizeZip(input.zip) ?? input.zip.trim(), phone: input.phone.trim() ? normalizePhone(input.phone) ?? input.phone.trim() : null,
     ...(input.timeZone ? { timeZone: input.timeZone } : {}),
+    ...(input.billingEntity !== undefined ? {
+      billingEntity: individual ? "individual" : "organization",
+      billingFirstName: individual ? input.billingFirstName?.trim().slice(0, 35) || null : null,
+      billingLastName: individual ? input.billingLastName?.trim().slice(0, 60) || null : null,
+    } : {}),
+    ...(input.cliaNumber !== undefined ? { cliaNumber: input.cliaNumber.trim().toUpperCase() || null } : {}),
   };
   if (input.timeZone && !validTimeZone(input.timeZone)) throw new Error("Choose a valid time zone");
   if (!v.name) throw new Error("Enter the practice's legal name");
@@ -42,9 +58,11 @@ export async function saveProfile(db: Db, practiceId: string, input: ProfileInpu
   if (!TAX_ID.test(v.taxId)) throw new Error("Enter the tax ID as nine digits, e.g. 12-3456789");
   if (!v.address1 || !v.city) throw new Error("Enter the street address and city (claims need a physical address, not a PO box)");
   if (/^p\.?\s*o\.?\s*box/i.test(v.address1)) throw new Error("The billing provider address must be a street address, not a PO box");
-  if (!STATE.test(v.state)) throw new Error("Enter the two-letter state");
+  if (!isUsState(v.state)) throw new Error("Choose the state");
   if (!ZIP.test(v.zip)) throw new Error("Enter a five- or nine-digit ZIP code");
   if (v.phone && !PHONE.test(v.phone)) throw new Error("Enter a US phone number");
+  if (individual && (!v.billingLastName || !v.billingFirstName)) throw new Error("Billing as an individual: enter the provider's first and last name, as enrolled with the NPI");
+  if (v.cliaNumber && !CLIA_RE.test(v.cliaNumber)) throw new Error("A CLIA number is 10 characters: two digits, the letter D, then seven digits (e.g. 10D1234567)");
   const [before] = await db.select().from(practices).where(eq(practices.id, practiceId)).limit(1);
   await db.update(practices).set(v).where(eq(practices.id, practiceId));
   await log(db, practiceId, userId, "practice_profile_changed", "practice", practiceId, diff(before as unknown as Record<string, unknown>, v));
@@ -89,7 +107,11 @@ export async function setProviderActive(db: Db, practiceId: string, id: string, 
 /* ------------------------------ Payers ------------------------------ */
 
 export const PAYER_TYPES = ["commercial", "medicare", "medicaid", "self_pay"];
+export const PAYER_TYPE_LABEL: Record<string, string> = { commercial: "Commercial", medicare: "Medicare", medicaid: "Medicaid", self_pay: "Self-pay" };
 export type PayerInput = { name: string; payerId: string; type: string; timelyFilingDays: number; appealDays: number };
+
+/** What to assume when the form leaves them empty: Medicare allows one year from the date of service, and 120 days to appeal. */
+export const payerDefaults = (type: string) => (type === "medicare" ? { timelyFilingDays: 365, appealDays: 120 } : { timelyFilingDays: 90, appealDays: 60 });
 
 export async function savePayer(db: Db, practiceId: string, id: string | null, input: PayerInput, userId?: string) {
   const v = { name: input.name.trim().slice(0, 120), payerId: input.payerId.trim().toUpperCase().slice(0, 20), type: input.type, timelyFilingDays: Math.round(input.timelyFilingDays), appealDays: Math.round(input.appealDays) };
@@ -97,6 +119,7 @@ export async function savePayer(db: Db, practiceId: string, id: string | null, i
   if (!/^[A-Z0-9]{2,20}$/.test(v.payerId)) throw new Error("Enter the clearinghouse payer ID (letters and digits)");
   if (!PAYER_TYPES.includes(v.type)) throw new Error("Choose the payer type");
   if (!(v.timelyFilingDays >= 30 && v.timelyFilingDays <= 730)) throw new Error("Timely filing is 30 to 730 days");
+  if (v.type === "medicare" && v.timelyFilingDays > 365) throw new Error("Medicare allows at most 365 days (one calendar year) from the date of service");
   if (!(v.appealDays >= 15 && v.appealDays <= 365)) throw new Error("The appeal window is 15 to 365 days");
   if (id) {
     const [before] = await db.select().from(payers).where(and(eq(payers.id, id), eq(payers.practiceId, practiceId))).limit(1);

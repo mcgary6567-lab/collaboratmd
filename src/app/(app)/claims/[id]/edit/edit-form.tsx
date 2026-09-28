@@ -1,17 +1,14 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash } from "lucide-react";
 import { editClaimAction } from "@/app/(app)/claim-edit-actions";
 import { Alert, Field } from "@/components/ui";
+import { PosOptions } from "@/components/code-pickers";
+import { money } from "@/lib/utils";
 
 type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string };
 
-const POS = [
-  ["11", "11 - Office"], ["02", "02 - Telehealth (other than home)"], ["10", "10 - Telehealth in patient home"], ["12", "12 - Home"],
-  ["19", "19 - Off-campus outpatient hospital"], ["21", "21 - Inpatient hospital"], ["22", "22 - On-campus outpatient hospital"],
-  ["23", "23 - Emergency room"], ["24", "24 - Ambulatory surgical center"], ["31", "31 - Skilled nursing facility"],
-];
 
 export function ClaimEditForm({
   claimId,
@@ -55,7 +52,7 @@ export function ClaimEditForm({
         <Field label="Date of service"><input type="date" className="input" value={dos} onChange={(e) => setDos(e.target.value)} /></Field>
         <Field label="Place of service">
           <select className="select" value={pos} onChange={(e) => setPos(e.target.value)}>
-            {POS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            <PosOptions />
           </select>
         </Field>
       </div>
@@ -71,7 +68,7 @@ export function ClaimEditForm({
             <div key={i} className="flex items-center gap-2">
               <span className="w-5 text-xs font-semibold text-slate-500">{i + 1}</span>
               <input list="icd-edit" className="input font-mono" value={d} onChange={(e) => setDx((a) => a.map((x, j) => (j === i ? e.target.value.toUpperCase() : x)))} />
-              {dx.length > 1 && <button type="button" aria-label="Remove diagnosis" className="text-slate-500 hover:text-red-600" onClick={() => setDx((a) => a.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></button>}
+              {dx.length > 1 && <button type="button" aria-label="Remove diagnosis" className="text-slate-500 hover:text-red-600" onClick={() => setDx((a) => a.filter((_, j) => j !== i))}><Trash className="h-4 w-4" /></button>}
             </div>
           ))}
         </div>
@@ -101,14 +98,14 @@ export function ClaimEditForm({
                   <td className="w-20"><input type="number" min={1} className="input" value={l.units} onChange={(e) => update(i, { units: Number(e.target.value) })} /></td>
                   <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} onChange={(e) => update(i, { charge: e.target.value })} /></td>
                   <td className="w-24"><input className="input" value={l.dxPointers} onChange={(e) => update(i, { dxPointers: e.target.value })} /></td>
-                  <td>{lines.length > 1 && <button type="button" aria-label="Remove line" className="text-slate-500 hover:text-red-600" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></button>}</td>
+                  <td>{lines.length > 1 && <button type="button" aria-label="Remove line" className="text-slate-500 hover:text-red-600" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}><Trash className="h-4 w-4" /></button>}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm text-slate-500">Total: <span className="font-semibold text-slate-900">${total.toFixed(2)}</span></div>
+          <div className="text-sm text-slate-500">Total: <span className="font-semibold text-slate-900">{money(Math.round(total * 100))}</span></div>
           <div className="flex gap-2">
             <a href={`/claims/${claimId}`} className="btn btn-secondary">Cancel</a>
             <button className="btn btn-primary" disabled={pending}>{pending ? "Saving..." : "Save and re-scrub"}</button>

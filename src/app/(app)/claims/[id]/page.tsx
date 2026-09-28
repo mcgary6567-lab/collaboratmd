@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, or } from "drizzle-orm";
@@ -17,6 +18,8 @@ import { ClaimActions } from "./claim-actions";
 import { WorkPanel } from "@/components/work-panel";
 import { claimRisk, PRE_SUBMIT } from "@/server/risk";
 import { RiskBadge } from "@/components/risk-badge";
+
+export const metadata: Metadata = { title: "Claim" };
 
 export const dynamic = "force-dynamic";
 
@@ -211,7 +214,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                     <div className="flex items-center gap-2">
                       <Badge tone={a.accepted ? "green" : "red"}>{a.kind}</Badge>
                       <span className="font-mono text-xs">{a.code}</span>
-                      <span className="ml-auto text-xs text-slate-500">{fmtDateTime(a.receivedAt)}</span>
+                      <span className="ml-auto text-xs text-slate-500">{fmtDateTime(a.receivedAt, s.timeZone)}</span>
                     </div>
                     <p className="mt-1 text-slate-800">{a.message}</p>
                     {a.raw && (
@@ -258,7 +261,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             <Card title="Institutional claim (UB-04 / 837I)">
               <dl className="grid gap-2 text-sm sm:grid-cols-3">
                 <div><dt className="text-xs text-slate-500">Type of bill</dt><dd className="font-mono">{b.claim.institutional.typeOfBill}</dd></div>
-                <div><dt className="text-xs text-slate-500">Statement period</dt><dd>{b.claim.institutional.statementFrom} to {b.claim.institutional.statementTo}</dd></div>
+                <div><dt className="text-xs text-slate-500">Statement period</dt><dd>{fmtDate(b.claim.institutional.statementFrom)} to {fmtDate(b.claim.institutional.statementTo)}</dd></div>
                 <div><dt className="text-xs text-slate-500">Patient status</dt><dd className="font-mono">{b.claim.institutional.patientStatus}</dd></div>
                 {b.claim.institutional.admissionDate && <div><dt className="text-xs text-slate-500">Admitted</dt><dd>{b.claim.institutional.admissionDate}{b.claim.institutional.admissionHour ? ` ${b.claim.institutional.admissionHour}` : ""} · type {b.claim.institutional.admissionType ?? "-"} · origin {b.claim.institutional.admissionSource ?? "-"}</dd></div>}
                 {b.claim.institutional.admittingDiagnosis && <div><dt className="text-xs text-slate-500">Admitting diagnosis</dt><dd className="font-mono">{b.claim.institutional.admittingDiagnosis}</dd></div>}
@@ -360,14 +363,14 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               {b.claim.authorizationNumber && <div>Prior auth <span className="font-mono">{b.claim.authorizationNumber}</span> (REF*G1)</div>}
             </div>
           </Card>
-          <WorkPanel db={db} practiceId={s.practiceId} entityType="claim" entityId={id} defaultTitle={`Work claim ${b.claim.controlNumber}`} />
+          <WorkPanel timeZone={s.timeZone} db={db} practiceId={s.practiceId} entityType="claim" entityId={id} defaultTitle={`Work claim ${b.claim.controlNumber}`} />
           <Card title="Timeline">
             <ol className="space-y-3 text-sm">
               {events.map((e) => (
                 <li key={e.id} className="border-l-2 border-slate-200 pl-3">
                   <div className="flex items-center gap-2"><StatusBadge status={e.status} /><span className="text-xs text-slate-500">{e.source}</span></div>
                   <div className="text-slate-700">{e.message}</div>
-                  <div className="text-xs text-slate-500">{fmtDateTime(e.at)}</div>
+                  <div className="text-xs text-slate-500">{fmtDateTime(e.at, s.timeZone)}</div>
                 </li>
               ))}
             </ol>

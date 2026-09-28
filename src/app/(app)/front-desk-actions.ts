@@ -1,5 +1,6 @@
 "use server";
 
+import { subscriberFrom } from "@/lib/subscriber-form";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -23,6 +24,7 @@ export async function addInsuranceAction(patientId: string, _prev: FormResult, f
       relationship: String(formData.get("relationship") ?? "self"),
       copayCents: copay ? Math.round(Number(copay) * 100) || 0 : 0,
       makePrimary: formData.get("makePrimary") === "on",
+      subscriber: subscriberFrom(formData),
     }, s.userId);
     revalidatePath(`/patients/${patientId}`);
     return { ok: true, message: "Insurance added. Check eligibility to confirm it is active." };

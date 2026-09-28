@@ -9,7 +9,7 @@ import { fmtDateTime, money } from "@/lib/utils";
 const TONE = { waiting: "amber", succeeded: "green", failed: "red", canceled: "slate" } as const;
 
 /** Card-present payment on a Stripe Terminal reader. Shown only when Stripe is connected. */
-export async function TerminalSection({ db, practiceId, patientId, canWrite, admin }: { db: Db; practiceId: string; patientId: string; canWrite: boolean; admin: boolean }) {
+export async function TerminalSection({ db, practiceId, patientId, canWrite, admin, timeZone }: { db: Db; practiceId: string; patientId: string; canWrite: boolean; admin: boolean; timeZone?: string }) {
   if (!(await practiceConfig(db, practiceId)).stripe) return null;
   let readers: Awaited<ReturnType<typeof listReaders>>["readers"] = [];
   let test = false;
@@ -46,7 +46,7 @@ export async function TerminalSection({ db, practiceId, patientId, canWrite, adm
               <span>
                 <span className="font-semibold tabular-nums">{money(p.amountCents)}</span>{" "}
                 <Badge tone={TONE[p.status as keyof typeof TONE] ?? "slate"}>{p.status}</Badge>{" "}
-                <span className="text-xs text-slate-500">{fmtDateTime(p.createdAt)}{p.failure ? ` · ${p.failure}` : ""}</span>
+                <span className="text-xs text-slate-500">{fmtDateTime(p.createdAt, timeZone)}{p.failure ? ` · ${p.failure}` : ""}</span>
               </span>
               {p.status === "waiting" && canWrite && (
                 <span className="flex gap-2">

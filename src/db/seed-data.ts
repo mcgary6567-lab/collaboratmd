@@ -95,7 +95,7 @@ export async function seedDemoData(db: Db) {
 
   const [practice] = await db
     .insert(schema.practices)
-    .values({ name: "Lakeside Family Medicine", taxId: "12-3456789", npi: makeNpi("123456789"), address1: "410 Lakeside Ave, Suite 200", city: "Orlando", state: "FL", zip: "32801", phone: "407-555-0100" })
+    .values({ name: "Lakeside Family Medicine", taxId: "12-3456789", npi: makeNpi("123456789"), address1: "410 Lakeside Ave, Suite 200", city: "Orlando", state: "FL", zip: "32801", phone: "407-555-0100", isDemo: true, cliaNumber: "10D1234567" })
     .returning();
 
   await db.insert(schema.users).values([
@@ -151,8 +151,10 @@ export async function seedDemoData(db: Db) {
       .returning();
     const payer = payerRows[i % payerRows.length];
     // Member IDs ending in X are rejected by the clearinghouse; ending in D are denied by the payer.
-    const suffix = i === 4 || i === 17 ? "X" : i % 11 === 3 ? "D" : String.fromCharCode(65 + (i % 20));
-    await db.insert(schema.patientInsurances).values({ patientId: p.id, payerId: payer.id, memberId: `${payer.payerId.slice(0, 2)}${String(100000 + i * 911)}${suffix}`, groupNumber: i % 3 ? `GRP${1000 + i}` : null, relationship: "self", copayCents: [2000, 2500, 3000][i % 3] });
+    const suffix = i === 2 || i === 17 ? "X" : i % 11 === 3 ? "D" : String.fromCharCode(65 + (i % 20));
+    // Medicare takes the 11-character MBI (lib/scrub/rules.ts isValidMbi), which ends in digits.
+    const memberId = payer.type === "medicare" ? `${1 + (i % 9)}EG${i % 10}TE${(i * 3) % 10}MK${10 + (i % 90)}` : `${payer.payerId.slice(0, 2)}${String(100000 + i * 911)}${suffix}`;
+    await db.insert(schema.patientInsurances).values({ patientId: p.id, payerId: payer.id, memberId, groupNumber: i % 3 ? `GRP${1000 + i}` : null, relationship: "self", copayCents: [2000, 2500, 3000][i % 3] });
     patientRows.push(p);
   }
 

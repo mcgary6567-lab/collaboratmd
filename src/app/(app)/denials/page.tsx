@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { CircleCheck } from "lucide-react";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +9,8 @@ import { Pager, SortLink, pageArgs, withParams, type Params } from "@/components
 import { denialStatusAction } from "@/app/(app)/actions";
 import { Card, PageHeader, PatientLink, Money, Badge, Empty, StatusBadge } from "@/components/ui";
 import { fmtDate, daysAgo } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Denials" };
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +66,7 @@ export default async function DenialsPage({ searchParams }: { searchParams: Prom
         </span>
       </div>
       {rows.length === 0 ? (
-        <Card><Empty>No denials in this view.</Empty></Card>
+        <Card><Empty icon={CircleCheck}>No denials in this view.</Empty></Card>
       ) : (
         <div className="space-y-3">
           {rows.map(({ denial, claim, patient, payer }) => {

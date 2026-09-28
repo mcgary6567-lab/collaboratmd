@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { eraGaps, transactionGrid, TRANSACTIONS, TXN_STATUSES } from "@/server/t
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
 import { Pager, pageArgs, withParams, type Params } from "@/components/data-table";
+
+export const metadata: Metadata = { title: "Enrollment" };
 
 export const dynamic = "force-dynamic";
 

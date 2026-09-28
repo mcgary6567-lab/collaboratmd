@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { checkStatusAction, runFollowUpAction } from "@/app/(app)/followup-actio
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, Stat, StatusBadge } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Claim follow-up" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { FileText } from "lucide-react";
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -11,6 +13,8 @@ import { fmtDate, daysAgo } from "@/lib/utils";
 import { SubmitAllButton } from "./submit-all";
 import { PRE_SUBMIT, riskForClaims } from "@/server/risk";
 import { RiskBadge } from "@/components/risk-badge";
+
+export const metadata: Metadata = { title: "Claims" };
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +77,10 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         <div className="mb-3"><SavedViews page="claims" query={query} views={views} /></div>
         <ClaimBulkBar people={people} />
         {rows.length === 0 ? (
-          <Empty>No claims match. Clear a filter or search for something else.</Empty>
+          <Empty icon={FileText} action={<Link href="/encounters/new" className="btn btn-primary">Enter charges</Link>}>No claims match. Clear a filter or search for something else, or enter charges for a visit.</Empty>
         ) : (
           <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
-            <table className="table">
+            <table className="table table-stack">
               <thead>
                 <tr>
                   <th className="w-8"><SelectAll /></th>
@@ -98,8 +102,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                   const tasks = taskCounts.get(claim.id) ?? 0;
                   return (
                     <tr key={claim.id}>
-                      <td><input type="checkbox" name="ids" value={claim.id} form="bulk-claims" aria-label={`Select ${claim.controlNumber}`} /></td>
-                      <td className="whitespace-nowrap">
+                      <td data-label=""><input type="checkbox" name="ids" value={claim.id} form="bulk-claims" aria-label={`Select ${claim.controlNumber}`} /></td>
+                      <td data-label="Claim" className="whitespace-nowrap">
                         <Link href={`/claims/${claim.id}`} className="font-mono text-brand-700 hover:underline">{claim.controlNumber}</Link>
                         {claim.frequencyCode === "7" && <span className="ml-1 text-[10px] font-semibold text-amber-700">CORRECTED</span>}
                         {claim.frequencyCode === "8" && <span className="ml-1 text-[10px] font-semibold text-red-700">VOID</span>}
@@ -107,18 +111,18 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                         {claim.claimType === "institutional" && <span className="ml-1 text-[10px] font-semibold text-indigo-700">UB-04</span>}
                         {tasks > 0 && <span className="ml-1 rounded bg-violet-100 px-1 text-[10px] font-semibold text-violet-800">{tasks} task{tasks > 1 ? "s" : ""}</span>}
                       </td>
-                      <td><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
-                      <td className="whitespace-nowrap">{fmtDate(encounter.dateOfService + "T00:00:00")}</td>
-                      <td className="text-xs">{payer.name}</td>
-                      <td><StatusBadge status={claim.status} /></td>
-                      <td className="text-xs">
+                      <td data-label="Patient"><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
+                      <td data-label="DOS" className="whitespace-nowrap">{fmtDate(encounter.dateOfService + "T00:00:00")}</td>
+                      <td data-label="Payer" className="text-xs">{payer.name}</td>
+                      <td data-label="Status"><StatusBadge status={claim.status} /></td>
+                      <td data-label="Scrub" className="text-xs">
                         {errors > 0 && <span className="mr-1 text-red-700">{errors} err</span>}
                         {warnings > 0 && <span className="text-amber-700">{warnings} warn</span>}
                         {errors === 0 && warnings === 0 && <span className="text-green-700">clean</span>}
                         {risks.get(claim.id) && risks.get(claim.id)!.level !== "low" && <span className="ml-1"><RiskBadge risk={risks.get(claim.id)!} compact /></span>}
                       </td>
-                      <td className="text-right"><Money cents={claim.totalCents} /></td>
-                      <td className={`whitespace-nowrap text-xs ${tfDays !== null && tfDays < 15 && !["paid", "closed", "voided"].includes(claim.status) ? "font-semibold text-red-700" : "text-slate-500"}`}>
+                      <td data-label="Billed" className="text-right"><Money cents={claim.totalCents} /></td>
+                      <td data-label="Timely filing" className={`whitespace-nowrap text-xs ${tfDays !== null && tfDays < 15 && !["paid", "closed", "voided"].includes(claim.status) ? "font-semibold text-red-700" : "text-slate-500"}`}>
                         {tfDays === null ? "-" : tfDays < 0 ? `${-tfDays}d overdue` : `${tfDays}d left`}
                       </td>
                     </tr>

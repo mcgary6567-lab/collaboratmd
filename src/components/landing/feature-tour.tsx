@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import {
-  BadgeCheck, CalendarDays, Check, CreditCard, FileSearch, Gauge, MessageSquareText, Pause, Play, ScanLine, Wand2,
+  BadgeCheck, CalendarDays, Check, CreditCard, FileSearch, Gauge, MessageSquareText, Pause, Play, ScanLine, WandSparkles,
 } from "lucide-react";
 
 type Bullet = { text: string; needs?: string };
@@ -78,7 +78,7 @@ const STAGES: Stage[] = [
   {
     key: "coding",
     label: "Coding",
-    icon: Wand2,
+    icon: WandSparkles,
     title: "The right visit level, without guessing",
     lead: "Coding help sits beside charge entry, built on the AMA's time and medical decision making rules.",
     bullets: [

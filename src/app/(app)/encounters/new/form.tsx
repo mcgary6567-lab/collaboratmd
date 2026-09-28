@@ -1,25 +1,15 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Trash, Plus } from "lucide-react";
 import { createEncounterAction } from "@/app/(app)/actions";
 import { Field, Alert } from "@/components/ui";
+import { PosOptions } from "@/components/code-pickers";
+import { money } from "@/lib/utils";
 import { PatientPicker, type PatientOption } from "@/components/patient-picker";
 
 type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string };
 
-const POS = [
-  ["11", "11 - Office"],
-  ["02", "02 - Telehealth (other than home)"],
-  ["10", "10 - Telehealth in patient home"],
-  ["12", "12 - Home"],
-  ["19", "19 - Off-campus outpatient hospital"],
-  ["21", "21 - Inpatient hospital"],
-  ["22", "22 - On-campus outpatient hospital"],
-  ["23", "23 - Emergency room"],
-  ["24", "24 - Ambulatory surgical center"],
-  ["31", "31 - Skilled nursing facility"],
-];
 
 export function ChargeEntryForm({
   defaults,
@@ -43,6 +33,7 @@ export function ChargeEntryForm({
   const [locationId, setLocationId] = useState(defaults.locationId ?? "");
   const [pos, setPos] = useState(locations.find((l) => l.id === defaults.locationId)?.placeOfService ?? "11");
   const [dx, setDx] = useState<string[]>([""]);
+  const [referring, setReferring] = useState({ lastName: "", firstName: "", npi: "" });
   const [lines, setLines] = useState<Line[]>([{ cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }]);
 
   const feeFor = (code: string) => cpts.find((c) => c.code === code)?.fee;
@@ -57,6 +48,7 @@ export function ChargeEntryForm({
     placeOfService: pos,
     locationId: locationId || null,
     diagnoses: dx.map((d) => d.trim()).filter(Boolean),
+    referring: referring.npi.trim() || referring.lastName.trim() ? referring : null,
     lines: lines
       .filter((l) => l.cpt.trim())
       .map((l) => ({
@@ -95,11 +87,17 @@ export function ChargeEntryForm({
         <Field label="Date of service"><input type="date" className="input" value={dos} onChange={(e) => setDos(e.target.value)} /></Field>
         <Field label="Place of service">
           <select className="select" value={pos} onChange={(e) => setPos(e.target.value)}>
-            {POS.map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
+            <PosOptions />
           </select>
         </Field>
+        <details className="sm:col-span-2 lg:col-span-4">
+          <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-300">Referring provider (when the payer requires a referral)</summary>
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+            <Field label="Last name"><input className="input" value={referring.lastName} onChange={(e) => setReferring((r) => ({ ...r, lastName: e.target.value }))} autoComplete="off" /></Field>
+            <Field label="First name"><input className="input" value={referring.firstName} onChange={(e) => setReferring((r) => ({ ...r, firstName: e.target.value }))} autoComplete="off" /></Field>
+            <Field label="NPI"><input className="input font-mono" value={referring.npi} onChange={(e) => setReferring((r) => ({ ...r, npi: e.target.value }))} inputMode="numeric" maxLength={10} placeholder="10 digits" autoComplete="off" /></Field>
+          </div>
+        </details>
       </div>
 
       <div className="card p-5">
@@ -122,7 +120,7 @@ export function ChargeEntryForm({
               <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 lg:inline">{icds.find((c) => c.code === d)?.description}</span>
               {dx.length > 1 && (
                 <button type="button" className="text-slate-500 hover:text-red-600" onClick={() => setDx((arr) => arr.filter((_, j) => j !== i))}>
-                  <Trash2 className="h-4 w-4" />
+                  <Trash className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -165,7 +163,7 @@ export function ChargeEntryForm({
                 <td>
                   {lines.length > 1 && (
                     <button type="button" className="text-slate-500 hover:text-red-600" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
-                      <Trash2 className="h-4 w-4" />
+                      <Trash className="h-4 w-4" />
                     </button>
                   )}
                 </td>
@@ -174,7 +172,7 @@ export function ChargeEntryForm({
           </tbody>
         </table></div>
         <div className="mt-3 flex items-center justify-between">
-          <div className="text-sm text-slate-500">Total charges: <span className="font-semibold text-slate-900">${total.toFixed(2)}</span></div>
+          <div className="text-sm text-slate-500">Total charges: <span className="font-semibold text-slate-900">{money(Math.round(total * 100))}</span></div>
           <button className="btn btn-primary" disabled={pending}>{pending ? "Creating claim..." : "Save encounter and build claim"}</button>
         </div>
       </div>

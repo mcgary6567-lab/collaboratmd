@@ -12,7 +12,7 @@ import { Faq } from "@/components/faq";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Pricing — CollaboratMD",
+  title: "Pricing",
   description:
     "CollaboratMD pricing: a subscription per rendering provider plus a per-claim transaction line, across three plans for practices and billing companies.",
 };

@@ -1,0 +1,55 @@
+/**
+ * Common provider taxonomy codes (NUCC Health Care Provider Taxonomy), offered
+ * as suggestions where a provider's or practice's taxonomy is entered. Any
+ * code of the right shape is still accepted: the full NUCC set has several
+ * hundred, and a specialist's may not be here.
+ */
+export const COMMON_TAXONOMIES: [code: string, name: string][] = [
+  ["207Q00000X", "Family Medicine"],
+  ["208D00000X", "General Practice"],
+  ["207R00000X", "Internal Medicine"],
+  ["208000000X", "Pediatrics"],
+  ["207V00000X", "Obstetrics & Gynecology"],
+  ["207P00000X", "Emergency Medicine"],
+  ["207RC0000X", "Cardiovascular Disease"],
+  ["207RE0101X", "Endocrinology, Diabetes & Metabolism"],
+  ["207RG0100X", "Gastroenterology"],
+  ["207RN0300X", "Nephrology"],
+  ["207RP1001X", "Pulmonary Disease"],
+  ["2084N0400X", "Neurology"],
+  ["2084P0800X", "Psychiatry"],
+  ["207N00000X", "Dermatology"],
+  ["207W00000X", "Ophthalmology"],
+  ["207Y00000X", "Otolaryngology"],
+  ["207X00000X", "Orthopaedic Surgery"],
+  ["208600000X", "Surgery"],
+  ["208800000X", "Urology"],
+  ["207L00000X", "Anesthesiology"],
+  ["2085R0202X", "Diagnostic Radiology"],
+  ["363L00000X", "Nurse Practitioner"],
+  ["363LF0000X", "Nurse Practitioner, Family"],
+  ["363A00000X", "Physician Assistant"],
+  ["363AM0700X", "Physician Assistant, Medical"],
+  ["103T00000X", "Psychologist"],
+  ["101YM0800X", "Counselor, Mental Health"],
+  ["1041C0700X", "Social Worker, Clinical"],
+  ["225100000X", "Physical Therapist"],
+  ["225X00000X", "Occupational Therapist"],
+  ["235Z00000X", "Speech-Language Pathologist"],
+  ["111N00000X", "Chiropractor"],
+  ["152W00000X", "Optometrist"],
+  ["213E00000X", "Podiatrist"],
+  ["133V00000X", "Dietitian, Registered"],
+  ["1223G0001X", "Dentist, General Practice"],
+  ["1223P0221X", "Dentist, Pediatric Dentistry"],
+  ["1223X0400X", "Dentist, Orthodontics"],
+  ["193200000X", "Multi-Specialty Group"],
+  ["193400000X", "Single Specialty Group"],
+  ["261QP2300X", "Clinic/Center, Primary Care"],
+  ["261QF0400X", "Clinic/Center, Federally Qualified Health Center"],
+  ["261QR1300X", "Clinic/Center, Rural Health"],
+  ["291U00000X", "Clinical Medical Laboratory"],
+  ["282N00000X", "General Acute Care Hospital"],
+];
+
+export const TAXONOMY_RE = /^[0-9]{3}[0-9A-Z]{6}X$/;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { CheckCircle2, Send } from "lucide-react";
+import { CircleCheck, Send } from "lucide-react";
 import { contactAction, type ContactState } from "./actions";
 
 const TOPICS = [
@@ -58,7 +58,7 @@ export function ContactForm({ defaultTopic = "sales" }: { defaultTopic?: string 
   if (state?.ok) {
     return (
       <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-green-700" />
+        <CircleCheck className="mx-auto h-10 w-10 text-green-700" />
         <h3 className="mt-4 text-lg font-bold text-slate-900">Thank you, we have your message</h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-700">
           It has been recorded and routed to the queue for the topic you selected. We reply to
@@ -176,7 +176,7 @@ export function ContactForm({ defaultTopic = "sales" }: { defaultTopic?: string 
       </button>
 
       <p className="text-xs leading-relaxed text-slate-500">
-        By sending this form you agree to our <a href="/terms" className="font-medium text-green-700 underline underline-offset-2">Terms &amp; Conditions</a> and{" "}
+        By sending this form you agree to our <a href="/terms" className="font-medium text-green-700 underline underline-offset-2">Terms of Service</a> and{" "}
         <a href="/privacy" className="font-medium text-green-700 underline underline-offset-2">Privacy Policy</a>. Do not include patient
         information in your message.
       </p>

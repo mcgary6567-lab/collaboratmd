@@ -6,6 +6,13 @@
  * (billing provider, subscriber, payer, claim, diagnoses, service lines).
  */
 import { contactPhone } from "./x12";
+import { REL_CODE, subscriberLoops, type Person } from "./subscriber";
+
+/**
+ * SBR09, the claim filing indicator, on a professional claim: Medicare Part B,
+ * Medicaid, or commercial. Medicare contractors reject a claim filed as CI.
+ */
+export const professionalFiling = (type?: string | null) => (type === "medicare" ? "MB" : type === "medicaid" ? "MC" : "CI");
 
 /** A supporting document for a claim (see server/attachments.ts). */
 export type ClaimAttachmentRef = { reportType: string; transmission: string; controlNumber: string };
@@ -39,9 +46,9 @@ export function serviceFacilityLoop(f: ServiceFacility): string[][] {
  * primary payer with its adjudication date, so the secondary pays only what
  * is left.
  */
-export function otherPayerLoops(o: OtherPayer): string[][] {
-  const rel: Record<string, string> = { self: "18", spouse: "01", child: "19", other: "G8" };
-  const out: string[][] = [["SBR", "P", rel[o.subscriber.relationship] ?? "18", o.subscriber.groupNumber ?? "", "", "", "", "", "", "CI"]];
+export function otherPayerLoops(o: OtherPayer, filing = "CI"): string[][] {
+  // 2320 SBR02 is the patient's relationship to the other plan's subscriber (18 when it is themselves).
+  const out: string[][] = [["SBR", "P", REL_CODE[o.subscriber.relationship] ?? "18", o.subscriber.groupNumber ?? "", "", "", "", "", "", filing]];
   const byGroup = new Map<string, { reason: string; amountCents: number }[]>();
   for (const a of o.adjustments.filter((x) => x.amountCents !== 0)) byGroup.set(a.group, [...(byGroup.get(a.group) ?? []), a]);
   for (const [group, list] of byGroup) out.push(["CAS", group, ...list.slice(0, 6).flatMap((a) => [a.reason, money(a.amountCents), ""])]);
@@ -69,10 +76,18 @@ export interface Edi837Input {
     zip: string;
     /** Submitter contact number (PER in loop 1000A). */
     phone?: string | null;
+    /** A solo provider billing under their Type 1 NPI: the billing provider is a person (NM1*85*1). */
+    individual?: { lastName: string; firstName: string } | null;
   };
   renderingProvider: { lastName: string; firstName: string; npi: string; taxonomy: string };
+  /** The referring provider, sent in loop 2310A when present. */
+  referringProvider?: { lastName: string; firstName: string; npi: string } | null;
   serviceFacility?: ServiceFacility | null;
-  payer: { name: string; payerId: string };
+  /** `type` (medicare, medicaid, commercial...) sets the claim filing indicator, SBR09. */
+  payer: { name: string; payerId: string; type?: string | null };
+  /** The patient, when not the subscriber (relationship not "self"): sent in loop 2000C. */
+  patient?: Person;
+  /** The insured person: the patient, or (relationship not "self") whoever holds the plan. */
   subscriber: {
     lastName: string;
     firstName: string;
@@ -94,6 +109,8 @@ export interface Edi837Input {
     originalPayerClaimNumber?: string | null;
     /** REF*G1: prior authorization number, when one covers the claim. */
     authorizationNumber?: string | null;
+    /** CLIA certificate number, for claims with laboratory tests (REF*X4). */
+    cliaNumber?: string | null;
     dateOfService: string; // YYYY-MM-DD
     diagnoses: string[]; // ICD-10-CM without dots
     /** PWK: supporting documents sent separately, matched by control number. */
@@ -104,6 +121,8 @@ export interface Edi837Input {
    * decided, sent in loops 2320/2330 so the secondary pays only what is left.
    */
   otherPayer?: {
+    /** The primary payer's type, for its filing indicator in loop 2320. */
+    type?: string | null;
     name: string;
     payerId: string;
     subscriber: { lastName: string; firstName: string; memberId: string; groupNumber?: string | null; relationship: string };
@@ -147,7 +166,7 @@ export function buildEdi837P(input: Edi837Input): string {
   const ccyymmdd = now.toISOString().slice(0, 10).replace(/-/g, "");
   const hhmm = now.toISOString().slice(11, 16).replace(":", "");
   const icn = input.interchangeControl.padStart(9, "0").slice(-9);
-  const relCode: Record<string, string> = { self: "18", spouse: "01", child: "19", other: "G8" };
+
 
   s.push(["ISA", "00", pad("", 10), "00", pad("", 10), "ZZ", pad(input.senderId, 15), "ZZ", pad(input.receiverId, 15), yymmdd, hhmm, "^", "00501", icn, "0", "P", ":"]);
   s.push(["GS", "HC", input.senderId, input.receiverId, ccyymmdd, hhmm, icn.replace(/^0+/, "") || "1", "X", "005010X222A1"]);
@@ -160,18 +179,19 @@ export function buildEdi837P(input: Edi837Input): string {
   // 2000A billing provider
   s.push(["HL", "1", "", "20", "1"]);
   s.push(["PRV", "BI", "PXC", input.renderingProvider.taxonomy]);
-  s.push(["NM1", "85", "2", input.billingProvider.name, "", "", "", "", "XX", input.billingProvider.npi]);
+  const bp = input.billingProvider;
+  s.push(bp.individual ? ["NM1", "85", "1", bp.individual.lastName, bp.individual.firstName, "", "", "", "XX", bp.npi] : ["NM1", "85", "2", bp.name, "", "", "", "", "XX", bp.npi]);
   s.push(["N3", input.billingProvider.address1]);
   s.push(["N4", input.billingProvider.city, input.billingProvider.state, input.billingProvider.zip.replace("-", "")]);
   s.push(["REF", "EI", input.billingProvider.taxId.replace("-", "")]);
-  // 2000B subscriber
-  s.push(["HL", "2", "1", "22", "0"]);
-  s.push(["SBR", input.otherPayer ? "S" : "P", relCode[input.subscriber.relationship] ?? "18", input.subscriber.groupNumber ?? "", "", "", "", "", "", "CI"]);
-  s.push(["NM1", "IL", "1", input.subscriber.lastName, input.subscriber.firstName, "", "", "", "MI", input.subscriber.memberId]);
-  if (input.subscriber.address1) s.push(["N3", input.subscriber.address1]);
-  if (input.subscriber.city) s.push(["N4", input.subscriber.city, input.subscriber.state ?? "", (input.subscriber.zip ?? "").replace("-", "")]);
-  s.push(["DMG", "D8", d8(input.subscriber.dob), input.subscriber.sex]);
-  s.push(["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId]);
+  // 2000B subscriber and payer, then 2000C patient when the patient is a dependent (lib/edi/subscriber.ts)
+  s.push(...subscriberLoops({
+    sequence: input.otherPayer ? "S" : "P",
+    subscriber: input.subscriber,
+    patient: input.patient ?? input.subscriber,
+    filing: professionalFiling(input.payer.type),
+    payer: ["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId],
+  }));
   // 2300 claim
   s.push(["CLM", input.controlNumber, money(input.claim.totalCents), "", "", `${input.claim.placeOfService}:B:${input.claim.frequencyCode}`, "Y", "A", "Y", "Y"]);
   for (const a of input.claim.attachments ?? []) s.push(pwk(a));
@@ -184,13 +204,16 @@ export function buildEdi837P(input: Edi837Input): string {
     s.push(["REF", "F8", input.claim.originalPayerClaimNumber]);
   }
   if (input.claim.authorizationNumber) s.push(["REF", "G1", input.claim.authorizationNumber]);
+  if (input.claim.cliaNumber) s.push(["REF", "X4", input.claim.cliaNumber]);
   const hi = ["HI", ...input.claim.diagnoses.map((c, i) => `${i === 0 ? "ABK" : "ABF"}:${icd(c)}`)];
   s.push(hi);
+  // 2310A referring provider
+  if (input.referringProvider) s.push(["NM1", "DN", "1", input.referringProvider.lastName, input.referringProvider.firstName, "", "", "", "XX", input.referringProvider.npi]);
   // 2310B rendering provider
   s.push(["NM1", "82", "1", input.renderingProvider.lastName, input.renderingProvider.firstName, "", "", "", "XX", input.renderingProvider.npi]);
   s.push(["PRV", "PE", "PXC", input.renderingProvider.taxonomy]);
   if (input.serviceFacility) s.push(...serviceFacilityLoop(input.serviceFacility));
-  if (input.otherPayer) s.push(...otherPayerLoops(input.otherPayer));
+  if (input.otherPayer) s.push(...otherPayerLoops(input.otherPayer, professionalFiling(input.otherPayer.type)));
   // 2400 service lines
   input.lines.forEach((line, idx) => {
     s.push(["LX", String(idx + 1)]);

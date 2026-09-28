@@ -15,7 +15,7 @@ export default async function NotFound() {
         <p className="mt-2 text-sm text-slate-600">The link may be old, or the address mistyped. If you followed a link from a message we sent, ask the practice for a new one.</p>
         <div className="mt-6 flex justify-center gap-3">
           <Link href="/" className="btn btn-secondary">Home</Link>
-          <Link href="/dashboard" className="btn btn-primary">Dashboard</Link>
+          <Link href="/dashboard" className="btn btn-primary">Go to the app</Link>
         </div>
       </div>
     </main>

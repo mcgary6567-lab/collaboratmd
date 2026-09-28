@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, CircleDashed } from "lucide-react";
+import { CircleCheck, CircleDashed } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Trust center — CollaboratMD",
+  title: "Trust center",
   description: "How CollaboratMD handles patient data: safeguards in the product, the services it runs on, what AI sees, and where independent assurance stands.",
 };
 
@@ -61,7 +61,7 @@ export default function TrustPage() {
           <h2 className="text-xl font-bold text-slate-900">Safeguards in the product</h2>
           <ul className="mt-4 space-y-2.5">
             {SAFEGUARDS.map((s) => (
-              <li key={s} className="flex gap-2.5 text-sm text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> {s}</li>
+              <li key={s} className="flex gap-2.5 text-sm text-slate-700"><CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> {s}</li>
             ))}
           </ul>
           <p className="mt-4 text-sm text-slate-600">More detail on the <Link href="/security" className="font-semibold text-green-700 underline">security page</Link>.</p>
@@ -72,7 +72,7 @@ export default function TrustPage() {
           <ul className="mt-4 space-y-2.5">
             {ASSURANCE.map((a) => (
               <li key={a.text} className="flex gap-2.5 text-sm text-slate-700">
-                {a.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> : <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />} {a.text}
+                {a.done ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-700" /> : <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />} {a.text}
               </li>
             ))}
           </ul>

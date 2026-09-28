@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -8,6 +9,8 @@ import { ActionForm, PrintButton, SubmitButton } from "@/components/action-form"
 import { CopyButton } from "@/components/copy-button";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Underpayment letter" };
 
 export const dynamic = "force-dynamic";
 

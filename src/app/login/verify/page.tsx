@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession, hasPendingMfa } from "@/lib/auth";
 import { LogoMark } from "@/components/logo";
 import { VerifyForm } from "./verify-form";
+
+export const metadata: Metadata = { title: "Two-factor verification" };
 
 export const dynamic = "force-dynamic";
 

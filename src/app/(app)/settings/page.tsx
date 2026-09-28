@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -6,6 +7,8 @@ import { settingsFor } from "@/lib/settings-sections";
 import { setupHealth } from "@/server/setup-health";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { SettingsDirectory } from "./settings-directory";
+
+export const metadata: Metadata = { title: "Settings" };
 
 export const dynamic = "force-dynamic";
 

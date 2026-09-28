@@ -1,5 +1,6 @@
 "use server";
 
+import { subscriberFrom } from "@/lib/subscriber-form";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -144,25 +145,37 @@ const patientSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zip: z.string().optional(),
-  payerId: z.string().uuid(),
-  memberId: z.string().min(1),
+  payerId: z.string().uuid().optional(),
+  memberId: z.string().optional(),
   groupNumber: z.string().optional(),
-  relationship: z.enum(["self", "spouse", "child", "other"]),
+  relationship: z.enum(["self", "spouse", "child", "other"]).optional(),
   copayCents: z.coerce.number().int().min(0),
+  subscriber: z.object({
+    firstName: z.string().optional(), lastName: z.string().optional(), dob: z.string().optional(), sex: z.string().optional(),
+    address1: z.string().optional(), city: z.string().optional(), state: z.string().optional(), zip: z.string().optional(),
+  }).optional(),
 });
 
 export async function createPatientAction(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {
   const s = await requireRole(CAN_WRITE);
   const data = Object.fromEntries(formData.entries());
-  const parsed = patientSchema.safeParse({ ...data, copayCents: Math.round(parseFloat(String(data.copay || "0")) * 100) });
+  const selfPay = data.coverage === "self_pay";
+  const parsed = patientSchema.safeParse({
+    ...data,
+    ...(selfPay ? { payerId: undefined, memberId: undefined, relationship: undefined } : {}),
+    copayCents: Math.round(parseFloat(String(data.copay || "0")) * 100) || 0,
+    subscriber: subscriberFrom(formData),
+  });
   if (!parsed.success) return { ok: false, message: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
+  if (!selfPay && (!parsed.data.payerId || !parsed.data.memberId?.trim())) return { ok: false, message: "Choose the payer and enter the member ID, or mark the patient self-pay" };
   const db = await getDb();
+  let p;
   try {
-    await assertOwned(db, s.practiceId, "payer", parsed.data.payerId);
+    if (parsed.data.payerId) await assertOwned(db, s.practiceId, "payer", parsed.data.payerId);
+    p = await createPatient(db, s.practiceId, { ...parsed.data, payerId: selfPay ? null : parsed.data.payerId!, memberId: parsed.data.memberId ?? "", relationship: parsed.data.relationship ?? "self" });
   } catch (e) {
     return fail(e);
   }
-  const p = await createPatient(db, s.practiceId, parsed.data);
   revalidatePath("/patients");
   redirect(`/patients/${p.id}`);
 }
@@ -250,6 +263,7 @@ const encounterSchema = z.object({
     )
     .min(1)
     .max(50),
+  referring: z.object({ lastName: z.string().max(60), firstName: z.string().max(35).optional(), npi: z.string().max(12) }).nullable().optional(),
 });
 
 export async function createEncounterAction(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {
@@ -271,7 +285,12 @@ export async function createEncounterAction(_prev: ActionResult | undefined, for
   } catch (e) {
     return fail(e);
   }
-  const { claim } = await createEncounterWithClaim(db, s.practiceId, parsed.data, s.userId);
+  let claim: { id: string };
+  try {
+    ({ claim } = await createEncounterWithClaim(db, s.practiceId, parsed.data, s.userId));
+  } catch (e) {
+    return fail(e);
+  }
   revalidatePath("/claims");
   redirect(`/claims/${claim.id}`);
 }

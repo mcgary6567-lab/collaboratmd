@@ -54,7 +54,8 @@ describe("the practice's clock", () => {
 });
 
 describe("the demo practice's schedule", () => {
-  it("puts today's appointments on the practice's today, also in its evening", async () => {
+  // Seeds a database of its own (the clock is faked), which takes a while.
+  it("puts today's appointments on the practice's today, also in its evening", { timeout: 180_000 }, async () => {
     // 01:00 UTC on Oct 6 is 21:00 on Oct 5 in New York (the demo practice's time zone).
     // The server runs in UTC (instrumentation.ts), which is where using the server's own date goes wrong.
     const tz = process.env.TZ;

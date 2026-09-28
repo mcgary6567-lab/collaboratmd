@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { fmtPhone } from "@/lib/us";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -9,6 +11,8 @@ import { getEstimate } from "@/server/billing";
 import { GFE_DISPUTE_THRESHOLD_CENTS } from "@/lib/billing/estimate";
 import { PrintButton } from "@/components/action-form";
 import { fmtDate, fmtDateTime, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Estimate" };
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +53,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
             <div className="text-lg font-bold text-slate-900">{practice.name}</div>
             <div className="mt-1 text-slate-600">
               {practice.address1}<br />{practice.city}, {practice.state} {practice.zip}
-              {practice.phone && <><br />{practice.phone}</>}
+              {practice.phone && <><br />{fmtPhone(practice.phone)}</>}
             </div>
             <div className="mt-1 text-xs text-slate-500">NPI {practice.npi} · Tax ID {practice.taxId}</div>
           </div>
@@ -122,7 +126,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
             )}
           </dl>
           {!gfe && ib.benefitsCheckedAt && (
-            <p className="mt-2 text-xs text-slate-500">Benefits verified with {ib.payer} on {fmtDateTime(ib.benefitsCheckedAt)}.</p>
+            <p className="mt-2 text-xs text-slate-500">Benefits verified with {ib.payer} on {fmtDateTime(ib.benefitsCheckedAt, s.timeZone)}.</p>
           )}
           {!gfe && (ib.uncontractedCodes?.length ?? 0) > 0 && (
             <p className="mt-1 text-xs text-amber-700">

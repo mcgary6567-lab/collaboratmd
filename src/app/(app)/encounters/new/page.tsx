@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { listLocations } from "@/server/locations";
 import { PageHeader } from "@/components/ui";
 import { ChargeEntryForm } from "./form";
 import type { PatientOption } from "@/components/patient-picker";
+
+export const metadata: Metadata = { title: "Charge entry" };
 
 export const dynamic = "force-dynamic";
 

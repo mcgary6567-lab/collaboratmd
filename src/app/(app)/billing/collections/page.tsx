@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -5,7 +6,9 @@ import { collectionCandidates, FINAL_NOTICE_DAYS, listCollections } from "@/serv
 import { closeAction, finalNoticeAction, placeAction } from "@/app/(app)/collection-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Collections" };
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +40,7 @@ export default async function CollectionsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Ready for a final notice" value={candidates.length.toLocaleString()} hint="2+ statements, the first 60+ days ago, no plan" />
         <Stat label="In final notice" value={open.filter((r) => r.collection.stage === "final_notice").length.toLocaleString()} />
-        <Stat label="At an agency" value={atAgency.length.toLocaleString()} hint={`$${(atAgency.reduce((a, r) => a + r.collection.amountCents, 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })} written off as bad debt`} />
+        <Stat label="At an agency" value={atAgency.length.toLocaleString()} hint={`${money(atAgency.reduce((a, r) => a + r.collection.amountCents, 0))} written off as bad debt`} />
       </div>
 
       <Card title="Ready for a final notice">

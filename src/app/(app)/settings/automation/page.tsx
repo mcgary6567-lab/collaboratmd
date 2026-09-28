@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -10,6 +11,8 @@ import { runNowAction, saveAutomationAction } from "@/app/(app)/automation-actio
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Automation" };
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +38,10 @@ export default async function AutomationPage() {
   const cfg = await practiceConfig(db, s.practiceId);
   const admin = s.role === "admin";
   const channels = [
-    { name: "Email (Resend)", on: emailEnabled(cfg), env: "Settings → Integrations" },
-    { name: "Text messages (Twilio)", on: smsEnabled(cfg), env: "Settings → Integrations" },
-    { name: "Card payments (Stripe)", on: stripeReady(cfg.stripe), env: "Settings → Integrations" },
-    { name: "Daily schedule", on: !!process.env.CRON_SECRET, env: "CRON_SECRET" },
+    { name: "Email (Resend)", on: emailEnabled(cfg), env: "Set it up under Settings → Integrations" },
+    { name: "Text messages (Twilio)", on: smsEnabled(cfg), env: "Set it up under Settings → Integrations" },
+    { name: "Card payments (Stripe)", on: stripeReady(cfg.stripe), env: "Set it up under Settings → Integrations" },
+    { name: "Daily schedule", on: !!process.env.CRON_SECRET, env: "Run by CollaboratMD; contact support if it shows off" },
   ];
 
   return (
@@ -67,7 +70,7 @@ export default async function AutomationPage() {
               {channels.map((c) => (
                 <li key={c.name}>
                   <div className="flex items-center justify-between"><span>{c.name}</span>{c.on ? <Badge tone="green">On</Badge> : <Badge>Not set up</Badge>}</div>
-                  {!c.on && <div className="text-xs text-slate-500">Set {c.env}</div>}
+                  {!c.on && <div className="text-xs text-slate-500">{c.env}</div>}
                 </li>
               ))}
             </ul>
@@ -77,7 +80,7 @@ export default async function AutomationPage() {
               <ul className="space-y-2 text-xs">
                 {runs.map((r) => (
                   <li key={r.id} className="border-b border-slate-100 pb-2 last:border-0">
-                    <div className="font-medium">{fmtDateTime(r.ranAt)} {r.error && <span className="text-red-700">· {r.error}</span>}</div>
+                    <div className="font-medium">{fmtDateTime(r.ranAt, s.timeZone)} {r.error && <span className="text-red-700">· {r.error}</span>}</div>
                     <pre className="whitespace-pre-wrap text-slate-500">{JSON.stringify(r.summary)}</pre>
                   </li>
                 ))}

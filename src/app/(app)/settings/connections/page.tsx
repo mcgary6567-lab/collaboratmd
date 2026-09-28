@@ -1,5 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, CircleDashed, CircleOff, ExternalLink, Server } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleOff, ExternalLink, Server } from "lucide-react";
 import { getDb } from "@/db";
 import { accessiblePractices, requireSession } from "@/lib/auth";
 import { listIntegrations } from "@/server/integrations";
@@ -9,11 +10,14 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Alert, Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { CopyField } from "./copy-field";
+import { isPlatformOperator } from "@/server/code-sets";
+
+export const metadata: Metadata = { title: "Integrations" };
 
 export const dynamic = "force-dynamic";
 
 const STATUS = {
-  practice: { label: "Connected", tone: "bg-green-100 text-green-800", icon: CheckCircle2 },
+  practice: { label: "Connected", tone: "bg-green-100 text-green-800", icon: CircleCheck },
   environment: { label: "Using the deployment's keys", tone: "bg-blue-100 text-blue-800", icon: Server },
   off: { label: "Not connected", tone: "bg-slate-100 text-slate-600", icon: CircleDashed },
   disabled: { label: "Switched off", tone: "bg-amber-100 text-amber-800", icon: CircleOff },
@@ -83,7 +87,7 @@ export default async function ConnectionsPage() {
                     </a>
                     {i.row?.lastTestAt && (
                       <p className={`rounded-lg px-3 py-2 text-xs ${i.row.lastTestOk ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
-                        Last test {fmtDateTime(i.row.lastTestAt)}: {i.row.lastTestMessage}
+                        Last test {fmtDateTime(i.row.lastTestAt, s.timeZone)}: {i.row.lastTestMessage}
                       </p>
                     )}
                     {i.source === "environment" && !i.row && (
@@ -179,7 +183,8 @@ export default async function ConnectionsPage() {
           );
         })}
 
-        <Card title="Deployment settings (set in Vercel, not here)">
+        {isPlatformOperator(s.email) && (
+        <Card title="Platform settings (operators only; set in the hosting project)">
           <p className="mb-3 text-sm text-slate-600">These belong to the whole installation rather than a practice, so they are environment variables in the hosting project.</p>
           <ul className="space-y-2 text-sm">
             <li className="flex items-center justify-between gap-3">
@@ -197,6 +202,7 @@ export default async function ConnectionsPage() {
           </ul>
           <p className="mt-3 text-xs text-slate-500">Changing AUTH_SECRET makes the saved keys above unreadable; they would need to be entered again.</p>
         </Card>
+        )}
       </div>
     </>
   );

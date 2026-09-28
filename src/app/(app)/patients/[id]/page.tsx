@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -26,6 +27,8 @@ import { LabsSection } from "./labs-section";
 import { WorkPanel } from "@/components/work-panel";
 import { PortalLinkButton } from "./patient-contact";
 import { preferredLanguageAction, remindersOptOutAction, smsConsentAction } from "@/app/(app)/portal-actions";
+
+export const metadata: Metadata = { title: "Patient" };
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +144,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 <div className="font-semibold">{payer.name}</div>
                 <Badge tone="blue">{insurance.rank === 1 ? "Primary" : insurance.rank === 2 ? "Secondary" : "Tertiary"}</Badge>
               </div>
-              <div className="mt-1 text-slate-500">Member {insurance.memberId}{insurance.groupNumber ? ` · Group ${insurance.groupNumber}` : ""} · {insurance.relationship}</div>
+              <div className="mt-1 text-slate-500">Member {insurance.memberId}{insurance.groupNumber ? ` · Group ${insurance.groupNumber}` : ""} · {insurance.relationship === "self" ? "self" : `${insurance.relationship} of ${insurance.subscriberFirstName ?? ""} ${insurance.subscriberLastName ?? "(insured person not entered)"}`.trim()}</div>
               <div className="text-slate-500">Copay {money(insurance.copayCents)}</div>
               <form action={eligibilityAction.bind(null, insurance.id, patient.id)} className="mt-2">
                 <button className="btn btn-secondary text-xs">Check eligibility (270/271)</button>
@@ -150,7 +153,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           ))}
           {latestCheck && (
             <div className={`rounded-lg p-3 text-sm ${latestCheck.status === "active" ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"}`}>
-              <div className="font-semibold">Coverage {latestCheck.status} · {fmtDateTime(latestCheck.checkedAt)}</div>
+              <div className="font-semibold">Coverage {latestCheck.status} · {fmtDateTime(latestCheck.checkedAt, s.timeZone)}</div>
               {latestCheck.status === "active" ? (
                 <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs">
                   <span>Plan: {latestCheck.planName}</span>
@@ -203,12 +206,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         </Card>
       </div>
 
-      <TerminalSection db={db} practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} admin={s.role === "admin"} />
+      <TerminalSection timeZone={s.timeZone} db={db} practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} admin={s.role === "admin"} />
       <BillingSection db={db} practiceId={s.practiceId} patientId={patient.id} />
       <AuthorizationsSection db={db} practiceId={s.practiceId} patientId={patient.id} />
       <LabsSection db={db} practiceId={s.practiceId} patientId={patient.id} />
       <div className="mt-6 max-w-2xl">
-        <WorkPanel db={db} practiceId={s.practiceId} entityType="patient" entityId={patient.id} defaultTitle={`Follow up with ${patient.firstName} ${patient.lastName}`} />
+        <WorkPanel timeZone={s.timeZone} db={db} practiceId={s.practiceId} entityType="patient" entityId={patient.id} defaultTitle={`Follow up with ${patient.firstName} ${patient.lastName}`} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

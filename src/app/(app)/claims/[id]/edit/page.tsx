@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
@@ -8,6 +9,8 @@ import { EDITABLE } from "@/server/claim-edit";
 import { loadClaimBundle } from "@/server/claims";
 import { Alert, PageHeader } from "@/components/ui";
 import { ClaimEditForm } from "./edit-form";
+
+export const metadata: Metadata = { title: "Edit claim" };
 
 export const dynamic = "force-dynamic";
 

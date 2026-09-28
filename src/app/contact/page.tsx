@@ -7,7 +7,7 @@ import { COMPANY, addressLines, whatsappLink } from "@/content/company";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Contact — CollaboratMD",
+  title: "Contact",
   description:
     "Talk to the CollaboratMD team about pricing, product support, privacy requests or a security disclosure.",
 };
@@ -106,7 +106,7 @@ export default async function ContactPage({
               </div>
             </dl>
             <p className="mt-5 text-xs leading-relaxed text-slate-500">
-              Measured from receipt during business hours, Monday through Friday.
+              Measured from receipt during business hours, 9 a.m. to 5 p.m. Mountain Time, Monday through Friday, excluding US federal holidays.
             </p>
           </div>
 

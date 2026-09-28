@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
+import { fmtPhone } from "@/lib/us";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { FINAL_NOTICE_DAYS, finalNoticeText, getCollection } from "@/server/collections";
 import { PrintButton } from "@/components/action-form";
+
+export const metadata: Metadata = { title: "Collection notice" };
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +34,7 @@ export default async function FinalNoticePage({ params }: { params: Promise<{ id
       <article className="card space-y-4 p-8 font-serif text-sm leading-relaxed text-slate-900">
         <header>
           <p className="font-sans text-base font-bold">{practice.name}</p>
-          <p>{practice.address1}, {practice.city}, {practice.state} {practice.zip}{practice.phone ? ` · ${practice.phone}` : ""}</p>
+          <p>{practice.address1}, {practice.city}, {practice.state} {practice.zip}{practice.phone ? ` · ${fmtPhone(practice.phone)}` : ""}</p>
         </header>
         <p>{sent.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
         <p>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
@@ -6,6 +7,8 @@ import { claimMissedEncounterAction, dismissMissedChargeAction } from "@/app/(ap
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Missed charges" };
 
 export const dynamic = "force-dynamic";
 

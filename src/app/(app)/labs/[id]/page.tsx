@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -9,6 +10,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader, PatientLink } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { LAB_STATUS_TONE } from "@/app/(app)/patients/[id]/labs-section";
+
+export const metadata: Metadata = { title: "Lab order" };
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +37,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
     <>
       <PageHeader
         title={`Lab order ${order.placerOrderNumber}`}
-        subtitle={`${LABS.find((l) => l.code === order.labCode)?.name} · ordered ${fmtDateTime(order.createdAt)} by Dr. ${provider.lastName}`}
+        subtitle={`${LABS.find((l) => l.code === order.labCode)?.name} · ordered ${fmtDateTime(order.createdAt, s.timeZone)} by Dr. ${provider.lastName}`}
         actions={
           <>
             <Badge tone={LAB_STATUS_TONE[order.status] ?? "slate"}>{order.status}</Badge>

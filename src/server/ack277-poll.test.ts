@@ -14,6 +14,8 @@ describe("277CA acknowledgments picked up by polling", () => {
     const two = await t.db.select().from(schema.claims).where(eq(schema.claims.practiceId, t.practiceId)).limit(2);
     for (const c of two) await t.db.update(schema.claims).set({ status: "submitted" }).where(eq(schema.claims.id, c.id));
     const [good, bad] = two;
+    const acks = async () => (await t.db.select().from(schema.claimAcknowledgments).where(eq(schema.claimAcknowledgments.claimId, bad.id))).filter((a) => a.kind === "277CA").length;
+    const acksBefore = await acks();
     const x12 = build277CA({
       senderId: "PAYER", receiverId: "COLLABORATMD", now: new Date(), control: "7", sourceName: "Payer", submitterName: "Practice",
       billingProvider: { name: "Practice", npi: "1234567893" },
@@ -40,6 +42,6 @@ describe("277CA acknowledgments picked up by polling", () => {
     // The same transaction again changes nothing.
     await pollRemittances(t.db, t.practiceId, { gateway });
     expect(await t.db.select().from(schema.denials).where(eq(schema.denials.claimId, bad.id))).toHaveLength(denials.length);
-    expect((await t.db.select().from(schema.claimAcknowledgments).where(eq(schema.claimAcknowledgments.claimId, bad.id))).filter((a) => a.kind === "277CA")).toHaveLength(1);
+    expect(await acks()).toBe(acksBefore + 1);
   });
 });

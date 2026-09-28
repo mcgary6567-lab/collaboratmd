@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { createInstitutionalAction } from "@/app/(app)/institutional-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
 import { PatientPicker } from "@/components/patient-picker";
+
+export const metadata: Metadata = { title: "Institutional claim" };
 
 export const dynamic = "force-dynamic";
 

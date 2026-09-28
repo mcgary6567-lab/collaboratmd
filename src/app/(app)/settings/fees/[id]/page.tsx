@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
@@ -9,6 +10,8 @@ import { formatModifierRules } from "@/server/contracts";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
 import { money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Fee schedule" };
 
 export const dynamic = "force-dynamic";
 

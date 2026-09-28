@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
@@ -6,6 +7,8 @@ import { ALWAYS_SHOWN } from "@/server/admin";
 import { saveMenuAction } from "@/app/(app)/admin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Menu" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listPayers } from "@/server/encounters";
 import { PageHeader } from "@/components/ui";
 import { NewPatientForm } from "./form";
+
+export const metadata: Metadata = { title: "New patient" };
 
 export const dynamic = "force-dynamic";
 

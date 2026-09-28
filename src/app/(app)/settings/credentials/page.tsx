@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { listProviders } from "@/server/encounters";
@@ -6,6 +7,8 @@ import { deleteCredentialAction, saveCredentialAction } from "@/app/(app)/admin-
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Credentials" };
 
 export const dynamic = "force-dynamic";
 

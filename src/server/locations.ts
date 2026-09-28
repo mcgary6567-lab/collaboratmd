@@ -7,6 +7,8 @@ import { and, asc, eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { isValidNpi } from "@/lib/scrub/rules";
+import { isUsState } from "@/lib/us";
+import { POS_CODES } from "@/lib/codes/pos";
 
 const { locations, auditLog } = schema;
 
@@ -30,9 +32,9 @@ export function validateLocation(input: LocationInput) {
   if (!v.name) throw new Error("Give the location a name");
   if (v.npi && !isValidNpi(v.npi)) throw new Error("That NPI is not valid (10 digits with a correct check digit)");
   if (!v.address1 || !v.city) throw new Error("Enter the street address and city");
-  if (!/^[A-Z]{2}$/.test(v.state)) throw new Error("Use the two-letter state code");
+  if (!isUsState(v.state)) throw new Error("Choose the state");
   if (!/^\d{5}(\d{4})?$/.test(v.zip)) throw new Error("Enter a 5 or 9 digit ZIP code");
-  if (!/^\d{2}$/.test(v.placeOfService)) throw new Error("Place of service is a two-digit code, like 11 for office");
+  if (!POS_CODES.has(v.placeOfService)) throw new Error("Choose a place of service from the CMS list, like 11 for office");
   return v;
 }
 

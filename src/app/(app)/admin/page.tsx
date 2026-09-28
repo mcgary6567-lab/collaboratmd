@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
@@ -12,6 +13,8 @@ import { RevenueTrend, AgingChart, DenialReasonChart, PayerMixChart, MiniBar } f
 import { CARC } from "@/lib/codes/carc";
 import { memo } from "@/lib/memo";
 import { dataStamp } from "@/server/data-stamp";
+
+export const metadata: Metadata = { title: "Administration" };
 
 export const dynamic = "force-dynamic";
 

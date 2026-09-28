@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -13,6 +14,8 @@ import { headers } from "next/headers";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { MfaSetup } from "@/components/mfa-setup";
 import { Badge, Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Security" };
 
 export const dynamic = "force-dynamic";
 

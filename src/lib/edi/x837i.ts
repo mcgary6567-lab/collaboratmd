@@ -9,6 +9,7 @@
  * (NM1*71), and service lines that carry a revenue code (SV2).
  */
 import { contactPhone, envelope } from "./x12";
+import { subscriberLoops, type Person, type Subscriber } from "./subscriber";
 import { otherPayerLoops, pwk, type ClaimAttachmentRef, type OtherPayer } from "./x837p";
 
 export interface Institutional {
@@ -37,7 +38,9 @@ export interface Edi837IInput {
   billingProvider: { name: string; npi: string; taxId: string; address1: string; city: string; state: string; zip: string; phone?: string | null };
   attending: { lastName: string; firstName: string; npi: string; taxonomy: string };
   payer: { name: string; payerId: string; type: string };
-  subscriber: { lastName: string; firstName: string; memberId: string; groupNumber?: string | null; dob: string; sex: string; address1?: string | null; city?: string | null; state?: string | null; zip?: string | null; relationship: string };
+  /** The insured person; with `patient`, the patient when that is someone else (lib/edi/subscriber.ts). */
+  subscriber: Subscriber;
+  patient?: Person;
   claim: {
     totalCents: number;
     frequencyCode: string;
@@ -67,7 +70,6 @@ const filingIndicator = (type: string) => (type === "medicare" ? "MA" : type ===
 export function buildEdi837I(input: Edi837IInput): string {
   const inst = input.claim.institutional;
   const tob = inst.typeOfBill.padStart(4, "0");
-  const relCode: Record<string, string> = { self: "18", spouse: "01", child: "19", other: "G8" };
   const hhmm = input.now.toISOString().slice(11, 16).replace(":", "");
   const body: string[][] = [
     ["BHT", "0019", "00", input.controlNumber, d8(input.now.toISOString().slice(0, 10)), hhmm, "CH"],
@@ -80,14 +82,14 @@ export function buildEdi837I(input: Edi837IInput): string {
     ["N3", input.billingProvider.address1],
     ["N4", input.billingProvider.city, input.billingProvider.state, input.billingProvider.zip.replace("-", "")],
     ["REF", "EI", input.billingProvider.taxId.replace("-", "")],
-    // 2000B subscriber and payer
-    ["HL", "2", "1", "22", "0"],
-    ["SBR", input.otherPayer ? "S" : "P", relCode[input.subscriber.relationship] ?? "18", input.subscriber.groupNumber ?? "", "", "", "", "", "", filingIndicator(input.payer.type)],
-    ["NM1", "IL", "1", input.subscriber.lastName, input.subscriber.firstName, "", "", "", "MI", input.subscriber.memberId],
-    ...(input.subscriber.address1 ? [["N3", input.subscriber.address1]] : []),
-    ...(input.subscriber.city ? [["N4", input.subscriber.city, input.subscriber.state ?? "", (input.subscriber.zip ?? "").replace("-", "")]] : []),
-    ["DMG", "D8", d8(input.subscriber.dob), input.subscriber.sex],
-    ["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId],
+    // 2000B subscriber and payer, then 2000C patient when the patient is a dependent (lib/edi/subscriber.ts)
+    ...subscriberLoops({
+      sequence: input.otherPayer ? "S" : "P",
+      subscriber: input.subscriber,
+      patient: input.patient ?? input.subscriber,
+      filing: filingIndicator(input.payer.type),
+      payer: ["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId],
+    }),
     // 2300 claim: CLM05 is facility type (TOB digits 2-3), qualifier A, frequency (TOB digit 4).
     ["CLM", input.controlNumber, money(input.claim.totalCents), "", "", `${tob.slice(1, 3)}:A:${input.claim.frequencyCode === "1" ? tob.slice(3) : input.claim.frequencyCode}`, "", "A", "Y", "Y"],
     ...(inst.admissionDate ? [["DTP", "435", "DT", `${d8(inst.admissionDate)}${(inst.admissionHour ?? "0000").padStart(4, "0")}`]] : []),
@@ -106,7 +108,7 @@ export function buildEdi837I(input: Edi837IInput): string {
   // 2310A attending provider
   body.push(["NM1", "71", "1", input.attending.lastName, input.attending.firstName, "", "", "", "XX", input.attending.npi]);
   body.push(["PRV", "AT", "PXC", input.attending.taxonomy]);
-  if (input.otherPayer) body.push(...otherPayerLoops(input.otherPayer));
+  if (input.otherPayer) body.push(...otherPayerLoops(input.otherPayer, filingIndicator(input.otherPayer.type ?? "")));
   // 2400 service lines
   input.lines.forEach((l, i) => {
     body.push(["LX", String(i + 1)]);

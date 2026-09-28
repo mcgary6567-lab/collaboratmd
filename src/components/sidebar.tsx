@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CheckSquare, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
+import { Bell, SquareCheckBig, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 import { PracticeSwitcher } from "@/components/practice-switcher";
@@ -114,7 +114,7 @@ export function Sidebar({
   const bell = (
     <span className="flex items-center">
       <Link href="/tasks" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title={`${tasks.open} open tasks, ${tasks.due} due`} aria-label={`Tasks: ${tasks.open} open, ${tasks.due} due`}>
-        <CheckSquare className="h-4 w-4" />
+        <SquareCheckBig className="h-4 w-4" />
         {tasks.open > 0 && (
           <span className={`absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full px-1 text-center text-[10px] font-bold leading-[1.1rem] text-white ${tasks.due > 0 ? "bg-red-600" : "bg-brand-700"}`}>
             {tasks.open > 99 ? "99+" : tasks.open}

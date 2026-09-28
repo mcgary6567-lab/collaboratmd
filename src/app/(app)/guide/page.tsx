@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireSession } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Guide" };
 
 export const dynamic = "force-dynamic";
 

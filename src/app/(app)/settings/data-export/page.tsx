@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { auditEvents } from "@/server/compliance";
@@ -7,6 +8,8 @@ import { prepareExportAction } from "@/app/(app)/export-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Data export" };
 
 export const dynamic = "force-dynamic";
 // The background export runs after the action's response, within this limit.
@@ -47,7 +50,7 @@ export default async function DataExportPage() {
             <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-200 text-sm">
               {jobs.map((j) => (
                 <li key={j.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span>{fmtDateTime(j.createdAt)} <Badge tone={TONE[j.status as keyof typeof TONE] ?? "slate"}>{j.status}</Badge>{j.error ? <span className="ml-2 text-red-700">{j.error}</span> : null}</span>
+                  <span>{fmtDateTime(j.createdAt, s.timeZone)} <Badge tone={TONE[j.status as keyof typeof TONE] ?? "slate"}>{j.status}</Badge>{j.error ? <span className="ml-2 text-red-700">{j.error}</span> : null}</span>
                   {j.status === "done" && (j.parts.length > 1 ? (
                     <span className="flex flex-wrap gap-2">{j.parts.map((p, i) => <a key={p.key} className="font-semibold text-brand-700 hover:underline" href={`/api/export/files/${j.id}?part=${i}`}>Part {i + 1} ({(p.bytes / 1e6).toFixed(1)} MB)</a>)}</span>
                   ) : <a className="font-semibold text-brand-700 hover:underline" href={`/api/export/files/${j.id}`}>Download ({((j.bytes ?? 0) / 1e6).toFixed(1)} MB)</a>)}
@@ -60,7 +63,7 @@ export default async function DataExportPage() {
         <Card title="Recent full exports" className="lg:col-span-2">
           {events.length ? (
             <ul className="space-y-2 text-sm">
-              {events.map(({ event, userName }) => <li key={event.id} className="flex justify-between gap-2"><span>{userName ?? "Someone"}</span><span className="text-slate-500">{fmtDateTime(event.at)}</span></li>)}
+              {events.map(({ event, userName }) => <li key={event.id} className="flex justify-between gap-2"><span>{userName ?? "Someone"}</span><span className="text-slate-500">{fmtDateTime(event.at, s.timeZone)}</span></li>)}
             </ul>
           ) : <p className="text-sm text-slate-500">No full exports yet.</p>}
         </Card>

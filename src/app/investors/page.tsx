@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  Activity, ArrowRight, BadgeCheck, Binary, Boxes, CheckCircle2, Database, FileCheck2,
-  Gauge, Landmark, Layers, LineChart, Lock, Radar, Repeat, ScanLine, ShieldCheck,
-  ArrowUpRight, Compass, Mail, MessageCircle, Network, PieChart, Plug, Sparkles, Timer, TrendingUp, Users, Workflow,
+  Activity, ArrowRight, BadgeCheck, Binary, Boxes, CircleCheck, Database, FileCheckCorner,
+  Gauge, Landmark, Layers, ChartLine, Lock, Radar, Repeat, ScanLine, ShieldCheck,
+  ArrowUpRight, Compass, Mail, MessageCircle, Network, ChartPie, Plug, Sparkles, Timer, TrendingUp, Users, Workflow,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -22,7 +22,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Investors — CollaboratMD",
+  title: "Investors",
   description:
     "CollaboratMD for healthcare IT investors: what is built, how it performs against every industry benchmark, how the business earns, and how to reach us.",
 };
@@ -49,7 +49,7 @@ const PROOF = [
     tag: "Audit-grade by construction",
   },
   {
-    icon: LineChart,
+    icon: ChartLine,
     title: "Analytics anchored to benchmarks",
     body: "Every headline metric is reported against its industry target rather than floating without context. Aggregation happens in SQL, so reporting stays fast as the ledger grows into the millions of rows.",
     tag: "SQL aggregation at scale",
@@ -142,7 +142,7 @@ function Benchmark({
         </span>
         {pass && (
           <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700">
-            <CheckCircle2 className="h-3 w-3" /> MEETS TARGET
+            <CircleCheck className="h-3 w-3" /> MEETS TARGET
           </span>
         )}
       </div>
@@ -424,7 +424,7 @@ export default async function InvestorsPage() {
       <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-700">
-            <PieChart className="h-3.5 w-3.5" /> Market size
+            <ChartPie className="h-3.5 w-3.5" /> Market size
           </span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             {compactMoney(subscriptionTam() * 100)} a year, in subscriptions alone
@@ -551,7 +551,7 @@ export default async function InvestorsPage() {
               <ul className="mt-4 space-y-2.5">
                 {DIFFERENTIATORS.map((d) => (
                   <li key={d} className="flex gap-2.5 text-sm leading-relaxed text-slate-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
+                    <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
                     {d}
                   </li>
                 ))}
@@ -686,7 +686,7 @@ export default async function InvestorsPage() {
           <ul className="space-y-3.5">
             {DATA_ROOM.map((item) => (
               <li key={item} className="flex gap-3 text-sm leading-relaxed text-slate-700">
-                <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
+                <FileCheckCorner className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
                 {item}
               </li>
             ))}

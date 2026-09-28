@@ -8,6 +8,7 @@ import { getDb, schema, type Db } from "@/db";
 import { appSecret as secret } from "@/lib/app-secret";
 import { allows, type Capability } from "@/lib/capabilities";
 import { clientIp, ipAllowed } from "@/lib/ip";
+import { DEMO_ACCOUNTS, demoOpen, isDemoEmail, type DemoRole } from "@/lib/demo";
 
 const COOKIE = "collaboratmd_session";
 
@@ -29,6 +30,8 @@ export interface Session {
   sso?: boolean;
   /** When the user actually signed in (seconds); a practice switch keeps it, so the session limit still applies. */
   authAt?: number;
+  /** The practice's time zone, for showing when things happened on its clock. */
+  timeZone?: string;
 }
 
 /**
@@ -64,7 +67,8 @@ export async function login(email: string, password: string): Promise<LoginResul
   const { isLocked, recordFailure, clearFailures } = await import("@/server/mfa");
   const db = await getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email.toLowerCase().trim())).limit(1);
-  if (!user) {
+  // The demo's sign-ins are published: where the demo is closed (lib/demo.ts) they open nothing.
+  if (!user || (isDemoEmail(user.email) && !demoOpen())) {
     await bcrypt.compare(password, DUMMY_HASH);
     return { ok: false, error: "Invalid email or password." };
   }
@@ -91,6 +95,29 @@ export async function login(email: string, password: string): Promise<LoginResul
 }
 
 /** Starts a session for a user the practice's identity provider vouched for (see server/sso.ts). */
+/**
+ * "Try the demo" (/demo): signs into the demo practice as one of its accounts,
+ * without a password, where the demo is open (lib/demo.ts). Only accounts in
+ * the demo practice; returns null otherwise.
+ */
+export async function startDemoSession(db: Db, role: DemoRole): Promise<Session | null> {
+  if (!demoOpen()) return null;
+  const account = DEMO_ACCOUNTS[role];
+  if (!account) return null;
+  const [row] = await db
+    .select({ user: schema.users })
+    .from(schema.users)
+    .innerJoin(schema.practices, eq(schema.practices.id, schema.users.practiceId))
+    .where(and(eq(schema.users.email, account.email), eq(schema.practices.isDemo, true)))
+    .limit(1);
+  if (!row || row.user.disabledAt) return null;
+  const u = row.user;
+  const session: Session = { userId: u.id, practiceId: u.practiceId, name: u.name, email: u.email, role: u.role };
+  await issue(db, session);
+  await db.insert(schema.auditLog).values({ practiceId: u.practiceId, userId: u.id, action: "login", entity: "user", entityId: u.id, details: { demo: true } });
+  return session;
+}
+
 /** `idpAuthAt`: when the identity provider itself checked the credentials (ms), kept for server/reauth.ts. */
 export async function startSsoSession(db: Db, user: typeof schema.users.$inferSelect, practiceId: string, idpAuthAt?: number): Promise<Session> {
   const blocked = await signInBlock(db, user, "sso");
@@ -247,6 +274,7 @@ export async function getSession(): Promise<Session | null> {
       role: String(payload.role),
       sso: payload.sso === true,
       authAt: Number(payload.authAt ?? payload.iat ?? 0),
+      timeZone: "America/New_York",
     };
   } catch {
     return null;
@@ -261,15 +289,15 @@ export async function getSession(): Promise<Session | null> {
   if (access.ipAllowlist.length && !ipAllowed(clientIp(await headers()), access.ipAllowlist)) return null;
   // An administrator signed everyone (or this person) out after this session began.
   if (access.revokedAt && (session.authAt ?? 0) * 1000 < access.revokedAt) return null;
-  return { ...session, role: access.role, customRole: access.customRole, denied: access.denied };
+  return { ...session, role: access.role, customRole: access.customRole, denied: access.denied, timeZone: access.timeZone };
 }
 
 /** The user's effective role in a practice and the practice's session policy, or null if they may not use it. */
 export async function accessFor(db: Db, userId: string, practiceId: string) {
-  const { rows } = await db.execute<{ disabled_at: string | null; home: string; home_role: string; member_role: string | null; session_hours: number; ip_allowlist: string[]; user_revoked: string | null; practice_revoked: string | null }>(sql`
+  const { rows } = await db.execute<{ disabled_at: string | null; home: string; home_role: string; member_role: string | null; session_hours: number; ip_allowlist: string[]; time_zone: string; user_revoked: string | null; practice_revoked: string | null }>(sql`
     SELECT u.disabled_at, u.practice_id AS home, u.role AS home_role, u.sessions_revoked_at::text AS user_revoked, p.sessions_revoked_at::text AS practice_revoked,
       (SELECT m.role FROM practice_memberships m WHERE m.user_id = u.id AND m.practice_id = ${practiceId} LIMIT 1) AS member_role,
-      p.session_hours, p.ip_allowlist
+      p.session_hours, p.ip_allowlist, p.time_zone
     FROM users u JOIN practices p ON p.id = ${practiceId}
     WHERE u.id = ${userId}`);
   const r = rows[0];
@@ -283,7 +311,7 @@ export async function accessFor(db: Db, userId: string, practiceId: string) {
     role = c.baseRole; customRole = c.name; denied = c.denied;
   }
   const revokedAt = Math.max(r.user_revoked ? Date.parse(r.user_revoked) : 0, r.practice_revoked ? Date.parse(r.practice_revoked) : 0) || null;
-  return { role, customRole, denied, sessionHours: Number(r.session_hours) || 12, ipAllowlist: (r.ip_allowlist ?? []) as string[], revokedAt };
+  return { role, customRole, denied, sessionHours: Number(r.session_hours) || 12, ipAllowlist: (r.ip_allowlist ?? []) as string[], revokedAt, timeZone: r.time_zone || "America/New_York" };
 }
 
 /** Returns the signed-in user, or redirects to the login page. */

@@ -1,7 +1,34 @@
+import { isLabCode } from "@/lib/codes/lab";
 import { buildEdi837P, type ClaimAttachmentRef, type OtherPayer, type ServiceFacility } from "@/lib/edi/x837p";
 import { buildEdi837I } from "@/lib/edi/x837i";
 import { buildEdi837D } from "@/lib/edi/x837d";
 import type { ClaimBundle } from "./claims";
+
+type Ins = ClaimBundle["insurance"];
+type Pat = ClaimBundle["patient"];
+
+/**
+ * The insured person, and the patient when that is someone else (a child on a
+ * parent's plan): lib/edi/subscriber.ts. A dependent's insurance without the
+ * insured person's details is stopped by the scrubber before it is sent; here
+ * it falls back to the patient so a preview can still be drawn.
+ */
+export function claimParties(patient: Pat, ins: Ins) {
+  const p = { lastName: patient.lastName, firstName: patient.firstName, dob: patient.dob, sex: patient.sex, address1: patient.address1, city: patient.city, state: patient.state, zip: patient.zip };
+  const plan = { memberId: ins.memberId, groupNumber: ins.groupNumber, relationship: ins.relationship };
+  if (ins.relationship === "self" || !ins.subscriberLastName || !ins.subscriberFirstName || !ins.subscriberDob) {
+    return { subscriber: { ...p, ...plan, relationship: "self" }, patient: p };
+  }
+  // The insured person's address, or the patient's when left empty (usually the same household).
+  const own = !!ins.subscriberAddress1;
+  return {
+    subscriber: {
+      ...plan, lastName: ins.subscriberLastName, firstName: ins.subscriberFirstName, dob: ins.subscriberDob, sex: ins.subscriberSex || "U",
+      address1: own ? ins.subscriberAddress1 : p.address1, city: own ? ins.subscriberCity : p.city, state: own ? ins.subscriberState : p.state, zip: own ? ins.subscriberZip : p.zip,
+    },
+    patient: p,
+  };
+}
 
 /** The 837 (P, I or D, by claim type) for a claim, without sending it. */
 export function buildClaimEdi(
@@ -18,10 +45,10 @@ export function buildClaimEdi(
     senderId: "COLLABORATMD",
     receiverId: bundle.payer.payerId,
     now,
-    billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone, taxonomy: bundle.provider.taxonomy },
+    billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone, taxonomy: bundle.provider.taxonomy, individual: bundle.practice.billingEntity === "individual" && bundle.practice.billingLastName ? { lastName: bundle.practice.billingLastName, firstName: bundle.practice.billingFirstName ?? "" } : null },
     rendering: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
     payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
-    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
+    ...claimParties(bundle.patient, bundle.insurance),
     claim: {
       totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
       originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber, diagnoses: bundle.encounter.diagnoses, attachments,
@@ -38,7 +65,7 @@ export function buildClaimEdi(
     billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone },
     attending: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
     payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
-    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
+    ...claimParties(bundle.patient, bundle.insurance),
     claim: {
       totalCents: bundle.claim.totalCents, frequencyCode: bundle.claim.frequencyCode, originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber,
       authorizationNumber, diagnoses: bundle.encounter.diagnoses, institutional: bundle.claim.institutional!, attachments,
@@ -51,13 +78,18 @@ export function buildClaimEdi(
     senderId: "COLLABORATMD",
     receiverId: bundle.payer.payerId,
     now,
-    billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone },
+    billingProvider: {
+      name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone,
+      individual: bundle.practice.billingEntity === "individual" && bundle.practice.billingLastName ? { lastName: bundle.practice.billingLastName, firstName: bundle.practice.billingFirstName ?? "" } : null,
+    },
     renderingProvider: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
-    payer: { name: bundle.payer.name, payerId: bundle.payer.payerId },
-    subscriber: { lastName: bundle.patient.lastName, firstName: bundle.patient.firstName, memberId: bundle.insurance.memberId, groupNumber: bundle.insurance.groupNumber, dob: bundle.patient.dob, sex: bundle.patient.sex, address1: bundle.patient.address1, city: bundle.patient.city, state: bundle.patient.state, zip: bundle.patient.zip, relationship: bundle.insurance.relationship },
+    referringProvider: bundle.encounter.referringNpi && bundle.encounter.referringLastName ? { lastName: bundle.encounter.referringLastName, firstName: bundle.encounter.referringFirstName ?? "", npi: bundle.encounter.referringNpi } : null,
+    payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
+    ...claimParties(bundle.patient, bundle.insurance),
     claim: {
       totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
       originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber,
+      cliaNumber: bundle.lines.some((l) => isLabCode(l.cpt)) ? bundle.practice.cliaNumber : null,
       dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses, attachments,
     },
     lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService })),

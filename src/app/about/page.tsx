@@ -7,7 +7,7 @@ import { COMPANY, addressLine } from "@/content/company";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "About — CollaboratMD",
+  title: "About",
   description:
     "Why CollaboratMD exists, what it believes about revenue cycle software, and how to see it running at full scale.",
 };

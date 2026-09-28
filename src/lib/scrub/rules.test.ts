@@ -57,7 +57,7 @@ describe("scrubClaim", () => {
     c.lines[0].cpt = "9921";
     c.lines[0].modifiers = ["ABC"];
     c.lines[0].units = 0;
-    c.encounter.placeOfService = "99";
+    c.encounter.placeOfService = "98";
     const rules = scrubClaim(c).map((f) => f.rule);
     expect(rules).toEqual(expect.arrayContaining(["LINE_CPT", "LINE_MODIFIER", "LINE_UNITS", "POS"]));
   });

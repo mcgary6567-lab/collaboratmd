@@ -11,7 +11,15 @@ import { schema } from "@/db";
 
 export const DEFAULT_TIME_ZONE = "America/New_York";
 
-export const US_TIME_ZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "America/Puerto_Rico"];
+export const US_TIME_ZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "America/Adak", "Pacific/Honolulu", "America/Puerto_Rico", "Pacific/Guam", "Pacific/Pago_Pago"];
+
+/** What people call them. */
+export const TIME_ZONE_NAMES: Record<string, string> = {
+  "America/New_York": "Eastern Time", "America/Chicago": "Central Time", "America/Denver": "Mountain Time", "America/Phoenix": "Mountain Time, Arizona (no daylight saving)",
+  "America/Los_Angeles": "Pacific Time", "America/Anchorage": "Alaska Time", "America/Adak": "Hawaii-Aleutian Time (Aleutian Islands)", "Pacific/Honolulu": "Hawaii Time",
+  "America/Puerto_Rico": "Atlantic Time (Puerto Rico, U.S. Virgin Islands)", "Pacific/Guam": "Chamorro Time (Guam, Northern Mariana Islands)", "Pacific/Pago_Pago": "Samoa Time (American Samoa)",
+};
+export const timeZoneName = (tz: string) => TIME_ZONE_NAMES[tz] ?? tz.replace(/_/g, " ");
 
 export function validTimeZone(tz: string) {
   try {

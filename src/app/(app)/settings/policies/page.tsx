@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -6,6 +7,8 @@ import { getPolicies } from "@/server/policies";
 import { runSmallBalancesAction, saveFinancingAction, savePoliciesAction } from "@/app/(app)/admin-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Policies" };
 
 export const dynamic = "force-dynamic";
 

@@ -5,7 +5,7 @@ import { PageShell, Prose } from "@/components/page-shell";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Security — CollaboratMD",
+  title: "Security",
   description:
     "How CollaboratMD protects protected health information: encryption, access control, the append-only ledger and audit logging.",
 };

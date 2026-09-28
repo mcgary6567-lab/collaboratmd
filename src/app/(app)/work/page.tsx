@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -8,6 +9,8 @@ import { ruleActiveAction, runRulesAction, saveRuleAction } from "@/app/(app)/op
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { money } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Work queue" };
 
 export const dynamic = "force-dynamic";
 

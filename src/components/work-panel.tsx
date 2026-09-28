@@ -6,7 +6,7 @@ import { Badge, Card } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 
 /** Open tasks and notes for one record, with forms to add both. */
-export async function WorkPanel({ db, practiceId, entityType, entityId, defaultTitle }: { db: Db; practiceId: string; entityType: EntityType; entityId: string; defaultTitle: string }) {
+export async function WorkPanel({ db, practiceId, entityType, entityId, defaultTitle, timeZone }: { db: Db; practiceId: string; entityType: EntityType; entityId: string; defaultTitle: string; timeZone?: string }) {
   const [open, notes, people] = await Promise.all([
     tasksFor(db, practiceId, entityType, entityId),
     notesFor(db, practiceId, entityType, entityId),
@@ -67,7 +67,7 @@ export async function WorkPanel({ db, practiceId, entityType, entityId, defaultT
             {notes.map(({ note, author }) => (
               <li key={note.id}>
                 <div className="whitespace-pre-wrap text-slate-800">{note.body}</div>
-                <div className="text-[11px] text-slate-500">{author ?? "Someone"} · {fmtDateTime(note.createdAt)}</div>
+                <div className="text-[11px] text-slate-500">{author ?? "Someone"} · {fmtDateTime(note.createdAt, timeZone)}</div>
               </li>
             ))}
           </ol>

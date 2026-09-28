@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { accessiblePractices, requireSession } from "@/lib/auth";
 import { arAging, headlineKpis } from "@/server/analytics";
@@ -5,6 +6,8 @@ import { switchPracticeAction } from "@/app/(app)/practice-actions";
 import { Badge, Card, Empty, Money, PageHeader } from "@/components/ui";
 import { memo } from "@/lib/memo";
 import { dataStamp } from "@/server/data-stamp";
+
+export const metadata: Metadata = { title: "Clients" };
 
 export const dynamic = "force-dynamic";
 
