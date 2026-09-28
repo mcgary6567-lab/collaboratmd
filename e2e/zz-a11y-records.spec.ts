@@ -80,10 +80,18 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   for (const p of pages) problems.push(...(await check(page, p)));
 
   // A restricted record: opening it asks for a reason first, then opens.
+  const gate = page.getByRole("heading", { name: "Restricted record" });
   await page.goto(patient!);
+  if (await gate.isVisible()) {
+    // Left restricted by an earlier attempt (a retry, or a kept local database): open it and lift that first.
+    await page.getByLabel("Reason").fill("Undoing the restriction an earlier test run left");
+    await page.getByRole("button", { name: "Open the record" }).click();
+    await page.getByRole("button", { name: "Remove restriction" }).click();
+    await expect(page.getByRole("button", { name: "Restrict", exact: true })).toBeVisible();
+  }
   await page.getByRole("button", { name: "Restrict", exact: true }).click();
-  await page.goto(patient!);
-  await expect(page.getByRole("heading", { name: "Restricted record" })).toBeVisible();
+  // Restricting asks everyone for a reason, the administrator who did it included: the page turns into the gate.
+  await expect(gate).toBeVisible();
   problems.push(...(await check(page, patient!)).map((x) => `${x} (restricted record gate)`));
   await page.getByLabel("Reason").fill("Checking the gate works in the accessibility test");
   await page.getByRole("button", { name: "Open the record" }).click();

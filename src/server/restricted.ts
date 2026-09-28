@@ -20,10 +20,17 @@ export const GRANT_HOURS = 4;
 export async function restrictedAccess(db: Db, who: { practiceId: string; userId: string }, patientId: string, now = new Date()) {
   const [p] = await db.select({ restricted: patients.restricted }).from(patients).where(and(eq(patients.id, patientId), eq(patients.practiceId, who.practiceId))).limit(1);
   if (!p?.restricted) return { restricted: false, granted: true };
+  // A reason given before the patient was (last) restricted does not count: restricting again asks everyone again.
+  const [last] = await db
+    .select({ at: sql<string | null>`max(${auditLog.at})` })
+    .from(auditLog)
+    .where(and(eq(auditLog.practiceId, who.practiceId), eq(auditLog.action, "patient_restricted"), eq(auditLog.entityId, patientId)));
+  const windowStart = now.getTime() - GRANT_HOURS * 3_600_000;
+  const since = new Date(Math.max(windowStart, last?.at ? new Date(last.at).getTime() : 0));
   const [grant] = await db
     .select({ id: auditLog.id })
     .from(auditLog)
-    .where(and(eq(auditLog.practiceId, who.practiceId), eq(auditLog.userId, who.userId), eq(auditLog.action, "restricted_record_opened"), eq(auditLog.entityId, patientId), gte(auditLog.at, new Date(now.getTime() - GRANT_HOURS * 3_600_000))))
+    .where(and(eq(auditLog.practiceId, who.practiceId), eq(auditLog.userId, who.userId), eq(auditLog.action, "restricted_record_opened"), eq(auditLog.entityId, patientId), gte(auditLog.at, since)))
     .limit(1);
   return { restricted: true, granted: !!grant };
 }

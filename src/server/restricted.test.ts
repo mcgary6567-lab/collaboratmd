@@ -36,5 +36,11 @@ describe("restricted patients", () => {
 
     await setRestricted(t.db, t.practiceId, p.id, false, t.userId);
     expect((await restrictedAccess(t.db, { practiceId: t.practiceId, userId: other.id }, p.id)).granted).toBe(true);
+
+    // Restricting again asks again, even of someone who gave a reason within the last few hours.
+    await setRestricted(t.db, t.practiceId, p.id, true, t.userId);
+    expect(await restrictedAccess(t.db, who, p.id)).toEqual({ restricted: true, granted: false });
+    await breakGlass(t.db, who, p.id, "Answering the patient's question about a bill");
+    expect((await restrictedAccess(t.db, who, p.id)).granted).toBe(true);
   });
 });

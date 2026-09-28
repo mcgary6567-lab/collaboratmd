@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@/db";
 import { testDb } from "@/test/db";
@@ -40,14 +40,36 @@ describe("the practice's clock", () => {
   it("keeps a check-in link usable through the practice's evening, not until UTC's", async () => {
     await t.db.update(schema.practices).set({ timeZone: "America/New_York" }).where(eq(schema.practices.id, t.practiceId));
     const [appt] = await t.db.select().from(schema.appointments).where(eq(schema.appointments.practiceId, t.practiceId)).limit(1);
-    // 9:30 this morning on the practice's clock: still today, so a link can be sent this evening.
-    const nineThirty = new Date(clockDay(await practiceNow(t.db, t.practiceId)).getTime() + 9.5 * 3_600_000);
-    await t.db.update(schema.appointments).set({ startsAt: nineThirty, endsAt: new Date(nineThirty.getTime() + 1_800_000), status: "scheduled" }).where(eq(schema.appointments.id, appt.id));
+    // Nine hours ago on the practice's clock: within the 12 hours a link lasts. Compared with the real time
+    // instead (New York is 4 or 5 hours behind UTC), it would look 13 or 14 hours old, and be refused.
+    const nineHoursAgo = new Date((await practiceNow(t.db, t.practiceId)).getTime() - 9 * 3_600_000);
+    await t.db.update(schema.appointments).set({ startsAt: nineHoursAgo, endsAt: new Date(nineHoursAgo.getTime() + 1_800_000), status: "scheduled" }).where(eq(schema.appointments.id, appt.id));
     const link = await createCheckinLink(t.db, t.practiceId, appt.id);
     expect(link.path).toMatch(/^\/check-in\//);
     // Yesterday's is gone.
-    const yesterday = new Date(nineThirty.getTime() - 86_400_000);
+    const yesterday = new Date(nineHoursAgo.getTime() - 86_400_000);
     await t.db.update(schema.appointments).set({ startsAt: yesterday, endsAt: new Date(yesterday.getTime() + 1_800_000) }).where(eq(schema.appointments.id, appt.id));
     await expect(createCheckinLink(t.db, t.practiceId, appt.id)).rejects.toThrow(/already passed/);
+  });
+});
+
+describe("the demo practice's schedule", () => {
+  it("puts today's appointments on the practice's today, also in its evening", async () => {
+    // 01:00 UTC on Oct 6 is 21:00 on Oct 5 in New York (the demo practice's time zone).
+    // The server runs in UTC (instrumentation.ts), which is where using the server's own date goes wrong.
+    const tz = process.env.TZ;
+    process.env.TZ = "UTC";
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-06T01:00:00Z") });
+    const t = await testDb();
+    try {
+      const rows = await t.db.select({ startsAt: schema.appointments.startsAt }).from(schema.appointments).where(eq(schema.appointments.practiceId, t.practiceId));
+      const days = new Set(rows.map((r) => clockDay(r.startsAt).toISOString().slice(0, 10)));
+      expect([...days].sort()).toEqual(["2026-10-05", "2026-10-06", "2026-10-07"]);
+    } finally {
+      vi.useRealTimers();
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+      await t.close();
+    }
   });
 });

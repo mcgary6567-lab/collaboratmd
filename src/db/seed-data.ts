@@ -5,6 +5,7 @@ import * as schema from "./schema";
 import { createEncounterWithClaim } from "@/server/encounters";
 import { submitClaim, fetchAndPostRemittances } from "@/server/claims";
 import { postPatientPayment } from "@/server/patients";
+import { DEFAULT_TIME_ZONE, practiceClock } from "@/server/practice-time";
 
 /** Appends the Luhn check digit to a 9-digit NPI base. */
 function makeNpi(base9: string): string {
@@ -155,7 +156,9 @@ export async function seedDemoData(db: Db) {
     patientRows.push(p);
   }
 
-  // Appointments: today and the next two days.
+  // Appointments: today and the next two days, on the practice's clock (appointment times are
+  // clock times), so in the evening "today" is still the practice's today and not the UTC date.
+  const today = practiceClock(new Date(), practice.timeZone || DEFAULT_TIME_ZONE);
   const visitKinds: [string, string][] = [
     ["office_visit", "Cough and fever"],
     ["follow_up", "Follow-up hypertension"],
@@ -166,9 +169,9 @@ export async function seedDemoData(db: Db) {
     ["follow_up", "Diabetes management"],
   ];
   for (let i = 0; i < 14; i++) {
-    const start = new Date();
-    start.setDate(start.getDate() + (i % 3));
-    start.setHours(8 + (i % 8), i % 2 ? 30 : 0, 0, 0);
+    const start = new Date(today);
+    start.setUTCDate(start.getUTCDate() + (i % 3));
+    start.setUTCHours(8 + (i % 8), i % 2 ? 30 : 0, 0, 0);
     const end = new Date(start.getTime() + 30 * 60_000);
     const [type, reason] = visitKinds[i % visitKinds.length];
     await db.insert(schema.appointments).values({
