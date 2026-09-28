@@ -50,5 +50,9 @@ jobs:
         env:
           LIVE_URL: ${{ vars.LIVE_URL }}
           OPS_ALERT_WEBHOOK_URL: ${{ secrets.OPS_ALERT_WEBHOOK_URL }}
+          # Optional: the site's CRON_SECRET, to start its five-minute run (server/tick.ts), and a
+          # heartbeat address (e.g. healthchecks.io) that alerts when these checks stop.
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIVE_HEARTBEAT_URL: ${{ secrets.LIVE_HEARTBEAT_URL }}
           LIVE_WATCH_MINUTES: ${{ github.event_name == 'schedule' && '330' || inputs.minutes || '0' }}
           LIVE_EVERY_MINUTES: "5"

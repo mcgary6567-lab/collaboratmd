@@ -22,6 +22,7 @@ import { notify } from "./notifications";
 import { practiceNow } from "./practice-time";
 import { langOf, replyCancelled, replyConfirmed, visitTime } from "@/lib/i18n/messages";
 import { claimOffer, offerSlot } from "./waitlist";
+import { deliveryCallbackUrl } from "@/lib/configured-origin";
 
 const { smsMessages, smsOptOuts, patients, auditLog, appointments, practices } = schema;
 
@@ -206,7 +207,7 @@ export async function replySms(db: Db, practiceId: string, cfg: IntegrationConfi
   const candidates = await patientsWithPhone(db, practiceId, e164);
   const consented = candidates.length ? (await db.select({ c: patients.smsConsentAt }).from(patients).where(and(eq(patients.practiceId, practiceId), inArray(patients.id, candidates.map((c) => c.id))))).some((r) => r.c) : false;
   if (!lastIn && !consented) throw new Error("No texting consent on file and the patient has not texted in. Record consent on the patient's page first.");
-  const r = await send(cfg.twilio, e164, text);
+  const r = await send(cfg.twilio, e164, text, undefined, { statusCallback: deliveryCallbackUrl(practiceId) });
   const sid = r.ok ? r.detail.replace(/^sid /, "") || null : null;
   const [row] = await db.insert(smsMessages).values({
     practiceId, patientId: candidates.length === 1 ? candidates[0].id : null, direction: "out", phone: e164, body: text, twilioSid: sid, status: r.ok ? "sent" : "failed", userId: userId ?? null, readAt: new Date(),

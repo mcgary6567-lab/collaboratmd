@@ -91,14 +91,15 @@ export async function login(email: string, password: string): Promise<LoginResul
 }
 
 /** Starts a session for a user the practice's identity provider vouched for (see server/sso.ts). */
-export async function startSsoSession(db: Db, user: typeof schema.users.$inferSelect, practiceId: string): Promise<Session> {
+/** `idpAuthAt`: when the identity provider itself checked the credentials (ms), kept for server/reauth.ts. */
+export async function startSsoSession(db: Db, user: typeof schema.users.$inferSelect, practiceId: string, idpAuthAt?: number): Promise<Session> {
   const blocked = await signInBlock(db, user, "sso");
   if (blocked) throw new Error(blocked);
   const role = await roleIn(db, user.id, practiceId);
   if (!role) throw new Error("This account has no access to the practice");
   const session: Session = { userId: user.id, practiceId, name: user.name, email: user.email, role, sso: true };
   await issue(db, session);
-  await db.insert(schema.auditLog).values({ practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id, details: { sso: true } });
+  await db.insert(schema.auditLog).values({ practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id, details: idpAuthAt ? { sso: true, idpAuthAt: new Date(idpAuthAt).toISOString() } : { sso: true } });
   return session;
 }
 

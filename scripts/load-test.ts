@@ -81,6 +81,40 @@ async function main() {
     await db.execute(sql`DROP TABLE lt`);
   };
 
+  /**
+   * The rest of a busy practice's month, for `target`: 20 staff opening charts (the access log,
+   * which grows faster than any other table), other audit entries, and two years of appointments.
+   * Uses the demo practice's patients, like the claims.
+   */
+  const AUDIT_VIEWS = Math.round(TARGET * 2);
+  const APPOINTMENTS = TARGET;
+  const extras = async (target: string, prefix: string) => {
+    const { n: views } = await one<{ n: number }>(sql`SELECT count(*)::int AS n FROM audit_log WHERE practice_id = ${target} AND action = 'patient_viewed'`);
+    if (views < AUDIT_VIEWS) {
+      await db.execute(sql`INSERT INTO users (practice_id, email, password_hash, name, role)
+        SELECT ${target}, lower(${prefix}) || '-staff-' || g || '@loadtest.invalid', 'not-a-password-hash', 'Load test staff ' || g, 'biller'
+        FROM generate_series(1, 20) g WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = lower(${prefix}) || '-staff-' || g || '@loadtest.invalid')`);
+      await db.execute(sql`INSERT INTO audit_log (practice_id, user_id, action, entity, entity_id, details, at)
+        SELECT ${target}, u.ids[1 + g % u.n], 'patient_viewed', 'patient', p.ids[1 + (g * 31) % p.n]::text, '{"via":"chart"}'::jsonb, now() - make_interval(mins => g % (31 * 24 * 60))
+        FROM generate_series(1, ${AUDIT_VIEWS - views}) g,
+          (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM users WHERE practice_id = ${target}) u,
+          (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM patients WHERE practice_id = ${practiceId}) p`);
+      await db.execute(sql`INSERT INTO audit_log (practice_id, action, entity, at)
+        SELECT ${target}, 'claim_submitted', 'claim', now() - make_interval(mins => g % (365 * 24 * 60)) FROM generate_series(1, ${AUDIT_VIEWS / 2}) g`);
+    }
+    const { n: appts } = await one<{ n: number }>(sql`SELECT count(*)::int AS n FROM appointments WHERE practice_id = ${target}`);
+    if (appts < APPOINTMENTS) {
+      await db.execute(sql`INSERT INTO appointments (practice_id, patient_id, provider_id, starts_at, ends_at, type, status, confirmed_at)
+        SELECT ${target}, p.ids[1 + (g * 13) % p.n], pr.ids[1 + g % pr.n],
+          date_trunc('day', now()) + make_interval(days => (g % 760) - 730, hours => 8 + g % 9), date_trunc('day', now()) + make_interval(days => (g % 760) - 730, hours => 8 + g % 9, mins => 30),
+          'office_visit', CASE WHEN (g % 760) >= 730 THEN 'scheduled' ELSE (ARRAY['completed','completed','completed','completed','no_show','cancelled'])[1 + g % 6] END,
+          CASE WHEN g % 3 = 0 THEN now() END
+        FROM generate_series(1, ${APPOINTMENTS - appts}) g,
+          (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM patients WHERE practice_id = ${practiceId}) p,
+          (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM providers WHERE practice_id = ${practiceId}) pr`);
+    }
+  };
+
   if (n < TARGET) {
     const t0 = Date.now();
     await load(practiceId, TARGET - n, "LT");
@@ -99,6 +133,17 @@ async function main() {
       await load(neighbour, TARGET - has, "LN");
       console.log(`Loaded ${TARGET - has} claims for a second practice in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     }
+    await extras(neighbour, "LN");
+  }
+  {
+    const t0 = Date.now();
+    await extras(practiceId, "LT");
+    // Everyone waiting and textable, at different hours: the waitlist's candidates query does the most work.
+    await db.execute(sql`UPDATE patients SET sms_consent_at = coalesce(sms_consent_at, now()), phone = coalesce(phone, '5550100000') WHERE practice_id = ${practiceId}`);
+    await db.execute(sql`INSERT INTO waitlist_entries (practice_id, patient_id, from_hour, until_hour)
+      SELECT ${practiceId}, p.id, CASE WHEN row_number() OVER () % 3 = 1 THEN 12 END, CASE WHEN row_number() OVER () % 3 = 2 THEN 12 END
+      FROM patients p WHERE p.practice_id = ${practiceId} AND NOT EXISTS (SELECT 1 FROM waitlist_entries w WHERE w.patient_id = p.id AND w.closed_at IS NULL)`);
+    console.log(`Chart views, appointments and the waitlist ready in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   }
   await db.execute(sql`ANALYZE`);
 
@@ -120,9 +165,16 @@ async function main() {
   const claims = await import("../src/server/claims");
   const patients = await import("../src/server/patients");
   const exp = await import("../src/server/practice-export");
+  const access = await import("../src/server/access-anomalies");
+  const enc = await import("../src/server/encounters");
+  const waitlist = await import("../src/server/waitlist");
+  const outcomes = await import("../src/server/appointment-outcomes");
 
-  // A sample claim and patient for the single-record screens.
+  // A sample claim and patient for the single-record screens, and an upcoming time for the waitlist.
   const sample = await one<{ claim: string; patient: string }>(sql`SELECT id AS claim, patient_id AS patient FROM claims WHERE practice_id = ${practiceId} ORDER BY created_at DESC LIMIT 1`);
+  const opening = await one<{ providerId: string; startsAt: Date; endsAt: Date }>(sql`SELECT provider_id AS "providerId", starts_at AS "startsAt", ends_at AS "endsAt" FROM appointments WHERE practice_id = ${practiceId} AND starts_at > now() ORDER BY starts_at LIMIT 1`);
+  opening.startsAt = new Date(opening.startsAt);
+  opening.endsAt = new Date(opening.endsAt);
 
   type Case = { name: string; run: (d: typeof db) => Promise<unknown>; selective?: boolean };
   const cases: Case[] = [
@@ -147,6 +199,10 @@ async function main() {
     { name: "Missed charges", run: (d) => recovery.missedCharges(d, practiceId) },
     { name: "Credit balances", run: (d) => recovery.creditBalances(d, practiceId) },
     { name: "Underpayment scan (all paid claims)", run: (d) => fees.scanUnderpayments(d, practiceId) },
+    { name: "Chart access review (24 hours)", run: (d) => access.accessAnomalies(d, practiceId), selective: true },
+    { name: "Schedule, one day", run: (d) => enc.listAppointments(d, practiceId, new Date()), selective: true },
+    { name: "Waitlist: who can take an opening", run: (d) => waitlist.waitlistCandidates(d, practiceId, opening, [], waitlist.OFFER_TO), selective: true },
+    { name: "Confirmations and no-shows (90 days)", run: (d) => outcomes.appointmentOutcomes(d, practiceId), selective: true },
   ];
 
   /**

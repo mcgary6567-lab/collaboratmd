@@ -8,6 +8,7 @@ import { restrictedAccess } from "@/server/restricted";
 import { RestrictedGate } from "@/components/restricted-gate";
 import { setRestrictedAction } from "@/app/(app)/restricted-actions";
 import { addToWaitlistAction, removeFromWaitlistAction } from "@/app/(app)/waitlist-actions";
+import { windowLabel } from "@/server/waitlist";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { listProviders } from "@/server/encounters";
 import { practiceConfig } from "@/server/integrations";
@@ -99,7 +100,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             )}
             {canWrite && (waiting ? (
               <div className="flex items-center justify-between">
-                <span>Waitlist: since {fmtDate(waiting.createdAt)} <span className="text-slate-500">({waiting.providerId ? `Dr. ${providerList.find((p) => p.id === waiting.providerId)?.lastName ?? ""} only` : "any provider"})</span></span>
+                <span>Waitlist: since {fmtDate(waiting.createdAt)} <span className="text-slate-500">({waiting.providerId ? `Dr. ${providerList.find((p) => p.id === waiting.providerId)?.lastName ?? ""} only` : "any provider"}, {windowLabel(waiting.fromHour, waiting.untilHour)})</span></span>
                 <form action={removeFromWaitlistAction.bind(null, waiting.id, patient.id)}>
                   <button className="font-semibold text-brand-700 hover:underline" aria-label="Remove from the waitlist">Remove</button>
                 </form>
@@ -114,7 +115,14 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                       {providerList.map((p) => <option key={p.id} value={p.id}>Dr. {p.firstName} {p.lastName}</option>)}
                     </select>
                   </label>
-                  <label className="block"><span className="label">Note</span><input name="note" className="input" maxLength={300} placeholder="Mornings only; knee follow-up" /></label>
+                  <label className="block"><span className="label">Hours they can come</span>
+                    <select name="hours" className="select" defaultValue="any">
+                      <option value="any">Any time</option>
+                      <option value="morning">Mornings (before noon)</option>
+                      <option value="afternoon">Afternoons (from noon)</option>
+                    </select>
+                  </label>
+                  <label className="block"><span className="label">Note</span><input name="note" className="input" maxLength={300} placeholder="Knee follow-up; can come at short notice" /></label>
                   <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Adding...">Add</SubmitButton>
                   {!patient.smsConsentAt && <p className="text-amber-800">No texting consent: openings cannot be texted to this patient; the waitlist will say to call.</p>}
                 </ActionForm>

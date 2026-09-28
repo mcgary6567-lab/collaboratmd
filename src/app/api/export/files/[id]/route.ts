@@ -1,3 +1,4 @@
+import { mfaRefusal } from "@/server/mfa-policy";
 import { getDb, schema } from "@/db";
 import { getSession } from "@/lib/auth";
 import { openExport } from "@/server/export-jobs";
@@ -10,6 +11,9 @@ export const maxDuration = 300;
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
+  // Anyone who can take data off the platform needs two-factor when the practice asks for it.
+  const mfa = await mfaRefusal(await getDb(), session);
+  if (mfa) return mfa;
   if (session.role !== "admin") return new Response("Exports are for administrators", { status: 403 });
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response("Not found", { status: 404 });

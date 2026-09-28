@@ -3,7 +3,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { mfaStatus } from "@/server/mfa";
-import { setRequireMfaAction } from "@/app/(app)/security-actions";
+import { setMfaForPrivilegedAction, setRequireMfaAction } from "@/app/(app)/security-actions";
+import { mfaRule } from "@/server/mfa-policy";
 import { ipAllowlistAction, sessionHoursAction } from "@/app/(app)/access-actions";
 import { signOutEveryoneAction } from "@/app/(app)/admin-actions";
 import { SESSION_HOURS } from "@/server/team";
@@ -18,10 +19,11 @@ export const dynamic = "force-dynamic";
 export default async function SecuritySettingsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [status, [practice], withoutMfa] = await Promise.all([
+  const [status, [practice], withoutMfa, rule] = await Promise.all([
     mfaStatus(db, s.userId),
     db.select().from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1),
     db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(and(eq(schema.users.practiceId, s.practiceId), isNull(schema.users.mfaSecret))),
+    mfaRule(db, s),
   ]);
   const admin = s.role === "admin";
   const ip = clientIp(await headers());
@@ -31,7 +33,7 @@ export default async function SecuritySettingsPage() {
       <PageHeader title="Sign-in security" subtitle="Two-factor sign-in for your account, and the practice's rules" actions={<Link href="/settings" className="btn btn-secondary">Back to settings</Link>} />
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Two-factor sign-in" className="lg:col-span-2">
-          <MfaSetup enabled={status.enabled} recoveryLeft={status.recoveryLeft} locked={practice.requireMfa} />
+          <MfaSetup enabled={status.enabled} recoveryLeft={status.recoveryLeft} locked={rule.required} />
         </Card>
         <Card title="Practice policy">
           <div className="space-y-3 text-sm">
@@ -42,6 +44,15 @@ export default async function SecuritySettingsPage() {
             {admin && (
               <form action={setRequireMfaAction.bind(null, !practice.requireMfa)}>
                 <button className="btn btn-secondary w-full justify-center text-xs">{practice.requireMfa ? "Make it optional" : "Require two-factor"}</button>
+              </form>
+            )}
+            <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+              <span>For administrators and anyone who can export</span>
+              {practice.requireMfa || practice.mfaForPrivileged ? <Badge tone="green">Required</Badge> : <Badge tone="amber">Optional</Badge>}
+            </div>
+            {admin && !practice.requireMfa && (
+              <form action={setMfaForPrivilegedAction.bind(null, !practice.mfaForPrivileged)}>
+                <button className="btn btn-secondary w-full justify-center text-xs">{practice.mfaForPrivileged ? "Make it optional for them" : "Require it for them"}</button>
               </form>
             )}
             <p className="text-xs text-slate-500">

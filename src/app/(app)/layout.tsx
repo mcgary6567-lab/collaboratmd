@@ -14,21 +14,21 @@ import { logoutAction } from "@/app/login/actions";
 import { standing } from "@/server/subscription";
 import { pendingDocuments } from "@/server/legal";
 import { AcceptTerms } from "@/components/accept-terms";
+import { mfaRule } from "@/server/mfa-policy";
 import Link from "next/link";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
   const db = await getDb();
-  const [practices, [practice], [user], taskCounts] = await Promise.all([
+  const [practices, [practice], taskCounts] = await Promise.all([
     accessiblePractices(db, session.userId),
     db.select({ requireMfa: schema.practices.requireMfa, hiddenNav: schema.practices.hiddenNav, selfServe: schema.practices.selfServe, subscriptionStatus: schema.practices.subscriptionStatus, trialEndsAt: schema.practices.trialEndsAt, plan: schema.practices.plan, stripeSubscriptionId: schema.practices.stripeSubscriptionId, pastDueSince: schema.practices.pastDueSince, closingAt: schema.practices.closingAt }).from(schema.practices).where(eq(schema.practices.id, session.practiceId)).limit(1),
-    db.select({ mfaSecret: schema.users.mfaSecret }).from(schema.users).where(eq(schema.users.id, session.userId)).limit(1),
     myTaskCounts(db, session.practiceId, session.userId),
   ]);
   const unread = await unreadCount(db, session.practiceId, session.userId, session.role === "admin");
-  // A practice that requires two-factor gets nothing else until it is set up.
+  // A practice that requires two-factor (of everyone, or of administrators and exporters) gets nothing else until it is set up.
   // Single sign-on users prove a second factor at their identity provider.
-  const mustEnroll = !!practice?.requireMfa && !user?.mfaSecret && !session.sso;
+  const mustEnroll = (await mfaRule(db, session)).mustEnroll;
   // Self-serve administrators accept changed terms before continuing; practices on a signed agreement are not asked.
   const mustAccept = practice?.selfServe && session.role === "admin" && !mustEnroll ? await pendingDocuments(db, session.practiceId, session.userId) : [];
   // Self-serve practices see their trial ending, and why claims stopped after it.

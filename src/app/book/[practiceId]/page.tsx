@@ -8,6 +8,7 @@ import { patientLang } from "@/lib/i18n/patient-server";
 import { BOOKING_TEXT } from "@/lib/i18n/booking";
 import { setPatientLangAction } from "@/app/lang-actions";
 import { RequestForm } from "./request-form";
+import { WaitlistForm } from "./waitlist-form";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Book an appointment", robots: { index: false } };
@@ -81,6 +82,12 @@ export default async function BookPage({ params, searchParams }: { params: Promi
         </section>
       ))}
       <p className="text-xs text-slate-500">{t.timesNote(tz.replace("_", " ").split("/")[1])}</p>
+      <details className="rounded-lg border border-slate-200 bg-white p-4" open={slots.length === 0}>
+        <summary className="cursor-pointer font-semibold text-slate-900">{t.waitlistTitle}</summary>
+        <div className="mt-3">
+          <WaitlistForm practiceId={practiceId} providers={provs.map((p) => ({ id: p.id, name: `Dr. ${p.firstName} ${p.lastName}` }))} lang={lang} />
+        </div>
+      </details>
     </div>,
   );
 }

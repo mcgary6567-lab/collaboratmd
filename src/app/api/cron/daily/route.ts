@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { cronRefusal } from "@/lib/cron-auth";
 import { getDb } from "@/db";
 import { siteOrigin } from "@/lib/origin";
 import { runDaily } from "@/server/automation";
@@ -10,6 +10,7 @@ import { runScheduledClosures } from "@/server/offboarding";
 import { sendEmail } from "@/server/notify";
 import { platformBillingReady, reportClaimUsage, syncSeats } from "@/server/subscription";
 import { deliverPending } from "@/server/webhooks";
+import { beat, checkTickStale } from "@/server/tick";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -20,13 +21,13 @@ export const maxDuration = 300;
  * does not run, so nobody can trigger patient messages by guessing the URL.
  */
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return new Response("CRON_SECRET is not set", { status: 503 });
-  const got = Buffer.from(req.headers.get("authorization") ?? "");
-  const want = Buffer.from(`Bearer ${secret}`);
-  if (got.length !== want.length || !timingSafeEqual(got, want)) return new Response("Unauthorized", { status: 401 });
+  const refused = cronRefusal(req);
+  if (refused) return refused;
   const db = await getDb();
+  await beat(db, "daily");
   const result = await runDaily(db, await siteOrigin());
+  // The five-minute runs come from outside; if they have stopped, the operators hear it here.
+  const ticks = await checkTickStale(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
   // Webhook deliveries that failed are retried here as well as straight after each event.
   const webhooks = await deliverPending(db, { limit: 500 });
   await pruneThrottle(db).catch((e) => console.error("throttle prune failed", e instanceof Error ? e.message : e));
@@ -38,5 +39,5 @@ export async function GET(req: Request) {
   const billing = platformBillingReady()
     ? { seats: await syncSeats(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`), claims: await reportClaimUsage(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`) }
     : null;
-  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing, accountEmails, closures, retention });
+  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing, accountEmails, closures, retention, ticks });
 }

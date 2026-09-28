@@ -50,7 +50,7 @@ describe("Spanish for patients", () => {
     const req = await requestBooking(t.db, t.practiceId, { providerId: prov.id, startsAt: "2026-10-06T09:00:00.000Z", firstName: "Lucía", lastName: "Morales", dob: "1988-02-02", phone: "5550102222", smsConsent: true, language: "es" }, { now });
     expect(req.language).toBe("es");
     const r = await confirmRequest(t.db, t.practiceId, req.id, t.userId);
-    const [appt] = await t.db.select().from(schema.appointments).where(eq(schema.appointments.id, r.appointmentId));
+    const [appt] = await t.db.select().from(schema.appointments).where(eq(schema.appointments.id, r.appointmentId!));
     expect(bookingConfirmed("es", { name: "Clínica" }, visitTime("es", appt.startsAt)).sms).toContain("su cita está confirmada para el martes, 6 de octubre, 9:00");
     const [p] = await t.db.select().from(schema.patients).where(eq(schema.patients.id, r.patientId));
     expect(p.preferredLanguage).toBe("es");

@@ -2,7 +2,7 @@ import { getDb } from "@/db";
 import { startSsoSession } from "@/lib/auth";
 import { siteOrigin } from "@/lib/origin";
 import { completeSaml } from "@/server/saml";
-import { getSso, ssoUser } from "@/server/sso";
+import { getSso, SAFE_NEXT, ssoUser } from "@/server/sso";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +23,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ practic
   try {
     const claims = await completeSaml(db, cfg, origin, samlResponse);
     const user = await ssoUser(db, cfg, claims);
-    await startSsoSession(db, user, cfg.practiceId);
+    await startSsoSession(db, user, cfg.practiceId, claims.authTime);
   } catch (e) {
     return back(e instanceof Error ? e.message : "SAML sign-in failed");
   }
-  return Response.redirect(`${origin}/dashboard`, 303);
+  // RelayState carries the restricted record that asked for a fresh sign-in; checked again here.
+  const relay = form.get("RelayState");
+  return Response.redirect(`${origin}${typeof relay === "string" && SAFE_NEXT.test(relay) ? relay : "/dashboard"}`, 303);
 }

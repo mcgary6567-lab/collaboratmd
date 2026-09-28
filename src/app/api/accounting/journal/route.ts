@@ -1,3 +1,4 @@
+import { mfaRefusal } from "@/server/mfa-policy";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { can, getSession } from "@/lib/auth";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
+  // Anyone who can take data off the platform needs two-factor when the practice asks for it.
+  const mfa = await mfaRefusal(await getDb(), session);
+  if (mfa) return mfa;
   if (session.role !== "admin" && (await getPolicies(await getDb(), session.practiceId)).exportsAdminOnly) return new Response("Your practice limits exports to administrators", { status: 403 });
   if (!can(session, "export") || !["admin", "biller"].includes(session.role)) return new Response("The journal is for billers and administrators", { status: 403 });
   const url = new URL(req.url);

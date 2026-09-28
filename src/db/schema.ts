@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   primaryKey,
   bigint,
+  smallint,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -31,6 +32,8 @@ export const practices = pgTable("practices", {
   /** For "today", "tomorrow" and online booking; see server/practice-time.ts and migration 0046. */
   timeZone: text("time_zone").notNull().default("America/New_York"),
   requireMfa: boolean("require_mfa").notNull().default(false),
+  /** Two-factor for administrators and anyone who can export, whatever requireMfa says (server/mfa-policy.ts); migration 0051. */
+  mfaForPrivileged: boolean("mfa_for_privileged").notNull().default(false),
   sessionHours: integer("session_hours").notNull().default(12),
   ipAllowlist: jsonb("ip_allowlist").$type<string[]>().notNull().default([]),
   automation: jsonb("automation").$type<AutomationSettings>().notNull().default({}),
@@ -1638,10 +1641,16 @@ export const providerHours = pgTable("provider_hours", {
 export const bookingRequests = pgTable("booking_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   practiceId: uuid("practice_id").notNull().references(() => practices.id),
-  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  /** "appointment" (a time) or "waitlist" (no time; migration 0051). */
+  kind: text("kind").notNull().default("appointment"),
+  /** For an appointment always; for the waitlist, when the patient wants one provider. */
+  providerId: uuid("provider_id").references(() => providers.id),
   locationId: uuid("location_id").references(() => locations.id),
-  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
-  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  /** Waitlist: the clock hours the patient can come (null is any). */
+  fromHour: smallint("from_hour"),
+  untilHour: smallint("until_hour"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   dob: date("dob").notNull(),
@@ -1700,6 +1709,9 @@ export const waitlistEntries = pgTable("waitlist_entries", {
   /** Only this provider's openings, or any provider's when null. */
   providerId: uuid("provider_id").references(() => providers.id),
   note: text("note"),
+  /** The clock hours at the practice the patient can come, [from, until); null is any. Migration 0051. */
+  fromHour: smallint("from_hour"),
+  untilHour: smallint("until_hour"),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -1717,6 +1729,9 @@ export const slotOffers = pgTable("slot_offers", {
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid("created_by").references(() => users.id),
+  /** Rounds of texts sent so far; the next goes out when nobody took it (server/waitlist.ts). */
+  rounds: integer("rounds").notNull().default(1),
+  lastRoundAt: timestamp("last_round_at", { withTimezone: true }),
   filledAt: timestamp("filled_at", { withTimezone: true }),
   filledPatientId: uuid("filled_patient_id").references(() => patients.id),
   filledAppointmentId: uuid("filled_appointment_id").references(() => appointments.id),
@@ -1727,4 +1742,12 @@ export const slotOfferRecipients = pgTable("slot_offer_recipients", {
   patientId: uuid("patient_id").notNull().references(() => patients.id),
   waitlistEntryId: uuid("waitlist_entry_id").notNull().references(() => waitlistEntries.id),
   sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+  /** Twilio reported the text did not reach the phone. */
+  undeliveredAt: timestamp("undelivered_at", { withTimezone: true }),
 }, (t) => [primaryKey({ columns: [t.offerId, t.patientId] })]);
+
+/* When something last ran, by name ("tick": the every-five-minutes run from outside). Migration 0051. */
+export const heartbeats = pgTable("heartbeats", {
+  name: text("name").primaryKey(),
+  at: timestamp("at", { withTimezone: true }).notNull(),
+});

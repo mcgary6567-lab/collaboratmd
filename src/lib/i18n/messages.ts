@@ -110,6 +110,18 @@ export function waitlistOffer(lang: Lang, p: Practice, when: string, provider: s
     ? `${p.name}: se abrió un horario el ${when} con ${provider}. Responda B para reservarlo; el primero en responder lo obtiene. Responda STOP para no recibir más mensajes.`
     : `${p.name}: a time opened ${when} with ${provider}. Reply B to book it; the first to reply gets it. Reply STOP to opt out.`;
 }
+/** Sent when staff confirm an online request to join the waitlist. */
+export function waitlistJoined(lang: Lang, p: Practice): Msg {
+  if (lang === "es") return {
+    sms: `${p.name}: está en nuestra lista de espera. Cuando se abra un horario le enviaremos un mensaje; responda B para reservarlo. Responda STOP para no recibir más mensajes.`,
+    email: { subject: `Lista de espera de ${p.name}`, text: `Está en nuestra lista de espera. Cuando se abra un horario le enviaremos un mensaje de texto; responda B para reservarlo.\n\n${p.name}${p.phone ? `\n${p.phone}` : ""}` },
+  };
+  return {
+    sms: `${p.name}: you are on our waitlist. When a time opens we will text you; reply B to book it. Reply STOP to opt out.`,
+    email: { subject: `${p.name} waitlist`, text: `You are on our waitlist. When a time opens we will text you; reply B to book it.\n\n${p.name}${p.phone ? `\n${p.phone}` : ""}` },
+  };
+}
+
 export function replyBooked(lang: Lang, p: Practice, when: string) {
   return lang === "es"
     ? `${p.name}: listo, su cita es el ${when}. Responda X si necesita cancelarla.`

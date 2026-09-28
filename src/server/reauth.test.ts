@@ -43,14 +43,22 @@ describe("proving it is still the signed-in person", () => {
     await reauthenticate(t.db, who(), { code: codeAt(secret, stepAt(now) + 1) }, key);
   });
 
-  it("for single sign-on without two-factor here, needs a recent sign-in", async () => {
+  it("for single sign-on without two-factor here, needs the identity provider to have checked the credentials just now", async () => {
     const [other] = await t.db.select().from(schema.users).where(and(eq(schema.users.practiceId, t.practiceId), eq(schema.users.role, "biller"))).limit(1);
     const sso = { userId: other.id, practiceId: t.practiceId, sso: true };
     expect(await reauthNeeds(t.db, other.id, true)).toBe("recent_sso");
     const now = new Date();
-    await t.db.insert(schema.auditLog).values({ practiceId: t.practiceId, userId: other.id, action: "login", entity: "user", entityId: other.id, at: new Date(now.getTime() - (RECENT_SSO_MINUTES + 5) * 60_000) });
-    await expect(reauthenticate(t.db, sso, {}, key, now)).rejects.toThrow(/sign in again/);
-    await t.db.insert(schema.auditLog).values({ practiceId: t.practiceId, userId: other.id, action: "login", entity: "user", entityId: other.id, at: new Date(now.getTime() - 60_000) });
+    const login = (at: Date, idpAuthAt?: Date) => t.db.insert(schema.auditLog).values({ practiceId: t.practiceId, userId: other.id, action: "login", entity: "user", entityId: other.id, at, details: idpAuthAt ? { sso: true, idpAuthAt: idpAuthAt.toISOString() } : { sso: true } });
+    const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000);
+    await login(minutesAgo(RECENT_SSO_MINUTES + 5), minutesAgo(RECENT_SSO_MINUTES + 5));
+    await expect(reauthenticate(t.db, sso, {}, key, now)).rejects.toThrow(/Sign in again/);
+    // A new session a minute ago, but from the provider's remembered sign-in of hours ago: not enough.
+    await login(minutesAgo(3), minutesAgo(300));
+    await expect(reauthenticate(t.db, sso, {}, key, now)).rejects.toThrow(/Sign in again/);
+    // A provider that does not say when it checked: not enough either.
+    await login(minutesAgo(2));
+    await expect(reauthenticate(t.db, sso, {}, key, now)).rejects.toThrow(/Sign in again/);
+    await login(minutesAgo(1), minutesAgo(1));
     await reauthenticate(t.db, sso, {}, key, now);
   });
 });

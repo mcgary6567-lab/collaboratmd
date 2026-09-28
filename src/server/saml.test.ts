@@ -58,6 +58,8 @@ describe("SAML single sign-on", () => {
     await expect(completeSaml(t.db, cfg, ORIGIN, Buffer.from(tampered).toString("base64"))).rejects.toThrow();
     const claims = await completeSaml(t.db, cfg, ORIGIN, Buffer.from(signed).toString("base64"));
     expect(claims).toMatchObject({ email: "pat@samlpractice.org" });
+    // When the identity provider checked the credentials, from the signed assertion's AuthnInstant.
+    expect(Math.abs(claims.authTime! - Date.now())).toBeLessThan(60_000);
     const user = await ssoUser(t.db, cfg, claims);
     expect(user).toMatchObject({ email: "pat@samlpractice.org", role: "front_desk" });
     // The same response again: its request was used up.
@@ -70,6 +72,13 @@ describe("SAML single sign-on", () => {
     const id2 = requestId(await samlLoginUrl(t.db, cfg, ORIGIN, "x@evil.org"));
     const foreign = response({ inResponseTo: id2, email: "x@evil.org", acs: urls.acs, audience: urls.entityId });
     await expect(completeSaml(t.db, cfg, ORIGIN, Buffer.from(foreign).toString("base64"))).rejects.toThrow(/not in a domain/);
+
+    // A fresh sign-in before a restricted record: ForceAuthn, and the way back in RelayState.
+    const next = "/patients/00000000-0000-0000-0000-000000000001";
+    const fresh = await samlLoginUrl(t.db, cfg, ORIGIN, "pat@samlpractice.org", { reauth: true, next });
+    expect(zlib.inflateRawSync(Buffer.from(new URL(fresh).searchParams.get("SAMLRequest")!, "base64")).toString()).toMatch(/ForceAuthn="true"/);
+    expect(new URL(fresh).searchParams.get("RelayState")).toBe(next);
+    expect(zlib.inflateRawSync(Buffer.from(new URL(login).searchParams.get("SAMLRequest")!, "base64")).toString()).not.toMatch(/ForceAuthn="true"/);
   });
 });
 

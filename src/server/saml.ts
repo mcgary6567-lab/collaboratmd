@@ -56,7 +56,7 @@ export function normalizeCert(input: string) {
   return body;
 }
 
-export function samlFor(db: Db, cfg: SsoConfig, origin: string) {
+export function samlFor(db: Db, cfg: SsoConfig, origin: string, opts: { forceAuthn?: boolean } = {}) {
   if (cfg.protocol !== "saml" || !cfg.samlEntryPoint || !cfg.samlIdpCert) throw new Error("SAML is not set up for this practice");
   const urls = samlUrls(origin, cfg.practiceId);
   return new SAML({
@@ -74,11 +74,24 @@ export function samlFor(db: Db, cfg: SsoConfig, origin: string) {
     cacheProvider: dbCache(db, cfg.practiceId),
     identifierFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
     disableRequestedAuthnContext: true,
+    forceAuthn: !!opts.forceAuthn,
   });
 }
 
-export async function samlLoginUrl(db: Db, cfg: SsoConfig, origin: string, loginHint: string) {
-  return samlFor(db, cfg, origin).getAuthorizeUrlAsync("", undefined, { additionalParams: { login_hint: loginHint } });
+/**
+ * The identity provider's sign-in address. With `reauth` (before a restricted
+ * record) it is told to ask for the credentials again (ForceAuthn), and the
+ * path to return to rides in RelayState (checked again when it comes back).
+ */
+export async function samlLoginUrl(db: Db, cfg: SsoConfig, origin: string, loginHint: string, opts: { reauth?: boolean; next?: string } = {}) {
+  return samlFor(db, cfg, origin, { forceAuthn: opts.reauth }).getAuthorizeUrlAsync(opts.next ?? "", undefined, { additionalParams: { login_hint: loginHint } });
+}
+
+/** When the identity provider checked the credentials: the signed assertion's AuthnInstant (ms), if present. */
+export function authnInstant(assertionXml: string | undefined) {
+  const m = /<(?:\w+:)?AuthnStatement\b[^>]*\bAuthnInstant="([^"]+)"/.exec(assertionXml ?? "");
+  const t = m ? Date.parse(m[1]) : NaN;
+  return Number.isNaN(t) ? undefined : t;
 }
 
 /** The email the IdP asserted: an email attribute, or the NameID when it is an address. */
@@ -97,7 +110,7 @@ export async function completeSaml(db: Db, cfg: SsoConfig, origin: string, samlR
   if (!cfg.domains.includes(email.split("@")[1] ?? "")) throw new Error(`${email} is not in a domain this practice signs in with`);
   const first = typeof profile.firstName === "string" ? profile.firstName : typeof profile.givenName === "string" ? profile.givenName : "";
   const last = typeof profile.lastName === "string" ? profile.lastName : typeof profile.surname === "string" ? profile.surname : "";
-  return { email, name: `${first} ${last}`.trim() || email, subject: profile.nameID };
+  return { email, name: `${first} ${last}`.trim() || email, subject: profile.nameID, authTime: authnInstant(profile.getAssertionXml?.()) };
 }
 
 export function spMetadata(db: Db, cfg: SsoConfig, origin: string) {

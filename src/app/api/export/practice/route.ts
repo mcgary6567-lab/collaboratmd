@@ -1,3 +1,4 @@
+import { mfaRefusal } from "@/server/mfa-policy";
 import { getDb, schema } from "@/db";
 import { getSession } from "@/lib/auth";
 import { practiceExport } from "@/server/practice-export";
@@ -10,6 +11,9 @@ export const maxDuration = 300;
 export async function GET() {
   const session = await getSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
+  // Anyone who can take data off the platform needs two-factor when the practice asks for it.
+  const mfa = await mfaRefusal(await getDb(), session);
+  if (mfa) return mfa;
   if (session.role !== "admin") return new Response("The full practice export is for administrators", { status: 403 });
   const db = await getDb();
   await db.insert(schema.auditLog).values({ practiceId: session.practiceId, userId: session.userId, action: "export", entity: "practice", entityId: session.practiceId, details: { full: true } });

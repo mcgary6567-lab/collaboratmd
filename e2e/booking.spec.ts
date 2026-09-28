@@ -39,4 +39,28 @@ test("a patient requests a time online and the front desk confirms it", async ({
   await expect(page.getByText(/Online requests waiting/)).toBeVisible();
   await page.getByRole("button", { name: "Confirm" }).first().click();
   await expect(page.getByText(/booked with a new patient record/).first()).toBeVisible();
+
+  // "No time that suits?": asks to join the waitlist, and the front desk confirms it the same way.
+  const other = await browser.newContext();
+  const q = await other.newPage();
+  await q.goto(new URL(new URL(link).pathname, page.url()).toString());
+  await q.getByText("No time that suits?").click();
+  const ask = q.locator("form").filter({ has: q.getByRole("button", { name: "Ask to join the waitlist" }) });
+  const last = `Waiter${Date.now() % 100000}`;
+  await ask.getByLabel("First name").fill("Online");
+  await ask.getByLabel("Last name").fill(last);
+  await ask.getByLabel("Date of birth").fill("1979-03-04");
+  await ask.getByLabel("Mobile phone").fill("555-010-7777");
+  await ask.getByLabel("When you can come").selectOption("morning");
+  await ask.getByRole("checkbox").check();
+  await ask.getByRole("button", { name: "Ask to join the waitlist" }).click();
+  await expect(q.getByText("Request sent")).toBeVisible();
+  await other.close();
+
+  await page.goto("/scheduling");
+  const request = page.locator("li").filter({ hasText: "Wants to join the waitlist" }).filter({ hasText: last });
+  await expect(request).toContainText("before noon");
+  await request.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByText(/Added to the waitlist with a new patient record/)).toBeVisible();
+  await expect(page.locator("li").filter({ hasText: last }).filter({ hasText: "before noon" }).first()).toBeVisible();
 });

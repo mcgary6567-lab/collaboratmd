@@ -10,6 +10,19 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-28",
+    title: "Reminders at the practice's own hour, and a waitlist that keeps asking",
+    items: [
+      "Waitlist offers nobody takes within 30 minutes go to the next people on the list; patients say which hours they can come",
+      "Patients can ask to join the waitlist from the online booking page",
+      "Morning-of and day-before reminders go out at each practice's own hour",
+      "The schedule shows reminder texts that did not reach the phone, so the front desk can call",
+      "Single sign-on users confirm with their identity provider before opening a restricted record",
+      "Two-factor can be required for administrators and anyone who can export; new practices start with it on",
+      "The status page shows when the site was last checked from outside",
+    ],
+  },
+  {
+    date: "2026-09-28",
     title: "A waitlist that fills cancelled times, and tighter protection for restricted records",
     items: [
       "Waitlist: a cancelled time is texted to patients waiting for it, and the first to reply B is booked",

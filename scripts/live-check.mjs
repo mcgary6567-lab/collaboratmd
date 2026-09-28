@@ -57,7 +57,23 @@ async function checkOnce() {
   console.log(new Date().toISOString());
   for (const r of results) console.log(`${r.problem ? "FAIL" : "ok  "} ${r.path} ${r.ms} ms${r.problem ? `: ${r.problem}` : ""}`);
 
+  // The site's five-minute run (waitlist rounds, reminders at each practice's hour), started from
+  // here because Vercel's plan runs its own cron once a day. Needs the site's CRON_SECRET.
+  if (process.env.CRON_SECRET && !results.some((r) => r.problem)) {
+    const started = Date.now();
+    try {
+      const r = await fetch(`${base}/api/cron/tick`, { method: "POST", headers: { authorization: `Bearer ${process.env.CRON_SECRET}`, "user-agent": "collaboratmd-live-check" }, signal: AbortSignal.timeout(60_000) });
+      results.push({ path: "/api/cron/tick", ms: Date.now() - started, problem: r.ok ? null : `HTTP ${r.status}` });
+      console.log(`${r.ok ? "ok  " : "FAIL"} /api/cron/tick ${Date.now() - started} ms`);
+    } catch (e) {
+      results.push({ path: "/api/cron/tick", ms: Date.now() - started, problem: String(e?.message ?? e) });
+    }
+  }
+
   const bad = results.filter((r) => r.problem);
+  // A heartbeat service (LIVE_HEARTBEAT_URL, e.g. healthchecks.io) alerts when these pings stop, which
+  // is the one failure this script cannot report itself: GitHub not running it at all.
+  if (!bad.length && process.env.LIVE_HEARTBEAT_URL) await fetch(process.env.LIVE_HEARTBEAT_URL, { signal: AbortSignal.timeout(10_000) }).catch((e) => console.error("heartbeat ping failed:", e.message));
   if (bad.length) {
     const text = `CollaboratMD live check failed at ${base}: ${bad.map((r) => `${r.path} (${r.problem})`).join("; ")}`;
     const hook = process.env.OPS_ALERT_WEBHOOK_URL;

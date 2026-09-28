@@ -41,7 +41,10 @@ export async function RestrictedGate({ patientId, back, what }: { patientId: str
             </label>
           )}
           {need === "recent_sso" && (
-            <p className="text-xs text-slate-600">You signed in with single sign-on, so there is no password to ask for here: this works within {RECENT_SSO_MINUTES} minutes of signing in. If it has been longer, sign out and in again first.</p>
+            <p className="text-xs text-slate-600">
+              You sign in with single sign-on, so your organization checks it is you: this works within {RECENT_SSO_MINUTES} minutes of entering your password there.{" "}
+              <a href={`/api/sso/start?reauth=1&next=${encodeURIComponent(back)}`} className="font-semibold text-brand-700 underline">Sign in again with single sign-on</a>, then give your reason here.
+            </p>
           )}
           <SubmitButton pendingLabel="Opening...">Open the record</SubmitButton>
         </ActionForm>

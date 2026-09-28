@@ -8,10 +8,14 @@ import { addToWaitlist, offerSlot, OFFER_TO, MIN_NOTICE_HOURS, removeFromWaitlis
 
 const CAN = ["admin", "biller", "front_desk"] as const;
 
+/** The form's hours: any, mornings, afternoons (clock hours at the practice). */
+const HOURS: Record<string, [number | null, number | null]> = { any: [null, null], morning: [null, 12], afternoon: [12, null] };
+
 export async function addToWaitlistAction(patientId: string, _prev: FormResult, fd: FormData): Promise<FormResult> {
   const s = await requireRole([...CAN]);
+  const [fromHour, untilHour] = HOURS[String(fd.get("hours") ?? "any")] ?? HOURS.any;
   try {
-    await addToWaitlist(await getDb(), s.practiceId, patientId, { providerId: String(fd.get("providerId") ?? "") || null, note: String(fd.get("note") ?? "") }, s.userId);
+    await addToWaitlist(await getDb(), s.practiceId, patientId, { providerId: String(fd.get("providerId") ?? "") || null, note: String(fd.get("note") ?? ""), fromHour, untilHour }, s.userId);
     revalidatePath(`/patients/${patientId}`);
     revalidatePath("/scheduling");
     return { ok: true, message: "Added to the waitlist" };

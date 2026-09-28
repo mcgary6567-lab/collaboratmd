@@ -120,8 +120,13 @@ export function oidc(cfg: SsoConfig) {
   return { ...cfg, issuer: cfg.issuer, clientId: cfg.clientId, clientSecretSealed: cfg.clientSecretSealed };
 }
 
-/** Where to send the browser, and what to remember (in a signed cookie) until it comes back. */
-export async function beginSso(sso: SsoConfig, redirectUri: string, loginHint: string, http?: Http) {
+/**
+ * Where to send the browser, and what to remember (in a signed cookie) until it
+ * comes back. With `reauth` (before a restricted record, server/reauth.ts) the
+ * identity provider is told to ask for the password again (prompt=login,
+ * max_age=0), and the answer must show it did (auth_time, in completeSso).
+ */
+export async function beginSso(sso: SsoConfig, redirectUri: string, loginHint: string, http?: Http, opts: { reauth?: boolean; next?: string; now?: number } = {}) {
   const cfg = oidc(sso);
   const doc = await discover(cfg.issuer, http);
   const state = b64url(crypto.randomBytes(24));
@@ -132,14 +137,19 @@ export async function beginSso(sso: SsoConfig, redirectUri: string, loginHint: s
   url.search = new URLSearchParams({
     response_type: "code", client_id: cfg.clientId, redirect_uri: redirectUri, scope: "openid email profile",
     state, nonce, code_challenge: challenge, code_challenge_method: "S256", login_hint: loginHint,
+    ...(opts.reauth ? { prompt: "login", max_age: "0" } : {}),
   }).toString();
-  return { url: url.toString(), pending: { practiceId: cfg.practiceId, state, nonce, verifier } };
+  return { url: url.toString(), pending: { practiceId: cfg.practiceId, state, nonce, verifier, ...(opts.reauth ? { reauthAt: opts.now ?? Date.now() } : {}), ...(opts.next ? { next: opts.next } : {}) } };
 }
 
-export type SsoClaims = { email: string; name: string; subject: string };
+/** `authTime`: when the identity provider itself last checked the person's credentials (ms), when it says. */
+export type SsoClaims = { email: string; name: string; subject: string; authTime?: number };
+
+/** Paths a sign-in may return to: the restricted-record screens that ask for it. */
+export const SAFE_NEXT = /^\/(patients|claims|statements|estimates)\/[0-9a-f-]{36}(\/[a-z-]+)?$/i;
 
 /** Exchanges the code and verifies the ID token. */
-export async function completeSso(sso: SsoConfig, code: string, redirectUri: string, pending: { nonce: string; verifier: string }, deps: { http?: Http; jwks?: JWTVerifyGetKey } = {}): Promise<SsoClaims> {
+export async function completeSso(sso: SsoConfig, code: string, redirectUri: string, pending: { nonce: string; verifier: string; reauthAt?: number }, deps: { http?: Http; jwks?: JWTVerifyGetKey } = {}): Promise<SsoClaims> {
   const http = deps.http ?? (fetch as unknown as Http);
   const cfg = oidc(sso);
   const doc = await discover(cfg.issuer, http);
@@ -162,7 +172,12 @@ export async function completeSso(sso: SsoConfig, code: string, redirectUri: str
   if (payload.email_verified === false) throw new Error("The identity provider says this email address is not verified");
   if (!cfg.domains.includes(email.split("@")[1] ?? "")) throw new Error(`${email} is not in a domain this practice signs in with`);
   const name = typeof payload.name === "string" && payload.name ? payload.name : [payload.given_name, payload.family_name].filter((x) => typeof x === "string").join(" ") || email;
-  return { email, name, subject: String(payload.sub) };
+  const authTime = typeof payload.auth_time === "number" ? payload.auth_time * 1000 : undefined;
+  // Asked to sign in again: the provider must say it checked the credentials just now, not reuse its session.
+  if (pending.reauthAt && (!authTime || authTime < pending.reauthAt - 60_000)) {
+    throw new Error("Your identity provider did not ask for your password again, so the record stays closed. Ask your administrator to let the app request a fresh sign-in (prompt=login).");
+  }
+  return { email, name, subject: String(payload.sub), authTime };
 }
 
 /**

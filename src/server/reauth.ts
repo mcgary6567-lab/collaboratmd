@@ -7,7 +7,9 @@
  *   recovery code).
  * - Otherwise: the password.
  * - Signed in through single sign-on, without two-factor here: there is no
- *   password to ask for, so the sign-in itself must be recent (RECENT_SSO_MINUTES).
+ *   password to ask for, so the identity provider must have checked the
+ *   credentials within RECENT_SSO_MINUTES. "Sign in again" on the gate asks it
+ *   to (prompt=login for OpenID Connect, ForceAuthn for SAML; server/sso.ts).
  *
  * Wrong answers count towards the same lockout as signing in, so this cannot be
  * used to guess a password.
@@ -42,14 +44,17 @@ export async function reauthenticate(
   if (isLocked(u, now)) throw new Error("Too many wrong attempts. Try again in 15 minutes.");
   const need = await reauthNeeds(db, who.userId, !!who.sso);
   if (need === "recent_sso") {
+    // When the identity provider itself last checked the credentials (auth_time or AuthnInstant,
+    // kept at sign-in): a new session from the provider's own remembered sign-in does not count.
     const [last] = await db
-      .select({ at: auditLog.at })
+      .select({ details: auditLog.details })
       .from(auditLog)
       .where(and(eq(auditLog.userId, who.userId), eq(auditLog.action, "login")))
       .orderBy(desc(auditLog.at))
       .limit(1);
-    if (!last || now.getTime() - last.at.getTime() > RECENT_SSO_MINUTES * 60_000) {
-      throw new Error(`Sign out and sign in again with single sign-on, then open the record within ${RECENT_SSO_MINUTES} minutes`);
+    const idpAuthAt = Date.parse(String((last?.details as { idpAuthAt?: string } | null)?.idpAuthAt ?? ""));
+    if (Number.isNaN(idpAuthAt) || now.getTime() - idpAuthAt > RECENT_SSO_MINUTES * 60_000) {
+      throw new Error("Sign in again with single sign-on to open this record");
     }
     return;
   }

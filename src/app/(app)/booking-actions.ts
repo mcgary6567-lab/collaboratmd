@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db";
 import { CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
-import { confirmRequest, declineRequest, getBookingSettings, saveBookingSettings, saveProviderHours } from "@/server/booking";
+import { confirmRequest, declineRequest, saveBookingSettings, saveProviderHours } from "@/server/booking";
 
 const fail = (e: unknown, fallback: string): FormResult => ({ ok: false, message: e instanceof Error ? e.message : fallback });
 
@@ -42,9 +42,10 @@ export async function confirmBookingAction(id: string, _prev: FormResult): Promi
     const db = await getDb();
     const r = await confirmRequest(db, s.practiceId, id, s.userId);
     const told = !!r.message && (r.message.sms === "sent" || r.message.email === "sent");
-    const settings = await getBookingSettings(db, s.practiceId);
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: settings.timeZone }).format(r.startsAt);
-    to = `/scheduling?date=${day}&booked=${r.matched ? "existing" : "new"}&told=${told ? 1 : 0}`;
+    // A clock time's date is its UTC date (server/practice-time.ts).
+    to = r.waitlist
+      ? `/scheduling?waitlisted=${r.matched ? "existing" : "new"}&told=${told ? 1 : 0}`
+      : `/scheduling?date=${r.startsAt.toISOString().slice(0, 10)}&booked=${r.matched ? "existing" : "new"}&told=${told ? 1 : 0}`;
   } catch (e) {
     return fail(e, "Could not book it");
   }

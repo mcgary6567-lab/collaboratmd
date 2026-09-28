@@ -29,7 +29,8 @@ const ROLES: Role[] = [
       ] },
       { title: "Through the day", steps: [
         { text: <>Answer patients in <L href="/messages">Text messages</L>. STOP, START, C, X and B are handled automatically.</> },
-        { text: <>A patient who wants an earlier time: <b>Add to the waitlist</b> on their page (any provider, or one).</> },
+        { text: <>A patient who wants an earlier time: <b>Add to the waitlist</b> on their page (any provider or one, the hours they can come). Patients can also ask online; confirm their request at the top of the schedule.</> },
+        { text: <>A red <b>Reminder not delivered</b> on the schedule means the text did not reach the phone: call the patient.</> },
         { text: <>Add new patients from <L href="/patients/new">Patients &gt; New patient</L>, or a whole list with <L href="/import">Import</L>. Record a patient&apos;s language on their page so their statements and texts are in it.</> },
         { text: <>Press Ctrl+K (Cmd+K on a Mac) to find any patient, claim or page.</> },
       ] },

@@ -8,6 +8,7 @@ The "Real Postgres behind a pooler" CI job runs the same load test against a rea
 
 - each query has a time budget (`BUDGET_MS` in `scripts/load-test.ts`); a query over it fails the build;
 - a second practice of the same size is loaded into the same tables, as in real use, so one practice's queries must find its rows through indexes;
+- each practice also gets a month of chart opening by 20 staff (twice as many access-log entries as claims, the fastest-growing table) plus other audit entries, two years of appointments (as many as claims), and a waitlist, for the chart access review, the day's schedule, the waitlist's "who can take this opening" query (which runs inside Twilio's webhook when a patient cancels) and the confirmations report;
 - the check first runs a lookup on a column with no index (`ledger_entries.note`) and fails the build if that is *not* flagged, so a pass means the check works;
 - for the queries behind list pages, one claim and one patient, Postgres is asked how it would run them (`EXPLAIN`); a plan that reads the whole of a table with more than 20,000 rows to keep under 1% of it fails the build as a probable missing index. Reading most of a table (counting every claim for a page total, say) is not flagged: that is what a full scan is for, and the test database holds a single practice.
 

@@ -35,7 +35,7 @@ async function alreadySent(db: Db, practiceId: string, kind: string, entityId: s
   const [row] = await db
     .select({ id: messageLog.id })
     .from(messageLog)
-    .where(and(eq(messageLog.practiceId, practiceId), eq(messageLog.kind, kind), eq(messageLog.entityId, entityId), inArray(messageLog.status, ["sent"]),
+    .where(and(eq(messageLog.practiceId, practiceId), eq(messageLog.kind, kind), eq(messageLog.entityId, entityId), inArray(messageLog.status, ["sent", "undelivered"]),
       ...(sinceDays ? [gte(messageLog.createdAt, new Date(Date.now() - sinceDays * 86_400_000))] : [])))
     .limit(1);
   return !!row;

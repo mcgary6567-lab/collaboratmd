@@ -48,7 +48,7 @@ describe("online booking", () => {
     const sent: string[] = [];
     const r = await confirmRequest(t.db, t.practiceId, req.id, t.userId, { sms: async (to, body) => { sent.push(`${to} ${body}`); return { ok: true, detail: "ok" }; }, email: async () => true });
     expect(r.matched).toBe(false);
-    const [appt] = await t.db.select().from(schema.appointments).where(eq(schema.appointments.id, r.appointmentId));
+    const [appt] = await t.db.select().from(schema.appointments).where(eq(schema.appointments.id, r.appointmentId!));
     // On the schedule at the hour the patient chose (clock time, like every appointment).
     expect(appt.startsAt.toISOString()).toBe("2026-10-06T09:00:00.000Z");
     expect(appt.reason).toContain("Insurance given online: Aetna W1");

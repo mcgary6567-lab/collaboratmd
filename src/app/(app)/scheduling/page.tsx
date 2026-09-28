@@ -15,14 +15,15 @@ import { localDateLabel, localTimeLabel, pendingRequests } from "@/server/bookin
 import { practiceNow } from "@/server/practice-time";
 import { confirmBookingAction, declineBookingAction } from "@/app/(app)/booking-actions";
 import { offerSlotAction, removeFromWaitlistAction } from "@/app/(app)/waitlist-actions";
-import { listWaitlist, offersFor } from "@/server/waitlist";
+import { listWaitlist, offersFor, windowLabel } from "@/server/waitlist";
+import { undeliveredReminders } from "@/server/sms-delivery";
 
 export const dynamic = "force-dynamic";
 
 const TONE: Record<string, "slate" | "green" | "red" | "amber" | "blue"> = { scheduled: "blue", checked_in: "amber", completed: "green", no_show: "red", cancelled: "slate" };
 
-export default async function SchedulingPage({ searchParams }: { searchParams: Promise<{ date?: string; booked?: string; told?: string; declined?: string }> }) {
-  const { date, booked, told, declined } = await searchParams;
+export default async function SchedulingPage({ searchParams }: { searchParams: Promise<{ date?: string; booked?: string; told?: string; declined?: string; waitlisted?: string }> }) {
+  const { date, booked, told, declined, waitlisted } = await searchParams;
   const s = await requireSession();
   const db = await getDb();
   // A clock time on the day shown: the date asked for, or today on the practice's clock.
@@ -39,7 +40,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
   const insByPatient = new Map(primaries.map((p) => [p.patientId, p.id]));
   const clockNow = await practiceNow(db, s.practiceId);
   const cancelled = appts.filter((a) => a.appt.status === "cancelled" && a.appt.startsAt > clockNow).map((a) => a.appt.id);
-  const [checks, checkins, offers, waitlist] = await Promise.all([latestChecks(db, primaries.map((p) => p.id)), checkinStatus(db, appts.map((a) => a.appt.id)), offersFor(db, cancelled), listWaitlist(db, s.practiceId)]);
+  const [checks, checkins, offers, waitlist, undelivered] = await Promise.all([latestChecks(db, primaries.map((p) => p.id)), checkinStatus(db, appts.map((a) => a.appt.id)), offersFor(db, cancelled), listWaitlist(db, s.practiceId), undeliveredReminders(db, s.practiceId, appts.map((a) => a.appt.id))]);
   const coverage = (patientId: string) => {
     const insId = insByPatient.get(patientId);
     if (!insId) return { label: "No insurance", tone: "amber" as const, title: "Self-pay unless insurance is collected" };
@@ -73,6 +74,11 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
           Online request booked {booked === "existing" ? "for the existing patient" : "with a new patient record"}. {told === "1" ? "The patient was told." : "Let the patient know; no message could be sent."}
         </div>
       )}
+      {waitlisted && (
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900" role="status">
+          Added to the waitlist {waitlisted === "existing" ? "(an existing patient)" : "with a new patient record"}. {told === "1" ? "The patient was told." : "Let the patient know; no message could be sent."}
+        </div>
+      )}
       {declined && <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-800" role="status">Request declined. Contact the patient to offer another time.</div>}
       {requests.length > 0 && (
         <Card title={`Online requests waiting (${requests.length})`} className="mb-6">
@@ -81,7 +87,12 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <div>
                   <div className="font-medium">{r.lastName}, {r.firstName} <span className="font-normal text-slate-500">· born {r.dob}</span></div>
-                  <div className="text-slate-600">{localDateLabel(r.startsAt)} at {localTimeLabel(r.startsAt)} with Dr. {providerFirst} {providerLast}{r.reason ? ` · ${r.reason}` : ""}</div>
+                  <div className="text-slate-600">
+                    {r.kind === "waitlist" || !r.startsAt
+                      ? <>Wants to join the waitlist: {providerLast ? `Dr. ${providerFirst} ${providerLast}` : "any provider"}, {windowLabel(r.fromHour, r.untilHour)}{r.smsConsent ? "" : " (no texting consent: call when a time opens)"}</>
+                      : <>{localDateLabel(r.startsAt)} at {localTimeLabel(r.startsAt)} with Dr. {providerFirst} {providerLast}</>}
+                    {r.reason ? ` · ${r.reason}` : ""}
+                  </div>
                   <div className="text-xs text-slate-500">{[r.phone, r.email, r.payerName && `${r.payerName}${r.memberId ? ` ${r.memberId}` : ""}`].filter(Boolean).join(" · ")}</div>
                 </div>
                 <div className="flex gap-2">
@@ -125,6 +136,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                     <td>
                       <Badge tone={TONE[appt.status] ?? "slate"}>{appt.status.replace("_", " ")}</Badge>
                       {appt.status === "scheduled" && appt.confirmedAt && <div className="mt-1 text-[11px] font-semibold text-green-700">Confirmed{appt.confirmedVia === "sms" ? " by text" : ""}</div>}
+                      {appt.status === "scheduled" && !appt.confirmedAt && undelivered.has(appt.id) && <div className="mt-1 text-[11px] font-semibold text-red-700" title="Twilio reported the reminder text did not reach the phone">Reminder not delivered: call</div>}
                       {checkins.get(appt.id)?.submission && (
                         <div className="mt-1"><Link href="/check-ins" className="text-[11px] font-semibold text-brand-700 hover:underline">Checked in online</Link></div>
                       )}
@@ -156,7 +168,9 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                       )}
                       {cancelled.includes(appt.id) && (offers.get(appt.id) ? (
                         <span className="text-[11px] font-semibold text-slate-600">
-                          {offers.get(appt.id)!.filled ? "Filled from the waitlist" : `Offered to ${offers.get(appt.id)!.sent} on the waitlist`}
+                          {offers.get(appt.id)!.filled
+                            ? "Filled from the waitlist"
+                            : `Offered to ${offers.get(appt.id)!.sent} on the waitlist${offers.get(appt.id)!.rounds > 1 ? ` in ${offers.get(appt.id)!.rounds} rounds` : ""}${offers.get(appt.id)!.undelivered ? ` (${offers.get(appt.id)!.undelivered} not delivered)` : ""}`}
                         </span>
                       ) : waitlist.length > 0 ? (
                         <ActionForm action={offerSlotAction.bind(null, appt.id)}>
@@ -186,7 +200,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
               <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <div>
                   <PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} />
-                  <span className="text-slate-500"> · {providerLast ? `Dr. ${providerLast} only` : "any provider"} · since {entry.createdAt.toISOString().slice(0, 10)}</span>
+                  <span className="text-slate-500"> · {providerLast ? `Dr. ${providerLast} only` : "any provider"} · {windowLabel(entry.fromHour, entry.untilHour)} · since {entry.createdAt.toISOString().slice(0, 10)}</span>
                   {entry.note && <div className="text-xs text-slate-600">{entry.note}</div>}
                   {!canText && <div className="text-xs text-amber-800">No texting consent: call when a time opens</div>}
                 </div>

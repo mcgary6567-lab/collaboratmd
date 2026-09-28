@@ -87,6 +87,8 @@ export async function completeSignup(db: Db, token: string, now = new Date(), ip
     // Filled in from the setup guide; claims cannot go out until they are.
     taxId: "", npi: "", address1: "", city: "", state: "", zip: "",
     selfServe: true, plan: pending.plan, subscriptionStatus: "trialing",
+    // New practices start with two-factor required for administrators and exporters (server/mfa-policy.ts).
+    mfaForPrivileged: true,
     trialEndsAt: new Date(now.getTime() + trialDays() * 86_400_000), billingEmail: pending.email,
   }).returning();
   const [user] = await db.insert(users).values({ practiceId: practice.id, email: pending.email, passwordHash: pending.passwordHash, name: pending.name, role: "admin" }).returning();

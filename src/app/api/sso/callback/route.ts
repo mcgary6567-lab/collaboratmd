@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { appSecret } from "@/lib/app-secret";
 import { startSsoSession } from "@/lib/auth";
 import { siteOrigin } from "@/lib/origin";
-import { completeSso, getSso, SSO_AUDIENCE, SSO_COOKIE, ssoUser } from "@/server/sso";
+import { completeSso, getSso, SAFE_NEXT, SSO_AUDIENCE, SSO_COOKIE, ssoUser } from "@/server/sso";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const cookie = jar.get(SSO_COOKIE)?.value;
   jar.delete({ name: SSO_COOKIE, path: "/api/sso" });
   if (params.get("error")) return back(params.get("error_description") || `The identity provider said: ${params.get("error")}`);
-  let pending: { practiceId: string; state: string; nonce: string; verifier: string };
+  let pending: { practiceId: string; state: string; nonce: string; verifier: string; reauthAt?: number; next?: string };
   try {
     const { payload } = await jwtVerify(cookie ?? "", appSecret(), { audience: SSO_AUDIENCE });
     pending = payload as unknown as typeof pending;
@@ -31,9 +31,10 @@ export async function GET(req: Request) {
   try {
     const claims = await completeSso(cfg, params.get("code")!, `${origin}/api/sso/callback`, pending);
     const user = await ssoUser(db, cfg, claims);
-    await startSsoSession(db, user, cfg.practiceId);
+    await startSsoSession(db, user, cfg.practiceId, claims.authTime);
   } catch (e) {
     return back(e instanceof Error ? e.message : "Single sign-on failed");
   }
-  return Response.redirect(`${origin}/dashboard`, 303);
+  // Back to the restricted record that asked for a fresh sign-in, or the dashboard.
+  return Response.redirect(`${origin}${pending.next && SAFE_NEXT.test(pending.next) ? pending.next : "/dashboard"}`, 303);
 }

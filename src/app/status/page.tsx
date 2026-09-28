@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recentErrorCount } from "@/server/errors";
+import { lastBeat } from "@/server/heartbeats";
 import { PageShell } from "@/components/page-shell";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "System status — CollaboratMD",
-  description: "Whether CollaboratMD is up right now: the application, its database, background jobs and server errors, checked live.",
+  description: "Whether CollaboratMD is up right now: the application, its database, background jobs, checks from outside and server errors, checked live.",
 };
 
 type State = "up" | "degraded" | "down" | "unknown";
@@ -32,6 +33,15 @@ async function check() {
   const last = runs[0]?.last ? new Date(runs[0].last) : null;
   const hours = last ? (Date.now() - last.getTime()) / 3_600_000 : null;
   out.push({ name: "Daily jobs (reminders, follow-up, reports)", state: hours === null ? "unknown" : hours <= 26 ? "up" : "degraded", detail: hours === null ? "Have not run yet" : `Last ran ${hours < 1 ? "under an hour" : `${Math.floor(hours)} hours`} ago` });
+  // Every five minutes a check from outside the site loads it and starts its five-minute run
+  // (server/tick.ts); if those stop, this shows it, so silence cannot pass for health.
+  const tick = await lastBeat(db, "tick").catch(() => null);
+  const tickMin = tick ? Math.round((Date.now() - tick.getTime()) / 60_000) : null;
+  out.push({
+    name: "Checks from outside (every 5 minutes)",
+    state: tickMin === null ? "unknown" : tickMin <= 15 ? "up" : "degraded",
+    detail: tickMin === null ? "Not set up yet" : tickMin < 1 ? "Last one under a minute ago" : `Last one ${tickMin} minute${tickMin === 1 ? "" : "s"} ago`,
+  });
   const errors = await recentErrorCount(db, 3_600_000).catch(() => null);
   out.push({ name: "Server errors", state: errors === null ? "unknown" : errors.hits === 0 ? "up" : errors.hits > 50 ? "degraded" : "up", detail: errors === null ? "Unavailable" : errors.hits === 0 ? "None in the last hour" : `${errors.hits} in the last hour` });
   const { rows } = await db.execute<{ day: string }>(sql`SELECT DISTINCT ran_at::date::text AS day FROM automation_runs WHERE ran_at >= now() - interval '14 days'`);

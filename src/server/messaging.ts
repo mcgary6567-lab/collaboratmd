@@ -18,6 +18,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { sendEmail } from "./notify";
 import { practiceConfig, type IntegrationConfig } from "./integrations";
+import { deliveryCallbackUrl } from "@/lib/configured-origin";
 
 type Http = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
 
@@ -32,15 +33,27 @@ export function toE164(phone: string | null | undefined): string | null {
   return null;
 }
 
-export async function sendSms(twilio: NonNullable<IntegrationConfig["twilio"]>, to: string, body: string, http: Http = fetch as unknown as Http): Promise<{ ok: boolean; detail: string }> {
+/**
+ * Sends a text through the practice's Twilio account. With `statusCallback`,
+ * Twilio later reports there whether it reached the phone (server/sms-delivery.ts).
+ */
+export async function sendSms(
+  twilio: NonNullable<IntegrationConfig["twilio"]>,
+  to: string,
+  body: string,
+  http: Http = fetch as unknown as Http,
+  opts: { statusCallback?: string | null } = {},
+): Promise<{ ok: boolean; detail: string }> {
   const sid = twilio.accountSid;
+  const params = new URLSearchParams({ To: to, From: twilio.from, Body: body });
+  if (opts.statusCallback) params.set("StatusCallback", opts.statusCallback);
   const res = await http(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${Buffer.from(`${sid}:${twilio.authToken}`).toString("base64")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ To: to, From: twilio.from, Body: body }).toString(),
+    body: params.toString(),
   });
   const text = await res.text();
   if (!res.ok) return { ok: false, detail: `Twilio ${res.status}: ${text.slice(0, 200)}` };
@@ -79,7 +92,7 @@ export async function messagePatient(
   deps: { sms?: (to: string, body: string) => Promise<{ ok: boolean; detail: string }>; email?: (to: string, subject: string, text: string) => Promise<boolean> } = {},
 ): Promise<MessageResult> {
   const cfg = await practiceConfig(db, p.practiceId);
-  const sms = deps.sms ?? ((to: string, body: string) => sendSms(cfg.twilio!, to, body));
+  const sms = deps.sms ?? ((to: string, body: string) => sendSms(cfg.twilio!, to, body, undefined, { statusCallback: deliveryCallbackUrl(p.practiceId) }));
   const email = deps.email ?? ((to: string, subject: string, text: string) => sendEmail(to, subject, text, undefined, cfg.resend));
   const out: MessageResult = { sms: "skipped", email: "skipped" };
   const log = (channel: string, recipient: string, status: string, detail?: string) =>

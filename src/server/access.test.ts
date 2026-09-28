@@ -124,6 +124,21 @@ describe("team, roles, SSO and SCIM against a migrated database", () => {
     idToken = await sign({ email: "dr.who@ssopractice.org", email_verified: false, nonce: pending.nonce });
     await expect(completeSso(cfg, "c", "r", pending, { http, jwks })).rejects.toThrow(/not verified/);
 
+    // A fresh sign-in before a restricted record: the provider is asked to check the password again,
+    // and a token that shows it reused an old sign-in is refused.
+    const next = "/patients/00000000-0000-0000-0000-000000000001";
+    const again = await beginSso(cfg, "https://app.test/api/sso/callback", "dr.who@ssopractice.org", http, { reauth: true, next });
+    expect(new URL(again.url).searchParams.get("prompt")).toBe("login");
+    expect(new URL(again.url).searchParams.get("max_age")).toBe("0");
+    expect(again.pending.next).toBe(next);
+    const nowSec = Math.floor(Date.now() / 1000);
+    idToken = await sign({ email: "dr.who@ssopractice.org", nonce: again.pending.nonce, auth_time: nowSec - 3600 });
+    await expect(completeSso(cfg, "c", "r", again.pending, { http, jwks })).rejects.toThrow(/did not ask for your password again/);
+    idToken = await sign({ email: "dr.who@ssopractice.org", nonce: again.pending.nonce });
+    await expect(completeSso(cfg, "c", "r", again.pending, { http, jwks })).rejects.toThrow(/did not ask for your password again/);
+    idToken = await sign({ email: "dr.who@ssopractice.org", nonce: again.pending.nonce, auth_time: nowSec });
+    expect((await completeSso(cfg, "c", "r", again.pending, { http, jwks })).authTime).toBe(nowSec * 1000);
+
     const user = await ssoUser(t.db, cfg, claims);
     expect(user).toMatchObject({ email: "dr.who@ssopractice.org", role: "front_desk", practiceId: t.practiceId });
     expect((await ssoUser(t.db, cfg, claims)).id).toBe(user.id);

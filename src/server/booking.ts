@@ -10,7 +10,8 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { notify } from "./notifications";
 import { messagePatient } from "./messaging";
-import { bookingConfirmed, langOf, visitTime } from "@/lib/i18n/messages";
+import { bookingConfirmed, langOf, visitTime, waitlistJoined } from "@/lib/i18n/messages";
+import { addToWaitlist, checkWindow } from "./waitlist";
 import { practiceClock, practiceTimeZone, US_TIME_ZONES, validTimeZone } from "./practice-time";
 
 const { bookingSettings, providerHours, bookingRequests, appointments, providers, patients, locations, practices, auditLog } = schema;
@@ -98,7 +99,8 @@ export async function availableSlots(db: Db, practiceId: string, opts: { provide
     ...(await db.select({ p: appointments.providerId, a: appointments.startsAt, b: appointments.endsAt }).from(appointments)
       .where(and(eq(appointments.practiceId, practiceId), inArray(appointments.providerId, providerIds), lt(appointments.startsAt, until), gte(appointments.endsAt, now), sql`${appointments.status} NOT IN ('cancelled', 'no_show')`))),
     ...(await db.select({ p: bookingRequests.providerId, a: bookingRequests.startsAt, b: bookingRequests.endsAt }).from(bookingRequests)
-      .where(and(eq(bookingRequests.practiceId, practiceId), eq(bookingRequests.status, "pending"), inArray(bookingRequests.providerId, providerIds), lt(bookingRequests.startsAt, until)))),
+      .where(and(eq(bookingRequests.practiceId, practiceId), eq(bookingRequests.kind, "appointment"), eq(bookingRequests.status, "pending"), inArray(bookingRequests.providerId, providerIds), lt(bookingRequests.startsAt, until))))
+      .map((r) => ({ p: r.p!, a: r.a!, b: r.b! })),
   ];
   const out: Slot[] = [];
   for (let i = 0; i <= s.horizonDays; i++) {
@@ -121,8 +123,8 @@ export async function availableSlots(db: Db, practiceId: string, opts: { provide
 
 export type BookingInput = { providerId: string; startsAt: string; firstName: string; lastName: string; dob: string; phone?: string; email?: string; reason?: string; payerName?: string; memberId?: string; smsConsent?: boolean; language?: "en" | "es" };
 
-export async function requestBooking(db: Db, practiceId: string, input: BookingInput, opts: { now?: Date; ipHash?: string | null } = {}) {
-  const now = opts.now ?? new Date();
+/** Who is asking, checked the same way for a time and for the waitlist. */
+function checkPerson(input: { firstName: string; lastName: string; dob: string; phone?: string; email?: string }, now: Date) {
   const first = input.firstName.trim().slice(0, 60);
   const last = input.lastName.trim().slice(0, 60);
   const phone = (input.phone ?? "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
@@ -131,13 +133,23 @@ export async function requestBooking(db: Db, practiceId: string, input: BookingI
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dob) || new Date(`${input.dob}T12:00:00Z`) > now || input.dob < "1900-01-01") throw new Error("Enter your date of birth");
   if (phone && phone.length !== 10) throw new Error("Enter a 10-digit phone number");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email");
-  if (!phone && !email) throw new Error("Give a phone number or email so the office can confirm");
-  const slot = (await availableSlots(db, practiceId, { providerId: input.providerId, now })).find((x) => x.startsAt.toISOString() === new Date(input.startsAt).toISOString());
-  if (!slot) throw new Error("That time is no longer available. Please pick another.");
-  // A few requests per person per day is plenty; more is a form being abused.
+  return { first, last, phone, email };
+}
+
+/** A few requests per person per day is plenty; more is a form being abused. */
+async function checkRequestLimit(db: Db, practiceId: string, phone: string, email: string, now: Date) {
   const contact = phone ? sql`${bookingRequests.phone} = ${phone}` : sql`${bookingRequests.email} = ${email}`;
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(bookingRequests).where(and(eq(bookingRequests.practiceId, practiceId), gte(bookingRequests.createdAt, new Date(now.getTime() - DAY)), contact));
   if (Number(n) >= 3) throw new Error("You already have requests waiting. The office will contact you.");
+}
+
+export async function requestBooking(db: Db, practiceId: string, input: BookingInput, opts: { now?: Date; ipHash?: string | null } = {}) {
+  const now = opts.now ?? new Date();
+  const { first, last, phone, email } = checkPerson(input, now);
+  if (!phone && !email) throw new Error("Give a phone number or email so the office can confirm");
+  const slot = (await availableSlots(db, practiceId, { providerId: input.providerId, now })).find((x) => x.startsAt.toISOString() === new Date(input.startsAt).toISOString());
+  if (!slot) throw new Error("That time is no longer available. Please pick another.");
+  await checkRequestLimit(db, practiceId, phone, email, now);
   const [row] = await db.insert(bookingRequests).values({
     practiceId, providerId: slot.providerId, locationId: slot.locationId, startsAt: slot.startsAt, endsAt: slot.endsAt,
     firstName: first, lastName: last, dob: input.dob, phone: phone || null, email: email || null,
@@ -149,19 +161,44 @@ export async function requestBooking(db: Db, practiceId: string, input: BookingI
   return row;
 }
 
-export async function pendingRequests(db: Db, practiceId: string) {
-  return db.select({ request: bookingRequests, providerFirst: providers.firstName, providerLast: providers.lastName }).from(bookingRequests)
-    .innerJoin(providers, eq(providers.id, bookingRequests.providerId))
-    .where(and(eq(bookingRequests.practiceId, practiceId), eq(bookingRequests.status, "pending"))).orderBy(asc(bookingRequests.startsAt));
+export type WaitlistRequestInput = {
+  providerId?: string | null; fromHour?: number | null; untilHour?: number | null;
+  firstName: string; lastName: string; dob: string; phone?: string; email?: string; reason?: string; smsConsent?: boolean; language?: "en" | "es";
+};
+
+/**
+ * "No time that suits": asks to join the waitlist. Openings are offered by
+ * text, so a phone number is needed; staff confirm it like a booking request.
+ */
+export async function requestWaitlist(db: Db, practiceId: string, input: WaitlistRequestInput, opts: { now?: Date; ipHash?: string | null } = {}) {
+  const now = opts.now ?? new Date();
+  const { first, last, phone, email } = checkPerson(input, now);
+  if (!phone) throw new Error("Give a mobile number: openings are offered by text");
+  const window = checkWindow(input.fromHour, input.untilHour);
+  if (input.providerId) {
+    const [pr] = await db.select({ id: providers.id }).from(providers).where(and(eq(providers.id, input.providerId), eq(providers.practiceId, practiceId), eq(providers.active, true))).limit(1);
+    if (!pr) throw new Error("Choose one of the practice's providers");
+  }
+  const s = await getBookingSettings(db, practiceId);
+  if (!s.enabled) throw new Error("Online booking is not open");
+  await checkRequestLimit(db, practiceId, phone, email, now);
+  const [row] = await db.insert(bookingRequests).values({
+    practiceId, kind: "waitlist", providerId: input.providerId || null, ...window,
+    firstName: first, lastName: last, dob: input.dob, phone, email: email || null, reason: input.reason?.trim().slice(0, 300) || null,
+    smsConsent: !!input.smsConsent, language: input.language === "es" ? "es" : "en", ipHash: opts.ipHash ?? null, createdAt: now,
+  }).returning();
+  await notify(db, practiceId, { kind: "booking_request", title: "New online waitlist request", body: "Confirm or decline it on the schedule.", href: "/scheduling", dedupeKey: `booking:${row.id}` });
+  return row;
 }
 
-/** Books it: an existing patient with the same name and date of birth, or a new one; then the appointment. */
-export async function confirmRequest(db: Db, practiceId: string, id: string, userId: string, deps: Parameters<typeof messagePatient>[3] = {}) {
-  const [r] = await db.select().from(bookingRequests).where(and(eq(bookingRequests.id, id), eq(bookingRequests.practiceId, practiceId))).limit(1);
-  if (!r || r.status !== "pending") throw new Error("This request was already handled");
-  const clash = await db.select({ id: appointments.id }).from(appointments)
-    .where(and(eq(appointments.providerId, r.providerId), lt(appointments.startsAt, r.endsAt), sql`${appointments.endsAt} > ${r.startsAt}`, sql`${appointments.status} NOT IN ('cancelled', 'no_show')`)).limit(1);
-  if (clash.length) throw new Error("Something else was booked at that time; decline this request and offer another time");
+export async function pendingRequests(db: Db, practiceId: string) {
+  return db.select({ request: bookingRequests, providerFirst: providers.firstName, providerLast: providers.lastName }).from(bookingRequests)
+    .leftJoin(providers, eq(providers.id, bookingRequests.providerId))
+    .where(and(eq(bookingRequests.practiceId, practiceId), eq(bookingRequests.status, "pending"))).orderBy(sql`${bookingRequests.startsAt} ASC NULLS LAST`, asc(bookingRequests.createdAt));
+}
+
+/** The patient a request is about: an existing one with the same name and date of birth, or a new one. */
+async function matchOrCreatePatient(db: Db, practiceId: string, r: typeof bookingRequests.$inferSelect) {
   let [patient] = await db.select().from(patients)
     .where(and(eq(patients.practiceId, practiceId), sql`lower(${patients.lastName}) = ${r.lastName.toLowerCase()}`, sql`lower(${patients.firstName}) = ${r.firstName.toLowerCase()}`, eq(patients.dob, r.dob))).limit(1);
   const matched = !!patient;
@@ -171,23 +208,58 @@ export async function confirmRequest(db: Db, practiceId: string, id: string, use
       practiceId, mrn: "P" + String(Number(n) + 1001).padStart(5, "0"), firstName: r.firstName, lastName: r.lastName, dob: r.dob, sex: "U",
       phone: r.phone, email: r.email, smsConsentAt: r.smsConsent ? r.createdAt : null, preferredLanguage: r.language,
     }).returning();
-  } else if (r.language !== patient.preferredLanguage) {
-    // They asked in this language just now; statements and reminders follow it.
-    [patient] = await db.update(patients).set({ preferredLanguage: r.language }).where(eq(patients.id, patient.id)).returning();
+  } else {
+    // They asked in this language just now; statements and reminders follow it. Texting consent given
+    // on the form counts for the number on file only when it is that number.
+    const sameNumber = !!r.phone && (patient.phone ?? "").replace(/\D/g, "").slice(-10) === r.phone;
+    const set = {
+      ...(r.language !== patient.preferredLanguage ? { preferredLanguage: r.language } : {}),
+      ...(r.smsConsent && sameNumber && !patient.smsConsentAt ? { smsConsentAt: r.createdAt } : {}),
+    };
+    if (Object.keys(set).length) [patient] = await db.update(patients).set(set).where(eq(patients.id, patient.id)).returning();
   }
+  return { patient, matched };
+}
+
+/**
+ * Confirms a request. A time: books it (for an existing patient with the same
+ * name and date of birth, or a new one). The waitlist: puts them on it.
+ */
+export async function confirmRequest(db: Db, practiceId: string, id: string, userId: string, deps: Parameters<typeof messagePatient>[3] = {}) {
+  const [r] = await db.select().from(bookingRequests).where(and(eq(bookingRequests.id, id), eq(bookingRequests.practiceId, practiceId))).limit(1);
+  if (!r || r.status !== "pending") throw new Error("This request was already handled");
+  const [practice] = await db.select({ name: practices.name, phone: practices.phone }).from(practices).where(eq(practices.id, practiceId)).limit(1);
+
+  if (r.kind === "waitlist") {
+    const { patient, matched } = await matchOrCreatePatient(db, practiceId, r);
+    await addToWaitlist(db, practiceId, patient.id, { providerId: r.providerId, note: r.reason ? `Online: ${r.reason}` : "Asked online", fromHour: r.fromHour, untilHour: r.untilHour }, userId)
+      .catch((e) => { if (!/already on the waitlist/.test(String(e?.message))) throw e; });
+    await db.update(bookingRequests).set({ status: "confirmed", decidedAt: new Date(), decidedBy: userId }).where(eq(bookingRequests.id, id));
+    await db.insert(auditLog).values({ practiceId, userId, action: "waitlist_request_confirmed", entity: "patient", entityId: patient.id, details: { matched } });
+    const lang = langOf(patient.preferredLanguage);
+    const message = await messagePatient(db, patient, { kind: "waitlist_joined", entityId: patient.id, ...waitlistJoined(lang, practice) }, deps).catch(() => null);
+    return { appointmentId: null, patientId: patient.id, matched, message, startsAt: null, waitlist: true as const };
+  }
+
+  const providerId = r.providerId!;
+  const startsAt = r.startsAt!;
+  const endsAt = r.endsAt!;
+  const clash = await db.select({ id: appointments.id }).from(appointments)
+    .where(and(eq(appointments.providerId, providerId), lt(appointments.startsAt, endsAt), sql`${appointments.endsAt} > ${startsAt}`, sql`${appointments.status} NOT IN ('cancelled', 'no_show')`)).limit(1);
+  if (clash.length) throw new Error("Something else was booked at that time; decline this request and offer another time");
+  const { patient, matched } = await matchOrCreatePatient(db, practiceId, r);
   const [appt] = await db.insert(appointments).values({
-    practiceId, patientId: patient.id, providerId: r.providerId, locationId: r.locationId, startsAt: r.startsAt, endsAt: r.endsAt,
+    practiceId, patientId: patient.id, providerId, locationId: r.locationId, startsAt, endsAt,
     type: "office_visit", reason: [r.reason, r.payerName ? `Insurance given online: ${r.payerName}${r.memberId ? ` ${r.memberId}` : ""}` : null].filter(Boolean).join(" · ") || null,
   }).returning();
   await db.update(bookingRequests).set({ status: "confirmed", appointmentId: appt.id, decidedAt: new Date(), decidedBy: userId }).where(eq(bookingRequests.id, id));
   await db.insert(auditLog).values({ practiceId, userId, action: "booking_confirmed", entity: "appointment", entityId: appt.id, details: { matched } });
-  const [practice] = await db.select({ name: practices.name, phone: practices.phone }).from(practices).where(eq(practices.id, practiceId)).limit(1);
   const lang = langOf(patient.preferredLanguage);
   const message = await messagePatient(db, patient, {
     kind: "booking_confirmed", entityId: appt.id,
-    ...bookingConfirmed(lang, practice, visitTime(lang, r.startsAt)),
+    ...bookingConfirmed(lang, practice, visitTime(lang, startsAt)),
   }, deps).catch(() => null);
-  return { appointmentId: appt.id, patientId: patient.id, matched, message, startsAt: r.startsAt };
+  return { appointmentId: appt.id, patientId: patient.id, matched, message, startsAt, waitlist: false as const };
 }
 
 export async function declineRequest(db: Db, practiceId: string, id: string, userId: string) {
