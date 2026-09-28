@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { AccidentCard } from "./accident-card";
+import { EDITABLE } from "@/server/claim-edit";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, or } from "drizzle-orm";
@@ -85,6 +87,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             {["draft", "scrub_errors", "ready", "rejected"].includes(b.claim.status) && b.claim.frequencyCode !== "8" && b.claim.payerSequence !== "S" && (
               <Link href={`/claims/${id}/edit`} className="btn btn-secondary">Edit claim</Link>
             )}
+            {b.claim.claimType === "professional" && <Link href={`/print/cms1500/${id}`} className="btn btn-secondary">Paper claim (CMS-1500)</Link>}
             <ClaimActions claimId={id} canSubmit={canSubmit} canRescrub={["draft", "scrub_errors", "ready"].includes(b.claim.status)} />
           </>
         }
@@ -311,6 +314,15 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               <span className="font-semibold">Diagnoses:</span> {b.encounter.diagnoses.map((d, i) => `${i + 1}. ${d}`).join("   ")} · <span className="font-semibold">POS</span> {b.encounter.placeOfService}
             </div>
           </Card>
+
+          {b.claim.claimType === "professional" && (
+            <AccidentCard
+              claimId={id}
+              encounter={b.encounter}
+              editable={(EDITABLE as readonly string[]).includes(b.claim.status) && b.claim.frequencyCode !== "8" && b.claim.payerSequence !== "S"}
+              open={b.claim.scrubResults.some((f) => ["ACCIDENT_STATE", "ACCIDENT_DATE", "WORKERS_COMP", "AUTO_CLAIM", "PC_CLAIM_NUMBER"].includes(f.rule))}
+            />
+          )}
 
           <Card title="Ledger">
             <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">

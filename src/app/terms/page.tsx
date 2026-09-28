@@ -156,6 +156,12 @@ export default function TermsPage() {
           successor in a merger or a sale of substantially all assets. These terms, the order form
           and the business associate agreement are the entire agreement between us.
         </p>
+        <p>
+          CPT® is a registered trademark of the American Medical Association. The service uses CPT
+          codes as identifiers only; it does not supply CPT descriptions, which you enter or import
+          under your own license. ICD-10-CM and HCPCS Level II code sets are published by the US
+          government.
+        </p>
 
         <h2>17. Contact</h2>
         <p>

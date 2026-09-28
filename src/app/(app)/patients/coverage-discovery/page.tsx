@@ -32,16 +32,16 @@ export default async function CoverageDiscoveryPage() {
         {rows.length === 0 ? (
           <Empty>Every patient has insurance on file.</Empty>
         ) : (
-          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table table-stack">
             <thead><tr><th>Patient</th><th>Date of birth</th><th>Next visit</th><th>Last searched</th><th /></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td><Link href={`/patients/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.last_name}, {r.first_name}</Link> <span className="text-xs text-slate-500">{r.mrn}</span></td>
-                  <td>{r.dob ? fmtDate(`${r.dob}T00:00:00`) : <span className="text-amber-700">missing</span>}</td>
-                  <td>{r.next_visit ? fmtDate(`${r.next_visit}T00:00:00`) : "-"}</td>
-                  <td>{r.last_search ? fmtDate(`${r.last_search}T00:00:00`) : "never"} {Number(r.found) > 0 && <Link href={`/patients/${r.id}`}><Badge tone="green">{r.found} found</Badge></Link>}</td>
-                  <td className="text-right">
+                  <td data-label="Patient"><Link href={`/patients/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.last_name}, {r.first_name}</Link> <span className="text-xs text-slate-500">{r.mrn}</span></td>
+                  <td data-label="Date of birth">{r.dob ? fmtDate(`${r.dob}T00:00:00`) : <span className="text-amber-700">missing</span>}</td>
+                  <td data-label="Next visit">{r.next_visit ? fmtDate(`${r.next_visit}T00:00:00`) : "-"}</td>
+                  <td data-label="Last searched">{r.last_search ? fmtDate(`${r.last_search}T00:00:00`) : "never"} {Number(r.found) > 0 && <Link href={`/patients/${r.id}`}><Badge tone="green">{r.found} found</Badge></Link>}</td>
+                  <td data-label="" className="text-right">
                     {canWrite && r.dob && (
                       <ActionForm action={discoverCoverageAction.bind(null, r.id)}>
                         <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Asking payers...">Find coverage</SubmitButton>

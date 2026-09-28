@@ -196,3 +196,31 @@ Never commit `.env.local`. To rotate:
 - `AUTH_SECRET`: signs everyone out. Before the first rotation, set `SEAL_KEYS` and press "Re-encrypt stored secrets" in /ops/practices; otherwise integration keys and second-factor secrets become unreadable.
 - `SEAL_KEYS` (encryption of stored secrets): put a new `id=key` at the front, deploy, re-encrypt from /ops/practices, then remove the old key and deploy again.
 - Integration keys: replace them in the provider, then in Settings → Integrations or the Vercel env.
+
+## Code sets every year
+
+- **ICD-10-CM** changes on **October 1** (and sometimes April 1). CMS publishes the files in the summer on its ICD-10 page ("Code Descriptions in Tabular Order"). Before October 1, load the new year's order file:
+  `npm run import:code-sets -- icd10cm ./icd10cm_order_2027.txt 2027`
+  Each code keeps the first and latest fiscal year that listed it: a new code is refused for earlier dates of service, a deleted one for later dates, and a category (header) code is never billable. Once any year is loaded, every diagnosis on every claim is checked; a date of service in a year not loaded yet gets a warning. Load earlier years' files too if practices bill older dates of service.
+- **HCPCS Level II**: CMS's quarterly Alpha-Numeric HCPCS file, opened in Excel and saved as CSV, loaded under Settings → Code sets (or `npm run import:code-sets -- hcpcs file.csv "2026 Q4"`). Discontinued and not-yet-effective codes are refused for the date of service.
+- **CPT** codes and descriptions belong to the AMA. The product ships only short labels of our own for a few dozen common codes; practices add their own codes, descriptions and fees under Fee schedules (CSV with code, description, fee). Showing AMA CPT descriptions needs an AMA distribution license.
+
+## Paper claims, and clearinghouses by file
+
+- **CMS-1500**: a professional claim's "Paper claim (CMS-1500)" button opens `/print/cms1500/<claim>`: data only for a pre-printed red form, a plain-paper copy with box captions, or an alignment test. Print at 100%. If the text sits off the boxes, set the alignment under Settings → Practice profile (millimetres right and down). "Mark as mailed" moves a ready claim to submitted.
+- **Another clearinghouse** (Office Ally, Availity, Claim.MD...): Claims → Send by file downloads every ready claim as one 837 (one functional group per claim kind, one transaction set per claim), under the submitter and receiver IDs the practice enters there. After uploading it to the clearinghouse, "Mark as sent". The 999, 277CA and 835 files that come back are uploaded on the same page and read like polled ones; the same file twice is read once.
+- **Workers' comp and auto**: payer types `workers_comp` (SBR09 WC) and `auto` (AM). Charge entry and the claim page take whether the condition is related to employment, an auto accident (with its state) or another accident, the accident date, and the insurer's claim number (CLM11, DTP*439, REF*Y4; boxes 10, 14 and 11b).
+
+## NPI lookup
+
+"Look up NPI" (practice profile, providers, locations, referring provider) asks CMS's public NPI Registry (`npiregistry.cms.hhs.gov`, no key) and fills the name, address, phone and taxonomy. Only the NPI is sent. If the registry is down, the fields are typed by hand as before.
+
+## Subscription invoices
+
+The platform Stripe webhook also takes `invoice.finalized`, `invoice.paid`, `invoice.payment_failed`, `invoice.voided` and `invoice.marked_uncollectible`: add them to the webhook endpoint's events in Stripe. Invoices are listed on Settings → Subscription with Stripe's hosted invoice and PDF links. A failed payment notifies the practice's administrators in the app; the account emails send one reminder when it fails and a last one two days before claims pause.
+
+## Security evidence
+
+- `/trust/questionnaire` answers the usual vendor security questions (and downloads as CSV). Keep it true: when a control changes, change the answer in `src/content/security-questionnaire.ts`.
+- Record every restore drill (docs/08-restore-drill.md) at `/ops/restore-tests`; the questionnaire shows the latest.
+- Incidents: `docs/12-incident-response.md`.

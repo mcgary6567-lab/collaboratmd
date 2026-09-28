@@ -24,7 +24,8 @@ export async function saveProfileAction(_prev: FormResult, fd: FormData): Promis
   const s = await admin();
   try {
     await saveProfile(await getDb(), s.practiceId, { name: f(fd, "name"), npi: f(fd, "npi"), taxId: f(fd, "taxId"), address1: f(fd, "address1"), city: f(fd, "city"), state: f(fd, "state"), zip: f(fd, "zip"), phone: f(fd, "phone"), timeZone: f(fd, "timeZone") || undefined,
-      billingEntity: f(fd, "billingEntity") === "individual" ? "individual" : "organization", billingFirstName: f(fd, "billingFirstName"), billingLastName: f(fd, "billingLastName"), cliaNumber: f(fd, "cliaNumber") }, s.userId);
+      billingEntity: f(fd, "billingEntity") === "individual" ? "individual" : "organization", billingFirstName: f(fd, "billingFirstName"), billingLastName: f(fd, "billingLastName"), cliaNumber: f(fd, "cliaNumber"),
+      formOffsetXmm: Number(f(fd, "formOffsetX") || 0), formOffsetYmm: Number(f(fd, "formOffsetY") || 0) }, s.userId);
     revalidatePath("/settings", "layout");
     return { ok: true, message: "Saved. Claims sent from now on carry these details." };
   } catch (e) {

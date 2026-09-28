@@ -12,7 +12,18 @@ import { REL_CODE, subscriberLoops, type Person } from "./subscriber";
  * SBR09, the claim filing indicator, on a professional claim: Medicare Part B,
  * Medicaid, or commercial. Medicare contractors reject a claim filed as CI.
  */
-export const professionalFiling = (type?: string | null) => (type === "medicare" ? "MB" : type === "medicaid" ? "MC" : "CI");
+export const professionalFiling = (type?: string | null) => (type === "medicare" ? "MB" : type === "medicaid" ? "MC" : type === "workers_comp" ? "WC" : type === "auto" ? "AM" : "CI");
+
+/** What caused the condition, for CLM11: employment (EM), an auto accident (AA, with its state) or another accident (OA). */
+export type AccidentInfo = { employment?: boolean; auto?: boolean; autoState?: string | null; other?: boolean; date?: string | null };
+
+/** CLM11 composite, or null when the condition is not related to work or an accident. */
+export function relatedCauses(a?: AccidentInfo | null) {
+  if (!a) return null;
+  const codes = [a.employment && "EM", a.auto && "AA", a.other && "OA"].filter(Boolean) as string[];
+  if (!codes.length) return null;
+  return [codes[0], codes[1] ?? "", codes[2] ?? "", a.auto ? (a.autoState ?? "").toUpperCase() : ""].join(":").replace(/:+$/, "");
+}
 
 /** A supporting document for a claim (see server/attachments.ts). */
 export type ClaimAttachmentRef = { reportType: string; transmission: string; controlNumber: string };
@@ -115,7 +126,11 @@ export interface Edi837Input {
     diagnoses: string[]; // ICD-10-CM without dots
     /** PWK: supporting documents sent separately, matched by control number. */
     attachments?: ClaimAttachmentRef[];
+    /** Related to employment or an accident: CLM11 and, for an accident, its date (DTP*439). */
+    accident?: AccidentInfo | null;
   };
+  /** The workers' comp or auto insurer's claim number (2010BA REF*Y4). */
+  propertyClaimNumber?: string | null;
   /**
    * Set on a secondary claim: the payer that adjudicated first and what it
    * decided, sent in loops 2320/2330 so the secondary pays only what is left.
@@ -191,9 +206,12 @@ export function buildEdi837P(input: Edi837Input): string {
     patient: input.patient ?? input.subscriber,
     filing: professionalFiling(input.payer.type),
     payer: ["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId],
+    propertyClaimNumber: input.propertyClaimNumber,
   }));
   // 2300 claim
-  s.push(["CLM", input.controlNumber, money(input.claim.totalCents), "", "", `${input.claim.placeOfService}:B:${input.claim.frequencyCode}`, "Y", "A", "Y", "Y"]);
+  const causes = relatedCauses(input.claim.accident);
+  s.push(["CLM", input.controlNumber, money(input.claim.totalCents), "", "", `${input.claim.placeOfService}:B:${input.claim.frequencyCode}`, "Y", "A", "Y", "Y", ...(causes ? ["", causes] : [])]);
+  if (input.claim.accident?.date && (input.claim.accident.auto || input.claim.accident.other || input.claim.accident.employment)) s.push(["DTP", "439", "D8", d8(input.claim.accident.date)]);
   for (const a of input.claim.attachments ?? []) s.push(pwk(a));
   // 2300 REF segments precede HI. A replacement or void without the payer's
   // original claim number is rejected, so refuse to build one.

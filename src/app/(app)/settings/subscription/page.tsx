@@ -4,10 +4,10 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { TIERS } from "@/content/pricing";
-import { platformBillingReady, priceFor, standing } from "@/server/subscription";
+import { listInvoices, platformBillingReady, priceFor, standing } from "@/server/subscription";
 import { billingPortalAction, subscribeAction } from "@/app/(app)/subscription-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Alert, Badge, Card, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, Money, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Subscription" };
@@ -23,7 +23,7 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const s = await requireRole(["admin"]);
   const db = await getDb();
-  const [p] = await db.select().from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1);
+  const [[p], invoices] = await Promise.all([db.select().from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1), listInvoices(db, s.practiceId)]);
   const st = standing(p);
   const ready = platformBillingReady();
   const buyable = TIERS.filter((t) => priceFor(t.id, "monthly") || priceFor(t.id, "annual"));
@@ -75,6 +75,32 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
           </Card>
         )}
       </div>
+      {invoices.length > 0 && (
+        <div className="mt-6">
+          <Card title="Invoices">
+            <div tabIndex={0} role="region" aria-label="Invoices" className="overflow-x-auto">
+              <table className="table table-stack">
+                <thead><tr><th>Invoice</th><th>Date</th><th>Period</th><th className="text-right">Amount</th><th>Status</th><th /></tr></thead>
+                <tbody>{invoices.map((i) => (
+                  <tr key={i.id}>
+                    <td data-label="Invoice" className="font-mono text-xs">{i.number ?? "Draft"}</td>
+                    <td data-label="Date">{fmtDate(i.createdAt, s.timeZone)}</td>
+                    <td data-label="Period" className="text-xs">{i.periodStart && i.periodEnd ? `${fmtDate(i.periodStart, s.timeZone)} to ${fmtDate(i.periodEnd, s.timeZone)}` : ""}</td>
+                    <td data-label="Amount" className="text-right"><Money cents={i.amountDueCents} /></td>
+                    <td data-label="Status"><Badge tone={i.status === "paid" ? "green" : i.status === "payment_failed" || i.status === "uncollectible" ? "red" : "slate"}>{INVOICE_LABEL[i.status] ?? i.status}</Badge></td>
+                    <td data-label="" className="text-right text-xs">
+                      {i.hostedUrl && <a href={i.hostedUrl} target="_blank" rel="noreferrer noopener" className="font-semibold text-brand-700 hover:underline">{i.status === "paid" ? "Receipt" : "Pay or view"}</a>}
+                      {i.pdfUrl && <> · <a href={i.pdfUrl} target="_blank" rel="noreferrer noopener" className="font-semibold text-brand-700 hover:underline">PDF</a></>}
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
+
+const INVOICE_LABEL: Record<string, string> = { draft: "Draft", open: "Due", paid: "Paid", payment_failed: "Payment failed", void: "Voided", uncollectible: "Uncollectible" };

@@ -65,7 +65,7 @@ export const INPATIENT_FACILITY_TYPES = ["11", "18", "21", "41", "65", "66", "86
 export const isInpatient = (tob: string) => INPATIENT_FACILITY_TYPES.includes(tob.padStart(4, "0").slice(1, 3));
 
 /** SBR09 claim filing indicator from the payer's type. */
-const filingIndicator = (type: string) => (type === "medicare" ? "MA" : type === "medicaid" ? "MC" : "CI");
+const filingIndicator = (type: string) => (type === "medicare" ? "MA" : type === "medicaid" ? "MC" : type === "workers_comp" ? "WC" : type === "auto" ? "AM" : "CI");
 
 export function buildEdi837I(input: Edi837IInput): string {
   const inst = input.claim.institutional;

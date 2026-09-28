@@ -13,7 +13,11 @@ export interface ScrubClaim {
   insurance: { memberId: string; payerId: string; relationship: string; subscriber?: { firstName: string | null; lastName: string | null; dob: string | null } | null };
   provider: { npi: string; taxonomy: string };
   practice: { npi: string; taxId: string; phone?: string | null; cliaNumber?: string | null };
-  encounter: { dateOfService: string; placeOfService: string; diagnoses: string[]; referringNpi?: string | null };
+  encounter: {
+    dateOfService: string; placeOfService: string; diagnoses: string[]; referringNpi?: string | null;
+    /** Work and accident details (box 10, CLM11), and the insurer's claim number for workers' comp and auto. */
+    relatedEmployment?: boolean; relatedAuto?: boolean; autoAccidentState?: string | null; relatedOther?: boolean; accidentDate?: string | null; propertyClaimNumber?: string | null;
+  };
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[] }[];
   payer: { timelyFilingDays: number; type?: string | null };
   /** Frequency and replacement reference; absent means an original claim. */
@@ -100,6 +104,28 @@ const rules: Record<string, Rule> = {
   REFERRING_NPI: (c) =>
     c.encounter.referringNpi && !isValidNpi(c.encounter.referringNpi)
       ? [{ rule: "REFERRING_NPI", severity: "error", message: `Referring provider NPI ${c.encounter.referringNpi} fails check-digit validation`, field: "encounter.referringNpi" }]
+      : [],
+  ACCIDENT_STATE: (c) =>
+    c.encounter.relatedAuto && !c.encounter.autoAccidentState
+      ? [{ rule: "ACCIDENT_STATE", severity: "error", message: "An auto accident claim needs the state where the accident happened", field: "encounter.autoAccidentState" }]
+      : [],
+  ACCIDENT_DATE: (c) =>
+    (c.encounter.relatedAuto || c.encounter.relatedOther || c.payer.type === "workers_comp") && !c.encounter.accidentDate
+      ? [{ rule: "ACCIDENT_DATE", severity: "error", message: "Enter the date of the accident or injury", field: "encounter.accidentDate" }]
+      : c.encounter.accidentDate && c.encounter.accidentDate > c.encounter.dateOfService
+        ? [{ rule: "ACCIDENT_DATE", severity: "error", message: "The accident date is after the date of service", field: "encounter.accidentDate" }]
+        : [],
+  WORKERS_COMP: (c) =>
+    c.payer.type === "workers_comp" && !c.encounter.relatedEmployment
+      ? [{ rule: "WORKERS_COMP", severity: "error", message: "A workers' comp claim must say the condition is related to employment (box 10a)", field: "encounter.relatedEmployment" }]
+      : [],
+  AUTO_CLAIM: (c) =>
+    c.payer.type === "auto" && !c.encounter.relatedAuto
+      ? [{ rule: "AUTO_CLAIM", severity: "warning", message: "The payer is an auto insurer but the claim does not say the condition is from an auto accident (box 10b)", field: "encounter.relatedAuto" }]
+      : [],
+  PC_CLAIM_NUMBER: (c) =>
+    (c.payer.type === "workers_comp" || c.payer.type === "auto") && !c.encounter.propertyClaimNumber?.trim()
+      ? [{ rule: "PC_CLAIM_NUMBER", severity: "warning", message: "Workers' comp and auto insurers expect their own claim number for the injury (box 11b); most return claims without it", field: "encounter.propertyClaimNumber" }]
       : [],
   // GZ: the provider expects Medicare to deny the service and has no signed ABN, so the patient cannot be billed for it.
   MEDICARE_GZ: (c) =>

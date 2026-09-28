@@ -5,6 +5,9 @@ import { Trash, Plus } from "lucide-react";
 import { createEncounterAction } from "@/app/(app)/actions";
 import { Field, Alert } from "@/components/ui";
 import { PosOptions } from "@/components/code-pickers";
+import { CodeList, useCodeSearch } from "@/components/code-search";
+import { US_STATES } from "@/lib/us";
+import { NpiLookup } from "@/components/npi-lookup";
 import { money } from "@/lib/utils";
 import { PatientPicker, type PatientOption } from "@/components/patient-picker";
 
@@ -33,7 +36,11 @@ export function ChargeEntryForm({
   const [locationId, setLocationId] = useState(defaults.locationId ?? "");
   const [pos, setPos] = useState(locations.find((l) => l.id === defaults.locationId)?.placeOfService ?? "11");
   const [dx, setDx] = useState<string[]>([""]);
+  const dxSearch = useCodeSearch("dx", icds);
+  const pxSearch = useCodeSearch("px", cpts);
   const [referring, setReferring] = useState({ lastName: "", firstName: "", npi: "" });
+  const [accident, setAccident] = useState({ employment: false, auto: false, autoState: "", other: false, date: "", claimNumber: "", employer: "" });
+  const setAcc = (patch: Partial<typeof accident>) => setAccident((a) => ({ ...a, ...patch }));
   const [lines, setLines] = useState<Line[]>([{ cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }]);
 
   const feeFor = (code: string) => cpts.find((c) => c.code === code)?.fee;
@@ -49,6 +56,7 @@ export function ChargeEntryForm({
     locationId: locationId || null,
     diagnoses: dx.map((d) => d.trim()).filter(Boolean),
     referring: referring.npi.trim() || referring.lastName.trim() ? referring : null,
+    accident: accident.employment || accident.auto || accident.other || accident.claimNumber.trim() ? accident : null,
     lines: lines
       .filter((l) => l.cpt.trim())
       .map((l) => ({
@@ -57,7 +65,7 @@ export function ChargeEntryForm({
         units: Number(l.units) || 1,
         chargeCents: Math.round((parseFloat(l.charge) || 0) * 100),
         dxPointers: l.dxPointers.split(",").map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n)),
-        description: l.description || cpts.find((c) => c.code === l.cpt)?.description,
+        description: l.description || pxSearch.describe(l.cpt),
       })),
   });
 
@@ -96,7 +104,32 @@ export function ChargeEntryForm({
             <Field label="Last name"><input className="input" value={referring.lastName} onChange={(e) => setReferring((r) => ({ ...r, lastName: e.target.value }))} autoComplete="off" /></Field>
             <Field label="First name"><input className="input" value={referring.firstName} onChange={(e) => setReferring((r) => ({ ...r, firstName: e.target.value }))} autoComplete="off" /></Field>
             <Field label="NPI"><input className="input font-mono" value={referring.npi} onChange={(e) => setReferring((r) => ({ ...r, npi: e.target.value }))} inputMode="numeric" maxLength={10} placeholder="10 digits" autoComplete="off" /></Field>
+            <div className="sm:col-span-3"><NpiLookup npi={referring.npi} onFound={(r) => setReferring((x) => ({ ...x, lastName: r.lastName ?? r.name, firstName: r.firstName ?? "" }))} /></div>
           </div>
+        </details>
+        <details className="sm:col-span-2 lg:col-span-4">
+          <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-300">Injury, accident or workers&apos; comp</summary>
+          <fieldset className="mt-3 space-y-3">
+            <legend className="sr-only">Is the condition related to</legend>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={accident.employment} onChange={(e) => setAcc({ employment: e.target.checked })} /> Related to employment (workers&apos; comp)</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={accident.auto} onChange={(e) => setAcc({ auto: e.target.checked })} /> Auto accident</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={accident.other} onChange={(e) => setAcc({ other: e.target.checked })} /> Other accident</label>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Date of accident or injury"><input type="date" className="input" value={accident.date} onChange={(e) => setAcc({ date: e.target.value })} /></Field>
+              {accident.auto && (
+                <Field label="State of the auto accident">
+                  <select className="select" value={accident.autoState} onChange={(e) => setAcc({ autoState: e.target.value })}>
+                    <option value="">Choose...</option>
+                    {US_STATES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                  </select>
+                </Field>
+              )}
+              <Field label="Insurer's claim number (box 11b)"><input className="input" value={accident.claimNumber} onChange={(e) => setAcc({ claimNumber: e.target.value })} autoComplete="off" /></Field>
+              {accident.employment && <Field label="Employer"><input className="input" value={accident.employer} onChange={(e) => setAcc({ employer: e.target.value })} autoComplete="off" /></Field>}
+            </div>
+          </fieldset>
         </details>
       </div>
 
@@ -107,17 +140,13 @@ export function ChargeEntryForm({
             <Plus className="h-3.5 w-3.5" /> Add diagnosis
           </button>
         </div>
-        <datalist id="icd-list">
-          {icds.map((c) => (
-            <option key={c.code} value={c.code}>{c.description}</option>
-          ))}
-        </datalist>
+        <CodeList id="icd-list" options={dxSearch.options} />
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {dx.map((d, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="w-5 text-xs font-semibold text-slate-500">{i + 1}</span>
-              <input list="icd-list" className="input font-mono" placeholder="e.g. E11.9" value={d} onChange={(e) => setDx((arr) => arr.map((x, j) => (j === i ? e.target.value.toUpperCase() : x)))} />
-              <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 lg:inline">{icds.find((c) => c.code === d)?.description}</span>
+              <input list="icd-list" className="input font-mono" placeholder="e.g. E11.9" value={d} onChange={(e) => { dxSearch.search(e.target.value); setDx((arr) => arr.map((x, j) => (j === i ? e.target.value.toUpperCase() : x))); }} />
+              <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 lg:inline">{dxSearch.describe(d)}</span>
               {dx.length > 1 && (
                 <button type="button" className="text-slate-500 hover:text-red-600" onClick={() => setDx((arr) => arr.filter((_, j) => j !== i))}>
                   <Trash className="h-4 w-4" />
@@ -135,11 +164,7 @@ export function ChargeEntryForm({
             <Plus className="h-3.5 w-3.5" /> Add line
           </button>
         </div>
-        <datalist id="cpt-list">
-          {cpts.map((c) => (
-            <option key={c.code} value={c.code}>{c.description}</option>
-          ))}
-        </datalist>
+        <CodeList id="cpt-list" options={pxSearch.options} />
         <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
           <thead>
             <tr><th>#</th><th>CPT</th><th>Description</th><th>Modifiers</th><th>Units</th><th>Charge ($)</th><th>Dx ptr</th><th></th></tr>
@@ -151,11 +176,12 @@ export function ChargeEntryForm({
                 <td className="w-32">
                   <input list="cpt-list" className="input font-mono" aria-label={`Line ${i + 1} CPT`} value={l.cpt} onChange={(e) => {
                     const code = e.target.value.toUpperCase();
+                    pxSearch.search(code);
                     const fee = feeFor(code);
                     updateLine(i, { cpt: code, charge: fee !== undefined ? (fee / 100).toFixed(2) : l.charge });
                   }} />
                 </td>
-                <td className="text-xs text-slate-500">{l.description || cpts.find((c) => c.code === l.cpt)?.description}</td>
+                <td className="text-xs text-slate-500">{l.description || pxSearch.describe(l.cpt)}</td>
                 <td className="w-28"><input className="input" placeholder="25, 59" value={l.modifiers} aria-label={`Line ${i + 1} modifiers`} onChange={(e) => updateLine(i, { modifiers: e.target.value })} /></td>
                 <td className="w-20"><input type="number" min={1} className="input" value={l.units} aria-label={`Line ${i + 1} units`} onChange={(e) => updateLine(i, { units: Number(e.target.value) })} /></td>
                 <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} aria-label={`Line ${i + 1} charge`} onChange={(e) => updateLine(i, { charge: e.target.value })} /></td>

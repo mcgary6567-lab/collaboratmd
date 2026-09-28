@@ -54,7 +54,7 @@ export async function discoverCoverage(db: Db, practiceId: string, patientId: st
   const [row] = await db.select({ patient: patients, practice: practices }).from(patients).innerJoin(practices, eq(practices.id, patients.practiceId)).where(and(eq(patients.id, patientId), eq(patients.practiceId, practiceId))).limit(1);
   if (!row) throw new Error("Patient not found");
   if (!row.patient.dob) throw new Error("A date of birth is needed to search");
-  const list = (await db.select().from(payers).where(and(eq(payers.practiceId, practiceId), sql`${payers.type} <> 'self_pay'`)).orderBy(asc(payers.name))).slice(0, DISCOVERY_MAX_PAYERS);
+  const list = (await db.select().from(payers).where(and(eq(payers.practiceId, practiceId), sql`${payers.type} NOT IN ('self_pay', 'workers_comp', 'auto')`)).orderBy(asc(payers.name))).slice(0, DISCOVERY_MAX_PAYERS);
   if (!list.length) throw new Error("Add payers first; discovery asks each of them");
   const gateway = getClearinghouse((await practiceConfig(db, practiceId)).stedi?.apiKey);
   const results: (typeof coverageSearches.$inferSelect)[] = [];

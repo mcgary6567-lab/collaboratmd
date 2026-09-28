@@ -65,7 +65,8 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     insurance: { memberId: b.insurance.memberId, payerId: b.payer.payerId, relationship: b.insurance.relationship, subscriber: { firstName: b.insurance.subscriberFirstName, lastName: b.insurance.subscriberLastName, dob: b.insurance.subscriberDob } },
     provider: { npi: b.provider.npi, taxonomy: b.provider.taxonomy },
     practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null, cliaNumber: b.practice.cliaNumber },
-    encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi },
+    encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi,
+      relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber },
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers })),
     payer: { timelyFilingDays: b.payer.timelyFilingDays, type: b.payer.type },
     today,
@@ -183,7 +184,7 @@ export async function rescrubClaim(db: Db, claimId: string) {
 }
 
 /** The claim's 837 as it would be sent now, for uploading to another clearinghouse or checking. Scrub errors still block it. */
-export async function previewClaimEdi(db: Db, claimId: string) {
+export async function previewClaimEdi(db: Db, claimId: string, opts: { now?: Date } = {}) {
   const bundle = await loadClaimBundle(db, claimId);
   if (!bundle) throw new Error("Claim not found");
   const account = standing(bundle.practice);
@@ -191,11 +192,13 @@ export async function previewClaimEdi(db: Db, claimId: string) {
   const { findings, edits } = await scrubBundle(db, bundle);
   if (blocksSubmission(findings, bundle.practice.policies)) throw new Error(bundle.practice.policies?.strictScrub && !hasBlockingErrors(findings) ? "Strict scrubbing is on: resolve the warnings first" : "Fix the scrub errors first");
   const otherPayer = bundle.claim.payerSequence === "S" && bundle.claim.primaryClaimId ? await primaryAdjudication(db, bundle.claim.primaryClaimId) : undefined;
-  const edi = buildClaimEdi(bundle, { now: new Date(), authorizationNumber: edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null, attachments: await attachmentRefs(db, claimId), otherPayer });
+  // A downloaded file goes to whichever clearinghouse the practice uses, under the IDs that clearinghouse gave it.
+  const envelope = bundle.practice.ediSubmitterId && bundle.practice.ediReceiverId ? { senderId: bundle.practice.ediSubmitterId, receiverId: bundle.practice.ediReceiverId } : undefined;
+  const edi = buildClaimEdi(bundle, { now: opts.now ?? new Date(), authorizationNumber: edits.authorization?.authNumber ?? bundle.claim.authorizationNumber ?? null, attachments: await attachmentRefs(db, claimId), otherPayer, envelope });
   const kind = bundle.claim.claimType === "dental" ? "837D" : bundle.claim.claimType === "institutional" ? "837I" : "837P";
   const check = validateX12(edi);
   if (check.errors.length) throw new Error(`The claim file failed its self-check: ${check.errors.slice(0, 3).join("; ")}`);
-  return { edi, filename: `${bundle.claim.controlNumber}-${kind}.x12`, practiceId: bundle.claim.practiceId };
+  return { edi, filename: `${bundle.claim.controlNumber}-${kind}.x12`, practiceId: bundle.claim.practiceId, kind, claimId };
 }
 
 /**

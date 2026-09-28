@@ -183,3 +183,57 @@ describe("lab, referral and ABN checks", () => {
     expect(find(claim({ encounter: { dateOfService: "2026-09-01", placeOfService: "98", diagnoses: ["E11.9"] } }), "POS")).toBeDefined();
   });
 });
+
+describe("accidents and workers' comp on the professional claim", () => {
+  it("sends CLM11, the accident date and the insurer's claim number, with the WC filing indicator", () => {
+    const edi = buildEdi837P({
+      ...base,
+      renderingProvider: { lastName: "Chen", firstName: "Sarah", npi: "1234567893", taxonomy: "207Q00000X" },
+      payer: { name: "State Fund", payerId: "WC001", type: "workers_comp" },
+      subscriber: { ...ana, relationship: "self" },
+      propertyClaimNumber: "WC-2026-0042",
+      claim: { totalCents: 12000, placeOfService: "11", frequencyCode: "1", dateOfService: "2026-09-01", diagnoses: ["S93.401A"], accident: { employment: true, date: "2026-08-28" } },
+      lines: [{ cpt: "99213", modifiers: [], chargeCents: 12000, units: 1, dxPointers: [1], dateOfService: "2026-09-01" }],
+    });
+    const s = segments(edi);
+    expect(s.find((x) => x.startsWith("SBR*"))).toBe("SBR*P*18*G9******WC");
+    expect(s.find((x) => x.startsWith("CLM*"))?.endsWith("11:B:1*Y*A*Y*Y**EM")).toBe(true);
+    expect(s).toContain("DTP*439*D8*20260828");
+    const y4 = s.indexOf("REF*Y4*WC-2026-0042");
+    expect(y4).toBeGreaterThan(s.indexOf("NM1*IL*1*Reyes*Ana****MI*XYZ123"));
+    expect(y4).toBeLessThan(s.findIndex((x) => x.startsWith("NM1*PR")));
+    expect(validateX12(edi).errors).toEqual([]);
+
+    const auto = buildEdi837P({
+      ...base,
+      renderingProvider: { lastName: "Chen", firstName: "Sarah", npi: "1234567893", taxonomy: "207Q00000X" },
+      payer: { name: "Auto Mutual", payerId: "AM001", type: "auto" },
+      subscriber: { ...ana, relationship: "self" },
+      claim: { totalCents: 12000, placeOfService: "11", frequencyCode: "1", dateOfService: "2026-09-01", diagnoses: ["S13.4XXA"], accident: { auto: true, autoState: "fl", date: "2026-08-30" } },
+      lines: [{ cpt: "99213", modifiers: [], chargeCents: 12000, units: 1, dxPointers: [1], dateOfService: "2026-09-01" }],
+    });
+    expect(segments(auto).find((x) => x.startsWith("CLM*"))?.endsWith("**AA:::FL")).toBe(true);
+    expect(segments(auto).find((x) => x.startsWith("SBR*"))?.endsWith("*AM")).toBe(true);
+    expect(validateX12(auto).errors).toEqual([]);
+  });
+
+  it("checks accident details before the claim goes out", () => {
+    const claim = (over: Partial<ScrubClaim["encounter"]>, type = "workers_comp"): ScrubClaim => ({
+      patient: { firstName: "Ana", lastName: "Reyes", dob: "1984-03-02", sex: "F", address1: "9 Palm St", zip: "33601" },
+      insurance: { memberId: "XYZ123", payerId: "WC001", relationship: "self" },
+      provider: { npi: "1234567893", taxonomy: "207Q00000X" },
+      practice: { npi: "1234567893", taxId: "12-3456789", phone: "407-555-0100" },
+      encounter: { dateOfService: "2026-09-01", placeOfService: "11", diagnoses: ["S93.401A"], ...over },
+      lines: [{ lineNumber: 1, cpt: "99213", modifiers: [], units: 1, chargeCents: 12000, dxPointers: [1] }],
+      payer: { timelyFilingDays: 90, type },
+      today: new Date("2026-09-10T12:00:00Z"),
+    });
+    const rules = (c: ScrubClaim) => scrubClaim(c).map((f) => f.rule);
+    expect(rules(claim({}))).toEqual(expect.arrayContaining(["WORKERS_COMP", "ACCIDENT_DATE", "PC_CLAIM_NUMBER"]));
+    expect(rules(claim({ relatedEmployment: true, accidentDate: "2026-08-28", propertyClaimNumber: "WC-1" }))).not.toEqual(expect.arrayContaining(["WORKERS_COMP"]));
+    expect(rules(claim({ relatedEmployment: true, accidentDate: "2026-09-05", propertyClaimNumber: "WC-1" }))).toContain("ACCIDENT_DATE");
+    expect(rules(claim({ relatedAuto: true, accidentDate: "2026-08-28" }, "commercial"))).toContain("ACCIDENT_STATE");
+    expect(rules(claim({}, "auto"))).toContain("AUTO_CLAIM");
+    expect(rules(claim({}, "commercial"))).not.toEqual(expect.arrayContaining(["ACCIDENT_DATE"]));
+  });
+});

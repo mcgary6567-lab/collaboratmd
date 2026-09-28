@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { demoLink } from "@/lib/demo";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 
@@ -73,8 +74,8 @@ export function SiteHeader({
               >
                 Start free trial
               </Link>
-              <Link href="/demo" className="btn bg-green-700 text-white hover:bg-green-800">
-                View the demo <ArrowRight className="h-4 w-4" />
+              <Link href={demoLink().href} className="btn bg-green-700 text-white hover:bg-green-800">
+                {demoLink().open ? "View the demo" : "Book a demo"} <ArrowRight className="h-4 w-4" />
               </Link>
             </>
           )}

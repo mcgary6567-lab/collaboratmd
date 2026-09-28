@@ -16,7 +16,7 @@ export default async function CodingPage() {
   const s = await requireSession();
   const db = await getDb();
   const ai = (await practiceConfig(db, s.practiceId)).anthropic;
-  const { cpts, icds } = await listCodes(db);
+  const { cpts, icds } = await listCodes(db, s.practiceId);
   const codes = (xs: { code: string; description: string }[]) => xs.map(({ code, description }) => ({ code, description }));
 
   return (

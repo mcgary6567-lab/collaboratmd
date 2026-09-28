@@ -20,17 +20,17 @@ export default async function LabsPage() {
   const waiting = rows.filter((r) => r.resultCount === 0);
 
   const table = (list: typeof rows) => (
-    <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
+    <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table table-stack">
       <thead><tr><th>Order</th><th>Patient</th><th>Lab</th><th>Tests</th><th>Ordered</th><th>Status</th></tr></thead>
       <tbody>
         {list.map(({ order, patient, abnormal }) => (
           <tr key={order.id}>
-            <td><Link href={`/labs/${order.id}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">{order.placerOrderNumber}</Link></td>
-            <td><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
-            <td className="text-xs">{LABS.find((l) => l.code === order.labCode)?.name}</td>
-            <td className="text-xs">{order.tests.map((t) => t.code).join(", ")}</td>
-            <td className="whitespace-nowrap text-xs">{fmtDateTime(order.createdAt, s.timeZone)}</td>
-            <td>
+            <td data-label="Order"><Link href={`/labs/${order.id}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">{order.placerOrderNumber}</Link></td>
+            <td data-label="Patient"><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
+            <td data-label="Lab" className="text-xs">{LABS.find((l) => l.code === order.labCode)?.name}</td>
+            <td data-label="Tests" className="text-xs">{order.tests.map((t) => t.code).join(", ")}</td>
+            <td data-label="Ordered" className="whitespace-nowrap text-xs">{fmtDateTime(order.createdAt, s.timeZone)}</td>
+            <td data-label="Status">
               <Badge tone={LAB_STATUS_TONE[order.status] ?? "slate"}>{order.status}</Badge>
               {abnormal > 0 && <span className="ml-1"><Badge tone="red">{abnormal} abnormal</Badge></span>}
             </td>

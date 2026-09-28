@@ -17,7 +17,7 @@ export async function codeNoteAction(_prev: NoteCodingState, formData: FormData)
   if (note.length < 40) return { ok: false, message: "Paste the full visit note (at least a few sentences)." };
   try {
     const db = await getDb();
-    const { cpts, icds } = await listCodes(db);
+    const { cpts, icds } = await listCodes(db, s.practiceId);
     const result = await codeNoteWithAi(ai, note, cpts, icds);
     // Record that a note was sent to the model, never the note itself.
     await db.insert(schema.auditLog).values({ practiceId: s.practiceId, userId: s.userId, action: "ai_note_coding", entity: "note", entityId: null });

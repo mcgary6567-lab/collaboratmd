@@ -14,13 +14,15 @@
  * subscription. After their trial, claims stop going out until someone
  * subscribes; everything else, including the data export, keeps working.
  */
-import { and, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { Stripe, type StripeEvent } from "@/lib/stripe";
 import { TIERS } from "@/content/pricing";
+import { money } from "@/lib/utils";
+import { notify } from "./notifications";
 
-const { practices, providers, claims, auditLog } = schema;
+const { practices, providers, claims, auditLog, platformInvoices } = schema;
 type Practice = typeof practices.$inferSelect;
 type Client = Pick<Stripe, "createSubscriptionCheckout" | "createPortalSession" | "updateSubscriptionItemQuantity" | "createMeterEvent">;
 
@@ -136,7 +138,46 @@ export async function handlePlatformEvent(db: Db, event: StripeEvent) {
     }).where(eq(practices.id, p.id));
     return { handled: true };
   }
+  if (event.type.startsWith("invoice.")) return handleInvoiceEvent(db, event.type, obj as InvoiceObject);
   return { handled: false };
+}
+
+type InvoiceObject = {
+  id: string; customer?: string; number?: string | null; status?: string | null; amount_due?: number; amount_paid?: number;
+  hosted_invoice_url?: string | null; invoice_pdf?: string | null; period_start?: number; period_end?: number; created?: number;
+  subscription_details?: { metadata?: Record<string, string> }; metadata?: Record<string, string>;
+};
+
+/**
+ * Invoices are kept for the subscription page, and a failed payment tells
+ * the practice's administrators in the app as well as by email.
+ */
+async function handleInvoiceEvent(db: Db, type: string, inv: InvoiceObject) {
+  if (!["invoice.finalized", "invoice.paid", "invoice.payment_failed", "invoice.voided", "invoice.marked_uncollectible", "invoice.updated"].includes(type)) return { handled: false };
+  const byMeta = inv.subscription_details?.metadata?.practice_id ?? inv.metadata?.practice_id;
+  const [p] = byMeta
+    ? await db.select().from(practices).where(eq(practices.id, byMeta)).limit(1)
+    : inv.customer ? await db.select().from(practices).where(eq(practices.stripeCustomerId, inv.customer)).limit(1) : [];
+  if (!p) return { handled: false };
+  const status = type === "invoice.payment_failed" ? "payment_failed" : inv.status ?? "open";
+  const at = (s?: number) => (s ? new Date(s * 1000) : null);
+  const row = {
+    practiceId: p.id, number: inv.number ?? null, status, amountDueCents: inv.amount_due ?? 0, amountPaidCents: inv.amount_paid ?? 0,
+    hostedUrl: inv.hosted_invoice_url ?? null, pdfUrl: inv.invoice_pdf ?? null, periodStart: at(inv.period_start), periodEnd: at(inv.period_end),
+  };
+  await db.insert(platformInvoices).values({ id: inv.id, ...row, createdAt: at(inv.created) ?? new Date() }).onConflictDoUpdate({ target: platformInvoices.id, set: row });
+  if (type === "invoice.payment_failed") {
+    await notify(db, p.id, {
+      kind: "subscription_payment_failed", dedupeKey: `invoice-failed-${inv.id}`, href: "/settings/subscription",
+      title: "A CollaboratMD payment did not go through",
+      body: `Invoice ${inv.number ?? ""} for ${money(inv.amount_due ?? 0)} failed. Claims keep going out for ${GRACE_DAYS} days; update the payment method under Subscription.`,
+    });
+  }
+  return { handled: true };
+}
+
+export async function listInvoices(db: Db, practiceId: string, limit = 24) {
+  return db.select().from(platformInvoices).where(eq(platformInvoices.practiceId, practiceId)).orderBy(desc(platformInvoices.createdAt)).limit(limit);
 }
 
 /** Daily: seats follow the number of active providers. */

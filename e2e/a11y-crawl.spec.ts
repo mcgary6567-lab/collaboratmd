@@ -22,7 +22,7 @@ const APP = [
   "/settings/sso", "/settings/subscription", "/settings/team",
 ];
 const PUBLIC = [
-  "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/contact", "/status", "/switch", "/changelog", "/demo",
+  "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/trust/questionnaire", "/contact", "/status", "/switch", "/changelog", "/demo",
   "/blog", "/investors", "/login", "/login/forgot", "/login/sso", "/signup", "/offline",
 ];
 const SKIP = /^\/(api|portal|check-in|reset|unsubscribe|logout|login\/verify|signup\/verify)(\/|$)/;

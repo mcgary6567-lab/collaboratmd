@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { procedureCatalog } from "@/server/code-catalog";
 import { requireSession } from "@/lib/auth";
 import { standardCharges } from "@/server/fees";
 import { createEstimateAction } from "@/app/(app)/billing-actions";
@@ -41,7 +42,7 @@ export default async function NewEstimatePage({ searchParams }: { searchParams: 
       .innerJoin(schema.payers, eq(schema.payers.id, schema.patientInsurances.payerId))
       .where(and(eq(schema.patientInsurances.patientId, patient.id), eq(schema.patientInsurances.active, true)))
       .orderBy(asc(schema.patientInsurances.rank)),
-    db.select().from(schema.cptCodes).orderBy(asc(schema.cptCodes.code)),
+    procedureCatalog(db, s.practiceId),
     standardCharges(db, s.practiceId),
   ]);
 

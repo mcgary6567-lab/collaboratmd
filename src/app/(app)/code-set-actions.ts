@@ -4,19 +4,21 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import { CAN_ADJUST, requireRole, requireSession } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
-import { importCodeSet, isPlatformOperator, type CodeSet } from "@/server/code-sets";
+import { CODE_SETS, importCodeSet, isPlatformOperator, type CodeSet } from "@/server/code-sets";
 import { adoptSuggestion, dismissSuggestion } from "@/server/rule-suggestions";
 
 export async function importCodeSetAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
   const s = await requireSession();
   if (!isPlatformOperator(s.email)) return { ok: false, message: "Only the platform operator can load national code sets" };
   const set = String(formData.get("set") ?? "") as CodeSet;
-  if (!["ncci_ptp", "ncci_mue", "coverage"].includes(set)) return { ok: false, message: "Choose which code set this file is" };
+  if (!CODE_SETS.includes(set)) return { ok: false, message: "Choose which code set this file is" };
+  const year = Number(formData.get("year") ?? "");
+  if (set === "icd10cm" && !year) return { ok: false, message: "Give the fiscal year of the ICD-10-CM file, e.g. 2027" };
   const file = formData.get("file");
   if (!(file instanceof File) || !file.size) return { ok: false, message: "Choose the file" };
   if (file.size > 4_000_000) return { ok: false, message: "Files over 4 MB go through the command-line importer (see below)" };
   try {
-    const r = await importCodeSet(await getDb(), set, await file.text(), String(formData.get("label") ?? file.name), s.email);
+    const r = await importCodeSet(await getDb(), set, await file.text(), String(formData.get("label") || file.name), s.email, year);
     revalidatePath("/settings/code-sets");
     return { ok: true, message: `Loaded ${r.added.toLocaleString("en-US")} rows${r.skipped ? `, skipped ${r.skipped.toLocaleString("en-US")} unreadable` : ""}` };
   } catch (e) {

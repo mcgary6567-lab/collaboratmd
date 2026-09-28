@@ -126,18 +126,18 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
             <Empty>No appointments on this day.</Empty>
           ) : (
             <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
-            <table className="table">
+            <table className="table table-stack">
               <thead><tr><th>Time</th><th>Patient</th><th>Provider</th><th>Type</th><th>Reason</th><th>Coverage</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {appts.map(({ appt, patient, provider }) => (
                   <tr key={appt.id}>
-                    <td className="whitespace-nowrap font-medium">{appt.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}</td>
-                    <td><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
-                    <td>Dr. {provider.lastName}</td>
-                    <td>{appt.type.replace(/_/g, " ")}</td>
-                    <td className="text-slate-500">{appt.reason}</td>
-                    <td title={coverage(patient.id).title}><Badge tone={coverage(patient.id).tone}>{coverage(patient.id).label}</Badge></td>
-                    <td>
+                    <td data-label="Time" className="whitespace-nowrap font-medium">{appt.startsAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}</td>
+                    <td data-label="Patient"><PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} /></td>
+                    <td data-label="Provider">Dr. {provider.lastName}</td>
+                    <td data-label="Type">{appt.type.replace(/_/g, " ")}</td>
+                    <td data-label="Reason" className="text-slate-500">{appt.reason}</td>
+                    <td data-label="Coverage" title={coverage(patient.id).title}><Badge tone={coverage(patient.id).tone}>{coverage(patient.id).label}</Badge></td>
+                    <td data-label="Status">
                       <Badge tone={TONE[appt.status] ?? "slate"}>{appt.status.replace("_", " ")}</Badge>
                       {appt.status === "scheduled" && appt.confirmedAt && <div className="mt-1 text-[11px] font-semibold text-green-700">Confirmed{appt.confirmedVia === "sms" ? " by text" : ""}</div>}
                       {appt.status === "scheduled" && !appt.confirmedAt && undelivered.has(appt.id) && <div className="mt-1 text-[11px] font-semibold text-red-700" title="Twilio reported the reminder text did not reach the phone">Reminder not delivered: call</div>}
@@ -145,7 +145,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                         <div className="mt-1"><Link href="/check-ins" className="text-[11px] font-semibold text-brand-700 hover:underline">Checked in online</Link></div>
                       )}
                     </td>
-                    <td>
+                    <td data-label="">
                       <div className="flex min-w-[15rem] flex-wrap items-start gap-1">
                       {appt.status === "scheduled" && (
                         <form action={appointmentStatusAction.bind(null, appt.id, "checked_in")} className="inline">

@@ -15,6 +15,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { rescrubClaim } from "./claims";
+import { accidentColumns, type AccidentInput } from "./encounters";
 
 const { claims, encounters, charges, ledgerEntries, claimEvents } = schema;
 
@@ -109,4 +110,15 @@ export async function editClaim(db: Db, practiceId: string, claimId: string, edi
   await db.insert(schema.auditLog).values({ practiceId, userId: userId ?? null, action: "edit_claim", entity: "claim", entityId: claimId, details: { changes } });
   const updated = await rescrubClaim(db, claimId);
   return { claim: updated, changes };
+}
+
+/** Changes the work and accident details (box 10, 11b) of a claim no payer has ruled on, then checks it again. */
+export async function editClaimAccident(db: Db, practiceId: string, claimId: string, input: AccidentInput, userId?: string) {
+  const [claim] = await db.select().from(claims).where(and(eq(claims.id, claimId), eq(claims.practiceId, practiceId))).limit(1);
+  if (!claim) throw new Error("Claim not found");
+  if (!(EDITABLE as readonly string[]).includes(claim.status)) throw new Error("A payer has already received or decided this claim. Create a corrected claim to change it.");
+  const cols = accidentColumns(input);
+  await db.update(encounters).set(cols).where(and(eq(encounters.id, claim.encounterId), eq(encounters.practiceId, practiceId)));
+  await db.insert(schema.auditLog).values({ practiceId, userId: userId ?? null, action: "edit_claim_accident", entity: "claim", entityId: claimId, details: cols });
+  return rescrubClaim(db, claimId);
 }

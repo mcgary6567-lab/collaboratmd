@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { procedureCatalog } from "@/server/code-catalog";
 import { requireSession } from "@/lib/auth";
 import { scheduleRates, standardCharges } from "@/server/fees";
 import { importContractAction, saveContractTermsAction, saveScheduleAction } from "@/app/(app)/fees-actions";
@@ -28,7 +29,7 @@ export default async function FeeScheduleEditor({ params }: { params: Promise<{ 
 
   const mpprCodes = new Set((await db.select({ cpt: schema.feeScheduleItems.cpt }).from(schema.feeScheduleItems).where(and(eq(schema.feeScheduleItems.feeScheduleId, schedule.id), eq(schema.feeScheduleItems.mppr, true)))).map((r) => r.cpt));
   const [codes, rates, standard] = await Promise.all([
-    db.select().from(schema.cptCodes).orderBy(asc(schema.cptCodes.code)),
+    procedureCatalog(db, s.practiceId),
     scheduleRates(db, schedule.id),
     standardCharges(db, s.practiceId),
   ]);

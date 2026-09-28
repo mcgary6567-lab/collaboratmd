@@ -7,6 +7,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { PosOptions } from "@/components/code-pickers";
 import { StateSelect, ZipInput } from "@/components/us-fields";
+import { NpiLookup } from "@/components/npi-lookup";
 
 export const metadata: Metadata = { title: "Locations" };
 
@@ -24,6 +25,7 @@ function LocationFields({ l }: { l?: Loc }) {
       <label className="block sm:col-span-1"><span className="label">City</span><input name="city" defaultValue={l?.city} className="input" required /></label>
       <label className="block sm:col-span-1"><span className="label">State</span><StateSelect defaultValue={l?.state} required className="select" /></label>
       <label className="block sm:col-span-1"><span className="label">ZIP (9 digits preferred)</span><ZipInput defaultValue={l?.zip} required /></label>
+      <div className="sm:col-span-6"><NpiLookup fill={{ name: "name", address1: "address1", city: "city", state: "state", zip: "zip" }} /></div>
     </div>
   );
 }

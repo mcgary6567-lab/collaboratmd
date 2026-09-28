@@ -26,3 +26,8 @@ export function demoOpen() {
   if (process.env.DEMO_LOGINS === "off") return false;
   return !onProduction();
 }
+
+/** Where "see the demo" buttons go: the live demo when it is open, otherwise a request for a guided one. */
+export function demoLink() {
+  return demoOpen() ? { href: "/demo", open: true } : { href: "/contact?topic=sales", open: false };
+}

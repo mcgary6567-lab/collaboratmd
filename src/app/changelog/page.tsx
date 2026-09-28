@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-28",
+    title: "Full code sets, paper claims, and any clearinghouse",
+    items: [
+      "ICD-10-CM loaded by fiscal year: every diagnosis is checked as billable and valid on the date of service, and searched as you type",
+      "HCPCS Level II checked on claims; practices add their own procedure codes, descriptions and fees from a spreadsheet",
+      "Print a claim on the CMS-1500 (red form or plain paper), with an alignment test",
+      "Workers' comp and auto accident claims: related causes, accident date and state, and the insurer's claim number",
+      "Send claims through any clearinghouse by file, and upload the 999, 277CA and 835 that come back",
+      "Look up an NPI in the national registry to fill in a provider, practice or referring provider",
+      "Subscription invoices in the app, and a warning before claims pause for a failed payment",
+      "A public security questionnaire with the latest backup restore test",
+    ],
+  },
+  {
+    date: "2026-09-28",
     title: "Claims for dependents, Medicare filing, and a separate demo",
     items: [
       "Fixed: a claim for a patient on someone else's plan (a child, a spouse) now names the insured person as the subscriber and the patient separately, as payers require; eligibility checks do the same",

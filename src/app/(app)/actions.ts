@@ -242,6 +242,11 @@ export async function appointmentStatusAction(id: string, status: string): Promi
 
 /* --------------------------- Charge entry ------------------------- */
 
+const accidentSchema = z.object({
+  employment: z.boolean(), auto: z.boolean(), autoState: z.string().max(2), other: z.boolean(),
+  date: z.string().max(10), claimNumber: z.string().max(50), employer: z.string().max(80),
+});
+
 const encounterSchema = z.object({
   patientId: z.string().uuid(),
   providerId: z.string().uuid(),
@@ -264,6 +269,7 @@ const encounterSchema = z.object({
     .min(1)
     .max(50),
   referring: z.object({ lastName: z.string().max(60), firstName: z.string().max(35).optional(), npi: z.string().max(12) }).nullable().optional(),
+  accident: accidentSchema.nullable().optional(),
 });
 
 export async function createEncounterAction(_prev: ActionResult | undefined, formData: FormData): Promise<ActionResult> {

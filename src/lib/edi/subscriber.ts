@@ -44,13 +44,15 @@ function nameAndPlace(p: Person): string[][] {
  * Loops 2000B/2010BA/2010BB and, for a dependent, 2000C/2010CA. `payer` is the
  * 2010BB payer name segment; `filing` is SBR09 (the claim filing indicator).
  */
-export function subscriberLoops(o: { sequence: "P" | "S"; subscriber: Subscriber; patient: Person; filing: string; payer: string[] }): string[][] {
+export function subscriberLoops(o: { sequence: "P" | "S"; subscriber: Subscriber; patient: Person; filing: string; payer: string[]; propertyClaimNumber?: string | null }): string[][] {
   const dependent = isDependent(o.subscriber.relationship);
   const out: string[][] = [
     ["HL", "2", "1", "22", dependent ? "1" : "0"],
     ["SBR", o.sequence, dependent ? "" : "18", o.subscriber.groupNumber ?? "", "", "", "", "", "", o.filing],
     ["NM1", "IL", "1", o.subscriber.lastName, o.subscriber.firstName, "", "", "", "MI", o.subscriber.memberId],
     ...nameAndPlace(o.subscriber),
+    // Workers' comp and auto: the insurer's own claim number for the injury.
+    ...(o.propertyClaimNumber ? [["REF", "Y4", o.propertyClaimNumber]] : []),
     o.payer,
   ];
   if (dependent) {

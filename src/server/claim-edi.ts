@@ -33,7 +33,7 @@ export function claimParties(patient: Pat, ins: Ins) {
 /** The 837 (P, I or D, by claim type) for a claim, without sending it. */
 export function buildClaimEdi(
   bundle: ClaimBundle,
-  o: { now: Date; authorizationNumber: string | null; attachments: ClaimAttachmentRef[]; otherPayer?: OtherPayer },
+  o: { now: Date; authorizationNumber: string | null; attachments: ClaimAttachmentRef[]; otherPayer?: OtherPayer; envelope?: { senderId: string; receiverId: string } },
 ): string {
   const { now, authorizationNumber, attachments, otherPayer } = o;
   const dental = bundle.claim.claimType === "dental";
@@ -42,8 +42,8 @@ export function buildClaimEdi(
   return dental ? buildEdi837D({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
-    senderId: "COLLABORATMD",
-    receiverId: bundle.payer.payerId,
+    senderId: o.envelope?.senderId ?? "COLLABORATMD",
+    receiverId: o.envelope?.receiverId ?? bundle.payer.payerId,
     now,
     billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone, taxonomy: bundle.provider.taxonomy, individual: bundle.practice.billingEntity === "individual" && bundle.practice.billingLastName ? { lastName: bundle.practice.billingLastName, firstName: bundle.practice.billingFirstName ?? "" } : null },
     rendering: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
@@ -59,8 +59,8 @@ export function buildClaimEdi(
   }) : institutional ? buildEdi837I({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
-    senderId: "COLLABORATMD",
-    receiverId: bundle.payer.payerId,
+    senderId: o.envelope?.senderId ?? "COLLABORATMD",
+    receiverId: o.envelope?.receiverId ?? bundle.payer.payerId,
     now,
     billingProvider: { name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone },
     attending: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
@@ -75,8 +75,8 @@ export function buildClaimEdi(
   }) : buildEdi837P({
     controlNumber: bundle.claim.controlNumber,
     interchangeControl: String(Math.floor(now.getTime() / 1000) % 1_000_000_000),
-    senderId: "COLLABORATMD",
-    receiverId: bundle.payer.payerId,
+    senderId: o.envelope?.senderId ?? "COLLABORATMD",
+    receiverId: o.envelope?.receiverId ?? bundle.payer.payerId,
     now,
     billingProvider: {
       name: bundle.practice.name, npi: bundle.practice.npi, taxId: bundle.practice.taxId, address1: bundle.practice.address1, city: bundle.practice.city, state: bundle.practice.state, zip: bundle.practice.zip, phone: bundle.practice.phone,
@@ -84,12 +84,14 @@ export function buildClaimEdi(
     },
     renderingProvider: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
     referringProvider: bundle.encounter.referringNpi && bundle.encounter.referringLastName ? { lastName: bundle.encounter.referringLastName, firstName: bundle.encounter.referringFirstName ?? "", npi: bundle.encounter.referringNpi } : null,
+    propertyClaimNumber: bundle.encounter.propertyClaimNumber,
     payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
     ...claimParties(bundle.patient, bundle.insurance),
     claim: {
       totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
       originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber,
       cliaNumber: bundle.lines.some((l) => isLabCode(l.cpt)) ? bundle.practice.cliaNumber : null,
+      accident: accidentOf(bundle.encounter),
       dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses, attachments,
     },
     lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService })),
@@ -109,4 +111,9 @@ export function facilityFor(bundle: ClaimBundle): ServiceFacility | undefined {
   const p = bundle.practice;
   if (norm(l.address1) === norm(p.address1) && norm(l.city) === norm(p.city) && norm(l.zip).slice(0, 5) === norm(p.zip).slice(0, 5)) return undefined;
   return { name: l.name, npi: l.npi, address1: l.address1, city: l.city, state: l.state, zip: l.zip };
+}
+
+/** The encounter's work and accident details, as the claim sends them. */
+export function accidentOf(e: ClaimBundle["encounter"]) {
+  return { employment: e.relatedEmployment, auto: e.relatedAuto, autoState: e.autoAccidentState, other: e.relatedOther, date: e.accidentDate };
 }

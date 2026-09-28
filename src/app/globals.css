@@ -292,3 +292,14 @@ body {
   .table-stack td:empty { display: none; }
   .table-stack tr:hover td { background: transparent; }
 }
+
+/* CMS-1500 paper claims (app/print/cms1500): a letter-size sheet with text on the form's print grid. */
+.cms1500-sheet { position: relative; width: 8.5in; height: 11in; margin: 1rem auto; background: #fff; color: #000; box-shadow: 0 1px 4px rgba(0,0,0,0.15); overflow: hidden; }
+.cms1500-field { position: absolute; font-family: "Courier New", Courier, monospace; font-size: 12pt; line-height: 1; white-space: pre; }
+.cms1500-box { position: absolute; top: -0.5em; left: 0; font-family: Arial, sans-serif; font-size: 5.5pt; color: #b91c1c; }
+.cms1500-title { position: absolute; top: 0.3in; left: 0.1in; font-family: Arial, sans-serif; font-size: 8pt; color: #b91c1c; }
+@media print {
+  @page cms1500 { size: letter; margin: 0; }
+  .cms1500-root { background: #fff; }
+  .cms1500-sheet { page: cms1500; margin: 0; box-shadow: none; page-break-after: always; break-after: page; }
+}

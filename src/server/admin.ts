@@ -35,6 +35,8 @@ export type ProfileInput = {
   billingEntity?: "organization" | "individual"; billingFirstName?: string; billingLastName?: string;
   /** The CLIA certificate, sent on claims with lab tests. */
   cliaNumber?: string;
+  /** Paper claim alignment, in millimetres (right and down). */
+  formOffsetXmm?: number; formOffsetYmm?: number;
 };
 
 export async function saveProfile(db: Db, practiceId: string, input: ProfileInput, userId?: string) {
@@ -51,7 +53,10 @@ export async function saveProfile(db: Db, practiceId: string, input: ProfileInpu
       billingLastName: individual ? input.billingLastName?.trim().slice(0, 60) || null : null,
     } : {}),
     ...(input.cliaNumber !== undefined ? { cliaNumber: input.cliaNumber.trim().toUpperCase() || null } : {}),
+    ...(input.formOffsetXmm !== undefined ? { formOffsetX: Math.round(input.formOffsetXmm * 10) } : {}),
+    ...(input.formOffsetYmm !== undefined ? { formOffsetY: Math.round(input.formOffsetYmm * 10) } : {}),
   };
+  for (const o of [v.formOffsetX, v.formOffsetY]) if (o !== undefined && !(Number.isFinite(o) && Math.abs(o) <= 250)) throw new Error("Paper claim alignment is at most 25 mm either way");
   if (input.timeZone && !validTimeZone(input.timeZone)) throw new Error("Choose a valid time zone");
   if (!v.name) throw new Error("Enter the practice's legal name");
   if (!isValidNpi(v.npi)) throw new Error("That NPI fails its check digit; claims would be rejected");
@@ -106,8 +111,8 @@ export async function setProviderActive(db: Db, practiceId: string, id: string, 
 
 /* ------------------------------ Payers ------------------------------ */
 
-export const PAYER_TYPES = ["commercial", "medicare", "medicaid", "self_pay"];
-export const PAYER_TYPE_LABEL: Record<string, string> = { commercial: "Commercial", medicare: "Medicare", medicaid: "Medicaid", self_pay: "Self-pay" };
+export const PAYER_TYPES = ["commercial", "medicare", "medicaid", "workers_comp", "auto", "self_pay"];
+export const PAYER_TYPE_LABEL: Record<string, string> = { commercial: "Commercial", medicare: "Medicare", medicaid: "Medicaid", workers_comp: "Workers' comp", auto: "Auto insurance", self_pay: "Self-pay" };
 export type PayerInput = { name: string; payerId: string; type: string; timelyFilingDays: number; appealDays: number };
 
 /** What to assume when the form leaves them empty: Medicare allows one year from the date of service, and 120 days to appeal. */

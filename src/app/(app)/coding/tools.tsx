@@ -1,5 +1,6 @@
 "use client";
 
+import { useCodeSearch } from "@/components/code-search";
 import { useActionState, useMemo, useState } from "react";
 import { emLevel, MDM_ELEMENTS, MDM_LEVELS, type MdmLevel, type PatientKind } from "@/lib/coding/em";
 import { suggestDiagnoses } from "@/lib/coding/dx";
@@ -63,13 +64,19 @@ export function EmCalculator({ cpts }: { cpts: Code[] }) {
   );
 }
 
+const NONE: { code: string; description: string }[] = [];
+
 export function DiagnosisFinder({ icds }: { icds: Code[] }) {
   const [q, setQ] = useState("");
-  const hits = useMemo(() => suggestDiagnoses(q, icds), [q, icds]);
+  // Everyday words matched to the common codes here, then the full ICD-10-CM list searched on the server.
+  const remote = useCodeSearch("dx", NONE);
+  const local = useMemo(() => suggestDiagnoses(q, icds), [q, icds]);
+  const seen = new Set<string>();
+  const hits = (q.trim() ? [...local, ...remote.options] : []).filter((h) => !seen.has(h.code) && seen.add(h.code)).slice(0, 25);
   const [copied, setCopied] = useState<string | null>(null);
   return (
     <div>
-      <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. high blood pressure, sugar, low back pain, UTI" aria-label="Describe the diagnosis" />
+      <input className="input" value={q} onChange={(e) => { setQ(e.target.value); remote.search(e.target.value); }} placeholder="e.g. high blood pressure, sugar, low back pain, UTI" aria-label="Describe the diagnosis" />
       <ul className="mt-3 divide-y divide-slate-100">
         {hits.map((h) => (
           <li key={h.code} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -79,7 +86,7 @@ export function DiagnosisFinder({ icds }: { icds: Code[] }) {
             </button>
           </li>
         ))}
-        {q && !hits.length && <li className="py-2 text-sm text-slate-500">No codes in this practice&apos;s list match. Try another word.</li>}
+        {q && !hits.length && <li className="py-2 text-sm text-slate-500">No codes match. Try another word, or the start of a code.</li>}
       </ul>
     </div>
   );

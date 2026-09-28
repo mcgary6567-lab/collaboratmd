@@ -9,6 +9,7 @@ import { timeZoneName, US_TIME_ZONES } from "@/server/practice-time";
 import { PhoneInput, StateSelect, ZipInput } from "@/components/us-fields";
 import { fmtPhone } from "@/lib/us";
 import { BillingEntityFields } from "./billing-entity";
+import { NpiLookup } from "@/components/npi-lookup";
 
 export const metadata: Metadata = { title: "Practice profile" };
 
@@ -34,6 +35,7 @@ export default async function ProfilePage() {
             <BillingEntityFields entity={p.billingEntity} firstName={p.billingFirstName} lastName={p.billingLastName} disabled={!admin} />
             {field("npi", p.billingEntity === "individual" ? "Billing NPI" : "Group NPI (Type 2)", { maxLength: 10, inputMode: "numeric", placeholder: "10 digits" })}
             {field("taxId", "Tax ID (EIN)", { placeholder: "12-3456789", maxLength: 10 })}
+            {admin && <div className="md:col-span-2"><NpiLookup fill={{ name: "name", address1: "address1", city: "city", state: "state", zip: "zip", phone: "phone", billingFirstName: "firstName", billingLastName: "lastName" }} /></div>}
             {field("address1", "Street address (not a PO box)", { className: "md:col-span-2" })}
             {field("city", "City")}
             <div className="grid grid-cols-2 gap-4">
@@ -55,6 +57,14 @@ export default async function ProfilePage() {
               <input name="cliaNumber" defaultValue={p.cliaNumber ?? ""} className="input" placeholder="10D1234567" maxLength={10} pattern="\d{2}[Dd]\d{7}" title="Two digits, the letter D, then seven digits" disabled={!admin} />
               <span className="mt-1 block text-xs text-slate-500">Only if you bill lab tests (CPT 80000-89999). Sent with those claims; Medicare rejects them without it.</span>
             </label>
+            <fieldset className="md:col-span-2">
+              <legend className="label">Paper claim alignment (CMS-1500)</legend>
+              <div className="flex flex-wrap items-end gap-4 text-sm">
+                <label className="block"><span className="text-xs text-slate-500">Move right (mm)</span><input name="formOffsetX" type="number" step="0.5" min={-25} max={25} defaultValue={p.formOffsetX / 10} className="input w-28" disabled={!admin} /></label>
+                <label className="block"><span className="text-xs text-slate-500">Move down (mm)</span><input name="formOffsetY" type="number" step="0.5" min={-25} max={25} defaultValue={p.formOffsetY / 10} className="input w-28" disabled={!admin} /></label>
+                <span className="text-xs text-slate-500">Print the alignment test from any claim&apos;s paper claim page on a red form; negative numbers move left or up.</span>
+              </div>
+            </fieldset>
             <label className="block text-sm">
               <span className="label">Time zone</span>
               <select name="timeZone" defaultValue={p.timeZone} className="input" disabled={!admin}>

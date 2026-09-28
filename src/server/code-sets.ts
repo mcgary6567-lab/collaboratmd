@@ -15,16 +15,18 @@
  * simply do not fire.
  */
 import { isDemoEmail, onProduction } from "@/lib/demo";
-import { and, desc, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { ScrubFinding } from "@/lib/scrub/rules";
 import { parseCsv } from "@/lib/import/csv";
 import { normalizeDate } from "@/lib/import/patients";
+import { hcpcsFindings, icdFindings, icdYearLoaded, importHcpcs, importIcd10 } from "./code-catalog";
 
 const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads } = schema;
 
-export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage";
+export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs";
+export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs"];
 
 /** Platform operators, by email: the only people who can replace national code sets. */
 export function isPlatformOperator(email: string | null | undefined) {
@@ -108,7 +110,9 @@ async function inChunks<T>(rows: T[], size: number, fn: (chunk: T[]) => Promise<
   for (let i = 0; i < rows.length; i += size) await fn(rows.slice(i, i + size));
 }
 
-export async function importCodeSet(db: Db, set: CodeSet, text: string, label: string, loadedBy: string) {
+export async function importCodeSet(db: Db, set: CodeSet, text: string, label: string, loadedBy: string, fiscalYear?: number) {
+  if (set === "icd10cm") return importIcd10(db, text, Number(fiscalYear), label, loadedBy);
+  if (set === "hcpcs") return importHcpcs(db, text, label, loadedBy);
   let added = 0;
   let skipped = 0;
   if (set === "ncci_ptp") {
@@ -136,13 +140,16 @@ export async function importCodeSet(db: Db, set: CodeSet, text: string, label: s
 }
 
 export async function codeSetStatus(db: Db) {
-  const [[ptp], [mue], [cov], loads] = await Promise.all([
+  const [[ptp], [mue], [cov], loads, [icd], [hcpcs], icdYear] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(ncciPtp),
     db.select({ n: sql<number>`count(*)::int` }).from(ncciMue),
     db.select({ n: sql<number>`count(DISTINCT policy_id)::int`, pairs: sql<number>`count(*)::int` }).from(coveragePolicyCodes),
     db.select().from(codeSetLoads).orderBy(desc(codeSetLoads.createdAt)).limit(20),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.icd10Codes).where(isNotNull(schema.icd10Codes.firstYear)),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.hcpcsCodes),
+    icdYearLoaded(db),
   ]);
-  return { ptp: Number(ptp.n), mue: Number(mue.n), policies: Number(cov.n), coveragePairs: Number(cov.pairs), loads };
+  return { ptp: Number(ptp.n), mue: Number(mue.n), policies: Number(cov.n), coveragePairs: Number(cov.pairs), loads, icd: Number(icd.n), icdYear, hcpcs: Number(hcpcs.n) };
 }
 
 /* ------------------------------ Checking claims ------------------------------ */
@@ -158,6 +165,11 @@ export type CodeSetClaim = {
 };
 
 export async function codeSetFindings(db: Db, c: CodeSetClaim): Promise<ScrubFinding[]> {
+  const [dx, level2] = await Promise.all([icdFindings(db, c.dateOfService, c.diagnoses), hcpcsFindings(db, c.dateOfService, c.lines)]);
+  return [...dx, ...level2, ...(await ncciFindings(db, c))];
+}
+
+async function ncciFindings(db: Db, c: CodeSetClaim): Promise<ScrubFinding[]> {
   const codes = [...new Set(c.lines.map((l) => l.cpt.toUpperCase()).filter(Boolean))];
   if (!codes.length) return [];
   // NCCI is mandated for Medicare and Medicaid; most commercial payers apply it too, so elsewhere it warns.

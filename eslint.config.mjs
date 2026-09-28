@@ -24,6 +24,16 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" }],
     },
   },
+  {
+    // The server runs in UTC: a time shown to a practice goes through its time zone, or it reads hours off.
+    files: ["src/app/**/*.tsx", "src/components/**/*.tsx"],
+    rules: {
+      "no-restricted-syntax": ["warn",
+        { selector: "CallExpression[callee.name='fmtDateTime'][arguments.length<2]", message: "Pass the practice's time zone: fmtDateTime(date, s.timeZone). Appointment times use fmtClock." },
+        { selector: "CallExpression[callee.property.name='toUTCString']", message: "Show dates with fmtDate or fmtDateTime and the practice's time zone." },
+      ],
+    },
+  },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "coverage/**", "playwright-report/**", "test-results/**", ".scratch/**", "public/**"]),
 ]);
 

@@ -51,6 +51,12 @@ export const practices = pgTable("practices", {
   billingFirstName: text("billing_first_name"),
   /** CLIA certificate number, sent on claims with laboratory tests (REF*X4). */
   cliaNumber: text("clia_number"),
+  /** Paper claim printing: how far to shift the data on a pre-printed CMS-1500, in tenths of a millimetre (right and down). */
+  formOffsetX: integer("form_offset_x").notNull().default(0),
+  formOffsetY: integer("form_offset_y").notNull().default(0),
+  /** For 837 files sent through another clearinghouse: the IDs it assigned (ISA06/GS02 and ISA08/GS03). */
+  ediSubmitterId: text("edi_submitter_id"),
+  ediReceiverId: text("edi_receiver_id"),
   /** The practice's own patient financing lender, offered for larger balances. */
   financing: jsonb("financing").$type<{ lender: string; url: string; minCents: number } | null>(),
   /* The practice's own subscription to CollaboratMD. See server/subscription.ts. */
@@ -279,6 +285,15 @@ export const encounters = pgTable("encounters", {
   referringLastName: text("referring_last_name"),
   referringFirstName: text("referring_first_name"),
   referringNpi: text("referring_npi"),
+  /** Whether the condition is related to employment, an auto accident (and its state) or another accident (CLM11, box 10). */
+  relatedEmployment: boolean("related_employment").notNull().default(false),
+  relatedAuto: boolean("related_auto").notNull().default(false),
+  autoAccidentState: text("auto_accident_state"),
+  relatedOther: boolean("related_other").notNull().default(false),
+  accidentDate: date("accident_date"),
+  /** Workers' comp or auto insurer's claim number (REF*Y4, box 11b) and the employer. */
+  propertyClaimNumber: text("property_claim_number"),
+  employerName: text("employer_name"),
   status: text("status").notNull().default("open"), // open | billed
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -428,7 +443,29 @@ export const cptCodes = pgTable("cpt_codes", {
 export const icd10Codes = pgTable("icd10_codes", {
   code: text("code").primaryKey(),
   description: text("description").notNull(),
+  /** A header code (a category) is not billable: the claim needs a more specific code under it. */
+  billable: boolean("billable").notNull().default(true),
+  /** The first and the latest fiscal year (October to September) whose CMS file listed the code; null for codes not from a CMS file. */
+  firstYear: integer("first_year"),
+  seenYear: integer("seen_year"),
 });
+
+/** HCPCS Level II (supplies, drugs, some services), from CMS's public annual file. */
+export const hcpcsCodes = pgTable("hcpcs_codes", {
+  code: text("code").primaryKey(),
+  description: text("description").notNull(),
+  shortDescription: text("short_description"),
+  addedOn: date("added_on"),
+  terminatedOn: date("terminated_on"),
+});
+
+/** Procedure codes a practice bills beyond the built-in list, with its own descriptions. */
+export const practiceCodes = pgTable("practice_codes", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  code: text("code").notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.code] })]);
 
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -1771,4 +1808,31 @@ export const slotOfferRecipients = pgTable("slot_offer_recipients", {
 export const heartbeats = pgTable("heartbeats", {
   name: text("name").primaryKey(),
   at: timestamp("at", { withTimezone: true }).notNull(),
+});
+
+/** CollaboratMD's own invoices to a practice, kept from the platform's Stripe events for the subscription page. */
+export const platformInvoices = pgTable("platform_invoices", {
+  id: text("id").primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  number: text("number"),
+  status: text("status").notNull(),
+  amountDueCents: integer("amount_due_cents").notNull(),
+  amountPaidCents: integer("amount_paid_cents").notNull(),
+  hostedUrl: text("hosted_url"),
+  pdfUrl: text("pdf_url"),
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (t) => [index("platform_invoices_practice_idx").on(t.practiceId, t.createdAt)]);
+
+/** Backup restore tests, recorded by operators as evidence the backups work. */
+export const restoreTests = pgTable("restore_tests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  testedAt: timestamp("tested_at", { withTimezone: true }).notNull(),
+  target: text("target").notNull(),
+  minutes: integer("minutes"),
+  result: text("result").notNull(),
+  notes: text("notes"),
+  recordedBy: text("recorded_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

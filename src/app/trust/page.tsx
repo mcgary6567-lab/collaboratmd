@@ -112,7 +112,8 @@ export default function TrustPage() {
         <section>
           <h2 className="text-xl font-bold text-slate-900">Questions and agreements</h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-700">
-            For a security questionnaire, a business associate agreement or anything on this page, <Link href="/contact" className="font-semibold text-green-700 underline">contact us</Link>.
+            Our answers to the usual vendor security questions are in the <Link href="/trust/questionnaire" className="font-semibold text-green-700 underline">security questionnaire</Link> (also as CSV).
+            The <Link href="/baa" className="font-semibold text-green-700 underline">business associate agreement</Link> page explains what it covers. For your own questionnaire or anything else, <Link href="/contact?topic=security" className="font-semibold text-green-700 underline">contact us</Link>.
             To report a vulnerability, write to us through the same form and mark it security; please do not test against other practices&apos; data.
           </p>
         </section>

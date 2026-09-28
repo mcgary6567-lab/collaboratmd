@@ -3,10 +3,12 @@ import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { listSchedules } from "@/server/fees";
-import { createContractAction } from "@/app/(app)/fees-actions";
+import { listSchedules, standardCharges } from "@/server/fees";
+import { listPracticeCodes } from "@/server/code-catalog";
+import { ActionForm, SubmitButton } from "@/components/action-form";
+import { createContractAction, importPracticeCodesAction, removePracticeCodeAction } from "@/app/(app)/fees-actions";
 import { Badge, Card, Empty, Field, PageHeader } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, money } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Fee schedules" };
 
@@ -15,9 +17,11 @@ export const dynamic = "force-dynamic";
 export default async function FeeSchedulesPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [schedules, payers] = await Promise.all([
+  const [schedules, payers, own, standard] = await Promise.all([
     listSchedules(db, s.practiceId),
     db.select().from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
+    listPracticeCodes(db, s.practiceId),
+    standardCharges(db, s.practiceId),
   ]);
   const contracted = new Set(schedules.map((r) => r.schedule.payerId).filter(Boolean));
   const uncontracted = payers.filter((p) => !contracted.has(p.id));
@@ -94,6 +98,34 @@ export default async function FeeSchedulesPage() {
                 </button>
               </form>
             </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card title={`Your procedure codes · ${own.length}`}>
+          <p className="mb-3 text-sm text-slate-600">
+            Codes you bill beyond the built-in list, described in your own words. They appear in charge entry, estimates and every fee schedule.
+            CPT descriptions themselves belong to the American Medical Association and are not supplied here.
+          </p>
+          {admin && (
+            <ActionForm action={importPracticeCodesAction} className="mb-4 flex flex-wrap items-end gap-3 text-sm">
+              <label className="block"><span className="label">CSV with code, description and (optionally) fee</span><input type="file" name="file" accept=".csv,.txt" className="input" required /></label>
+              <SubmitButton pendingLabel="Adding...">Add codes</SubmitButton>
+            </ActionForm>
+          )}
+          {own.length === 0 ? <Empty>No codes of your own yet. Most practices export their procedure list with fees from their current system and add it here.</Empty> : (
+            <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="max-h-96 overflow-auto"><table className="table">
+              <thead><tr><th>Code</th><th>Description</th><th className="text-right">Standard charge</th>{admin && <th />}</tr></thead>
+              <tbody>{own.map((c) => (
+                <tr key={c.code}>
+                  <td className="font-mono">{c.code}</td>
+                  <td>{c.description}</td>
+                  <td className="text-right tabular-nums">{standard.has(c.code) ? money(standard.get(c.code)!) : "-"}</td>
+                  {admin && <td className="text-right"><ActionForm action={removePracticeCodeAction.bind(null, c.code)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Remove</SubmitButton></ActionForm></td>}
+                </tr>
+              ))}</tbody>
+            </table></div>
           )}
         </Card>
       </div>

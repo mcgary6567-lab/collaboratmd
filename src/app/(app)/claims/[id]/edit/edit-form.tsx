@@ -5,6 +5,7 @@ import { Plus, Trash } from "lucide-react";
 import { editClaimAction } from "@/app/(app)/claim-edit-actions";
 import { Alert, Field } from "@/components/ui";
 import { PosOptions } from "@/components/code-pickers";
+import { CodeList, useCodeSearch } from "@/components/code-search";
 import { money } from "@/lib/utils";
 
 type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string };
@@ -24,6 +25,8 @@ export function ClaimEditForm({
   const [state, action, pending] = useActionState(editClaimAction.bind(null, claimId), undefined);
   const [dos, setDos] = useState(initial.dateOfService);
   const [pos, setPos] = useState(initial.placeOfService);
+  const dxSearch = useCodeSearch("dx", icds);
+  const pxSearch = useCodeSearch("px", cpts);
   const [dx, setDx] = useState<string[]>(initial.diagnoses.length ? initial.diagnoses : [""]);
   const [lines, setLines] = useState<Line[]>(
     initial.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers.join(", "), units: l.units, charge: (l.chargeCents / 100).toFixed(2), dxPointers: l.dxPointers.join(","), description: l.description ?? "" })),
@@ -40,7 +43,7 @@ export function ClaimEditForm({
       units: Number(l.units) || 1,
       chargeCents: Math.round((parseFloat(l.charge) || 0) * 100),
       dxPointers: l.dxPointers.split(",").map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n)),
-      description: l.description || cpts.find((c) => c.code === l.cpt)?.description,
+      description: l.description || pxSearch.describe(l.cpt),
     })),
   });
 
@@ -62,12 +65,12 @@ export function ClaimEditForm({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Diagnoses (ICD-10-CM)</h2>
           <button type="button" className="btn btn-secondary text-xs" onClick={() => setDx((d) => [...d, ""])} disabled={dx.length >= 12}><Plus className="h-3.5 w-3.5" /> Add</button>
         </div>
-        <datalist id="icd-edit">{icds.map((c) => <option key={c.code} value={c.code}>{c.description}</option>)}</datalist>
+        <CodeList id="icd-edit" options={dxSearch.options} />
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {dx.map((d, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="w-5 text-xs font-semibold text-slate-500">{i + 1}</span>
-              <input list="icd-edit" className="input font-mono" value={d} onChange={(e) => setDx((a) => a.map((x, j) => (j === i ? e.target.value.toUpperCase() : x)))} />
+              <input list="icd-edit" className="input font-mono" value={d} onChange={(e) => { dxSearch.search(e.target.value); setDx((a) => a.map((x, j) => (j === i ? e.target.value.toUpperCase() : x))); }} />
               {dx.length > 1 && <button type="button" aria-label="Remove diagnosis" className="text-slate-500 hover:text-red-600" onClick={() => setDx((a) => a.filter((_, j) => j !== i))}><Trash className="h-4 w-4" /></button>}
             </div>
           ))}
@@ -79,7 +82,7 @@ export function ClaimEditForm({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Service lines</h2>
           <button type="button" className="btn btn-secondary text-xs" onClick={() => setLines((ls) => [...ls, { cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }])}><Plus className="h-3.5 w-3.5" /> Add line</button>
         </div>
-        <datalist id="cpt-edit">{cpts.map((c) => <option key={c.code} value={c.code}>{c.description}</option>)}</datalist>
+        <CodeList id="cpt-edit" options={pxSearch.options} />
         <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
           <table className="table">
             <thead><tr><th>#</th><th>CPT</th><th>Modifiers</th><th>Units</th><th>Charge ($)</th><th>Dx ptr</th><th /></tr></thead>
@@ -90,8 +93,9 @@ export function ClaimEditForm({
                   <td className="w-32">
                     <input list="cpt-edit" className="input font-mono" value={l.cpt} onChange={(e) => {
                       const code = e.target.value.toUpperCase();
+                      pxSearch.search(code);
                       const fee = cpts.find((c) => c.code === code)?.fee;
-                      update(i, { cpt: code, charge: fee !== undefined ? (fee / 100).toFixed(2) : l.charge, description: cpts.find((c) => c.code === code)?.description ?? "" });
+                      update(i, { cpt: code, charge: fee !== undefined ? (fee / 100).toFixed(2) : l.charge, description: pxSearch.describe(code) ?? "" });
                     }} />
                   </td>
                   <td className="w-28"><input className="input" value={l.modifiers} onChange={(e) => update(i, { modifiers: e.target.value })} /></td>

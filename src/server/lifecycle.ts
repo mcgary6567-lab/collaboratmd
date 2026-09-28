@@ -9,6 +9,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { standing, GRACE_DAYS } from "./subscription";
+import { fmtDate } from "@/lib/utils";
 
 const { practices, users, providers, lifecycleEmails } = schema;
 type Send = (to: string, subject: string, text: string) => Promise<boolean>;
@@ -60,13 +61,16 @@ export async function sendLifecycleEmails(db: Db, origin: string, send: Send, no
         `Claims can't go out until these are filled in: ${missing.join(", ")}.\n\nThe setup guide on your dashboard takes you to each one: ${origin}/dashboard\n\nStuck on something? Reply to this email.`, send, now))) sent++;
     }
     if (!subscribed && st.trialDaysLeft !== null && st.trialDaysLeft > 0 && st.trialDaysLeft <= 3 && (await deliver(db, p, "trial_ending", `Your CollaboratMD trial ends in ${st.trialDaysLeft} day${st.trialDaysLeft === 1 ? "" : "s"}`,
-      `The free trial for ${p.name} ends on ${p.trialEndsAt!.toUTCString().slice(0, 16)}. After that, claims stop going out until someone subscribes; your data stays and can be exported at any time.\n\nChoose a plan: ${plan}`, send, now))) sent++;
+      `The free trial for ${p.name} ends on ${fmtDate(p.trialEndsAt!, p.timeZone)}. After that, claims stop going out until someone subscribes; your data stays and can be exported at any time.\n\nChoose a plan: ${plan}`, send, now))) sent++;
     if (!subscribed && st.blocked && st.status === "trial_ended" && (await deliver(db, p, "trial_ended", `Your CollaboratMD trial has ended`,
       `The free trial for ${p.name} has ended, so claims are paused. Everything else keeps working, including the data export.\n\nSubscribe to send claims again: ${plan}`, send, now))) sent++;
     if (p.subscriptionStatus === "past_due" && p.pastDueSince) {
       const until = new Date(p.pastDueSince.getTime() + GRACE_DAYS * DAY);
       if (await deliver(db, p, `past_due:${p.pastDueSince.toISOString().slice(0, 10)}`, "A CollaboratMD payment failed",
-        `The latest payment for ${p.name} did not go through. Claims keep going out until ${until.toUTCString().slice(0, 16)}; after that they pause until the payment method is updated.\n\nUpdate it here: ${plan}`, send, now)) sent++;
+        `The latest payment for ${p.name} did not go through. Claims keep going out until ${fmtDate(until, p.timeZone)}; after that they pause until the payment method is updated.\n\nUpdate it here: ${plan}`, send, now)) sent++;
+      // A last reminder two days before claims pause, if it is still unpaid.
+      if (until.getTime() - now.getTime() <= 2 * DAY && until > now && await deliver(db, p, `past_due_final:${p.pastDueSince.toISOString().slice(0, 10)}`, "Claims pause in 2 days: CollaboratMD payment still failing",
+        `The payment for ${p.name} still has not gone through. On ${fmtDate(until, p.timeZone)} claims stop going out until it is paid; nothing else changes and no data is lost.\n\nUpdate the payment method: ${plan}`, send, now)) sent++;
     }
   }
   return sent;

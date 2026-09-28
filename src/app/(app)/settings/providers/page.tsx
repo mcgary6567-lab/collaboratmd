@@ -6,6 +6,7 @@ import { providerActiveAction, saveProviderAction } from "@/app/(app)/admin-acti
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { TaxonomyInput } from "@/components/code-pickers";
+import { NpiLookup } from "@/components/npi-lookup";
 
 export const metadata: Metadata = { title: "Providers" };
 
@@ -21,6 +22,7 @@ function ProviderFields({ p }: { p?: P }) {
       <input name="npi" defaultValue={p?.npi} placeholder="NPI (Type 1)" className="input font-mono" maxLength={10} inputMode="numeric" required />
       <TaxonomyInput defaultValue={p?.taxonomy} className="input font-mono" required id={`taxonomy-${p?.npi ?? "new"}`} placeholder="Taxonomy: type a specialty or code" />
       <input name="specialty" defaultValue={p?.specialty} placeholder="Specialty" className="input" required />
+      <div className="sm:col-span-5"><NpiLookup fill={{ firstName: "firstName", lastName: "lastName", taxonomy: "taxonomy", specialty: "specialty" }} /></div>
     </div>
   );
 }

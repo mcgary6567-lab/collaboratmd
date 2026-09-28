@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteUrl();
   const pages: [string, number][] = [
     ["", 1], ["/pricing", 0.9], ["/demo", 0.8], ["/signup", 0.8], ["/about", 0.6], ["/security", 0.7], ["/trust", 0.7], ["/baa", 0.6],
-    ["/contact", 0.6], ["/blog", 0.7], ["/changelog", 0.5], ["/status", 0.4], ["/accessibility", 0.3], ["/privacy", 0.3], ["/terms", 0.3], ["/gdpr", 0.2],
+    ["/trust/questionnaire", 0.5], ["/contact", 0.6], ["/blog", 0.7], ["/changelog", 0.5], ["/status", 0.4], ["/accessibility", 0.3], ["/privacy", 0.3], ["/terms", 0.3], ["/gdpr", 0.2],
   ];
   return [
     ...pages.map(([path, priority]) => ({ url: `${base}${path}`, changeFrequency: "weekly" as const, priority })),

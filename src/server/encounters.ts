@@ -4,8 +4,10 @@ import { schema } from "@/db";
 import { createClaimForEncounter } from "./claims";
 import { standardCharges } from "./fees";
 import { isValidNpi } from "@/lib/scrub/rules";
+import { isUsState } from "@/lib/us";
+import { commonDiagnoses, procedureCatalog } from "./code-catalog";
 
-const { encounters, charges, appointments, patients, providers, cptCodes, icd10Codes } = schema;
+const { encounters, charges, appointments, patients, providers, cptCodes } = schema;
 
 export interface NewEncounterInput {
   patientId: string;
@@ -18,12 +20,31 @@ export interface NewEncounterInput {
   lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string }[];
   /** The provider who referred the patient, when the payer needs one on the claim. */
   referring?: { lastName: string; firstName?: string; npi: string } | null;
+  /** Related to work or an accident: box 10 of the claim form, CLM11 on the 837. */
+  accident?: AccidentInput | null;
+}
+
+export type AccidentInput = { employment: boolean; auto: boolean; autoState?: string | null; other: boolean; date?: string | null; claimNumber?: string | null; employer?: string | null };
+
+/** Encounter columns for the work and accident details, checked. */
+export function accidentColumns(a: AccidentInput | null | undefined) {
+  const state = a?.auto ? a.autoState?.trim().toUpperCase() || null : null;
+  if (state && !isUsState(state)) throw new Error(`${state} is not a US state`);
+  const date = a?.date?.trim() || null;
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Enter the accident date as a date");
+  return {
+    relatedEmployment: !!a?.employment, relatedAuto: !!a?.auto, autoAccidentState: state, relatedOther: !!a?.other,
+    accidentDate: a && (a.employment || a.auto || a.other) ? date : null,
+    propertyClaimNumber: a?.claimNumber?.trim().slice(0, 50) || null,
+    employerName: a?.employment ? a.employer?.trim().slice(0, 80) || null : null,
+  };
 }
 
 export async function createEncounterWithClaim(db: Db, practiceId: string, input: NewEncounterInput, userId?: string) {
   const ref = input.referring?.npi?.trim() ? { ...input.referring, npi: input.referring.npi.replace(/\D/g, "") } : null;
   if (ref && !isValidNpi(ref.npi)) throw new Error("The referring provider's NPI fails its check digit");
   if (ref && !ref.lastName.trim()) throw new Error("Enter the referring provider's last name");
+  const accident = accidentColumns(input.accident);
   const [enc] = await db
     .insert(encounters)
     .values({
@@ -38,6 +59,7 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
       referringLastName: ref?.lastName.trim().slice(0, 60) ?? null,
       referringFirstName: ref?.firstName?.trim().slice(0, 35) || null,
       referringNpi: ref?.npi ?? null,
+      ...accident,
     })
     .returning();
   let n = 1;
@@ -53,12 +75,17 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
  * Codes for charge entry. With a practice, each code's fee is that practice's
  * standard charge where its schedule sets one, falling back to the default.
  */
+/**
+ * Codes to offer without typing: the practice's procedures with its fees, and
+ * its most used diagnoses (the full ICD-10-CM list is searched as you type).
+ */
 export async function listCodes(db: Db, practiceId?: string) {
-  const cpts = await db.select().from(cptCodes).orderBy(asc(cptCodes.code));
-  const icds = await db.select().from(icd10Codes).orderBy(asc(icd10Codes.code));
-  if (!practiceId) return { cpts, icds };
-  const fees = await standardCharges(db, practiceId);
-  return { cpts: cpts.map((c) => ({ ...c, defaultFeeCents: fees.get(c.code) ?? c.defaultFeeCents })), icds };
+  if (!practiceId) {
+    const [cpts, icds] = await Promise.all([db.select().from(cptCodes).orderBy(asc(cptCodes.code)), commonDiagnoses(db, undefined)]);
+    return { cpts, icds };
+  }
+  const [catalog, fees, icds] = await Promise.all([procedureCatalog(db, practiceId), standardCharges(db, practiceId), commonDiagnoses(db, practiceId)]);
+  return { cpts: catalog.map((c) => ({ ...c, defaultFeeCents: fees.get(c.code) ?? c.defaultFeeCents })), icds };
 }
 
 /** One day's appointments. `day` is any clock time on that day (appointment times are clock times; see practice-time.ts). */

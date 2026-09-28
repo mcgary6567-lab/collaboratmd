@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { demoLink } from "@/lib/demo";
 import type { Metadata } from "next";
 import {
   ArrowRight, BadgeCheck, Brain, CalendarDays, CreditCard, EyeOff, FileSearch, Gauge, KeyRound, Landmark, ChartLine, Lock,
@@ -251,8 +252,8 @@ export default async function LandingPage() {
               match deposits, recover what was missed or underpaid, forecast cash and let patients pay from their phone.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/demo" className="btn bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
-                Explore the live demo <ArrowRight className="h-4 w-4" />
+              <Link href={demoLink().href} className="btn bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
+                {demoLink().open ? "Explore the live demo" : "Book a demo"} <ArrowRight className="h-4 w-4" />
               </Link>
               <a href="#calculator" className="btn btn-secondary px-6 py-3 text-base">
                 What do denials cost you?
@@ -452,8 +453,8 @@ export default async function LandingPage() {
               A dashboard that reports 51 days in A/R without saying whether that is good is just trivia. Every headline
               metric is shown against the industry target and colored accordingly. With email connected, a summary arrives every Monday.
             </p>
-            <Link href="/demo" className="btn mt-8 bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
-              See it on a full-size demo practice <ArrowRight className="h-4 w-4" />
+            <Link href={demoLink().href} className="btn mt-8 bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
+              {demoLink().open ? "See it on a full-size demo practice" : "See it on a full-size practice: book a demo"} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -537,8 +538,8 @@ export default async function LandingPage() {
               scrubbed, submitted, adjudicated by a simulated payer, denied and appealed, with bank deposits and collection accounts to work through.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/demo" className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-green-700 transition-colors hover:bg-green-50">
-                Open the demo <ArrowRight className="h-4 w-4" />
+              <Link href={demoLink().href} className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-bold text-green-700 transition-colors hover:bg-green-50">
+                {demoLink().open ? "Open the demo" : "Book a demo"} <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href="/signup" className="inline-flex items-center gap-2 rounded-lg border border-white/40 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white/10">
                 Start a free trial

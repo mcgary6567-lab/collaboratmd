@@ -55,7 +55,7 @@ export default async function FollowUpPage({ searchParams }: { searchParams: Pro
           <Empty>No unpaid claims need attention.</Empty>
         ) : (
           <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
-            <table className="table">
+            <table className="table table-stack">
               <thead><tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Sent</th><th className="text-right">Days</th><th className="text-right">Billed</th><th>Payer says</th><th>Next step</th><th /></tr></thead>
               <tbody>
                 {rows.map((r) => {
@@ -63,21 +63,21 @@ export default async function FollowUpPage({ searchParams }: { searchParams: Pro
                   const action = r.last?.nextAction ?? "unchecked";
                   return (
                     <tr key={r.claim.id}>
-                      <td>
+                      <td data-label="Claim">
                         <Link href={`/claims/${r.claim.id}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">{r.claim.controlNumber}</Link>
                         <div><StatusBadge status={r.claim.status} /></div>
                       </td>
-                      <td>{r.patientName}</td>
-                      <td className="text-xs">{r.payerName}</td>
-                      <td className="whitespace-nowrap text-xs">{fmtDate(r.claim.submittedAt)}</td>
-                      <td className={`text-right tabular-nums ${r.ageDays > 60 ? "font-semibold text-red-700" : ""}`}>{r.ageDays}</td>
-                      <td className="text-right"><Money cents={r.claim.totalCents} /></td>
-                      <td className="max-w-xs text-xs">
+                      <td data-label="Patient">{r.patientName}</td>
+                      <td data-label="Payer" className="text-xs">{r.payerName}</td>
+                      <td data-label="Sent" className="whitespace-nowrap text-xs">{fmtDate(r.claim.submittedAt)}</td>
+                      <td data-label="Days" className={`text-right tabular-nums ${r.ageDays > 60 ? "font-semibold text-red-700" : ""}`}>{r.ageDays}</td>
+                      <td data-label="Billed" className="text-right"><Money cents={r.claim.totalCents} /></td>
+                      <td data-label="Payer says" className="max-w-xs text-xs">
                         {r.last ? (r.last.error ? <span className="text-red-700">{r.last.error}</span> : r.last.message) : <span className="text-slate-500">Not asked yet</span>}
                         {r.last && <div className="text-[10px] text-slate-500">asked {fmtDate(r.last.checkedAt)}</div>}
                       </td>
-                      <td><Badge tone={TONE[action] ?? "slate"}>{step?.label ?? (r.last?.error ? "Call the payer" : "Ask the payer")}</Badge></td>
-                      <td>
+                      <td data-label="Next step"><Badge tone={TONE[action] ?? "slate"}>{step?.label ?? (r.last?.error ? "Call the payer" : "Ask the payer")}</Badge></td>
+                      <td data-label="">
                         <form action={checkStatusAction.bind(null, r.claim.id)}>
                           <button className="btn btn-secondary whitespace-nowrap text-xs">Check now</button>
                         </form>

@@ -48,16 +48,16 @@ export default async function CollectionsPage() {
           <Empty>No accounts qualify. Accounts need a balance of $25 or more, at least two statements with the first 60 or more days ago, and no active payment plan.</Empty>
         ) : (
           <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
-            <table className="table">
+            <table className="table table-stack">
               <thead><tr><th>Patient</th><th className="text-right">Balance</th><th>Statements</th><th>First statement</th><th /></tr></thead>
               <tbody>
                 {candidates.map((c) => (
                   <tr key={c.patientId}>
-                    <td><PatientLink id={c.patientId} first={c.firstName} last={c.lastName} /></td>
-                    <td className="text-right"><Money cents={c.balanceCents} /></td>
-                    <td>{c.statementCount}</td>
-                    <td>{c.firstStatement ? fmtDate(c.firstStatement + "T00:00:00") : "-"}</td>
-                    <td className="text-right">
+                    <td data-label="Patient"><PatientLink id={c.patientId} first={c.firstName} last={c.lastName} /></td>
+                    <td data-label="Balance" className="text-right"><Money cents={c.balanceCents} /></td>
+                    <td data-label="Statements">{c.statementCount}</td>
+                    <td data-label="First statement">{c.firstStatement ? fmtDate(c.firstStatement + "T00:00:00") : "-"}</td>
+                    <td data-label="" className="text-right">
                       {canEdit && (
                         <ActionForm action={finalNoticeAction.bind(null, c.patientId)}>
                           <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Sending...">Send final notice</SubmitButton>

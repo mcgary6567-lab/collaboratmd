@@ -9,6 +9,7 @@ import {
   contractFromPercent, ensureSchedule, saveScheduleItems, scanUnderpayments, setUnderpaymentStatus,
 } from "@/server/fees";
 import { importContractCsv, saveContractRules } from "@/server/contracts";
+import { importPracticeCodes, removePracticeCode } from "@/server/code-catalog";
 import type { FormResult } from "@/components/action-form";
 
 /** Pricing changes what the practice bills, so only an administrator may make them. */
@@ -92,4 +93,26 @@ export async function importContractAction(scheduleId: string, _prev: FormResult
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Could not import" };
   }
+}
+
+export async function importPracticeCodesAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
+  const s = await requireRole(["admin"]);
+  const file = formData.get("file");
+  if (!(file instanceof File) || !file.size) return { ok: false, message: "Choose a CSV file" };
+  if (file.size > 2_000_000) return { ok: false, message: "The file is over 2 MB; split it into smaller files" };
+  try {
+    const r = await importPracticeCodes(await getDb(), s.practiceId, await file.text());
+    revalidatePath("/settings/fees");
+    const extra = r.problems.length ? ` ${r.problems.length} row${r.problems.length === 1 ? "" : "s"} skipped: ${r.problems.slice(0, 3).join("; ")}` : "";
+    return { ok: true, message: `Added or updated ${r.added} codes${r.fees ? `, ${r.fees} with fees on standard charges` : ""}.${extra}` };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not read the file" };
+  }
+}
+
+export async function removePracticeCodeAction(code: string, _prev: FormResult): Promise<FormResult> {
+  const s = await requireRole(["admin"]);
+  await removePracticeCode(await getDb(), s.practiceId, code);
+  revalidatePath("/settings/fees");
+  return { ok: true, message: `Removed ${code}` };
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { demoLink } from "@/lib/demo";
 import { ArrowRight, Lock, Mail, MapPin, MessageCircle, ScrollText, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { COMPANY, addressLines, whatsappLink } from "@/content/company";
@@ -67,12 +68,12 @@ export function SiteFooter() {
               See it running on a full-size practice
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-slate-600">
-              105,000 synthetic claims scrubbed, submitted, adjudicated by a simulated payer, denied and appealed. No sign-up form.
+              105,000 synthetic claims scrubbed, submitted, adjudicated by a simulated payer, denied and appealed. {demoLink().open ? "No sign-up form." : "We walk you through it."}
             </p>
           </div>
           <div className="flex flex-wrap gap-3 sm:ml-auto sm:shrink-0">
-            <Link href="/demo" className="btn bg-green-700 text-white hover:bg-green-800">
-              Open the demo <ArrowRight className="h-4 w-4" />
+            <Link href={demoLink().href} className="btn bg-green-700 text-white hover:bg-green-800">
+              {demoLink().open ? "Open the demo" : "Book a demo"} <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href="/contact" className="btn btn-secondary">
               Talk to us
@@ -136,7 +137,7 @@ export function SiteFooter() {
 
         <div className="mt-7 flex flex-col gap-4 border-t border-slate-200 pt-7 sm:flex-row sm:items-center">
           <p className="text-sm text-slate-500">
-            © {new Date().getFullYear()} {COMPANY.legalName}. All rights reserved.
+            © {new Date().getFullYear()} {COMPANY.legalName}. All rights reserved. CPT® is a registered trademark of the American Medical Association.
           </p>
           <div className="flex gap-6 text-sm font-medium text-slate-600 sm:ml-auto">
             <Link href="/login" className="hover:text-green-700">Sign in</Link>
