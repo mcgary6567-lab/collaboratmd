@@ -23,6 +23,8 @@ export default async function CollectionsPage() {
   const canEdit = ["admin", "biller"].includes(s.role);
   const open = rows.filter((r) => !r.collection.closedAt);
   const atAgency = open.filter((r) => r.collection.stage === "agency");
+  // A server component renders once per request, so reading the clock here is safe.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
   return (
@@ -30,7 +32,7 @@ export default async function CollectionsPage() {
       <PageHeader
         title="Collections"
         subtitle="Accounts past statements and reminders: a final notice, then a collection agency"
-        actions={<>{atAgency.length > 0 && canEdit && <a href="/api/export/collections" className="btn btn-secondary">Agency placement file (CSV)</a>}<Link href="/billing" className="btn btn-secondary">Patient billing</Link></>}
+        actions={<>{atAgency.length > 0 && canEdit && <a href="/api/export/collections" download className="btn btn-secondary">Agency placement file (CSV)</a>}<Link href="/billing" className="btn btn-secondary">Patient billing</Link></>}
       />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Ready for a final notice" value={candidates.length.toLocaleString()} hint="2+ statements, the first 60+ days ago, no plan" />

@@ -1,6 +1,7 @@
 import { getDb, schema } from "@/db";
 import { getSession } from "@/lib/auth";
 import { openExport } from "@/server/export-jobs";
+import { recordRestrictedDisclosure, restrictedPatientIds } from "@/server/restricted";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -17,6 +18,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const file = await openExport(db, session.practiceId, id, new Date(), part);
   if (!file) return new Response("This export has expired or is not ready", { status: 404 });
   await db.insert(schema.auditLog).values({ practiceId: session.practiceId, userId: session.userId, action: "export_downloaded", entity: "practice", entityId: session.practiceId, details: { job: id, part } });
+  // Every restricted patient is in a full export: note it on their access logs (once, with the first part).
+  if (part === 0) await recordRestrictedDisclosure(db, session.practiceId, await restrictedPatientIds(db, session.practiceId), { userId: session.userId }, "the full practice export");
   return new Response(file.stream, {
     headers: {
       "Content-Type": "application/zip",

@@ -76,6 +76,8 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
               <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Two-factor</th><th>Last sign-in</th><th>Status</th></tr></thead>
               <tbody>
                 {people.map((u) => {
+                  // A server component renders once per request, so reading the clock here is safe.
+                  // eslint-disable-next-line react-hooks/purity
                   const dormant = !u.lastLogin || Date.now() - u.lastLogin.getTime() > 90 * 86_400_000;
                   return (
                     <tr key={u.id}>

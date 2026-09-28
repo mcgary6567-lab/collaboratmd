@@ -7,6 +7,10 @@
  * consent and block further texts to that number until they reply START.
  * Carriers and Twilio enforce the same keywords; recording them here keeps
  * this system from trying to text someone who has said no.
+ *
+ * Replies to what the practice sent: C confirms and X cancels the next
+ * appointment (the reminder), B takes a time offered from the waitlist
+ * (server/waitlist.ts).
  */
 import crypto from "node:crypto";
 import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
@@ -17,6 +21,7 @@ import { sendSms, toE164 } from "./messaging";
 import { notify } from "./notifications";
 import { practiceNow } from "./practice-time";
 import { langOf, replyCancelled, replyConfirmed, visitTime } from "@/lib/i18n/messages";
+import { claimOffer, offerSlot } from "./waitlist";
 
 const { smsMessages, smsOptOuts, patients, auditLog, appointments, practices } = schema;
 
@@ -56,7 +61,7 @@ export async function isOptedOut(db: Db, practiceId: string, phone: string) {
 }
 
 /** Records an inbound text (idempotent on Twilio's MessageSid) and applies STOP/START. */
-export async function receiveSms(db: Db, practiceId: string, params: Record<string, string>) {
+export async function receiveSms(db: Db, practiceId: string, params: Record<string, string>, deps: { send?: (to: string, body: string) => Promise<{ ok: boolean; detail: string }> } = {}) {
   const phone = toE164(params.From);
   const body = (params.Body ?? "").slice(0, 1600);
   if (!phone) return { stored: false as const, reason: "unreadable number" };
@@ -85,23 +90,33 @@ export async function receiveSms(db: Db, practiceId: string, params: Record<stri
   if (keyword) {
     await db.insert(auditLog).values({ practiceId, action: keyword === "stop" ? "sms_opt_out" : "sms_opt_in", entity: "sms", entityId: row.id, details: { patients: matches.length } });
   }
-  // C or X answers the appointment reminder: only when the number belongs to exactly one patient.
-  const reply = !keyword && patientId && (CONFIRM_WORDS.includes(word) || CANCEL_WORDS.includes(word))
-    ? await answerReminder(db, practiceId, patientId, CONFIRM_WORDS.includes(word) ? "confirm" : "cancel", phone)
-    : null;
+  // C or X answers the appointment reminder, B takes a time offered from the waitlist: only when
+  // the number belongs to exactly one patient.
+  let reply: { text: string; answer?: "confirm" | "cancel"; status?: "booked" | "taken"; appointmentId?: string } | null = null;
+  if (!keyword && patientId && (CONFIRM_WORDS.includes(word) || CANCEL_WORDS.includes(word))) {
+    reply = await answerReminder(db, practiceId, patientId, CONFIRM_WORDS.includes(word) ? "confirm" : "cancel", phone, deps.send);
+  } else if (!keyword && patientId && BOOK_WORDS.includes(word)) {
+    const claim = await claimOffer(db, practiceId, patientId);
+    if (claim) {
+      await db.insert(smsMessages).values({ practiceId, patientId, direction: "out", phone, body: claim.text, status: "sent", readAt: new Date() });
+      reply = { ...claim };
+    }
+  }
   return { stored: true as const, id: row.id, patientId, matches: matches.length, keyword, reply };
 }
 
 /** Replies to a reminder. X, not CANCEL: CANCEL is a carrier opt-out word and would stop all texts. */
 export const CONFIRM_WORDS = ["C", "CONFIRM"];
 export const CANCEL_WORDS = ["X"];
+/** Takes a time offered from the waitlist. B, not YES: YES is a carrier opt-in word (START_WORDS). */
+export const BOOK_WORDS = ["B", "BOOK"];
 
 /**
  * Confirms or cancels the patient's next scheduled appointment in the coming
  * week (on the practice's clock). Returns the text to send back, or null when
  * there is no such appointment (the message then just waits in the inbox).
  */
-async function answerReminder(db: Db, practiceId: string, patientId: string, answer: "confirm" | "cancel", phone: string) {
+async function answerReminder(db: Db, practiceId: string, patientId: string, answer: "confirm" | "cancel", phone: string, send?: (to: string, body: string) => Promise<{ ok: boolean; detail: string }>) {
   const now = await practiceNow(db, practiceId);
   const [appt] = await db
     .select()
@@ -129,6 +144,8 @@ async function answerReminder(db: Db, practiceId: string, patientId: string, ans
   await db.insert(auditLog).values({ practiceId, action: answer === "confirm" ? "appointment_confirmed_by_text" : "appointment_cancelled_by_text", entity: "appointment", entityId: appt.id });
   // The reply goes out in Twilio's answer to this webhook; it is kept in the thread like any text sent.
   await db.insert(smsMessages).values({ practiceId, patientId, direction: "out", phone, body: text, status: "sent", readAt: new Date() });
+  // The freed time goes to the waitlist straight away. A failure here must not lose the patient's reply.
+  if (answer === "cancel") await offerSlot(db, practiceId, appt.id, { send }).catch((e) => console.error("[collaboratmd] waitlist offer failed", e instanceof Error ? e.message : e));
   return { appointmentId: appt.id, answer, text };
 }
 

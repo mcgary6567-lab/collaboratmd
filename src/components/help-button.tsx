@@ -16,7 +16,14 @@ export function HelpButton() {
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   const guide = guideFor(path);
-  useEffect(() => { setOpen(false); setReporting(false); setResult(null); }, [path]);
+  // Moving to another page closes the panel (set during render, as React advises for state that follows a prop).
+  const [shownFor, setShownFor] = useState(path);
+  if (shownFor !== path) {
+    setShownFor(path);
+    setOpen(false);
+    setReporting(false);
+    setResult(null);
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     window.addEventListener("keydown", onKey);

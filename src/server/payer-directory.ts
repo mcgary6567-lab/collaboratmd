@@ -10,6 +10,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { practiceConfig } from "./integrations";
 import { savePayer } from "./admin";
+import { TRANSACTIONS, type TransactionKey } from "./transaction-enrollment";
 
 const { payers, transactionEnrollments } = schema;
 const BASE = "https://payers.us.stedi.com/2024-04-01";
@@ -22,8 +23,7 @@ export type DirectoryPayer = {
 type Http = (url: string, init: { method: string; headers: Record<string, string> }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 type Raw = { displayName?: string; primaryPayerId?: string; stediId?: string; aliases?: string[]; transactionSupport?: Record<string, Support> };
 
-/** Directory transaction names to the enrollment tracker's. */
-const TXN_MAP = { claims: "professionalClaimSubmission", eligibility: "eligibilityCheck", era: "claimPayment", eft: "electronicFundsTransfer", claim_status: "claimStatus" } as const;
+const KNOWN = new Set<string>(TRANSACTIONS.map((t) => t.key));
 
 export async function searchPayerDirectory(db: Db, practiceId: string, query: string, http: Http = fetch as unknown as Http): Promise<DirectoryPayer[]> {
   const q = query.trim();
@@ -41,10 +41,12 @@ export async function searchPayerDirectory(db: Db, practiceId: string, query: st
 }
 
 /** Adds the payer (or finds it by payer ID) and marks which transactions need enrollment. */
-export async function addDirectoryPayer(db: Db, practiceId: string, p: { name: string; payerId: string; type: string; support: Partial<Record<keyof typeof TXN_MAP, Support | null>> }, userId?: string) {
+export async function addDirectoryPayer(db: Db, practiceId: string, p: { name: string; payerId: string; type: string; support: Partial<Record<TransactionKey, Support | null>> }, userId?: string) {
   const [existing] = await db.select().from(payers).where(and(eq(payers.practiceId, practiceId), eq(payers.payerId, p.payerId.toUpperCase()))).limit(1);
   const id = existing?.id ?? (await savePayer(db, practiceId, null, { name: p.name, payerId: p.payerId, type: p.type, timelyFilingDays: p.type === "medicare" ? 365 : 90, appealDays: p.type === "medicare" ? 120 : 60 }, userId));
-  for (const [txn, support] of Object.entries(p.support) as [keyof typeof TXN_MAP, Support | null][]) {
+  for (const [txn, support] of Object.entries(p.support) as [TransactionKey, Support | null][]) {
+    // The support map comes from the browser: only the tracker's own transactions are recorded.
+    if (!KNOWN.has(txn)) continue;
     if (!support || support === "NOT_SUPPORTED") continue;
     const status = support === "ENROLLMENT_REQUIRED" ? "not_started" : "not_required";
     await db.insert(transactionEnrollments).values({ practiceId, payerId: id, transaction: txn, status }).onConflictDoNothing();

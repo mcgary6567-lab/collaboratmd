@@ -14,6 +14,8 @@ import { AppointmentForm } from "./form";
 import { localDateLabel, localTimeLabel, pendingRequests } from "@/server/booking";
 import { practiceNow } from "@/server/practice-time";
 import { confirmBookingAction, declineBookingAction } from "@/app/(app)/booking-actions";
+import { offerSlotAction, removeFromWaitlistAction } from "@/app/(app)/waitlist-actions";
+import { listWaitlist, offersFor } from "@/server/waitlist";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +37,9 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
         .where(and(inArray(schema.patientInsurances.patientId, patientIds), eq(schema.patientInsurances.active, true), eq(schema.patientInsurances.rank, 1)))
     : [];
   const insByPatient = new Map(primaries.map((p) => [p.patientId, p.id]));
-  const [checks, checkins] = await Promise.all([latestChecks(db, primaries.map((p) => p.id)), checkinStatus(db, appts.map((a) => a.appt.id))]);
+  const clockNow = await practiceNow(db, s.practiceId);
+  const cancelled = appts.filter((a) => a.appt.status === "cancelled" && a.appt.startsAt > clockNow).map((a) => a.appt.id);
+  const [checks, checkins, offers, waitlist] = await Promise.all([latestChecks(db, primaries.map((p) => p.id)), checkinStatus(db, appts.map((a) => a.appt.id)), offersFor(db, cancelled), listWaitlist(db, s.practiceId)]);
   const coverage = (patientId: string) => {
     const insId = insByPatient.get(patientId);
     if (!insId) return { label: "No insurance", tone: "amber" as const, title: "Self-pay unless insurance is collected" };
@@ -145,6 +149,20 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                           <button className="btn btn-secondary text-xs">No-show</button>
                         </form>
                       )}
+                      {appt.status === "scheduled" && appt.startsAt > clockNow && (
+                        <form action={appointmentStatusAction.bind(null, appt.id, "cancelled")} className="inline">
+                          <button className="btn btn-secondary text-xs" title="The patient called to cancel. The time can then be offered to the waitlist.">Cancel</button>
+                        </form>
+                      )}
+                      {cancelled.includes(appt.id) && (offers.get(appt.id) ? (
+                        <span className="text-[11px] font-semibold text-slate-600">
+                          {offers.get(appt.id)!.filled ? "Filled from the waitlist" : `Offered to ${offers.get(appt.id)!.sent} on the waitlist`}
+                        </span>
+                      ) : waitlist.length > 0 ? (
+                        <ActionForm action={offerSlotAction.bind(null, appt.id)}>
+                          <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Texting...">Offer to waitlist</SubmitButton>
+                        </ActionForm>
+                      ) : null)}
                       </div>
                     </td>
                   </tr>
@@ -158,6 +176,28 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
           <AppointmentForm date={iso} providers={providers.map((p) => ({ id: p.id, name: `Dr. ${p.firstName} ${p.lastName} — ${p.specialty}` }))} />
         </Card>
       </div>
+      <Card title={`Waitlist (${waitlist.length})`} className="mt-6">
+        <p className="mb-3 text-xs text-slate-500">
+          Patients who want an earlier time. When a patient replies X to their reminder, the time is texted to the first few who can take it; the first to reply B is booked and you get a notification. For a cancellation by phone, press Cancel, then Offer to waitlist. Add patients from their page.
+        </p>
+        {waitlist.length === 0 ? <Empty>Nobody is waiting.</Empty> : (
+          <ul className="divide-y divide-slate-100 text-sm">
+            {waitlist.map(({ entry, patient, providerLast, canText }) => (
+              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div>
+                  <PatientLink id={patient.id} first={patient.firstName} last={patient.lastName} />
+                  <span className="text-slate-500"> · {providerLast ? `Dr. ${providerLast} only` : "any provider"} · since {entry.createdAt.toISOString().slice(0, 10)}</span>
+                  {entry.note && <div className="text-xs text-slate-600">{entry.note}</div>}
+                  {!canText && <div className="text-xs text-amber-800">No texting consent: call when a time opens</div>}
+                </div>
+                <form action={removeFromWaitlistAction.bind(null, entry.id, patient.id)}>
+                  <button className="text-xs font-semibold text-slate-500 hover:text-red-700" aria-label={`Remove ${patient.firstName} ${patient.lastName} from the waitlist`}>Remove</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </>
   );
 }

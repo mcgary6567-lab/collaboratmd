@@ -23,7 +23,9 @@ export function ClaimBulkBar({ people }: { people: { id: string; name: string }[
   useEffect(() => {
     if (state?.message) toast(state.ok, state.message);
     if (state?.ok) document.querySelectorAll<HTMLInputElement>('input[form="bulk-claims"]').forEach((b) => { if (b.type === "checkbox") b.checked = false; });
-    setCount(0);
+    // Recount from the boxes themselves (unticking them in code fires no change event): after a
+    // failed action they are still ticked, and the bar must still say so.
+    document.dispatchEvent(new Event("change"));
   }, [state]);
 
   return (
@@ -72,9 +74,14 @@ export function SelectAll() {
 export function SavedViews({ page, query, views }: { page: string; query: string; views: { id: string; name: string; query: string }[] }) {
   const [state, action, pending] = useActionState<FormResult, FormData>(saveViewAction.bind(null, page, query), undefined);
   const [naming, setNaming] = useState(false);
+  // A saved view closes the name field (set during render when the result changes, as React advises).
+  const [seen, setSeen] = useState(state);
+  if (seen !== state) {
+    setSeen(state);
+    if (state?.ok) setNaming(false);
+  }
   useEffect(() => {
     if (state?.message) toast(state.ok, state.message);
-    if (state?.ok) setNaming(false);
   }, [state]);
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">

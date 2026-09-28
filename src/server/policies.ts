@@ -29,6 +29,7 @@ export const DEFAULT_POLICIES: Required<{ [K in keyof PracticePolicies]: NonNull
   smallBalanceAgeDays: 90,
   exportsAdminOnly: false,
   refundDualControl: false,
+  accessReview: null,
 };
 
 export async function getPolicies(db: Db, practiceId: string): Promise<PracticePolicies> {
@@ -68,7 +69,8 @@ export async function savePolicies(db: Db, practiceId: string, input: PracticePo
   let before: PracticePolicies;
   try { before = validatePolicies(stored); } catch { before = stored; }
   const policies = validatePolicies(input);
-  await db.update(practices).set({ policies }).where(eq(practices.id, practiceId));
+  // Settings saved on other screens live in the same column: keep them (the access review's limits).
+  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}) } }).where(eq(practices.id, practiceId));
   const changed = Object.keys(policies).filter((k) => JSON.stringify(policies[k as keyof PracticePolicies] ?? null) !== JSON.stringify(before[k as keyof PracticePolicies] ?? null));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed, policies } });
   return policies;

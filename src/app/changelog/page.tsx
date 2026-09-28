@@ -9,6 +9,19 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-09-28",
+    title: "A waitlist that fills cancelled times, and tighter protection for restricted records",
+    items: [
+      "Waitlist: a cancelled time is texted to patients waiting for it, and the first to reply B is booked",
+      "An optional same-day text to patients who have not confirmed, and a report of no-shows for confirmed and unconfirmed patients",
+      "Opening a restricted record asks for your password or authenticator code as well as a reason",
+      "Exports that include a restricted patient, and API reads of one, go on the patient's access log; API keys see restricted patients only when allowed",
+      "Chart access review: each practice sets its own limits, and reviewers record what they found",
+      "Fixed: after a bulk action on the claims list failed, the bar said nothing was selected while the claims were still ticked",
+      "Fixed: saving the billing policies could have cleared settings kept alongside them",
+    ],
+  },
+  {
     date: "2026-09-27",
     title: "Confirm by text, restricted records, and a daily guide for each role",
     items: [

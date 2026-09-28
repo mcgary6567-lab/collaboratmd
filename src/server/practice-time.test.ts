@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { schema } from "@/db";
 import { testDb } from "@/test/db";
 import { clockDay, practiceClock, practiceNow, practiceTimeZone } from "./practice-time";
@@ -69,6 +69,48 @@ describe("the demo practice's schedule", () => {
       vi.useRealTimers();
       if (tz === undefined) delete process.env.TZ;
       else process.env.TZ = tz;
+      await t.close();
+    }
+  });
+});
+
+describe("daylight-saving changes (New York: back an hour on 2026-11-01, forward on 2027-03-14)", () => {
+  const NY = "America/New_York";
+  it("reads the clock through the repeated hour and the skipped one", () => {
+    // 01:30 happens twice on Nov 1: first in daylight time (05:30 UTC), then in standard time (06:30 UTC).
+    expect(practiceClock(new Date("2026-11-01T05:30:00Z"), NY).toISOString()).toBe("2026-11-01T01:30:00.000Z");
+    expect(practiceClock(new Date("2026-11-01T06:30:00Z"), NY).toISOString()).toBe("2026-11-01T01:30:00.000Z");
+    expect(practiceClock(new Date("2026-11-01T17:00:00Z"), NY).toISOString()).toBe("2026-11-01T12:00:00.000Z");
+    // On Mar 14 the clock goes from 01:59 to 03:00.
+    expect(practiceClock(new Date("2027-03-14T06:59:00Z"), NY).toISOString()).toBe("2027-03-14T01:59:00.000Z");
+    expect(practiceClock(new Date("2027-03-14T07:00:00Z"), NY).toISOString()).toBe("2027-03-14T03:00:00.000Z");
+  });
+
+  it("keeps the day's schedule and tomorrow's reminders on the right days across the change", async () => {
+    const t = await testDb();
+    try {
+      await t.db.update(schema.practices).set({ timeZone: NY }).where(eq(schema.practices.id, t.practiceId));
+      const [prov] = await t.db.select().from(schema.providers).where(eq(schema.providers.practiceId, t.practiceId)).limit(1);
+      const [pat] = await t.db.select().from(schema.patients).where(eq(schema.patients.practiceId, t.practiceId)).limit(1);
+      const at = (iso: string) => new Date(iso);
+      const insert = async (starts: string) => (await t.db.insert(schema.appointments).values({ practiceId: t.practiceId, patientId: pat.id, providerId: prov.id, startsAt: at(starts), endsAt: new Date(at(starts).getTime() + 1_800_000), type: "office_visit" }).returning())[0];
+      // Clock times: 00:30 and 23:30 on the 25-hour day, and 08:00 the day after.
+      const early = await insert("2026-11-01T00:30:00Z");
+      const late = await insert("2026-11-01T23:30:00Z");
+      const next = await insert("2026-11-02T08:00:00Z");
+      const ids = (rows: { appt: { id: string } }[]) => rows.map((r) => r.appt.id);
+      const day = ids(await listAppointments(t.db, t.practiceId, new Date("2026-11-01T12:00:00Z")));
+      expect(day).toEqual(expect.arrayContaining([early.id, late.id]));
+      expect(day).not.toContain(next.id);
+
+      // Saturday afternoon before the change: "tomorrow" is the whole of Sunday Nov 1, by the clock.
+      const { appointmentReminders } = await import("./automation");
+      const sat = new Date("2026-10-31T18:00:00Z"); // 14:00 in New York
+      const r = await appointmentReminders(t.db, t.practiceId, "http://localhost", sat);
+      const [{ n }] = (await t.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM appointments WHERE practice_id = ${t.practiceId} AND status = 'scheduled' AND starts_at >= '2026-11-01T00:00:00Z' AND starts_at < '2026-11-02T00:00:00Z'`)).rows;
+      expect(r.due).toBe(Number(n));
+      expect(r.due).toBeGreaterThanOrEqual(2);
+    } finally {
       await t.close();
     }
   });

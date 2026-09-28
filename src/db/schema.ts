@@ -80,10 +80,14 @@ export type PracticePolicies = {
   exportsAdminOnly?: boolean;
   /** A refund must be approved by someone other than the person who requested it. */
   refundDualControl?: boolean;
+  /** Thresholds for the chart access review (server/access-anomalies.ts); unset ones use its defaults. */
+  accessReview?: { chartsPerDay?: number; multiple?: number; minForMultiple?: number; unrelatedPerDay?: number };
 };
 
 export type AutomationSettings = {
   appointmentReminders?: boolean;
+  /** A second reminder on the morning of the visit, to patients who have not confirmed. */
+  sameDayReminders?: boolean;
   balanceReminders?: boolean;
   weeklyReport?: boolean;
   claimFollowUp?: boolean;
@@ -1258,6 +1262,8 @@ export const apiKeys = pgTable("api_keys", {
   prefix: text("prefix").notNull(),
   keyHash: text("key_hash").notNull().unique(),
   scope: text("scope").notNull().default("read"),
+  /** May read restricted patients (each read goes on the patient's access log); migration 0050. */
+  restrictedAccess: boolean("restricted_access").notNull().default(false),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
@@ -1685,3 +1691,40 @@ export const featureUsage = pgTable("feature_usage", {
   day: date("day").notNull(),
   count: integer("count").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.practiceId, t.feature, t.day] })]);
+
+/* Waitlist: a cancelled time is offered by text; the first to reply B gets it. See migration 0050 and server/waitlist.ts. */
+export const waitlistEntries = pgTable("waitlist_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  /** Only this provider's openings, or any provider's when null. */
+  providerId: uuid("provider_id").references(() => providers.id),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  closedReason: text("closed_reason"),
+});
+
+export const slotOffers = pgTable("slot_offers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  cancelledAppointmentId: uuid("cancelled_appointment_id").references(() => appointments.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  locationId: uuid("location_id").references(() => locations.id),
+  type: text("type").notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  filledAt: timestamp("filled_at", { withTimezone: true }),
+  filledPatientId: uuid("filled_patient_id").references(() => patients.id),
+  filledAppointmentId: uuid("filled_appointment_id").references(() => appointments.id),
+});
+
+export const slotOfferRecipients = pgTable("slot_offer_recipients", {
+  offerId: uuid("offer_id").notNull().references(() => slotOffers.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  waitlistEntryId: uuid("waitlist_entry_id").notNull().references(() => waitlistEntries.id),
+  sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.offerId, t.patientId] })]);

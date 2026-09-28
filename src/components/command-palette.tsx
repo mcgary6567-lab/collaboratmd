@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Search, User, CornerDownLeft, Keyboard } from "lucide-react";
 
@@ -28,7 +28,8 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
   const [open, setOpen] = useState(false);
   const [help, setHelp] = useState(false);
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<Hit[]>([]);
+  // Results from the server, with the search term they answer.
+  const [found, setFound] = useState<{ term: string; hits: Hit[] }>({ term: "", hits: [] });
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const pendingG = useRef<number>(0);
@@ -36,7 +37,6 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
   const close = useCallback(() => {
     setOpen(false);
     setQ("");
-    setHits([]);
     setActive(0);
   }, []);
 
@@ -78,20 +78,22 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
     if (open) setTimeout(() => input.current?.focus(), 0);
   }, [open]);
 
+  const term = q.trim().toLowerCase();
+  const pageHits = useMemo<Hit[]>(
+    () => pages.filter((p) => !term || p.label.toLowerCase().includes(term)).slice(0, term ? 5 : 8).map((p) => ({ kind: "page", label: p.label, href: p.href })),
+    [pages, term],
+  );
+  const hits = term.length >= 2 && found.term === term ? [...found.hits, ...pageHits] : pageHits;
+
   useEffect(() => {
-    if (!open) return;
-    const term = q.trim().toLowerCase();
-    const pageHits: Hit[] = pages.filter((p) => !term || p.label.toLowerCase().includes(term)).slice(0, term ? 5 : 8).map((p) => ({ kind: "page", label: p.label, href: p.href }));
-    setHits(pageHits);
-    setActive(0);
-    if (term.length < 2) return;
+    if (!open || term.length < 2) return;
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`, { signal: ctrl.signal });
         if (!res.ok) return;
         const data = (await res.json()) as Hit[];
-        setHits([...data, ...pageHits]);
+        setFound({ term, hits: data });
       } catch {
         /* aborted by the next keystroke */
       }
@@ -100,7 +102,7 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
       clearTimeout(timer);
       ctrl.abort();
     };
-  }, [q, open, pages]);
+  }, [q, term, open]);
 
   const go = (h: Hit | undefined) => {
     if (!h) return;
@@ -118,7 +120,10 @@ export function CommandPalette({ pages }: { pages: { href: string; label: string
               <input
                 ref={input}
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setActive(0);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, hits.length - 1)); }
                   else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }

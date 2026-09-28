@@ -49,7 +49,7 @@ export function Importer({ fields, maxRows, templates: initialTemplates = [] }: 
     });
   };
 
-  const useTemplate = (id: string) => {
+  const applyTemplate = (id: string) => {
     const t = templates.find((x) => x.id === id);
     if (!t || !prev) return;
     const r = mappingFromTemplate(prev.preview.headers, t);
@@ -126,7 +126,7 @@ export function Importer({ fields, maxRows, templates: initialTemplates = [] }: 
             <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-4 text-sm">
               {templates.length > 0 && (
                 <label className="block"><span className="label">Use a saved template</span>
-                  <select className="input py-1 text-xs" defaultValue="" onChange={(e) => useTemplate(e.target.value)} disabled={pending}>
+                  <select className="input py-1 text-xs" defaultValue="" onChange={(e) => applyTemplate(e.target.value)} disabled={pending}>
                     <option value="">Choose...</option>
                     {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>

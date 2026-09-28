@@ -30,7 +30,9 @@ describe("product round", () => {
     expect(calls[0]).toBe("https://payers.us.stedi.com/2024-04-01/payers/search?query=directory&pageSize=15 test_stedi_key");
     expect(found[0]).toMatchObject({ name: "Directory Health", payerId: "DIR01", claims: "SUPPORTED", era: "ENROLLMENT_REQUIRED", eft: "NOT_SUPPORTED" });
 
-    const r = await addDirectoryPayer(t.db, t.practiceId, { name: found[0].name, payerId: found[0].payerId, type: "commercial", support: { claims: found[0].claims, era: found[0].era, eligibility: found[0].eligibility, eft: found[0].eft } }, t.userId);
+    // The support map arrives from the browser; a name the enrollment tracker does not know is left out.
+    const support = { claims: found[0].claims, era: found[0].era, eligibility: found[0].eligibility, eft: found[0].eft, made_up: "SUPPORTED" } as Parameters<typeof addDirectoryPayer>[2]["support"];
+    const r = await addDirectoryPayer(t.db, t.practiceId, { name: found[0].name, payerId: found[0].payerId, type: "commercial", support }, t.userId);
     const rows = await t.db.select().from(schema.transactionEnrollments).where(and(eq(schema.transactionEnrollments.practiceId, t.practiceId), eq(schema.transactionEnrollments.payerId, r.id)));
     expect(Object.fromEntries(rows.map((x) => [x.transaction, x.status]))).toEqual({ claims: "not_required", era: "not_started", eligibility: "not_required" });
     expect((await addDirectoryPayer(t.db, t.practiceId, { name: "Directory Health", payerId: "dir01", type: "commercial", support: {} })).existed).toBe(true);

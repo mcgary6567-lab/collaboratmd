@@ -13,6 +13,14 @@ import { defineConfig } from "@playwright/test";
  */
 const PORT = Number(process.env.E2E_PORT ?? 3700);
 const DEV = process.env.E2E_DEV === "1";
+// Each run starts from an empty database (seeded again on first sign-in), so one run's leftovers
+// (a restricted patient, a used link) cannot change the next. E2E_KEEP_DB=1 keeps it.
+const FRESH_DB = process.env.E2E_KEEP_DB === "1" ? "" : `node -e "require('fs').rmSync('.e2e/pg',{recursive:true,force:true})" && `;
+// The time-of-day CI job runs the server this many minutes ahead of the real clock, with
+// libfaketime (Linux only), to try the app in the practice's morning, evening and after midnight.
+// The embedded database runs inside the same process, so it sees the same time.
+const OFFSET_MIN = process.env.E2E_CLOCK_OFFSET_MIN ? Math.round(Number(process.env.E2E_CLOCK_OFFSET_MIN)) : null;
+const faked = (cmd: string) => (OFFSET_MIN === null ? cmd : `faketime -f "${OFFSET_MIN >= 0 ? "+" : ""}${OFFSET_MIN}m" ${cmd}`);
 
 export default defineConfig({
   testDir: "e2e",
@@ -30,7 +38,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: DEV ? `npx next dev -p ${PORT}` : `npx next build && npx next start -p ${PORT}`,
+    command: FRESH_DB + (DEV ? faked(`npx next dev -p ${PORT}`) : `npx next build && ${faked(`npx next start -p ${PORT}`)}`),
     url: `http://localhost:${PORT}/api/health`,
     timeout: 600_000,
     reuseExistingServer: false,
@@ -40,6 +48,8 @@ export default defineConfig({
       // Production mode builds patient links from the configured address.
       APP_URL: `http://localhost:${PORT}`,
       PGLITE_DIR: ".e2e/pg",
+      // Shift the wall clock only: timers and Node's own bookkeeping keep the real monotonic clock.
+      FAKETIME_DONT_FAKE_MONOTONIC: "1",
       AUTH_SECRET: "e2e-only-secret-0123456789abcdef0123456789",
       // The demo administrator can open the operator pages, so the accessibility crawl covers them.
       PLATFORM_ADMIN_EMAILS: "admin@collaboratmd.local",

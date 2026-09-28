@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
 import { logPatientView } from "@/lib/log-view";
 import { restrictedAccess } from "@/server/restricted";
 import { RestrictedGate } from "@/components/restricted-gate";
 import { setRestrictedAction } from "@/app/(app)/restricted-actions";
+import { addToWaitlistAction, removeFromWaitlistAction } from "@/app/(app)/waitlist-actions";
+import { ActionForm, SubmitButton } from "@/components/action-form";
+import { listProviders } from "@/server/encounters";
 import { practiceConfig } from "@/server/integrations";
 import { InsuranceTools } from "./insurance-tools";
 import { CoverageSection } from "./coverage-section";
@@ -37,9 +40,11 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { patient, insurances, checks, visits, ledger } = data;
   const fin = computeFinancials(ledger);
   const latestCheck = checks[0];
-  const [payerList, cfg] = await Promise.all([
+  const [payerList, cfg, [waiting], providerList] = await Promise.all([
     db.select({ id: schema.payers.id, name: schema.payers.name, type: schema.payers.type }).from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
     practiceConfig(db, s.practiceId),
+    db.select().from(schema.waitlistEntries).where(and(eq(schema.waitlistEntries.practiceId, s.practiceId), eq(schema.waitlistEntries.patientId, id), isNull(schema.waitlistEntries.closedAt))).limit(1),
+    listProviders(db, s.practiceId),
   ]);
   const canWrite = (CAN_WRITE as readonly string[]).includes(s.role);
   const insured = insurances.some(({ insurance, payer }) => insurance.active && payer.type !== "self_pay");
@@ -92,6 +97,29 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 </form>
               </div>
             )}
+            {canWrite && (waiting ? (
+              <div className="flex items-center justify-between">
+                <span>Waitlist: since {fmtDate(waiting.createdAt)} <span className="text-slate-500">({waiting.providerId ? `Dr. ${providerList.find((p) => p.id === waiting.providerId)?.lastName ?? ""} only` : "any provider"})</span></span>
+                <form action={removeFromWaitlistAction.bind(null, waiting.id, patient.id)}>
+                  <button className="font-semibold text-brand-700 hover:underline" aria-label="Remove from the waitlist">Remove</button>
+                </form>
+              </div>
+            ) : (
+              <details>
+                <summary className="cursor-pointer font-semibold text-brand-700">Add to the waitlist</summary>
+                <ActionForm action={addToWaitlistAction.bind(null, patient.id)} className="mt-2 space-y-2">
+                  <label className="block"><span className="label">Provider</span>
+                    <select name="providerId" className="select" defaultValue="">
+                      <option value="">Any provider</option>
+                      {providerList.map((p) => <option key={p.id} value={p.id}>Dr. {p.firstName} {p.lastName}</option>)}
+                    </select>
+                  </label>
+                  <label className="block"><span className="label">Note</span><input name="note" className="input" maxLength={300} placeholder="Mornings only; knee follow-up" /></label>
+                  <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Adding...">Add</SubmitButton>
+                  {!patient.smsConsentAt && <p className="text-amber-800">No texting consent: openings cannot be texted to this patient; the waitlist will say to call.</p>}
+                </ActionForm>
+              </details>
+            ))}
             <div className="flex flex-wrap gap-2 pt-1">
               <PortalLinkButton patientId={patient.id} purpose="portal" label="Send portal link" />
               <PortalLinkButton patientId={patient.id} purpose="pay" label="Send pay link" />

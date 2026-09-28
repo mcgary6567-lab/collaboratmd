@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, CheckSquare, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
@@ -10,9 +10,15 @@ import { PracticeSwitcher } from "@/components/practice-switcher";
 import { openSearch } from "@/components/command-palette";
 import { ALL_PAGES, NAV_GROUPS } from "@/lib/nav";
 
+/** Follows the page's data-theme attribute (set on the server from the cookie, and by the button below). */
+function subscribeTheme(onChange: () => void) {
+  const watch = new MutationObserver(onChange);
+  watch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => watch.disconnect();
+}
+
 function ThemeToggle() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => setDark(document.documentElement.dataset.theme === "dark"), []);
+  const dark = useSyncExternalStore(subscribeTheme, () => document.documentElement.dataset.theme === "dark", () => false);
   return (
     <button
       type="button"
@@ -23,7 +29,6 @@ function ThemeToggle() {
         const next = dark ? "light" : "dark";
         document.documentElement.dataset.theme = next;
         document.cookie = `cmd_theme=${next}; path=/; max-age=31536000; samesite=lax`;
-        setDark(!dark);
       }}
     >
       {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -81,7 +86,12 @@ export function Sidebar({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  useEffect(() => setOpen(false), [pathname]);
+  // Moving to another page closes the menu on a phone.
+  const [openedOn, setOpenedOn] = useState(pathname);
+  if (openedOn !== pathname) {
+    setOpenedOn(pathname);
+    setOpen(false);
+  }
   const multi = practices.length > 1;
 
   const footer = (

@@ -1,6 +1,7 @@
 import { getDb, schema } from "@/db";
 import { getSession } from "@/lib/auth";
 import { practiceExport } from "@/server/practice-export";
+import { recordRestrictedDisclosure, restrictedPatientIds } from "@/server/restricted";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -12,6 +13,7 @@ export async function GET() {
   if (session.role !== "admin") return new Response("The full practice export is for administrators", { status: 403 });
   const db = await getDb();
   await db.insert(schema.auditLog).values({ practiceId: session.practiceId, userId: session.userId, action: "export", entity: "practice", entityId: session.practiceId, details: { full: true } });
+  await recordRestrictedDisclosure(db, session.practiceId, await restrictedPatientIds(db, session.practiceId), { userId: session.userId }, "the full practice export");
   const it = practiceExport(db, session.practiceId);
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {

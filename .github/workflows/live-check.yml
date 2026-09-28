@@ -1,23 +1,36 @@
-# Checks the live site every 10 minutes from outside: health (database
+# Checks the live site every 5 minutes from outside: health (database
 # answers), sign-in page, home page and status page. See scripts/live-check.mjs.
 #
-# A failed run emails whoever last changed this schedule (GitHub's default for
-# scheduled workflows). To also alert the operators' channel, add the
-# repository secret OPS_ALERT_WEBHOOK_URL (Settings > Secrets and variables >
-# Actions); the site address can be changed with the variable LIVE_URL.
-# GitHub may delay scheduled runs by several minutes when it is busy, and turns
-# them off after 60 days without activity in the repository.
+# GitHub starts scheduled runs hours apart when it is busy, so one run does not
+# check once: it keeps checking every 5 minutes for five and a half hours. The
+# workflow is scheduled every hour and runs one at a time, so there is nearly
+# always a next run waiting, and it takes over the moment the current one ends.
+# The repository is public, so these runner minutes are free; on a private
+# repository they would count against the plan's Actions minutes.
+#
+# A failure ends the run (the next one resumes checking) and emails whoever
+# last changed this schedule (GitHub's default for scheduled workflows). To
+# also alert the operators' channel, add the repository secret
+# OPS_ALERT_WEBHOOK_URL (Settings > Secrets and variables > Actions); the site
+# address can be changed with the variable LIVE_URL. GitHub turns scheduled
+# workflows off after 60 days without activity in the repository.
 name: Live check
 
 on:
   schedule:
-    # Off the hour and off round minutes: GitHub delays or drops scheduled runs at busy times.
-    - cron: "3,13,23,33,43,53 * * * *"
+    # Off the hour: GitHub delays or drops scheduled runs at busy times.
+    - cron: "17 * * * *"
   workflow_dispatch:
+    inputs:
+      minutes:
+        description: How long to keep checking (0 checks once)
+        default: "0"
 
 permissions:
   contents: read
 
+# One at a time. GitHub keeps at most one run waiting behind the current one (a newer
+# scheduled run replaces an older waiting one), and that run starts when this one ends.
 concurrency:
   group: live-check
   cancel-in-progress: false
@@ -25,7 +38,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 345
     steps:
       - uses: actions/checkout@v7
         with:
@@ -37,3 +50,5 @@ jobs:
         env:
           LIVE_URL: ${{ vars.LIVE_URL }}
           OPS_ALERT_WEBHOOK_URL: ${{ secrets.OPS_ALERT_WEBHOOK_URL }}
+          LIVE_WATCH_MINUTES: ${{ github.event_name == 'schedule' && '330' || inputs.minutes || '0' }}
+          LIVE_EVERY_MINUTES: "5"

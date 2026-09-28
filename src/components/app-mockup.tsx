@@ -53,9 +53,15 @@ const KPIS = [
 
 const NAV = ["My work", "Practice analytics", "Scheduling", "Patients", "Claims", "Remittance", "Denials", "Reports"];
 
+const circumference = 2 * Math.PI * 42;
+/** Each payer's arc in the donut, starting where the previous one ended. */
+const ARCS = MIX.map((s, i) => ({
+  ...s,
+  dash: (s.pct / 100) * circumference,
+  start: (MIX.slice(0, i).reduce((sum, x) => sum + x.pct, 0) / 100) * circumference,
+}));
+
 export function AppMockup() {
-  let offset = 0;
-  const circumference = 2 * Math.PI * 42;
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/20 ring-1 ring-slate-900/5">
@@ -146,22 +152,17 @@ export function AppMockup() {
               <div className="mb-2 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Payer mix</div>
               <div className="flex items-center gap-2">
                 <svg viewBox="0 0 100 100" className="h-20 w-20 -rotate-90" role="img" aria-label="Share of billed charges by payer">
-                  {MIX.map((s) => {
-                    const dash = (s.pct / 100) * circumference;
-                    const el = (
-                      <circle
-                        key={s.label}
-                        cx="50" cy="50" r="42"
-                        fill="none"
-                        stroke={s.color}
-                        strokeWidth="14"
-                        strokeDasharray={`${dash} ${circumference - dash}`}
-                        strokeDashoffset={-offset}
-                      />
-                    );
-                    offset += dash;
-                    return el;
-                  })}
+                  {ARCS.map((s) => (
+                    <circle
+                      key={s.label}
+                      cx="50" cy="50" r="42"
+                      fill="none"
+                      stroke={s.color}
+                      strokeWidth="14"
+                      strokeDasharray={`${s.dash} ${circumference - s.dash}`}
+                      strokeDashoffset={-s.start}
+                    />
+                  ))}
                 </svg>
                 <ul className="space-y-0.5 text-[8px] text-slate-500">
                   {MIX.slice(0, 5).map((s) => (

@@ -11,6 +11,7 @@ import { createEncounterWithClaim } from "./encounters";
 import { computeFinancials } from "./claims";
 import { standardCharges } from "./fees";
 import { patientBalanceCents } from "./billing";
+import { recordRestrictedDisclosure } from "./restricted";
 
 const { patients, patientInsurances, payers, claims, encounters, charges, ledgerEntries, denials, claimEvents, providers } = schema;
 
@@ -55,24 +56,48 @@ export const claimShape = (c: ClaimRow, extra: { patient?: PatientRow; payerName
   created_at: c.createdAt.toISOString(), updated_at: c.updatedAt.toISOString(),
 });
 
+/* --------------------------- Restricted patients --------------------------- */
+
+/**
+ * What the calling key may see of restricted patients (server/restricted.ts). Without
+ * restricted access they appear in lists as { id, restricted: true } and their records
+ * are refused; with it, every read is recorded on the patient's access log.
+ */
+export type ApiAccess = { restrictedAccess: boolean; keyName: string };
+const NO_RESTRICTED: ApiAccess = { restrictedAccess: false, keyName: "" };
+const restrictedRefusal = () =>
+  new ApiError(403, "restricted", "This patient's records are restricted. An administrator can allow an API key to read restricted records (Settings > Developers).");
+
 /* ------------------------------ Patients ------------------------------ */
 
-export async function listPatients(db: Db, practiceId: string, params: URLSearchParams) {
+export async function listPatients(db: Db, practiceId: string, params: URLSearchParams, access: ApiAccess = NO_RESTRICTED) {
   const { limit, offset } = page(params);
   const where: SQL[] = [eq(patients.practiceId, practiceId)];
   const q = params.get("q")?.trim();
   if (q) {
     const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     where.push(or(ilike(patients.lastName, like), ilike(patients.firstName, like), ilike(patients.mrn, like))!);
+    // A name search must not reveal that a restricted patient matches it.
+    if (!access.restrictedAccess) where.push(eq(patients.restricted, false));
   }
   const rows = await db.select().from(patients).where(and(...where)).orderBy(asc(patients.lastName), asc(patients.firstName), asc(patients.id)).limit(limit + 1).offset(offset);
-  return paged(rows.map(patientShape), limit, offset);
+  const shown = rows.slice(0, limit).filter((p) => p.restricted).map((p) => p.id);
+  if (access.restrictedAccess && shown.length) await recordRestrictedDisclosure(db, practiceId, shown, { apiKeyName: access.keyName }, "a patient list read through the API");
+  return paged(
+    rows.map((p) => (!p.restricted ? patientShape(p) : access.restrictedAccess ? { ...patientShape(p), restricted: true } : { id: p.id, restricted: true })),
+    limit,
+    offset,
+  );
 }
 
-export async function getPatient(db: Db, practiceId: string, id: string) {
+export async function getPatient(db: Db, practiceId: string, id: string, access: ApiAccess = NO_RESTRICTED) {
   if (!UUID.test(id)) throw notFound("Patient");
   const [p] = await db.select().from(patients).where(and(eq(patients.id, id), eq(patients.practiceId, practiceId))).limit(1);
   if (!p) throw notFound("Patient");
+  if (p.restricted) {
+    if (!access.restrictedAccess) throw restrictedRefusal();
+    await recordRestrictedDisclosure(db, practiceId, [p.id], { apiKeyName: access.keyName }, "a patient record read through the API");
+  }
   const ins = await db
     .select({ i: patientInsurances, payerName: payers.name, payerCode: payers.payerId })
     .from(patientInsurances)
@@ -81,6 +106,7 @@ export async function getPatient(db: Db, practiceId: string, id: string) {
     .orderBy(asc(patientInsurances.rank));
   return {
     ...patientShape(p),
+    ...(p.restricted ? { restricted: true } : {}),
     balance_cents: await patientBalanceCents(db, p.id),
     insurances: ins.map(({ i, payerName, payerCode }) => ({ rank: i.rank, payer_id: i.payerId, payer_name: payerName, payer_code: payerCode, member_id: i.memberId, group_number: i.groupNumber, relationship: i.relationship, active: i.active })),
   };
@@ -143,16 +169,22 @@ export async function listClaims(db: Db, practiceId: string, params: URLSearchPa
   return paged(rows.map((r) => claimShape(r.c, { payerName: r.payerName, dateOfService: r.dos })), limit, offset);
 }
 
-export async function getClaim(db: Db, practiceId: string, id: string) {
+export async function getClaim(db: Db, practiceId: string, id: string, access: ApiAccess = NO_RESTRICTED) {
   if (!UUID.test(id)) throw notFound("Claim");
   const [row] = await db
-    .select({ c: claims, payerName: payers.name, enc: encounters })
+    .select({ c: claims, payerName: payers.name, enc: encounters, restricted: patients.restricted })
     .from(claims)
     .innerJoin(payers, eq(payers.id, claims.payerId))
     .innerJoin(encounters, eq(encounters.id, claims.encounterId))
+    .innerJoin(patients, eq(patients.id, claims.patientId))
     .where(and(eq(claims.id, id), eq(claims.practiceId, practiceId)))
     .limit(1);
   if (!row) throw notFound("Claim");
+  // A claim carries the visit's diagnoses and procedures: the patient's restriction covers it.
+  if (row.restricted) {
+    if (!access.restrictedAccess) throw restrictedRefusal();
+    await recordRestrictedDisclosure(db, practiceId, [row.c.patientId], { apiKeyName: access.keyName }, `claim ${row.c.controlNumber}, read through the API`);
+  }
   const ledgerClaimId = row.c.payerSequence === "S" && row.c.primaryClaimId ? row.c.primaryClaimId : row.c.id;
   const [lines, entries, events, dens] = await Promise.all([
     db.select().from(charges).where(eq(charges.encounterId, row.enc.id)).orderBy(asc(charges.lineNumber)),

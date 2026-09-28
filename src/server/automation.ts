@@ -26,7 +26,7 @@ import { runDailyChecks } from "./daily-checks";
 import { getFhir, syncFhir } from "./fhir";
 import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
-import { appointmentReminder, balanceReminder, langOf, payLink, visitTime } from "@/lib/i18n/messages";
+import { appointmentReminder, balanceReminder, langOf, payLink, sameDayReminder, visitTime } from "@/lib/i18n/messages";
 import { clockDay, practiceNow } from "./practice-time";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
@@ -99,6 +99,38 @@ export async function appointmentReminders(db: Db, practiceId: string, origin: s
       ...appointmentReminder(lang, practice, patient.firstName, visitTime(lang, appt.startsAt), url),
     });
     if (r.sms === "sent" || r.email === "sent") sent++;
+    else skipped++;
+  }
+  return { due: rows.length, sent, skipped };
+}
+
+/** Only visits at least this far off get a same-day reminder: nearer ones cannot usefully be moved. */
+export const SAME_DAY_LEAD_MINUTES = 60;
+
+/**
+ * The morning of the visit, a text to each patient who has not confirmed
+ * (reply C to confirm, X to cancel, which frees the time for the waitlist).
+ * Once per appointment, texts only. It goes out when the daily job runs
+ * (13:00 UTC), so on the East Coast visits before 10:00 are already too close.
+ */
+export async function sameDayReminders(db: Db, practiceId: string, now = new Date(), deps: Parameters<typeof messagePatient>[3] = {}) {
+  const clock = await practiceNow(db, practiceId, now);
+  const from = new Date(clock.getTime() + SAME_DAY_LEAD_MINUTES * 60_000);
+  const to = new Date(clockDay(clock).getTime() + 86_400_000);
+  const [practice] = await db.select().from(practices).where(eq(practices.id, practiceId)).limit(1);
+  const rows = await db
+    .select({ appt: appointments, patient: patients })
+    .from(appointments)
+    .innerJoin(patients, eq(patients.id, appointments.patientId))
+    .where(and(eq(appointments.practiceId, practiceId), eq(appointments.status, "scheduled"), isNull(appointments.confirmedAt), gte(appointments.startsAt, from), lt(appointments.startsAt, to)));
+  let sent = 0;
+  let skipped = 0;
+  for (const { appt, patient } of rows) {
+    if (await alreadySent(db, practiceId, "appointment_reminder_today", appt.id)) continue;
+    const lang = langOf(patient.preferredLanguage);
+    const time = appt.startsAt.toLocaleTimeString(lang === "es" ? "es-US" : "en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+    const r = await messagePatient(db, patient, { kind: "appointment_reminder_today", entityId: appt.id, reminder: true, sms: sameDayReminder(lang, practice, time) }, deps);
+    if (r.sms === "sent") sent++;
     else skipped++;
   }
   return { due: rows.length, sent, skipped };
@@ -192,6 +224,7 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   };
   await step("planStatuses", () => refreshPlanStatuses(db, practiceId).then(() => "refreshed"));
   if (s.appointmentReminders) await step("appointmentReminders", () => appointmentReminders(db, practiceId, origin, now));
+  if (s.sameDayReminders) await step("sameDayReminders", () => sameDayReminders(db, practiceId, now));
   if (s.balanceReminders) await step("balanceReminders", () => balanceReminders(db, practiceId, origin));
   if (s.claimFollowUp) await step("claimFollowUp", () => runFollowUp(db, practiceId));
   if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));

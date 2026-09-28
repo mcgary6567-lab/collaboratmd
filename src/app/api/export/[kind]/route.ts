@@ -7,6 +7,7 @@ import { arAging, payerPerformance } from "@/server/analytics";
 import { agencyPlacements } from "@/server/collections";
 import { getReport, runReport } from "@/server/report-builder";
 import { auditEvents } from "@/server/compliance";
+import { recordRestrictedDisclosure } from "@/server/restricted";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +29,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   const db = await getDb();
   let headers: string[];
   let rows: unknown[][];
+  // Whose records are in the file, so a restricted patient's access log shows the export.
+  let patientIds: string[] = [];
 
   if (kind === "claims") {
     const r = await searchClaims(db, session.practiceId, { q: q.q, status: q.status, payerId: q.payer, from: q.from, to: q.to, sort: q.sort, dir: q.dir, offset: 0, limit: MAX_ROWS });
     headers = ["Claim", "Patient", "MRN", "Date of service", "Payer", "Status", "Billed", "Payer claim number", "Timely filing deadline", "Submitted"];
+    patientIds = r.rows.map((x) => x.patient.id);
     rows = r.rows.map(({ claim, patient, payer, encounter }) => [
       claim.controlNumber, `${patient.lastName}, ${patient.firstName}`, patient.mrn, encounter.dateOfService, payer.name, claim.status,
       dollars(claim.totalCents), claim.payerClaimNumber, claim.timelyFilingDeadline, claim.submittedAt,
@@ -39,6 +43,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   } else if (kind === "denials") {
     const r = await searchDenials(db, session.practiceId, { q: q.q, status: q.status === "" ? undefined : q.status ?? "open", category: q.category, sort: q.sort, dir: q.dir, offset: 0, limit: MAX_ROWS });
     headers = ["Claim", "Patient", "Payer", "CARC", "RARC", "Category", "Amount", "Status", "Appeal deadline", "Received"];
+    patientIds = r.rows.map((x) => x.patient.id);
     rows = r.rows.map(({ denial, claim, patient, payer }) => [
       claim.controlNumber, `${patient.lastName}, ${patient.firstName}`, payer.name, denial.carc, denial.rarc, denial.category,
       dollars(denial.amountCents), denial.status, denial.appealDeadline, denial.createdAt,
@@ -63,11 +68,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     if (!report) return new Response("Report not found", { status: 404 });
     const r = await runReport(db, session.practiceId, report.dataset, report.config, { limit: MAX_ROWS });
     headers = r.headers.map((h) => (h.kind === "money" ? `${h.label} ($)` : h.label));
+    patientIds = r.patientIds;
     rows = r.rows.map((row) => r.headers.map((h) => (h.kind === "money" ? dollars(row[h.key] as number | null) : row[h.key])));
   } else if (kind === "collections") {
     // The agency's placement file: who to collect from and how much.
     const r = await agencyPlacements(db, session.practiceId);
     headers = ["Account", "Last name", "First name", "Date of birth", "Address", "City", "State", "ZIP", "Phone", "Email", "Agency", "Placed", "Amount placed", "Last payment"];
+    patientIds = r.map((x) => x.patient.id);
     rows = r.map(({ collection: c, patient: p, lastPayment }) => [
       p.mrn, p.lastName, p.firstName, p.dob, p.address1, p.city, p.state, p.zip, p.phone, p.email, c.agency, c.placedAt?.toISOString().slice(0, 10), dollars(c.amountCents), lastPayment,
     ]);
@@ -76,6 +83,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   }
 
   await db.insert(schema.auditLog).values({ practiceId: session.practiceId, userId: session.userId, action: "export", entity: kind, entityId: null, details: { rows: rows.length, filters: q } });
+  await recordRestrictedDisclosure(db, session.practiceId, patientIds, { userId: session.userId }, `the ${kind.replace("-", " ")} export (CSV)`);
   const date = new Date().toISOString().slice(0, 10);
   return new Response(toCsv(headers, rows), {
     headers: {

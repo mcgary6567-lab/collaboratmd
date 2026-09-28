@@ -15,7 +15,7 @@ export type RevealResult = { ok: boolean; message: string; secret?: string } | u
 export async function createApiKeyAction(_prev: RevealResult, formData: FormData): Promise<RevealResult> {
   const s = await requireRole(["admin"]);
   try {
-    const { key } = await createApiKey(await getDb(), s.practiceId, String(formData.get("name") ?? ""), String(formData.get("scope") ?? "read") as ApiScope, s.userId);
+    const { key } = await createApiKey(await getDb(), s.practiceId, String(formData.get("name") ?? ""), String(formData.get("scope") ?? "read") as ApiScope, s.userId, { restrictedAccess: formData.get("restrictedAccess") === "on" });
     revalidatePath(PATH);
     return { ok: true, message: "Copy this key now; it will not be shown again.", secret: key };
   } catch (e) {

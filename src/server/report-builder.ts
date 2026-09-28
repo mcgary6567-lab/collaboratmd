@@ -193,7 +193,12 @@ export type ReportResult = {
   totals: Record<string, number>;
   truncated: boolean;
   rowCount: number;
+  /** The patients named in the rows (when the report shows the patient or MRN), for the access log. */
+  patientIds: string[];
 };
+
+/** Columns that say who the patient is. Groupings never do. */
+const IDENTIFYING = ["patient", "mrn"];
 
 export async function runReport(db: Db, practiceId: string, dataset: string, input: Partial<ReportConfig>, opts: { limit?: number; now?: Date } = {}): Promise<ReportResult> {
   const ds = DATASETS[dataset];
@@ -217,15 +222,17 @@ export async function runReport(db: Db, practiceId: string, dataset: string, inp
     const headers = [{ key: "group", label: g.label, kind: "text" as Kind }, { key: "count", label: "Count", kind: "number" as Kind }, ...sums.map((c) => ({ key: c, label: `${ds.columns[c].label} (total)`, kind: "money" as Kind }))];
     const clean: Record<string, string | number | null>[] = rows.slice(0, limit).map((r) => ({ group: r.group === null ? "(none)" : String(r.group), count: Number(r.count), ...Object.fromEntries(sums.map((c) => [c, Number(r[c] ?? 0)])) }));
     const totals = Object.fromEntries(["count", ...sums].map((k) => [k, clean.reduce((a, r) => a + Number(r[k] ?? 0), 0)]));
-    return { headers, rows: clean, totals, truncated: rows.length > limit, rowCount: clean.length };
+    return { headers, rows: clean, totals, truncated: rows.length > limit, rowCount: clean.length, patientIds: [] };
   }
 
-  const select = cfg.columns.map((c) => sql.raw(`${ds.columns[c].expr} AS "${c}"`));
+  // Every dataset joins the patient as pt: its id rides along (not shown) so exports can record whose rows went out.
+  const select = [...cfg.columns.map((c) => sql.raw(`${ds.columns[c].expr} AS "${c}"`)), sql.raw(`pt.id AS "__patient"`)];
   const { rows } = await db.execute<Record<string, string | number | null>>(sql`SELECT ${sql.join(select, sql`, `)} FROM ${sql.raw(ds.from)} WHERE ${whereSql} ORDER BY ${sql.raw(ds.date)} DESC LIMIT ${limit + 1}`);
   const headers = cfg.columns.map((c) => ({ key: c, label: ds.columns[c].label, kind: ds.columns[c].kind }));
   const clean = rows.slice(0, limit).map((r) => Object.fromEntries(cfg.columns.map((c) => [c, cell(ds.columns[c].kind, r[c])])));
   const totals = Object.fromEntries(money.map((c) => [c, clean.reduce((a, r) => a + Number(r[c] ?? 0), 0)]));
-  return { headers, rows: clean, totals, truncated: rows.length > limit, rowCount: clean.length };
+  const patientIds = cfg.columns.some((c) => IDENTIFYING.includes(c)) ? [...new Set(rows.slice(0, limit).map((r) => String(r.__patient)))] : [];
+  return { headers, rows: clean, totals, truncated: rows.length > limit, rowCount: clean.length, patientIds };
 }
 
 /* ------------------------------ Saved reports ------------------------------ */

@@ -38,7 +38,7 @@ export default async function DataExportPage() {
               </>
             ) : (
               <>
-                <a href="/api/export/practice" className="btn btn-primary">Download everything</a>
+                <a href="/api/export/practice" download className="btn btn-primary">Download everything</a>
                 <p className="text-xs text-slate-500">Large practices can take a few minutes. Keep this tab open until the download finishes.</p>
               </>
             )}

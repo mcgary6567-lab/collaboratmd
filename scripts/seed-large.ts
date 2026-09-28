@@ -177,7 +177,7 @@ async function main() {
   const patientIds: string[] = [];
   const insuranceIds: string[] = [];
   const insurancePayerIdx: number[] = [];
-  let pStart = Date.now();
+  const pStart = Date.now();
   for (let offset = 0; offset < PATIENT_COUNT; offset += 5000) {
     const count = Math.min(5000, PATIENT_COUNT - offset);
     const pRows: unknown[][] = [];

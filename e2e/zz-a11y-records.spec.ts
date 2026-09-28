@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { check, signIn } from "./helpers";
+import { check, DEMO_ADMIN, signIn } from "./helpers";
 
 /**
  * Accessibility of the screens that only exist once there is a record to show:
@@ -85,6 +85,7 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   if (await gate.isVisible()) {
     // Left restricted by an earlier attempt (a retry, or a kept local database): open it and lift that first.
     await page.getByLabel("Reason").fill("Undoing the restriction an earlier test run left");
+    await page.getByLabel("Your password").fill(DEMO_ADMIN.password);
     await page.getByRole("button", { name: "Open the record" }).click();
     await page.getByRole("button", { name: "Remove restriction" }).click();
     await expect(page.getByRole("button", { name: "Restrict", exact: true })).toBeVisible();
@@ -94,6 +95,7 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   await expect(gate).toBeVisible();
   problems.push(...(await check(page, patient!)).map((x) => `${x} (restricted record gate)`));
   await page.getByLabel("Reason").fill("Checking the gate works in the accessibility test");
+  await page.getByLabel("Your password").fill(DEMO_ADMIN.password);
   await page.getByRole("button", { name: "Open the record" }).click();
   await expect(page.getByRole("button", { name: "Remove restriction" })).toBeVisible();
   await page.getByRole("button", { name: "Remove restriction" }).click();

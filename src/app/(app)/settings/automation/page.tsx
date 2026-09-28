@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 const OPTIONS = [
   { key: "appointmentReminders", label: "Appointment reminders", help: "The day before each visit, with an online check-in link. By text (patients who consented) and email." },
+  { key: "sameDayReminders", label: "Same-day reminder if not confirmed", help: "The morning of the visit, a text to patients who have not replied C. Goes out when the daily run happens (13:00 UTC, 9:00 in New York), so visits within the hour after that are skipped. A patient who replies X frees the time for the waitlist." },
   { key: "balanceReminders", label: "Balance reminders", help: "A secure pay link to patients who owe $25 or more, two weeks after a statement, at most once a month. Skips patients on a payment plan." },
   { key: "claimFollowUp", label: "Unpaid claim follow-up", help: "Asks payers the status (276/277) of claims unpaid after 30 days, at most once a week per claim." },
   { key: "autopay", label: "Autopay", help: "Charges saved cards for payment-plan installments on their due dates. Needs Stripe." },

@@ -9,7 +9,7 @@
  * practice connects its own outside account carries a tag saying which.
  */
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import {
   BadgeCheck, CalendarDays, Check, CreditCard, FileSearch, Gauge, MessageSquareText, Pause, Play, ScanLine, Wand2,
 } from "lucide-react";
@@ -250,17 +250,23 @@ const STAGES: Stage[] = [
 ];
 
 const AUTOPLAY_MS = 7000;
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+function subscribeReducedMotion(onChange: () => void) {
+  const q = window.matchMedia(REDUCED_MOTION);
+  q.addEventListener("change", onChange);
+  return () => q.removeEventListener("change", onChange);
+}
 
 export function FeatureTour() {
   const [active, setActive] = useState(0);
   // The tour plays itself until the visitor takes over, and never for people who asked for reduced motion.
-  const [playing, setPlaying] = useState(false);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia(REDUCED_MOTION).matches, () => true);
+  // Play or pause, once the visitor has chosen; until then it plays unless they asked for reduced motion.
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const playing = chosen ?? !reducedMotion;
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const stage = STAGES[active];
 
-  useEffect(() => {
-    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setPlaying(true);
-  }, []);
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => setActive((a) => (a + 1) % STAGES.length), AUTOPLAY_MS);
@@ -268,7 +274,7 @@ export function FeatureTour() {
   }, [playing]);
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    setPlaying(false);
+    setChosen(false);
     const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!delta) return;
     e.preventDefault();
@@ -292,7 +298,7 @@ export function FeatureTour() {
               aria-selected={on}
               aria-controls={`tour-panel-${s.key}`}
               tabIndex={on ? 0 : -1}
-              onClick={() => { setActive(i); setPlaying(false); }}
+              onClick={() => { setActive(i); setChosen(false); }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
                 on ? "border-green-600 bg-green-700 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700"
               }`}
@@ -304,7 +310,7 @@ export function FeatureTour() {
       </div>
 
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" onClick={() => setPlaying((p) => !p)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-green-700" aria-label={playing ? "Pause the tour" : "Play the tour"}>
+        <button type="button" onClick={() => setChosen(!playing)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-green-700" aria-label={playing ? "Pause the tour" : "Play the tour"}>
           {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />} {playing ? "Pause tour" : "Play tour"}
         </button>
         <div className="flex gap-1" aria-hidden>
@@ -313,7 +319,7 @@ export function FeatureTour() {
       </div>
 
       <div
-        onPointerEnter={() => setPlaying(false)}
+        onPointerEnter={() => setChosen(false)}
         role="tabpanel"
         id={`tour-panel-${stage.key}`}
         aria-labelledby={`tour-tab-${stage.key}`}

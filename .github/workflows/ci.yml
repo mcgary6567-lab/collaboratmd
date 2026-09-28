@@ -1,4 +1,4 @@
-# Every push and pull request: type check, unit tests, production build and
+# Every push and pull request: type check, lint, unit tests, production build and
 # end-to-end tests. Everything runs on an embedded database; no secrets or
 # production services are used. Protect main so merges need these to pass.
 name: CI
@@ -40,6 +40,8 @@ jobs:
       - name: No known high or critical vulnerabilities in dependencies
         run: npm audit --audit-level=high
       - run: npm run typecheck
+      - name: Lint (React and Next.js rules, no warnings allowed)
+        run: npm run lint
       - name: Migrations bundle is up to date
         run: node scripts/build-migrations.mjs && git diff --exit-code src/db/migrations.ts
       - run: npx vitest run
@@ -78,6 +80,45 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-results
+          path: test-results/
+          retention-days: 7
+
+  time-of-day:
+    # Appointment times are clock times at the practice, and several bugs only showed in the
+    # practice's evening, when UTC is already on the next day. The time-sensitive flows run with
+    # the server's clock moved (libfaketime) to the practice's morning, evening and just after
+    # its midnight. Daylight-saving changeovers are covered by the unit tests (practice-time.test.ts).
+    name: Time of day (${{ matrix.at }} New York)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        at: ["07:30", "21:30", "00:30"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq faketime
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Move the server's clock to ${{ matrix.at }} in New York
+        run: |
+          n=$(node scripts/clock-offset.mjs "${{ matrix.at }}" America/New_York)
+          echo "E2E_CLOCK_OFFSET_MIN=$n" >> "$GITHUB_ENV"
+          # Check libfaketime moves Node's clock as expected before relying on it.
+          FAKETIME_DONT_FAKE_MONOTONIC=1 faketime -f "+${n}m" node -e "
+            const d = Date.now() - ${n} * 60000 - Number(process.argv[1]) * 1000;
+            console.log('server clock will read', new Date(Date.now()).toLocaleString('en-US', { timeZone: 'America/New_York' }), 'in New York');
+            if (Math.abs(d) > 120000) { console.error('faketime did not move the clock by the expected amount:', d, 'ms off'); process.exit(1); }" "$(date +%s)"
+      - run: npx playwright test e2e/clock.spec.ts e2e/booking.spec.ts e2e/money-path.spec.ts e2e/zz-a11y-records.spec.ts
+      - name: Keep traces of failures
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results-${{ strategy.job-index }}
           path: test-results/
           retention-days: 7
 

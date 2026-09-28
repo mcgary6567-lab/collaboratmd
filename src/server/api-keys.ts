@@ -14,13 +14,14 @@ const { apiKeys, auditLog, practices } = schema;
 export type ApiScope = "read" | "write";
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 
-export async function createApiKey(db: Db, practiceId: string, name: string, scope: ApiScope, userId?: string) {
+export async function createApiKey(db: Db, practiceId: string, name: string, scope: ApiScope, userId?: string, opts: { restrictedAccess?: boolean } = {}) {
   const label = name.trim().slice(0, 80);
   if (!label) throw new Error("Name the key after what will use it, such as \"Epic integration\"");
   if (scope !== "read" && scope !== "write") throw new Error("Choose read or write access");
   const key = `cmd_live_${randomBytes(24).toString("base64url")}`;
-  const [row] = await db.insert(apiKeys).values({ practiceId, name: label, prefix: key.slice(0, 16), keyHash: hash(key), scope, createdBy: userId ?? null }).returning();
-  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "api_key_created", entity: "api_key", entityId: row.id, details: { name: label, scope } });
+  const restrictedAccess = opts.restrictedAccess === true;
+  const [row] = await db.insert(apiKeys).values({ practiceId, name: label, prefix: key.slice(0, 16), keyHash: hash(key), scope, restrictedAccess, createdBy: userId ?? null }).returning();
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "api_key_created", entity: "api_key", entityId: row.id, details: { name: label, scope, restrictedAccess } });
   return { key, row };
 }
 
@@ -31,20 +32,21 @@ export async function revokeApiKey(db: Db, practiceId: string, id: string, userI
 
 export async function listApiKeys(db: Db, practiceId: string) {
   return db
-    .select({ id: apiKeys.id, name: apiKeys.name, prefix: apiKeys.prefix, scope: apiKeys.scope, createdAt: apiKeys.createdAt, lastUsedAt: apiKeys.lastUsedAt, revokedAt: apiKeys.revokedAt })
+    .select({ id: apiKeys.id, name: apiKeys.name, prefix: apiKeys.prefix, scope: apiKeys.scope, restrictedAccess: apiKeys.restrictedAccess, createdAt: apiKeys.createdAt, lastUsedAt: apiKeys.lastUsedAt, revokedAt: apiKeys.revokedAt })
     .from(apiKeys)
     .where(eq(apiKeys.practiceId, practiceId))
     .orderBy(desc(apiKeys.createdAt));
 }
 
-export type ApiCaller = { keyId: string; practiceId: string; practiceName: string; scope: ApiScope };
+/** Who is calling: the key (its name is shown on access logs) and what it may do. */
+export type ApiCaller = { keyId: string; keyName: string; practiceId: string; practiceName: string; scope: ApiScope; restrictedAccess: boolean };
 
 /** Resolves "Authorization: Bearer cmd_live_…" to the practice it belongs to, or null. */
 export async function authenticateApiKey(db: Db, header: string | null): Promise<ApiCaller | null> {
   const key = header?.replace(/^Bearer\s+/i, "").trim();
   if (!key?.startsWith("cmd_live_") || key.length > 100) return null;
   const [row] = await db
-    .select({ id: apiKeys.id, practiceId: apiKeys.practiceId, scope: apiKeys.scope, lastUsedAt: apiKeys.lastUsedAt, practiceName: practices.name })
+    .select({ id: apiKeys.id, name: apiKeys.name, practiceId: apiKeys.practiceId, scope: apiKeys.scope, restrictedAccess: apiKeys.restrictedAccess, lastUsedAt: apiKeys.lastUsedAt, practiceName: practices.name })
     .from(apiKeys)
     .innerJoin(practices, eq(practices.id, apiKeys.practiceId))
     .where(and(eq(apiKeys.keyHash, hash(key)), isNull(apiKeys.revokedAt)))
@@ -54,7 +56,7 @@ export async function authenticateApiKey(db: Db, header: string | null): Promise
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
     await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, row.id));
   }
-  return { keyId: row.id, practiceId: row.practiceId, practiceName: row.practiceName, scope: row.scope as ApiScope };
+  return { keyId: row.id, keyName: row.name, practiceId: row.practiceId, practiceName: row.practiceName, scope: row.scope as ApiScope, restrictedAccess: row.restrictedAccess };
 }
 
 /** A per-key budget of requests per minute, per server instance. */

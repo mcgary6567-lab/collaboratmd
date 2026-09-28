@@ -71,6 +71,10 @@ export async function patientAccessLog(db: Db, practiceId: string, patientId: st
     const via = (log.details as { via?: string } | null)?.via;
     const reason = (log.details as { reason?: string } | null)?.reason;
     if (log.action === "restricted_record_opened") return { at: log.at, who: name ? `${name}${email ? ` <${email}>` : ""}` : "A former user", what: `Opened the restricted record. Reason: ${reason ?? "(none recorded)"}`, action: log.action };
+    if (log.action === "restricted_record_disclosed") {
+      const d = log.details as { how?: string; apiKey?: string } | null;
+      return { at: log.at, who: name ? `${name}${email ? ` <${email}>` : ""}` : d?.apiKey ? `API key "${d.apiKey}"` : "A former user", what: `Included in ${d?.how ?? "an export"}`, action: log.action };
+    }
     const what = log.action === "patient_viewed"
       ? `Opened the ${via === "chart" ? "chart" : via ?? "record"}`
       : LABELS[log.action] ?? log.action.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) + (log.entity !== "patient" ? ` (${log.entity})` : "");

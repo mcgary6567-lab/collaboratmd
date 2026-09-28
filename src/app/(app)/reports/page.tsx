@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { arAging, payerPerformance, providerProductivity, denialReasons } from "@/server/analytics";
@@ -5,17 +6,19 @@ import { Card, PageHeader, Money, Empty } from "@/components/ui";
 import { PrintButton } from "@/components/action-form";
 import { compactMoney, pct } from "@/components/kpi";
 import { AgingChart, PayerMixChart } from "@/components/charts";
+import { appointmentOutcomes } from "@/server/appointment-outcomes";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [ar, payers, providers, denials] = await Promise.all([
+  const [ar, payers, providers, denials, outcomes] = await Promise.all([
     arAging(db, s.practiceId),
     payerPerformance(db, s.practiceId, 20),
     providerProductivity(db, s.practiceId, 25),
     denialReasons(db, s.practiceId, 12),
+    appointmentOutcomes(db, s.practiceId),
   ]);
   const share = (part: number, whole: number) => (whole ? pct(part / whole, 1) : "-");
 
@@ -26,12 +29,12 @@ export default async function ReportsPage() {
         subtitle="Accounts receivable, payer performance and provider productivity"
         actions={
           <span className="no-print flex flex-wrap gap-2">
-            <a href="/reports/builder" className="btn btn-primary text-xs">Report builder</a>
-            <a href="/reports/forecast" className="btn btn-secondary text-xs">Cash forecast</a>
-            <a href="/reports/payer-alerts" className="btn btn-secondary text-xs">Payer alerts</a>
-            <a href="/reports/locations" className="btn btn-secondary text-xs">By location</a>
-            <a href="/api/export/ar-aging" className="btn btn-secondary text-xs">A/R aging CSV</a>
-            <a href="/api/export/payer-performance" className="btn btn-secondary text-xs">Payer performance CSV</a>
+            <Link href="/reports/builder" className="btn btn-primary text-xs">Report builder</Link>
+            <Link href="/reports/forecast" className="btn btn-secondary text-xs">Cash forecast</Link>
+            <Link href="/reports/payer-alerts" className="btn btn-secondary text-xs">Payer alerts</Link>
+            <Link href="/reports/locations" className="btn btn-secondary text-xs">By location</Link>
+            <a href="/api/export/ar-aging" download className="btn btn-secondary text-xs">A/R aging CSV</a>
+            <a href="/api/export/payer-performance" download className="btn btn-secondary text-xs">Payer performance CSV</a>
             <PrintButton label="Print or save as PDF" />
           </span>
         }
@@ -137,6 +140,25 @@ export default async function ReportsPage() {
               ))}
             </tbody>
           </table></div>
+        </Card>
+        <Card title={`Confirmations and no-shows (last ${outcomes.days} days)`}>
+          <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
+            <thead><tr><th>Patients who</th><th className="text-right">Visits</th><th className="text-right">No-shows</th><th className="text-right">Rate</th></tr></thead>
+            <tbody>
+              {outcomes.rows.map((r) => (
+                <tr key={r.group}>
+                  <td>{r.group === "confirmed" ? "Confirmed by text" : "Did not confirm"}</td>
+                  <td className="text-right tabular-nums">{r.visits.toLocaleString()}</td>
+                  <td className="text-right tabular-nums">{r.noShows.toLocaleString()}</td>
+                  <td className="text-right font-semibold tabular-nums">{r.rate === null ? "-" : pct(r.rate, 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+          <p className="mt-3 text-xs text-slate-500">
+            {outcomes.offered ? `${outcomes.filled} of ${outcomes.offered} cancelled times offered to the waitlist were filled. ` : ""}
+            A comparison, not proof: patients who confirm were likelier to come anyway. A wide gap says the unconfirmed are worth a call the day before.
+          </p>
         </Card>
       </div>
     </>

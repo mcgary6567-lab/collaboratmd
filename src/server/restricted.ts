@@ -9,7 +9,7 @@
  * (patients, claims, the schedule) still show the name, so the front desk and
  * billers can find and work the account; exports and the API are not gated.
  */
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { notify } from "./notifications";
@@ -50,6 +50,44 @@ export async function setRestricted(db: Db, practiceId: string, patientId: strin
   const r = await db.update(patients).set({ restricted }).where(and(eq(patients.id, patientId), eq(patients.practiceId, practiceId))).returning();
   if (!r.length) throw new Error("Patient not found");
   await db.insert(auditLog).values({ practiceId, userId, action: restricted ? "patient_restricted" : "patient_unrestricted", entity: "patient", entityId: patientId });
+}
+
+/**
+ * Records that restricted patients' records left the app (an export, or a read through the API):
+ * an entry on each one's access log, and one notification to the administrators, naming who
+ * and how but not the patients. Patients who are not restricted are left alone (exports are
+ * already in the audit log). Returns how many were restricted.
+ */
+export async function recordRestrictedDisclosure(
+  db: Db,
+  practiceId: string,
+  patientIds: string[],
+  by: { userId?: string; apiKeyName?: string },
+  how: string,
+) {
+  const unique = [...new Set(patientIds)];
+  if (!unique.length) return 0;
+  const hit: string[] = [];
+  for (let i = 0; i < unique.length; i += 1000) {
+    const rows = await db.select({ id: patients.id }).from(patients).where(and(eq(patients.practiceId, practiceId), eq(patients.restricted, true), inArray(patients.id, unique.slice(i, i + 1000))));
+    hit.push(...rows.map((r) => r.id));
+  }
+  if (!hit.length) return 0;
+  await db.insert(auditLog).values(hit.map((id) => ({ practiceId, userId: by.userId ?? null, action: "restricted_record_disclosed", entity: "patient", entityId: id, details: by.apiKeyName ? { how, apiKey: by.apiKeyName } : { how } })));
+  const [u] = by.userId ? await db.select({ name: users.name }).from(users).where(eq(users.id, by.userId)).limit(1) : [];
+  const who = u?.name ?? (by.apiKeyName ? `the API key "${by.apiKeyName}"` : "a team member");
+  await notify(db, practiceId, {
+    kind: "restricted_record",
+    title: hit.length === 1 ? "A restricted patient's records left the app" : `${hit.length} restricted patients' records left the app`,
+    body: `In ${how}, by ${who}. Each patient's access log shows it.`,
+    href: "/settings/audit",
+  });
+  return hit.length;
+}
+
+/** Every restricted patient in the practice (for exports that include everyone). */
+export async function restrictedPatientIds(db: Db, practiceId: string) {
+  return (await db.select({ id: patients.id }).from(patients).where(and(eq(patients.practiceId, practiceId), eq(patients.restricted, true)))).map((r) => r.id);
 }
 
 export async function restrictedCount(db: Db, practiceId: string) {

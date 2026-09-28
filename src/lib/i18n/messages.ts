@@ -97,6 +97,30 @@ export function portalLink(lang: Lang, p: Practice, firstName: string, purpose: 
 }
 
 /** Replies to a patient's C (confirm) or X (cancel) text. "CANCEL" itself is a carrier opt-out word, so X is used. */
+/** The morning of the visit, to a patient who has not confirmed. SMS only (email would arrive too late to matter). */
+export function sameDayReminder(lang: Lang, p: Practice, when: string) {
+  return lang === "es"
+    ? `${p.name}: le esperamos hoy, ${when}. Responda C para confirmar o X si no puede venir. Responda STOP para no recibir más mensajes.`
+    : `${p.name}: we expect you today, ${when}. Reply C to confirm or X if you cannot come. Reply STOP to opt out.`;
+}
+
+/** A time freed by a cancellation, offered to a patient on the waitlist. B, not YES: carriers treat YES as an opt-in word. */
+export function waitlistOffer(lang: Lang, p: Practice, when: string, provider: string) {
+  return lang === "es"
+    ? `${p.name}: se abrió un horario el ${when} con ${provider}. Responda B para reservarlo; el primero en responder lo obtiene. Responda STOP para no recibir más mensajes.`
+    : `${p.name}: a time opened ${when} with ${provider}. Reply B to book it; the first to reply gets it. Reply STOP to opt out.`;
+}
+export function replyBooked(lang: Lang, p: Practice, when: string) {
+  return lang === "es"
+    ? `${p.name}: listo, su cita es el ${when}. Responda X si necesita cancelarla.`
+    : `${p.name}: you are booked for ${when}. Reply X if you need to cancel.`;
+}
+export function replyTaken(lang: Lang, p: Practice) {
+  return lang === "es"
+    ? `${p.name}: lo sentimos, ese horario ya se reservó. Sigue en nuestra lista de espera y le avisaremos del próximo.`
+    : `${p.name}: sorry, that time was just taken. You are still on our waitlist, and we will text you the next one.`;
+}
+
 export function replyConfirmed(lang: Lang, p: Practice, when: string) {
   return lang === "es"
     ? `${p.name}: gracias, su cita del ${when} está confirmada.`

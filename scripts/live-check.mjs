@@ -44,20 +44,38 @@ async function run(check) {
   }
 }
 
-let results = await Promise.all(CHECKS.map(run));
-const failed = results.filter((r) => r.problem).map((r) => r.path);
-if (failed.length) {
-  await new Promise((res) => setTimeout(res, RETRY_AFTER_MS));
-  const again = await Promise.all(CHECKS.filter((c) => failed.includes(c.path)).map(run));
-  results = results.map((r) => again.find((a) => a.path === r.path) ?? r);
-}
-for (const r of results) console.log(`${r.problem ? "FAIL" : "ok  "} ${r.path} ${r.ms} ms${r.problem ? `: ${r.problem}` : ""}`);
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-const bad = results.filter((r) => r.problem);
-if (bad.length) {
-  const text = `CollaboratMD live check failed at ${base}: ${bad.map((r) => `${r.path} (${r.problem})`).join("; ")}`;
-  const hook = process.env.OPS_ALERT_WEBHOOK_URL;
-  if (hook) await fetch(hook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) }).catch((e) => console.error("alert webhook failed:", e.message));
-  console.error(text);
-  process.exit(1);
+async function checkOnce() {
+  let results = await Promise.all(CHECKS.map(run));
+  const failed = results.filter((r) => r.problem).map((r) => r.path);
+  if (failed.length) {
+    await sleep(RETRY_AFTER_MS);
+    const again = await Promise.all(CHECKS.filter((c) => failed.includes(c.path)).map(run));
+    results = results.map((r) => again.find((a) => a.path === r.path) ?? r);
+  }
+  console.log(new Date().toISOString());
+  for (const r of results) console.log(`${r.problem ? "FAIL" : "ok  "} ${r.path} ${r.ms} ms${r.problem ? `: ${r.problem}` : ""}`);
+
+  const bad = results.filter((r) => r.problem);
+  if (bad.length) {
+    const text = `CollaboratMD live check failed at ${base}: ${bad.map((r) => `${r.path} (${r.problem})`).join("; ")}`;
+    const hook = process.env.OPS_ALERT_WEBHOOK_URL;
+    if (hook) await fetch(hook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) }).catch((e) => console.error("alert webhook failed:", e.message));
+    console.error(text);
+    process.exit(1);
+  }
+}
+
+// Once by default. With LIVE_WATCH_MINUTES, keeps checking every LIVE_EVERY_MINUTES (5) until that
+// time is up, and stops at the first failure (which alerts): the scheduled workflow uses this, since
+// GitHub starts scheduled runs hours apart at busy times.
+const watchMs = Number(process.env.LIVE_WATCH_MINUTES ?? 0) * 60_000;
+const everyMs = Number(process.env.LIVE_EVERY_MINUTES ?? 5) * 60_000;
+const until = Date.now() + watchMs;
+for (;;) {
+  const started = Date.now();
+  await checkOnce();
+  if (Date.now() + everyMs > until) break;
+  await sleep(Math.max(0, everyMs - (Date.now() - started)));
 }

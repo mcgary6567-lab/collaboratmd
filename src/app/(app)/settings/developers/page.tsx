@@ -14,11 +14,11 @@ export const dynamic = "force-dynamic";
 
 const ENDPOINTS = [
   { method: "GET", path: "/api/v1", scope: "read", what: "Check a key: returns the practice it belongs to" },
-  { method: "GET", path: "/api/v1/patients?q=&limit=&offset=", scope: "read", what: "List or search patients" },
-  { method: "GET", path: "/api/v1/patients/{id}", scope: "read", what: "A patient with insurance and balance" },
+  { method: "GET", path: "/api/v1/patients?q=&limit=&offset=", scope: "read", what: "List or search patients (restricted patients: { id, restricted: true } only, unless the key may read them)" },
+  { method: "GET", path: "/api/v1/patients/{id}", scope: "read", what: "A patient with insurance and balance (403 restricted for a restricted patient, unless the key may read them)" },
   { method: "POST", path: "/api/v1/patients", scope: "write", what: "Create a patient with primary insurance" },
   { method: "GET", path: "/api/v1/claims?status=&updated_since=&patient_id=", scope: "read", what: "List claims, newest change first" },
-  { method: "GET", path: "/api/v1/claims/{id}", scope: "read", what: "A claim with lines, money, denials and history" },
+  { method: "GET", path: "/api/v1/claims/{id}", scope: "read", what: "A claim with lines, money, denials and history (403 restricted, as for the patient)" },
   { method: "POST", path: "/api/v1/encounters", scope: "write", what: "Send charges; returns the scrubbed claim" },
   { method: "GET", path: "/api/v1/denials?status=", scope: "read", what: "Denials with plain-English explanations" },
   { method: "GET", path: "/api/v1/payments?since=", scope: "read", what: "Insurance and patient payments posted" },
@@ -64,6 +64,10 @@ export default async function DevelopersPage() {
               <label className="block text-sm"><span className="label">Access</span>
                 <select name="scope" className="input"><option value="read">Read only</option><option value="write">Read and write</option></select>
               </label>
+              <label className="flex basis-full items-start gap-2 text-xs text-slate-600">
+                <input type="checkbox" name="restrictedAccess" className="mt-0.5" />
+                <span>Can read restricted patients. Without this, they appear in lists as an id only and their records are refused. Each read is recorded on the patient&apos;s access log.</span>
+              </label>
             </RevealForm>
           )}
           {keys.length === 0 ? <Empty>No API keys yet.</Empty> : (
@@ -74,7 +78,7 @@ export default async function DevelopersPage() {
                   <tr key={k.id} className={k.revokedAt ? "opacity-50" : ""}>
                     <td>{k.name}</td>
                     <td className="font-mono text-xs">{k.prefix}…</td>
-                    <td><Badge tone={k.scope === "write" ? "amber" : "slate"}>{k.scope}</Badge></td>
+                    <td><Badge tone={k.scope === "write" ? "amber" : "slate"}>{k.scope}</Badge>{k.restrictedAccess && <> <Badge tone="red">restricted patients</Badge></>}</td>
                     <td className="text-xs">{k.revokedAt ? `revoked ${fmtDateTime(k.revokedAt)}` : k.lastUsedAt ? fmtDateTime(k.lastUsedAt) : "never"}</td>
                     <td>{admin && !k.revokedAt && <ActionForm action={revokeApiKeyAction.bind(null, k.id)}><SubmitButton className="text-xs text-red-700 underline" pendingLabel="...">Revoke</SubmitButton></ActionForm>}</td>
                   </tr>

@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ practic
   if (fields.AccountSid && fields.AccountSid !== twilio.accountSid) return new Response("Wrong account", { status: 403 });
 
   const r = await receiveSms(db, practiceId, fields);
-  // A reply to C or X (confirm or cancel the appointment) goes back in Twilio's answer.
+  // A reply to C, X or B (confirm, cancel, or take a waitlist opening) goes back in Twilio's answer.
   const twiml = r.stored && r.reply ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${xml(r.reply.text)}</Message></Response>` : EMPTY_TWIML;
   return new Response(twiml, { headers: { "Content-Type": "text/xml" } });
 }

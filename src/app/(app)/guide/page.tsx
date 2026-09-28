@@ -20,6 +20,7 @@ const ROLES: Role[] = [
         { text: <>Open <L href="/scheduling">Scheduling</L>. Confirm or decline any <b>online requests waiting</b> at the top; the patient is told either way.</> },
         { text: <>Press <b>Verify coverage for this day</b> so each patient&apos;s insurance is checked before they arrive. Anything inactive shows on the row.</> },
         { text: <>Appointments marked <b>Confirmed by text</b> were confirmed by the patient replying C to their reminder. A patient who replies X is cancelled automatically and you get a notification.</> },
+        { text: <>A time a patient cancels is texted to the <b>waitlist</b> (below the schedule); the first to reply B is booked into it and you get a notification. When someone cancels by phone, press <b>Cancel</b> on their row, then <b>Offer to waitlist</b>.</> },
       ] },
       { title: "Before and during visits", steps: [
         { text: <>Send an <b>online check-in</b> link from the schedule row (reminders the day before include one when automation is on). Review what patients sent in <L href="/check-ins">Online check-ins</L>.</> },
@@ -27,7 +28,8 @@ const ROLES: Role[] = [
         { text: <>When the patient arrives, press <b>Check in</b> on the schedule. Take the copay on the patient&apos;s page (<b>Post payment</b>), or on the card reader when one is connected.</> },
       ] },
       { title: "Through the day", steps: [
-        { text: <>Answer patients in <L href="/messages">Text messages</L>. STOP, START, C and X are handled automatically.</> },
+        { text: <>Answer patients in <L href="/messages">Text messages</L>. STOP, START, C, X and B are handled automatically.</> },
+        { text: <>A patient who wants an earlier time: <b>Add to the waitlist</b> on their page (any provider, or one).</> },
         { text: <>Add new patients from <L href="/patients/new">Patients &gt; New patient</L>, or a whole list with <L href="/import">Import</L>. Record a patient&apos;s language on their page so their statements and texts are in it.</> },
         { text: <>Press Ctrl+K (Cmd+K on a Mac) to find any patient, claim or page.</> },
       ] },
@@ -57,7 +59,7 @@ const ROLES: Role[] = [
     parts: [
       { title: "Each day", steps: [
         { text: <>Read the notifications (the bell). They include payer problems, expiring credentials, restricted records opened and unusual chart access.</> },
-        { text: <><L href="/settings/access-review">Chart access review</L> shows who opened how many charts and flags anything unusual. A flag is a prompt to ask, not a finding.</> },
+        { text: <><L href="/settings/access-review">Chart access review</L> shows who opened how many charts and flags anything unusual. A flag is a prompt to ask, not a finding: ask, then <b>Record the review</b>. Set the limits there to what is normal for your staff.</> },
       ] },
       { title: "Each week", steps: [
         { text: <><L href="/admin">Practice analytics</L>: collections, days in A/R, denial rate and clean claim rate against their targets.</> },
