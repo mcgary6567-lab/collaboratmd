@@ -54,21 +54,35 @@ body {
   background: #f8fafc;
 }
 
-.input,
-.select,
-.textarea {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.65rem;
-  font-size: 0.875rem;
-  background: #fff;
-}
-.input:focus,
-.select:focus,
-.textarea:focus {
-  outline: 2px solid #bfdbfe;
-  border-color: #60a5fa;
+/*
+ * Form fields sit in the components layer so utility classes on them win:
+ * w-28, w-auto, py-1, text-xs and the like. (Unlayered, these rules used to
+ * override every such class, so a field meant to be narrow filled its cell.)
+ */
+@layer components {
+  .input,
+  .select,
+  .textarea {
+    /* A block, as when it always filled the line: a label's text stays above its field whatever the field's width. */
+    display: block;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.875rem;
+    background: #fff;
+  }
+  .input:focus,
+  .select:focus,
+  .textarea:focus {
+    outline: 2px solid #bfdbfe;
+    border-color: #60a5fa;
+  }
+  /* In a table cell a dropdown takes the width of its choices, not of the cell: the table scrolls instead. */
+  .table select.input,
+  .table select.select {
+    width: auto;
+  }
 }
 .label {
   display: block;
@@ -250,11 +264,11 @@ body {
   .card {
     min-width: 0;
   }
-  /* .input sets width: 100%, so in a narrow table cell a dropdown would shrink to its arrow. Not on phones, where rows are narrower than that. */
+  /* .input sets width: 100%, so squeezed in a row a dropdown would shrink to its arrow. Never wider than its own cell, though. Not on phones, where rows are narrower than that. */
   @media (min-width: 640px) {
     select.input,
     select.select {
-      min-width: 9rem;
+      min-width: min(9rem, 100%);
     }
   }
 }

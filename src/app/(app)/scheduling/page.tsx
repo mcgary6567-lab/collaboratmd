@@ -120,6 +120,7 @@ export default async function SchedulingPage({ searchParams }: { searchParams: P
                     <td title={coverage(patient.id).title}><Badge tone={coverage(patient.id).tone}>{coverage(patient.id).label}</Badge></td>
                     <td>
                       <Badge tone={TONE[appt.status] ?? "slate"}>{appt.status.replace("_", " ")}</Badge>
+                      {appt.status === "scheduled" && appt.confirmedAt && <div className="mt-1 text-[11px] font-semibold text-green-700">Confirmed{appt.confirmedVia === "sms" ? " by text" : ""}</div>}
                       {checkins.get(appt.id)?.submission && (
                         <div className="mt-1"><Link href="/check-ins" className="text-[11px] font-semibold text-brand-700 hover:underline">Checked in online</Link></div>
                       )}

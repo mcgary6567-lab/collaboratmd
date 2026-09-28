@@ -15,6 +15,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { CheckinConsents, CheckinDemographics, CheckinInsurance } from "@/db/schema";
 import { runEligibility } from "./patients";
+import { practiceNow } from "./practice-time";
 
 const { checkinLinks, checkinSubmissions, appointments, patients, patientInsurances, payers, practices, eligibilityChecks } = schema;
 
@@ -48,9 +49,13 @@ export async function createCheckinLink(db: Db, practiceId: string, appointmentI
     .limit(1);
   if (!appt) throw new Error("Appointment not found");
   if (["cancelled", "completed", "no_show"].includes(appt.status)) throw new Error(`The appointment is ${appt.status.replace("_", " ")}`);
-  // Usable until the end of the visit day, and never for less than an hour.
-  const expiresAt = new Date(Math.max(appt.startsAt.getTime() + 12 * 3_600_000, Date.now() + 3_600_000));
-  if (appt.startsAt.getTime() + 12 * 3_600_000 < Date.now()) throw new Error("The appointment has already passed");
+  // Appointment times are clock times (practice-time.ts): compare them with the practice's clock, and
+  // turn the visit time into a real moment (clock time plus the offset between now and the clock) for the expiry.
+  const realNow = Date.now();
+  const offset = realNow - (await practiceNow(db, practiceId, new Date(realNow))).getTime();
+  // Usable until 12 hours after the visit starts, and never for less than an hour.
+  const expiresAt = new Date(Math.max(appt.startsAt.getTime() + offset + 12 * 3_600_000, realNow + 3_600_000));
+  if (appt.startsAt.getTime() + offset + 12 * 3_600_000 < realNow) throw new Error("The appointment has already passed");
 
   // One live link per appointment: sending a new one retires the old.
   await db

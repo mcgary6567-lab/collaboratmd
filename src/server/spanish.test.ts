@@ -36,7 +36,7 @@ describe("Spanish for patients", () => {
     expect(visitTime("en", d)).toBe("Tuesday, October 6 at 9:00 AM");
     expect(visitTime("es", d)).toMatch(/^martes, 6 de octubre, 9:00/);
     const en = appointmentReminder("en", { name: "Clinic", phone: "555-0100" }, "Ana", visitTime("en", d), "https://x/c/1");
-    expect(en.sms).toBe("Clinic: reminder of your appointment Tuesday, October 6 at 9:00 AM. Check in online: https://x/c/1 . Reply STOP to opt out.");
+    expect(en.sms).toBe("Clinic: reminder of your appointment Tuesday, October 6 at 9:00 AM. Check in online: https://x/c/1 . Reply C to confirm or X to cancel. Reply STOP to opt out.");
     const es = bookingConfirmed("es", { name: "Clínica" }, visitTime("es", d));
     expect(es.sms).toContain("su cita está confirmada");
     expect(es.sms).toContain("STOP");

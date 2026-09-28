@@ -169,6 +169,8 @@ export const patients = pgTable(
     remindersOptOut: boolean("reminders_opt_out").notNull().default(false),
     /** en | es: statements, reminders and confirmations are sent in it. See migration 0045. */
     preferredLanguage: text("preferred_language").notNull().default("en"),
+    /** Opening this patient's records asks for a reason (migration 0049, server/restricted.ts). */
+    restricted: boolean("restricted").notNull().default(false),
     fhirId: text("fhir_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -225,6 +227,9 @@ export const appointments = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     type: text("type").notNull().default("office_visit"),
     status: text("status").notNull().default("scheduled"), // scheduled | checked_in | completed | no_show | cancelled
+    /** When the patient confirmed, and how ("sms"): see migration 0049. */
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedVia: text("confirmed_via"),
     reason: text("reason"),
     fhirId: text("fhir_id"),
     locationId: uuid("location_id").references(() => locations.id),

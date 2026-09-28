@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { logPatientView } from "@/lib/log-view";
+import { restrictedAccess } from "@/server/restricted";
+import { RestrictedGate } from "@/components/restricted-gate";
 import { getEstimate } from "@/server/billing";
 import { GFE_DISPUTE_THRESHOLD_CENTS } from "@/lib/billing/estimate";
 import { PrintButton } from "@/components/action-form";
@@ -25,6 +27,8 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
   const row = await getEstimate(db, s.practiceId, id);
   if (!row) notFound();
   const { estimate: e, patient, practice } = row;
+  const gate = await restrictedAccess(db, s, patient.id);
+  if (!gate.granted) return <RestrictedGate patientId={patient.id} back={`/estimates/${id}`} what="estimate" />;
   await logPatientView(s, patient.id, "estimate", e.id);
   const gfe = e.kind === "good_faith";
   const ib = e.basis as InsuredBasis;

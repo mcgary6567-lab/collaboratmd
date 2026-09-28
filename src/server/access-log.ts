@@ -38,6 +38,8 @@ const LABELS: Record<string, string> = {
   create_portal_link: "Sent a portal link",
   statement_mailed: "Mailed a statement",
   patient_checkin: "Patient checked in online",
+  patient_restricted: "Restricted the record",
+  patient_unrestricted: "Removed the restriction",
 };
 
 export type AccessEntry = { at: Date; who: string; what: string; action: string };
@@ -67,6 +69,8 @@ export async function patientAccessLog(db: Db, practiceId: string, patientId: st
     .limit(limit);
   const entries: AccessEntry[] = rows.map(({ log, name, email }) => {
     const via = (log.details as { via?: string } | null)?.via;
+    const reason = (log.details as { reason?: string } | null)?.reason;
+    if (log.action === "restricted_record_opened") return { at: log.at, who: name ? `${name}${email ? ` <${email}>` : ""}` : "A former user", what: `Opened the restricted record. Reason: ${reason ?? "(none recorded)"}`, action: log.action };
     const what = log.action === "patient_viewed"
       ? `Opened the ${via === "chart" ? "chart" : via ?? "record"}`
       : LABELS[log.action] ?? log.action.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) + (log.entity !== "patient" ? ` (${log.entity})` : "");

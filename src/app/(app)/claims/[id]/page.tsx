@@ -4,6 +4,8 @@ import { and, asc, desc, eq, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
 import { logPatientView } from "@/lib/log-view";
+import { restrictedAccess } from "@/server/restricted";
+import { RestrictedGate } from "@/components/restricted-gate";
 import { AttachmentsSection } from "./attachments-section";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
@@ -24,6 +26,8 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
   const db = await getDb();
   const b = await loadClaimBundle(db, id);
   if (!b || b.claim.practiceId !== s.practiceId) notFound();
+  const gate = await restrictedAccess(db, s, b.claim.patientId);
+  if (!gate.granted) return <RestrictedGate patientId={b.claim.patientId} back={`/claims/${id}`} what="claim" />;
   await logPatientView(s, b.claim.patientId, "claim", b.claim.id);
   const dental = b.claim.claimType === "dental";
   // A secondary claim's money posts to its primary, so show the primary's books.

@@ -41,20 +41,20 @@ async function main() {
   const { getDb } = await import("../src/db");
   const db = await getDb();
   const one = async <T>(q: ReturnType<typeof sql>) => (await db.execute(q)).rows[0] as T;
-  const { id: practiceId } = await one<{ id: string }>(sql`SELECT p.id FROM practices p JOIN claims c ON c.practice_id = p.id GROUP BY p.id ORDER BY count(*) DESC LIMIT 1`);
+  // The demo practice (the one with patients) is the one measured.
+  const { id: practiceId } = await one<{ id: string }>(sql`SELECT p.id FROM practices p JOIN patients pt ON pt.practice_id = p.id GROUP BY p.id ORDER BY count(*) DESC LIMIT 1`);
   let { n } = await one<{ n: number }>(sql`SELECT count(*)::int AS n FROM claims WHERE practice_id = ${practiceId}`);
   console.log(`Practice ${practiceId}: ${n} claims before loading`);
 
-  if (n < TARGET) {
-    const add = TARGET - n;
-    const t0 = Date.now();
-    // One row per new claim, spread across the practice's insured patients, providers and two years of visits.
+  /** Adds `add` claims (with visits, charges, ledger entries and denials) to `target`, using the demo practice's patients and providers. */
+  const load = async (target: string, add: number, prefix: string) => {
+    const source = practiceId;
     await db.execute(sql`DROP TABLE IF EXISTS lt`);
     await db.execute(sql`
       CREATE TABLE lt AS
       WITH ins AS (SELECT array_agg(pi.id ORDER BY pi.id) AS ids, array_agg(pi.patient_id ORDER BY pi.id) AS pats, array_agg(pi.payer_id ORDER BY pi.id) AS pays, count(*)::int AS n
-                   FROM patient_insurances pi JOIN patients p ON p.id = pi.patient_id WHERE p.practice_id = ${practiceId}),
-           pr AS (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM providers WHERE practice_id = ${practiceId})
+                   FROM patient_insurances pi JOIN patients p ON p.id = pi.patient_id WHERE p.practice_id = ${source}),
+           pr AS (SELECT array_agg(id ORDER BY id) AS ids, count(*)::int AS n FROM providers WHERE practice_id = ${source})
       SELECT g, gen_random_uuid() AS enc, gen_random_uuid() AS claim,
              ins.ids[1 + (g * 7919) % ins.n] AS pi, ins.pats[1 + (g * 7919) % ins.n] AS patient, ins.pays[1 + (g * 7919) % ins.n] AS payer,
              pr.ids[1 + g % pr.n] AS provider, (current_date - (g % 730))::date AS dos,
@@ -62,27 +62,45 @@ async function main() {
              (9000 + (g % 23) * 1500) AS line1, 2500 AS line2
       FROM generate_series(1, ${add}) g, ins, pr`);
     await db.execute(sql`INSERT INTO encounters (id, practice_id, patient_id, provider_id, date_of_service, place_of_service, diagnoses, status)
-      SELECT enc, ${practiceId}, patient, provider, dos, '11', '["E11.9","I10"]'::jsonb, 'billed' FROM lt`);
+      SELECT enc, ${target}, patient, provider, dos, '11', '["E11.9","I10"]'::jsonb, 'billed' FROM lt`);
     await db.execute(sql`INSERT INTO charges (encounter_id, line_number, cpt, modifiers, units, charge_cents, dx_pointers)
       SELECT enc, 1, (ARRAY['99213','99214','99203','99204'])[1 + g % 4], '[]'::jsonb, 1, line1, '[1]'::jsonb FROM lt
       UNION ALL SELECT enc, 2, '36415', '[]'::jsonb, 1, line2, '[1]'::jsonb FROM lt`);
     await db.execute(sql`INSERT INTO claims (id, practice_id, encounter_id, patient_id, payer_id, patient_insurance_id, control_number, status, total_cents, submitted_at, created_at, updated_at)
-      SELECT claim, ${practiceId}, enc, patient, payer, pi, 'LT' || lpad(g::text, 8, '0'), status, line1 + line2,
+      SELECT claim, ${target}, enc, patient, payer, pi, ${prefix} || lpad(g::text, 8, '0'), status, line1 + line2,
              CASE WHEN status = 'ready' THEN NULL ELSE dos + interval '2 days' END, dos + interval '1 day', dos + interval '20 days' FROM lt`);
     await db.execute(sql`INSERT INTO ledger_entries (practice_id, patient_id, claim_id, type, amount_cents, posted_at)
-      SELECT ${practiceId}, patient, claim, 'charge', line1 + line2, dos + interval '1 day' FROM lt`);
+      SELECT ${target}, patient, claim, 'charge', line1 + line2, dos + interval '1 day' FROM lt`);
     await db.execute(sql`INSERT INTO ledger_entries (practice_id, patient_id, claim_id, type, amount_cents, group_code, reason_code, posted_at)
-      SELECT ${practiceId}, patient, claim, 'adjustment', ((line1 + line2) * 35 / 100), 'CO', '45', dos + interval '20 days' FROM lt WHERE status IN ('paid','partially_paid')`);
+      SELECT ${target}, patient, claim, 'adjustment', ((line1 + line2) * 35 / 100), 'CO', '45', dos + interval '20 days' FROM lt WHERE status IN ('paid','partially_paid')`);
     await db.execute(sql`INSERT INTO ledger_entries (practice_id, patient_id, claim_id, type, amount_cents, posted_at)
-      SELECT ${practiceId}, patient, claim, 'insurance_payment', ((line1 + line2) * 55 / 100), dos + interval '20 days' FROM lt WHERE status IN ('paid','partially_paid')`);
+      SELECT ${target}, patient, claim, 'insurance_payment', ((line1 + line2) * 55 / 100), dos + interval '20 days' FROM lt WHERE status IN ('paid','partially_paid')`);
     await db.execute(sql`INSERT INTO denials (practice_id, claim_id, category, carc, amount_cents, status, created_at)
-      SELECT ${practiceId}, claim, (ARRAY['eligibility','coding','authorization','medical_necessity','timely_filing'])[1 + g % 5], (ARRAY['27','16','197','50','29'])[1 + g % 5], line1 + line2,
+      SELECT ${target}, claim, (ARRAY['eligibility','coding','authorization','medical_necessity','timely_filing'])[1 + g % 5], (ARRAY['27','16','197','50','29'])[1 + g % 5], line1 + line2,
              (ARRAY['open','open','in_progress','appealed','resolved'])[1 + g % 5], dos + interval '20 days' FROM lt WHERE status = 'denied'`);
     await db.execute(sql`DROP TABLE lt`);
-    await db.execute(sql`ANALYZE`);
+  };
+
+  if (n < TARGET) {
+    const t0 = Date.now();
+    await load(practiceId, TARGET - n, "LT");
     n = TARGET;
-    console.log(`Loaded ${add} claims with charges, ledger entries and denials in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    console.log(`Loaded ${TARGET} claims for the measured practice in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   }
+  // A second practice of the same size in the same tables, as in real use: queries for one practice must
+  // find its rows through indexes rather than by reading everything. Its claims reuse the demo practice's
+  // patients and providers; only its own visits, claims, ledger entries and denials are separate rows.
+  if (process.env.LOAD_NEIGHBOUR !== "0") {
+    const existing = await one<{ id: string } | undefined>(sql`SELECT id FROM practices WHERE name = 'Load test neighbour practice' LIMIT 1`);
+    const neighbour = existing?.id ?? (await one<{ id: string }>(sql`INSERT INTO practices (name, tax_id, npi, address1, city, state, zip) SELECT 'Load test neighbour practice', tax_id, npi, address1, city, state, zip FROM practices WHERE id = ${practiceId} RETURNING id`)).id;
+    const { n: has } = await one<{ n: number }>(sql`SELECT count(*)::int AS n FROM claims WHERE practice_id = ${neighbour}`);
+    if (has < TARGET) {
+      const t0 = Date.now();
+      await load(neighbour, TARGET - has, "LN");
+      console.log(`Loaded ${TARGET - has} claims for a second practice in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    }
+  }
+  await db.execute(sql`ANALYZE`);
 
   const counts = await one<Record<string, number>>(sql`SELECT
     (SELECT count(*)::int FROM claims WHERE practice_id = ${practiceId}) AS claims,
@@ -175,23 +193,31 @@ async function main() {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
     const { rows: big } = await pool.query<{ relname: string; reltuples: number }>(`SELECT relname, reltuples FROM pg_class WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace AND reltuples > $1`, [BIG_TABLE_ROWS]);
     const bigTables = new Map(big.map((r) => [r.relname, Number(r.reltuples)]));
+    /** Large tables the plan reads in full to keep under 1% of their rows: an index would find those rows directly. */
+    const fullScans = async (query: string, params: unknown[]) => {
+      const { rows: [plan] } = await pool.query(`EXPLAIN (FORMAT JSON) ${query}`, params);
+      const scans: string[] = [];
+      const walk = (node: Record<string, unknown>) => {
+        const table = String(node["Relation Name"]);
+        const size = bigTables.get(table);
+        if (node["Node Type"] === "Seq Scan" && size && Number(node["Plan Rows"]) < size * 0.01) scans.push(`${table} (to keep about ${node["Plan Rows"]} of ${Math.round(size).toLocaleString()} rows)`);
+        for (const child of (node.Plans as Record<string, unknown>[] | undefined) ?? []) walk(child);
+      };
+      walk((plan["QUERY PLAN"] as { Plan: Record<string, unknown> }[])[0].Plan);
+      return [...new Set(scans)];
+    };
+    // The check must catch a query with no index to use, or a pass means nothing.
+    const canary = await fullScans("SELECT id FROM ledger_entries WHERE note = $1", ["load-test canary"]);
+    if (!canary.length) failures.push("The missing-index check did not flag a lookup on an unindexed column (ledger_entries.note); the check itself is broken");
+    else console.log(`Missing-index check: the unindexed canary lookup was flagged (${canary.join(", ")}), as it should be.`);
     for (const c of cases.filter((x) => x.selective)) {
       const captured: { query: string; params: unknown[] }[] = [];
       const logged = drizzle({ client: pool, schema, logger: { logQuery: (query, params) => captured.push({ query, params }) } });
       await c.run(logged as unknown as typeof db);
       for (const q of captured) {
         if (!/^\s*(select|with)\b/i.test(q.query)) continue;
-        const { rows: [plan] } = await pool.query(`EXPLAIN (FORMAT JSON) ${q.query}`, q.params as unknown[]);
-        const scans: string[] = [];
-        const walk = (node: Record<string, unknown>) => {
-          const table = String(node["Relation Name"]);
-          const size = bigTables.get(table);
-          // A whole large table read to keep a small fraction of it: an index would find those rows directly.
-          if (node["Node Type"] === "Seq Scan" && size && Number(node["Plan Rows"]) < size * 0.01) scans.push(`${table} (to keep about ${node["Plan Rows"]} of ${Math.round(size).toLocaleString()} rows)`);
-          for (const child of (node.Plans as Record<string, unknown>[] | undefined) ?? []) walk(child);
-        };
-        walk((plan["QUERY PLAN"] as { Plan: Record<string, unknown> }[])[0].Plan);
-        if (scans.length) failures.push(`${c.name}: reads all of ${[...new Set(scans)].join(", ")} (missing index?) in: ${q.query.replace(/\s+/g, " ").slice(0, 160)}`);
+        const scans = await fullScans(q.query, q.params as unknown[]);
+        if (scans.length) failures.push(`${c.name}: reads all of ${scans.join(", ")} (missing index?) in: ${q.query.replace(/\s+/g, " ").slice(0, 160)}`);
       }
     }
     await pool.end();

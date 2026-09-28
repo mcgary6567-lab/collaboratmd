@@ -50,6 +50,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     title: "Oversight",
     links: [
       { href: "/settings/audit", label: "Audit log", description: "Every sign-in, change, export and payment, searchable", adminOnly: true, keywords: "history activity who changed" },
+      { href: "/settings/access-review", label: "Chart access review", description: "Who opened how many charts today, and unusual access to look into", adminOnly: true, keywords: "snooping privacy hipaa access log restricted" },
       { href: "/settings/close", label: "Close account", description: "Schedule deletion of all of this practice's data", adminOnly: true, keywords: "cancel delete close offboard leave terminate" },
       { href: "/settings/data-export", label: "Data export", description: "Download everything the practice has here, as one zip", adminOnly: true, keywords: "backup download leave csv zip portability" },
       { href: "/settings/compliance", label: "Compliance", description: "HIPAA control checks, access reviews and BAAs", adminOnly: true, keywords: "hipaa soc 2 baa" },

@@ -79,6 +79,18 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   const problems: string[] = [];
   for (const p of pages) problems.push(...(await check(page, p)));
 
+  // A restricted record: opening it asks for a reason first, then opens.
+  await page.goto(patient!);
+  await page.getByRole("button", { name: "Restrict", exact: true }).click();
+  await page.goto(patient!);
+  await expect(page.getByRole("heading", { name: "Restricted record" })).toBeVisible();
+  problems.push(...(await check(page, patient!)).map((x) => `${x} (restricted record gate)`));
+  await page.getByLabel("Reason").fill("Checking the gate works in the accessibility test");
+  await page.getByRole("button", { name: "Open the record" }).click();
+  await expect(page.getByRole("button", { name: "Remove restriction" })).toBeVisible();
+  await page.getByRole("button", { name: "Remove restriction" }).click();
+  await expect(page.getByRole("button", { name: "Restrict", exact: true })).toBeVisible();
+
   // The patient's side: a portal link and a check-in link, opened without a staff session.
   await page.goto(patient!);
   await page.getByRole("button", { name: "Send portal link" }).click();

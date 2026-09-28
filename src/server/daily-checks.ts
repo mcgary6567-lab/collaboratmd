@@ -11,6 +11,7 @@ import { schema } from "@/db";
 import { payerAlerts } from "./payer-alerts";
 import { credentialState, CREDENTIAL_KINDS, listCredentials } from "./credentials";
 import { notify } from "./notifications";
+import { notifyAccessAnomalies } from "./access-anomalies";
 
 /** ISO week, e.g. 2026-W39, so a payer alert repeats at most weekly. */
 function isoWeek(d: Date) {
@@ -23,7 +24,7 @@ function isoWeek(d: Date) {
 }
 
 export async function runDailyChecks(db: Db, practiceId: string, now = new Date()) {
-  const out = { payerAlerts: 0, credentials: 0, accessReview: false };
+  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0 };
   const week = isoWeek(now);
   for (const a of (await payerAlerts(db, practiceId, now)).filter((x) => x.severity === "high")) {
     await notify(db, practiceId, { kind: "payer_alert", title: `${a.payerName}: ${a.title}`, body: a.detail, href: "/reports/payer-alerts", dedupeKey: `payer:${a.payerId}:${a.kind}:${week}` });
@@ -40,6 +41,7 @@ export async function runDailyChecks(db: Db, practiceId: string, now = new Date(
     });
     out.credentials++;
   }
+  out.accessAnomalies = await notifyAccessAnomalies(db, practiceId, now);
   const [last] = await db.select({ at: schema.accessReviews.createdAt }).from(schema.accessReviews).where(eq(schema.accessReviews.practiceId, practiceId)).orderBy(desc(schema.accessReviews.createdAt)).limit(1);
   if (!last || now.getTime() - last.at.getTime() > 90 * 86_400_000) {
     const q = `${now.getUTCFullYear()}-Q${Math.floor(now.getUTCMonth() / 3) + 1}`;

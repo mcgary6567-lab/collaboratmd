@@ -56,7 +56,19 @@ Every request gets an ID (a valid incoming `X-Request-Id` is kept, otherwise a n
 
 Opening a patient's chart, one of their claims, a statement or an estimate is recorded (the same person reopening the same record within 15 minutes is recorded once; link prefetches are not views). Administrators see it from the chart: **Access log**, which lists who opened what and when, what was done (links sent, statements mailed, attachments opened, changes), and the full practice exports in the same period, which include every patient.
 
-Use it to review access and to investigate a suspected snooping incident. It is the practice's internal access log (HIPAA audit controls). It is not the accounting of disclosures a patient can request, which covers disclosures outside the practice and excludes treatment, payment and operations; keep that record separately.
+Use it to review access and to investigate a suspected snooping incident. It is the practice's internal access log (HIPAA audit controls).
+
+**Restricted patients.** An administrator can mark a patient **Restrict** on their page (a staff member, someone well known). Opening that patient's chart, claims, statements or estimates then asks for a reason; the reason goes in the access log, administrators get a notification (naming the staff member, not the patient), and the person can open that patient's records for 4 hours. Lists (patients, claims, the schedule) still show the name so the account can be worked; exports and the API are not gated.
+
+**Chart access review** (Settings → Chart access review, and a notification each morning): each person's charts opened in the last 24 hours against their usual, flagged at 40 or more charts in a day, at least 15 and over three times their usual, or 10 or more patients with no appointment within 30 days, no claim or payment in six months, and not new. The thresholds are in `src/server/access-anomalies.ts`; adjust them to what is normal for the practice. A flag is a prompt to ask, not a finding. It is not the accounting of disclosures a patient can request, which covers disclosures outside the practice and excludes treatment, payment and operations; keep that record separately.
+
+## Texts: confirm or cancel
+
+Appointment reminders say "Reply C to confirm or X to cancel". A reply of C (or CONFIRM) marks the patient's next appointment within a week as confirmed ("Confirmed by text" on the schedule); X cancels it and notifies the front desk. The patient gets a reply in their language through Twilio's answer to the webhook, and it is kept in the texting inbox. The number must belong to exactly one patient. CANCEL is not used: carriers treat it as an opt-out word that stops all texts, and it still does that here.
+
+## Staff guide
+
+The help button links to **The working day, by role** (`/guide`): the front desk, biller and administrator routines, step by step, each step linked to its screen. Update it when a screen it names changes.
 
 ## Problem reports and usage
 

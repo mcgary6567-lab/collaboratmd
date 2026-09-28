@@ -10,6 +10,18 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-27",
+    title: "Confirm by text, restricted records, and a daily guide for each role",
+    items: [
+      "Patients reply C to confirm or X to cancel their appointment reminder; the schedule shows who confirmed, and the front desk hears about cancellations",
+      "Restrict a patient's records: opening them asks for a reason, which administrators are told about",
+      "Settings > Chart access review flags unusual chart access each day",
+      "The working day for the front desk, billers and administrators, from the help button",
+      "Fixed: sending an online check-in link in the evening could say the day's appointment had already passed",
+      "Fixed: narrow fields and dropdowns now keep their intended width instead of stretching or collapsing",
+    ],
+  },
+  {
+    date: "2026-09-27",
     title: "A patient access log, and checks at the size of a large practice",
     items: [
       "Administrators can see who opened a patient's chart, claims, statements and estimates, and what was done with them (Patient > Access log)",

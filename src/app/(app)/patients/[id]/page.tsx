@@ -4,6 +4,9 @@ import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
 import { logPatientView } from "@/lib/log-view";
+import { restrictedAccess } from "@/server/restricted";
+import { RestrictedGate } from "@/components/restricted-gate";
+import { setRestrictedAction } from "@/app/(app)/restricted-actions";
 import { practiceConfig } from "@/server/integrations";
 import { InsuranceTools } from "./insurance-tools";
 import { CoverageSection } from "./coverage-section";
@@ -28,6 +31,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const db = await getDb();
   const data = await getPatient(db, s.practiceId, id);
   if (!data) notFound();
+  const gate = await restrictedAccess(db, s, id);
+  if (!gate.granted) return <RestrictedGate patientId={id} back={`/patients/${id}`} what="chart" />;
   await logPatientView(s, id, "chart");
   const { patient, insurances, checks, visits, ledger } = data;
   const fin = computeFinancials(ledger);
@@ -43,7 +48,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={`${patient.lastName}, ${patient.firstName}`}
-        subtitle={`MRN ${patient.mrn} · DOB ${fmtDate(patient.dob + "T00:00:00")} · ${patient.sex}`}
+        subtitle={`MRN ${patient.mrn} · DOB ${fmtDate(patient.dob + "T00:00:00")} · ${patient.sex}${patient.restricted ? " · Restricted record" : ""}`}
         actions={
           <>
             {s.role === "admin" && <Link href={`/patients/${patient.id}/access`} className="btn btn-secondary">Access log</Link>}
@@ -79,6 +84,14 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 <button className="font-semibold text-brand-700 hover:underline">{patient.preferredLanguage === "es" ? "Use English" : "Use Spanish"}</button>
               </form>
             </div>
+            {s.role === "admin" && (
+              <div className="flex items-center justify-between">
+                <span>Access: {patient.restricted ? <span className="font-semibold text-amber-700">restricted</span> : "normal"} <span className="text-slate-500">(opening asks for a reason)</span></span>
+                <form action={setRestrictedAction.bind(null, patient.id, !patient.restricted)}>
+                  <button className="font-semibold text-brand-700 hover:underline">{patient.restricted ? "Remove restriction" : "Restrict"}</button>
+                </form>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 pt-1">
               <PortalLinkButton patientId={patient.id} purpose="portal" label="Send portal link" />
               <PortalLinkButton patientId={patient.id} purpose="pay" label="Send pay link" />
@@ -140,8 +153,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             <div className="flex justify-between border-t pt-1 font-semibold"><dt>Insurance balance</dt><dd><Money cents={fin.insuranceBalanceCents} /></dd></div>
             <div className="flex justify-between font-semibold"><dt>Patient balance</dt><dd className={fin.patientBalanceCents > 0 ? "text-red-700" : ""}><Money cents={fin.patientBalanceCents} /></dd></div>
           </dl>
-          <form action={patientPaymentAction.bind(null, patient.id)} className="mt-4 flex items-end gap-2">
-            <Field label="Post payment ($)"><input name="amount" type="number" step="0.01" min="0.01" className="input" placeholder="25.00" required /></Field>
+          <form action={patientPaymentAction.bind(null, patient.id)} className="mt-4 flex flex-wrap items-end gap-2">
+            <Field label="Post payment ($)"><input name="amount" type="number" step="0.01" min="0.01" className="input w-28" placeholder="25.00" required /></Field>
             <Field label="Method">
               <select name="method" className="select">
                 <option value="card">Card</option>

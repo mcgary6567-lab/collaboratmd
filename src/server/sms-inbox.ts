@@ -9,14 +9,16 @@
  * this system from trying to text someone who has said no.
  */
 import crypto from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { IntegrationConfig } from "./integrations";
 import { sendSms, toE164 } from "./messaging";
 import { notify } from "./notifications";
+import { practiceNow } from "./practice-time";
+import { langOf, replyCancelled, replyConfirmed, visitTime } from "@/lib/i18n/messages";
 
-const { smsMessages, smsOptOuts, patients, auditLog } = schema;
+const { smsMessages, smsOptOuts, patients, auditLog, appointments, practices } = schema;
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
 export const START_WORDS = ["START", "UNSTOP", "YES"];
@@ -83,7 +85,51 @@ export async function receiveSms(db: Db, practiceId: string, params: Record<stri
   if (keyword) {
     await db.insert(auditLog).values({ practiceId, action: keyword === "stop" ? "sms_opt_out" : "sms_opt_in", entity: "sms", entityId: row.id, details: { patients: matches.length } });
   }
-  return { stored: true as const, id: row.id, patientId, matches: matches.length, keyword };
+  // C or X answers the appointment reminder: only when the number belongs to exactly one patient.
+  const reply = !keyword && patientId && (CONFIRM_WORDS.includes(word) || CANCEL_WORDS.includes(word))
+    ? await answerReminder(db, practiceId, patientId, CONFIRM_WORDS.includes(word) ? "confirm" : "cancel", phone)
+    : null;
+  return { stored: true as const, id: row.id, patientId, matches: matches.length, keyword, reply };
+}
+
+/** Replies to a reminder. X, not CANCEL: CANCEL is a carrier opt-out word and would stop all texts. */
+export const CONFIRM_WORDS = ["C", "CONFIRM"];
+export const CANCEL_WORDS = ["X"];
+
+/**
+ * Confirms or cancels the patient's next scheduled appointment in the coming
+ * week (on the practice's clock). Returns the text to send back, or null when
+ * there is no such appointment (the message then just waits in the inbox).
+ */
+async function answerReminder(db: Db, practiceId: string, patientId: string, answer: "confirm" | "cancel", phone: string) {
+  const now = await practiceNow(db, practiceId);
+  const [appt] = await db
+    .select()
+    .from(appointments)
+    .where(and(eq(appointments.practiceId, practiceId), eq(appointments.patientId, patientId), eq(appointments.status, "scheduled"), gte(appointments.startsAt, now), lt(appointments.startsAt, new Date(now.getTime() + 7 * 86_400_000))))
+    .orderBy(asc(appointments.startsAt))
+    .limit(1);
+  if (!appt) return null;
+  const [[patient], [practice]] = await Promise.all([
+    db.select({ lang: patients.preferredLanguage }).from(patients).where(eq(patients.id, patientId)).limit(1),
+    db.select({ name: practices.name, phone: practices.phone }).from(practices).where(eq(practices.id, practiceId)).limit(1),
+  ]);
+  const lang = langOf(patient?.lang);
+  const when = visitTime(lang, appt.startsAt);
+  let text: string;
+  if (answer === "confirm") {
+    await db.update(appointments).set({ confirmedAt: new Date(), confirmedVia: "sms" }).where(eq(appointments.id, appt.id));
+    text = replyConfirmed(lang, practice, when);
+  } else {
+    await db.update(appointments).set({ status: "cancelled" }).where(eq(appointments.id, appt.id));
+    // No patient details in the notification: titles can reach the email digest.
+    await notify(db, practiceId, { kind: "appointment_cancelled", title: "An appointment was cancelled by text", body: "The time is open again on the schedule.", href: `/scheduling?date=${appt.startsAt.toISOString().slice(0, 10)}`, dedupeKey: `sms-cancel:${appt.id}` });
+    text = replyCancelled(lang, practice, when);
+  }
+  await db.insert(auditLog).values({ practiceId, action: answer === "confirm" ? "appointment_confirmed_by_text" : "appointment_cancelled_by_text", entity: "appointment", entityId: appt.id });
+  // The reply goes out in Twilio's answer to this webhook; it is kept in the thread like any text sent.
+  await db.insert(smsMessages).values({ practiceId, patientId, direction: "out", phone, body: text, status: "sent", readAt: new Date() });
+  return { appointmentId: appt.id, answer, text };
 }
 
 export type Thread = { phone: string; patientId: string | null; patientName: string | null; lastBody: string; lastAt: Date; lastDirection: string; unread: number; optedOut: boolean };

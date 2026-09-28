@@ -27,8 +27,57 @@ export async function check(page: Page, path: string) {
     .filter((v) => v.impact === "serious" || v.impact === "critical")
     .map((v) => `${path}: ${v.id} (${v.nodes.length}) e.g. ${v.nodes[0]?.target.join(" ")}`);
   const wide = (await sidewaysOverflow(page)).map((c) => `${path}: wider than the screen: ${c}`);
+  const squashed = (await squashedControls(page)).map((c) => `${path}: squashed control: ${c}`);
   const covered = (await coveredControls(page)).map((c) => `${path}: covered control: ${c}`);
-  return [...axe, ...wide, ...covered];
+  return [...axe, ...wide, ...squashed, ...covered];
+}
+
+/**
+ * Dropdowns and text fields squeezed too narrow to show their choice or
+ * placeholder (down to "Ca" for "Card", or just the arrow), buttons whose
+ * label spills out of them, and controls reaching past their card. This
+ * is the layout mistake a screenshot shows at a glance and the other checks
+ * miss; it is checked directly because pixel comparisons would break every
+ * day on the demo data's changing dates and totals.
+ */
+export async function squashedControls(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    const fields = "main input:is([type=text], [type=number], [type=email], [type=tel], [type=search], :not([type]))";
+    for (const el of document.querySelectorAll<HTMLElement>(`main select, main button, main a.btn, ${fields}`)) {
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden" || el.closest("[aria-hidden='true'], [hidden], .sr-only, .hidden, details:not([open]) > :not(summary)")) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      // A control reaching past the edge of its card, over the card's border or the next card.
+      const card = el.closest(".card")?.getBoundingClientRect();
+      if (card && (r.right > card.right + 1 || r.left < card.left - 1) && !el.closest(".card .overflow-x-auto, .card .overflow-auto")) {
+        out.push(`<${el.tagName.toLowerCase()}> "${(el instanceof HTMLSelectElement ? el.options[el.selectedIndex]?.text : el.getAttribute("placeholder") || el.innerText || el.getAttribute("name") || "")?.trim().slice(0, 30)}" reaches ${Math.round(Math.max(r.right - card.right, card.left - r.left))}px outside its card`);
+      }
+      if (el instanceof HTMLInputElement) {
+        const text = (el.value || el.placeholder).trim();
+        if (text.length < 2) continue;
+        ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        const need = ctx.measureText(text).width;
+        // Number fields keep room for their up/down arrows.
+        const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - (el.type === "number" ? 16 : 0);
+        if (room < Math.min(need, 40)) out.push(`<input> "${text.slice(0, 30)}" shows ${Math.max(0, Math.round(room))}px of ${Math.round(need)}px`);
+      } else if (el instanceof HTMLSelectElement) {
+        const text = el.options[el.selectedIndex]?.text.trim() ?? "";
+        if (text.length < 2) continue;
+        ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        const need = ctx.measureText(text).width;
+        // Room for the text: the box, less its padding and the arrow.
+        const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 16;
+        if (room < Math.min(need, 40)) out.push(`<select> "${text.slice(0, 30)}" shows ${Math.max(0, Math.round(room))}px of ${Math.round(need)}px`);
+      } else if (el.scrollWidth > el.clientWidth + 2) {
+        out.push(`<${el.tagName.toLowerCase()}> "${el.innerText.trim().slice(0, 30)}" label spills out (${el.scrollWidth}px in ${el.clientWidth}px)`);
+      }
+      if (out.length >= 5) break;
+    }
+    return out;
+  });
 }
 
 /**

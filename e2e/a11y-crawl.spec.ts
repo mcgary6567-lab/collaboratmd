@@ -8,14 +8,14 @@ import { check, signIn } from "./helpers";
  * one example each. Pages that act on a token in the address are left out.
  */
 const APP = [
-  "/dashboard", "/work", "/tasks", "/notifications", "/messages", "/welcome", "/setup",
+  "/dashboard", "/guide", "/work", "/tasks", "/notifications", "/messages", "/welcome", "/setup",
   "/patients", "/patients/new", "/patients/coverage-discovery", "/check-ins", "/scheduling", "/scheduling/estimates", "/estimates/new",
   "/encounters/new", "/encounters/dental", "/encounters/institutional", "/coding", "/labs", "/import",
   "/claims", "/claims/follow-up", "/denials", "/denials/agent", "/remittance", "/remittance/deposits", "/underpayments",
   "/billing", "/billing/accounting", "/billing/collections", "/billing/credits", "/billing/legacy", "/billing/missed-charges",
   "/reports", "/reports/builder", "/reports/forecast", "/reports/locations", "/reports/payer-alerts",
   "/clients", "/clients/invoicing", "/admin", "/ops/errors", "/ops/feedback", "/ops/practices",
-  "/settings", "/settings/audit", "/settings/automation", "/settings/booking", "/settings/close", "/settings/code-sets", "/settings/compliance",
+  "/settings", "/settings/access-review", "/settings/audit", "/settings/automation", "/settings/booking", "/settings/close", "/settings/code-sets", "/settings/compliance",
   "/settings/connections", "/settings/connections/doctor", "/settings/credentials", "/settings/data-export", "/settings/developers",
   "/settings/enrollment", "/settings/fees", "/settings/fhir", "/settings/go-live", "/settings/integrations", "/settings/locations", "/settings/menu",
   "/settings/payer-edits", "/settings/payers", "/settings/policies", "/settings/profile", "/settings/providers", "/settings/security",

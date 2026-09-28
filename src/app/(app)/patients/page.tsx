@@ -35,7 +35,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
       />
       <Card>
         <form className="mb-3 flex flex-wrap gap-2" action="/patients">
-          <input name="q" defaultValue={params.q} placeholder="Name, MRN or phone" className="input max-w-md flex-1" />
+          <input name="q" defaultValue={params.q} placeholder="Name, MRN or phone" className="input min-w-48 max-w-md flex-1" />
           <select name="language" defaultValue={params.language ?? ""} className="input w-40" aria-label="Language">
             <option value="">Any language</option><option value="es">Spanish</option><option value="en">English</option>
           </select>

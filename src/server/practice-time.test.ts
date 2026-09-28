@@ -5,6 +5,7 @@ import { testDb } from "@/test/db";
 import { clockDay, practiceClock, practiceNow, practiceTimeZone } from "./practice-time";
 import { listAppointments } from "./encounters";
 import { getBookingSettings, saveBookingSettings } from "./booking";
+import { createCheckinLink } from "./checkin";
 
 describe("the practice's clock", () => {
   let t: Awaited<ReturnType<typeof testDb>>;
@@ -34,5 +35,19 @@ describe("the practice's clock", () => {
     await t.db.update(schema.appointments).set({ startsAt: late, endsAt: new Date(late.getTime() + 1_800_000) }).where(eq(schema.appointments.id, appt.id));
     expect((await listAppointments(t.db, t.practiceId, new Date(day.getTime() + 12 * 3_600_000))).some((a) => a.appt.id === appt.id)).toBe(true);
     expect((await listAppointments(t.db, t.practiceId, new Date(day.getTime() + 36 * 3_600_000))).some((a) => a.appt.id === appt.id)).toBe(false);
+  });
+
+  it("keeps a check-in link usable through the practice's evening, not until UTC's", async () => {
+    await t.db.update(schema.practices).set({ timeZone: "America/New_York" }).where(eq(schema.practices.id, t.practiceId));
+    const [appt] = await t.db.select().from(schema.appointments).where(eq(schema.appointments.practiceId, t.practiceId)).limit(1);
+    // 9:30 this morning on the practice's clock: still today, so a link can be sent this evening.
+    const nineThirty = new Date(clockDay(await practiceNow(t.db, t.practiceId)).getTime() + 9.5 * 3_600_000);
+    await t.db.update(schema.appointments).set({ startsAt: nineThirty, endsAt: new Date(nineThirty.getTime() + 1_800_000), status: "scheduled" }).where(eq(schema.appointments.id, appt.id));
+    const link = await createCheckinLink(t.db, t.practiceId, appt.id);
+    expect(link.path).toMatch(/^\/check-in\//);
+    // Yesterday's is gone.
+    const yesterday = new Date(nineThirty.getTime() - 86_400_000);
+    await t.db.update(schema.appointments).set({ startsAt: yesterday, endsAt: new Date(yesterday.getTime() + 1_800_000) }).where(eq(schema.appointments.id, appt.id));
+    await expect(createCheckinLink(t.db, t.practiceId, appt.id)).rejects.toThrow(/already passed/);
   });
 });

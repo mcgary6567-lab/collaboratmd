@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { logPatientView } from "@/lib/log-view";
+import { restrictedAccess } from "@/server/restricted";
+import { RestrictedGate } from "@/components/restricted-gate";
 import { getStatement } from "@/server/billing";
 import { mailStatementAction, markStatementSentAction, voidStatementAction } from "@/app/(app)/billing-actions";
 import { practiceConfig } from "@/server/integrations";
@@ -28,6 +30,8 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   const row = await getStatement(db, s.practiceId, id);
   if (!row) notFound();
   const { statement: st, patient, practice } = row;
+  const gate = await restrictedAccess(db, s, patient.id);
+  if (!gate.granted) return <RestrictedGate patientId={patient.id} back={`/statements/${id}`} what="statement" />;
   await logPatientView(s, patient.id, "statement", st.id);
   const visits = st.detail.visits;
   const lob = !!(await practiceConfig(db, s.practiceId)).lob;

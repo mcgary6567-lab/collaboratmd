@@ -28,11 +28,11 @@ export function shortDate(lang: Lang, d: Date) {
 
 export function appointmentReminder(lang: Lang, p: Practice, firstName: string, when: string, url: string): Msg {
   if (lang === "es") return {
-    sms: `${p.name}: le recordamos su cita del ${when}. Regístrese en línea: ${url} . Responda STOP para no recibir más mensajes.`,
+    sms: `${p.name}: le recordamos su cita del ${when}. Regístrese en línea: ${url} . Responda C para confirmar o X para cancelar. Responda STOP para no recibir más mensajes.`,
     email: { subject: `Su cita con ${p.name}`, text: `Hola, ${firstName}:\n\nLe recordamos su cita del ${when}.\n\nAhorre tiempo registrándose en línea:\n${url}\n\n${p.name}${p.phone ? `\n${p.phone}` : ""}` },
   };
   return {
-    sms: `${p.name}: reminder of your appointment ${when}. Check in online: ${url} . Reply STOP to opt out.`,
+    sms: `${p.name}: reminder of your appointment ${when}. Check in online: ${url} . Reply C to confirm or X to cancel. Reply STOP to opt out.`,
     email: { subject: `Your appointment with ${p.name}`, text: `Hi ${firstName},\n\nThis is a reminder of your appointment on ${when}.\n\nSave time by checking in online:\n${url}\n\n${p.name}${p.phone ? `\n${p.phone}` : ""}` },
   };
 }
@@ -94,4 +94,16 @@ export function portalLink(lang: Lang, p: Practice, firstName: string, purpose: 
     sms: `${p.name}: ${what} at ${url} . Reply STOP to opt out.`,
     email: { subject: `Your account with ${p.name}`, text: `Hi ${firstName},\n\nYou can ${what} here:\n\n${url}\n\nThe link asks for your date of birth and works for 30 days.\n\n${p.name}` },
   };
+}
+
+/** Replies to a patient's C (confirm) or X (cancel) text. "CANCEL" itself is a carrier opt-out word, so X is used. */
+export function replyConfirmed(lang: Lang, p: Practice, when: string) {
+  return lang === "es"
+    ? `${p.name}: gracias, su cita del ${when} está confirmada.`
+    : `${p.name}: thank you, your appointment ${when} is confirmed.`;
+}
+export function replyCancelled(lang: Lang, p: Practice, when: string) {
+  return lang === "es"
+    ? `${p.name}: cancelamos su cita del ${when}. Para hacer otra, llame al ${p.phone ?? "consultorio"}.`
+    : `${p.name}: your appointment ${when} is cancelled. To book another, call ${p.phone ?? "the office"}.`;
 }

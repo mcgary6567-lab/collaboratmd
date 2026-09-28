@@ -53,7 +53,10 @@ export function HelpButton() {
                   {guide.related.map((r) => <Link key={r.href} href={r.href} className="text-xs font-semibold text-brand-700 hover:underline">{r.label}</Link>)}
                 </div>
               )}
-              <button type="button" className="mt-3 text-xs font-semibold text-brand-700 hover:underline" onClick={() => setReporting(true)}>Report a problem with this page</button>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                <Link href="/guide" className="text-xs font-semibold text-brand-700 hover:underline">The working day, by role</Link>
+                <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={() => setReporting(true)}>Report a problem with this page</button>
+              </div>
             </>
           )}
         </div>
