@@ -105,7 +105,10 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   const portalField = page.locator('input[readonly][value*="/portal/"]');
   await expect(portalField).toBeVisible();
   const portalPath = new URL(await portalField.inputValue()).pathname;
+  // Tomorrow's schedule: late in the practice's evening, this morning's visits are past their check-in window.
   await page.goto("/scheduling");
+  await page.getByRole("link", { name: "Next", exact: true }).click();
+  await page.waitForURL(/\/scheduling\?date=/);
   await page.locator("button[title^='Create a link the patient uses to check in']").first().click();
   const checkinField = page.locator('input[readonly][value*="/check-in/"]').first();
   await expect(checkinField).toBeVisible();
