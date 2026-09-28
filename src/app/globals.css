@@ -186,6 +186,7 @@ body {
 [data-theme="dark"] .app-shell .text-slate-500 { color: #8b99ad; }
 [data-theme="dark"] .app-shell .text-slate-400 { color: #6b7a90; }
 [data-theme="dark"] .app-shell .border-slate-100, [data-theme="dark"] .app-shell .border-slate-200 { border-color: #243048; }
+[data-theme="dark"] .app-shell .divide-slate-100 > *, [data-theme="dark"] .app-shell .divide-slate-200 > * { border-color: #243048; }
 [data-theme="dark"] .app-shell .border-slate-300 { border-color: #2f3d5a; }
 [data-theme="dark"] .app-shell .table tr:hover td { background: #16213a; }
 [data-theme="dark"] .app-shell .input, [data-theme="dark"] .app-shell .select, [data-theme="dark"] .app-shell .textarea { background: #0f1829; color: var(--text); }

@@ -8,7 +8,7 @@ test("a wrong password is refused and the right one signs in", async ({ page }) 
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByText("Invalid email or password.")).toBeVisible();
   await signIn(page);
-  await expect(page.getByRole("heading", { name: /Good day/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Good (morning|afternoon|evening), / })).toBeVisible();
 });
 
 test("charge entry to claim, submitted, and paid from the remittance", async ({ page }) => {
