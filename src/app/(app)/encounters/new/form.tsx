@@ -1,7 +1,8 @@
 "use client";
 
+import { NDC_UNITS, isDrugCode } from "@/lib/codes/ndc";
 import { TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode } from "@/lib/time-units";
-import { useActionState, useState } from "react";
+import { Fragment, useActionState, useState } from "react";
 import { Trash, Plus } from "lucide-react";
 import { createEncounterAction } from "@/app/(app)/actions";
 import { Field, Alert } from "@/components/ui";
@@ -12,7 +13,7 @@ import { NpiLookup } from "@/components/npi-lookup";
 import { money } from "@/lib/utils";
 import { PatientPicker, type PatientOption } from "@/components/patient-picker";
 
-type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string; minutes?: string };
+type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string; minutes?: string; ndc?: string; ndcUnit?: string; ndcQuantity?: string };
 
 
 export function ChargeEntryForm({
@@ -65,6 +66,9 @@ export function ChargeEntryForm({
         modifiers: l.modifiers.split(",").map((m) => m.trim()).filter(Boolean),
         units: Number(l.units) || 1,
         minutes: Number(l.minutes) || null,
+        ndc: isDrugCode(l.cpt) ? l.ndc || null : null,
+        ndcUnit: isDrugCode(l.cpt) ? l.ndcUnit || "UN" : null,
+        ndcQuantity: isDrugCode(l.cpt) ? Number(l.ndcQuantity) || null : null,
         chargeCents: Math.round((parseFloat(l.charge) || 0) * 100),
         dxPointers: l.dxPointers.split(",").map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n)),
         description: l.description || pxSearch.describe(l.cpt),
@@ -179,7 +183,8 @@ export function ChargeEntryForm({
           </thead>
           <tbody>
             {lines.map((l, i) => (
-              <tr key={i}>
+              <Fragment key={i}>
+              <tr>
                 <td className="text-slate-500">{i + 1}</td>
                 <td className="w-32">
                   <input list="cpt-list" className="input font-mono" aria-label={`Line ${i + 1} CPT`} value={l.cpt} onChange={(e) => {
@@ -203,6 +208,19 @@ export function ChargeEntryForm({
                   )}
                 </td>
               </tr>
+              {isDrugCode(l.cpt) && (
+                <tr>
+                  <td />
+                  <td colSpan={8}>
+                    <div className="flex flex-wrap items-end gap-3 text-sm">
+                      <label className="block"><span className="label">NDC (from the package)</span><input className="input w-40 font-mono" value={l.ndc ?? ""} placeholder="12345-6789-01" aria-label={`Line ${i + 1} NDC`} onChange={(e) => updateLine(i, { ndc: e.target.value })} /></label>
+                      <label className="block"><span className="label">Quantity</span><input type="number" min={0} step="0.001" className="input w-24" value={l.ndcQuantity ?? ""} aria-label={`Line ${i + 1} drug quantity`} onChange={(e) => updateLine(i, { ndcQuantity: e.target.value })} /></label>
+                      <label className="block"><span className="label">Unit</span><select className="select w-44" value={l.ndcUnit ?? "UN"} aria-label={`Line ${i + 1} drug unit`} onChange={(e) => updateLine(i, { ndcUnit: e.target.value })}>{NDC_UNITS.map(([u, n]) => <option key={u} value={u}>{u}: {n}</option>)}</select></label>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table></div>

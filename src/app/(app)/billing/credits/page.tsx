@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { CAN_ADJUST, requireSession } from "@/lib/auth";
-import { creditBalances, listRefunds } from "@/server/recovery";
-import { approveRefundAction, cancelRefundAction, issueRefundAction, requestRefundAction } from "@/app/(app)/recovery-actions";
+import { creditBalances, listRefunds, overpaymentClocks, OVERPAYMENT_DAYS } from "@/server/recovery";
+import { approveRefundAction, cancelRefundAction, issueRefundAction, overpaymentIdentifiedAction, requestRefundAction } from "@/app/(app)/recovery-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
@@ -12,8 +12,6 @@ export const metadata: Metadata = { title: "Patient credits" };
 
 export const dynamic = "force-dynamic";
 
-/** Medicare and Medicaid overpayments must be returned within 60 days of being identified (42 U.S.C. 1320a-7k(d)). */
-const GOVERNMENT = new Set(["medicare", "medicaid"]);
 const STATUS_TONE = { requested: "amber", approved: "blue", issued: "green", cancelled: "slate" } as const;
 
 function RequestForm({ payee, patientId, claimId, maxCents }: { payee: "patient" | "payer"; patientId?: string; claimId?: string; maxCents: number }) {
@@ -36,9 +34,11 @@ export default async function CreditsPage() {
   const s = await requireSession();
   const db = await getDb();
   const [credits, refunds] = await Promise.all([creditBalances(db, s.practiceId), listRefunds(db, s.practiceId)]);
+  const clocks = new Map((await overpaymentClocks(db, s.practiceId, new Date(), credits)).map((c) => [c.claimId, c]));
   const canAdjust = (CAN_ADJUST as readonly string[]).includes(s.role);
   const isAdmin = s.role === "admin";
-  const urgent = credits.claims.filter((c) => GOVERNMENT.has(c.payerType) && (c.ageDays ?? 0) > 45 && c.overpaidCents > c.pendingCents);
+  const urgent = [...clocks.values()].filter((c) => c.daysLeft <= 15 && c.overpaidCents > c.pendingCents);
+  const late = urgent.filter((c) => c.daysLeft < 0).length;
   const open = refunds.filter((r) => r.refund.status === "requested" || r.refund.status === "approved");
 
   return (
@@ -56,8 +56,8 @@ export default async function CreditsPage() {
 
       {urgent.length > 0 && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-          <p className="font-semibold">{urgent.length} Medicare or Medicaid overpayment{urgent.length === 1 ? "" : "s"} paid more than 45 days ago</p>
-          <p className="mt-1">Federal law requires identified Medicare and Medicaid overpayments to be reported and returned within 60 days. Keeping them longer can be treated as a false claim. Review these first; the date shown is the last payment, so confirm when the overpayment was actually identified.</p>
+          <p className="font-semibold">{urgent.length} Medicare or Medicaid overpayment{urgent.length === 1 ? "" : "s"} due within 15 days{late ? `, ${late} already past the deadline` : ""}</p>
+          <p className="mt-1">Federal law requires identified Medicare and Medicaid overpayments to be reported and returned within {OVERPAYMENT_DAYS} days. Keeping them longer can be treated as a false claim. The clock starts on the day the payment was posted; if the overpayment was actually identified later (or a good-faith investigation paused the clock), correct the date on the claim below.</p>
         </div>
       )}
 
@@ -141,7 +141,7 @@ export default async function CreditsPage() {
               <tbody>
                 {credits.claims.map((c) => {
                   const left = c.overpaidCents - c.pendingCents;
-                  const gov = GOVERNMENT.has(c.payerType);
+                  const clock = clocks.get(c.claimId);
                   return (
                     <tr key={c.claimId}>
                       <td>
@@ -150,7 +150,21 @@ export default async function CreditsPage() {
                       </td>
                       <td>
                         {c.payerName}
-                        {c.lastPaidOn && <span className={`block text-xs ${gov && (c.ageDays ?? 0) > 45 ? "font-semibold text-red-700" : "text-slate-500"}`}>paid {fmtDate(c.lastPaidOn)}{gov ? ` · ${c.ageDays} days` : ""}</span>}
+                        {c.lastPaidOn && <span className="block text-xs text-slate-500">paid {fmtDate(c.lastPaidOn)}</span>}
+                        {clock && (
+                          <span className={`block text-xs ${clock.daysLeft <= 15 ? "font-semibold text-red-700" : "text-slate-600"}`}>
+                            {clock.daysLeft < 0 ? `${-clock.daysLeft} days late` : `return by ${fmtDate(clock.dueOn)} (${clock.daysLeft} days)`}
+                          </span>
+                        )}
+                        {clock && canAdjust && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-brand-700">Identified {fmtDate(clock.identifiedOn)}</summary>
+                            <ActionForm action={overpaymentIdentifiedAction.bind(null, c.claimId)} className="mt-1 flex items-end gap-1">
+                              <input type="date" name="identifiedOn" defaultValue={clock.identifiedOn} className="input text-xs" aria-label="Date identified" required />
+                              <SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Save</SubmitButton>
+                            </ActionForm>
+                          </details>
+                        )}
                       </td>
                       <td className="text-right font-semibold text-amber-700"><Money cents={c.overpaidCents} />{c.pendingCents ? <span className="block text-xs font-normal text-slate-500">{money(c.pendingCents)} in refund</span> : null}</td>
                       <td className="text-right">{canAdjust && left >= 100 && <RequestForm payee="payer" claimId={c.claimId} maxCents={left} />}</td>

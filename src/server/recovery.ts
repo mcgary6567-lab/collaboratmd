@@ -16,7 +16,7 @@ import { contractRates } from "./fees";
 import { getPolicies } from "./policies";
 import { notify } from "./notifications";
 
-const { chargeReviewDismissals, refunds, underpayments, ledgerEntries, auditLog, claims, payers, patients, practices, patientInsurances, encounters, charges } = schema;
+const { chargeReviewDismissals, refunds, underpayments, ledgerEntries, auditLog, claims, payers, patients, practices, patientInsurances, encounters, charges, overpaymentIdentifications } = schema;
 type Row = Record<string, string | null>;
 
 /* ------------------------------ Missed charges ------------------------------ */
@@ -197,6 +197,69 @@ export async function creditBalances(db: Db, practiceId: string, now = new Date(
     ageDays: r.last_paid ? Math.floor((now.getTime() - Date.parse(r.last_paid)) / 86_400_000) : null,
   }));
   return { patients: patientsOut, claims: claimsOut };
+}
+
+/* ------------------------------ The 60-day overpayment rule ------------------------------ */
+
+/**
+ * Medicare and Medicaid overpayments must be reported and returned within 60
+ * days of being identified (42 U.S.C. 1320a-7k(d); 42 CFR 401.305). The clock
+ * starts, by default, on the day the payment that caused it was posted: that is
+ * when the ledger shows it. A biller can correct the date (for example, to when
+ * an audit actually found it), and every change is in the audit log. The 2024
+ * rule lets a timely, good-faith investigation pause the clock for up to 180
+ * days; that judgment is the practice's, so it is recorded as a later date here.
+ */
+export const OVERPAYMENT_DAYS = 60;
+export const GOVERNMENT_PAYERS = new Set(["medicare", "medicaid"]);
+
+export type OverpaymentClock = ClaimOverpayment & { identifiedOn: string; dueOn: string; daysLeft: number };
+
+const plusDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** Government overpayments with their deadlines, starting the clock on any found for the first time. */
+export async function overpaymentClocks(db: Db, practiceId: string, now = new Date(), credits?: Awaited<ReturnType<typeof creditBalances>>) {
+  const all = (credits ?? (await creditBalances(db, practiceId, now))).claims;
+  const gov = all.filter((c) => GOVERNMENT_PAYERS.has(c.payerType));
+  const today = now.toISOString().slice(0, 10);
+  const known = new Map((await db.select().from(overpaymentIdentifications).where(eq(overpaymentIdentifications.practiceId, practiceId))).map((r) => [r.claimId, r.identifiedOn]));
+  const fresh = gov.filter((c) => !known.has(c.claimId));
+  if (fresh.length) {
+    await db.insert(overpaymentIdentifications).values(fresh.map((c) => ({ claimId: c.claimId, practiceId, identifiedOn: c.lastPaidOn ?? today }))).onConflictDoNothing();
+    for (const c of fresh) known.set(c.claimId, c.lastPaidOn ?? today);
+  }
+  // A claim no longer overpaid stops its clock, so a later overpayment on it starts a new one. (The list is capped at 500.)
+  const current = new Set(all.map((c) => c.claimId));
+  const cleared = [...known.keys()].filter((id) => !current.has(id));
+  if (cleared.length && all.length < 500) await db.delete(overpaymentIdentifications).where(and(eq(overpaymentIdentifications.practiceId, practiceId), inArray(overpaymentIdentifications.claimId, cleared)));
+  return gov.map((c): OverpaymentClock => {
+    const identifiedOn = known.get(c.claimId)!;
+    const dueOn = plusDays(identifiedOn, OVERPAYMENT_DAYS);
+    return { ...c, identifiedOn, dueOn, daysLeft: Math.round((Date.parse(`${dueOn}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000) };
+  }).sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+/** Corrects when an overpayment was identified; the deadline moves with it. */
+export async function setOverpaymentIdentified(db: Db, practiceId: string, claimId: string, identifiedOn: string, userId?: string, now = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(identifiedOn) || identifiedOn > now.toISOString().slice(0, 10)) throw new Error("Enter the date the overpayment was identified (not in the future)");
+  const [before] = await db.select().from(overpaymentIdentifications).where(and(eq(overpaymentIdentifications.claimId, claimId), eq(overpaymentIdentifications.practiceId, practiceId))).limit(1);
+  if (!before) throw new Error("This claim has no Medicare or Medicaid overpayment being tracked");
+  await db.update(overpaymentIdentifications).set({ identifiedOn, identifiedBy: userId ?? null }).where(eq(overpaymentIdentifications.claimId, claimId));
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "overpayment_identified_date", entity: "claim", entityId: claimId, details: { from: before.identifiedOn, to: identifiedOn } });
+}
+
+/** Daily: a notice for each government overpayment due within 15 days (or late), until it is refunded. */
+export async function overpaymentDeadlineAlerts(db: Db, practiceId: string, now = new Date()) {
+  const clocks = await overpaymentClocks(db, practiceId, now);
+  const soon = clocks.filter((c) => c.daysLeft <= 15 && c.overpaidCents > c.pendingCents);
+  for (const c of soon) {
+    await notify(db, practiceId, {
+      kind: "overpayment_60day", href: "/billing/credits", dedupeKey: `op60:${c.claimId}:${c.dueOn}:${c.daysLeft < 0 ? "late" : "soon"}`,
+      title: c.daysLeft < 0 ? `${c.payerName} overpayment on ${c.controlNumber} is ${-c.daysLeft} days past the 60-day deadline` : `Return the ${c.payerName} overpayment on ${c.controlNumber} by ${c.dueOn}`,
+      body: `${usd(c.overpaidCents - c.pendingCents)} still to return. Medicare and Medicaid overpayments must be returned within 60 days of being identified.`,
+    });
+  }
+  return { tracked: clocks.length, dueSoon: soon.length };
 }
 
 export async function requestRefund(db: Db, practiceId: string, input: { payee: "patient" | "payer"; patientId?: string; claimId?: string; amountCents: number; reason: string }, userId?: string) {

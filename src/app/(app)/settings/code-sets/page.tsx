@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Code sets" };
 
 export const dynamic = "force-dynamic";
 
-const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units" };
+const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units", telehealth: "Medicare telehealth list" };
 
 export default async function CodeSetsPage() {
   const s = await requireSession();
@@ -56,6 +56,7 @@ export default async function CodeSetsPage() {
             <li>HCPCS Level II: CMS&apos;s quarterly Alpha-Numeric HCPCS file. Open the Excel file and save it as CSV.</li>
             <li>Medicare fee schedule: from CMS&apos;s Physician Fee Schedule relative value files each year, the PPRRVU file and the GPCI file (Addendum E), each saved as CSV, with the calendar year. Practices then choose their locality on the practice profile.</li>
             <li>Anesthesia base units: CMS&apos;s anesthesia base unit file saved as CSV (code and base units).</li>
+            <li>Medicare telehealth services: CMS&apos;s list for the calendar year (Telehealth, List of Telehealth Services), saved as CSV with its HCPCS, status and audio-only columns, and the year. Medicare telehealth lines for a code not on that year&apos;s list, or audio only where the list does not allow it, get a warning.</li>
             <li>CPT codes and descriptions belong to the American Medical Association and are not loaded here; each practice describes its procedure codes in its own words under Fee schedules.</li>
             <li>NCCI code pairs and unit limits: CMS publishes them quarterly as downloads on the National Correct Coding Initiative pages (practitioner files). Save each table as tab- or comma-separated text.</li>
             <li>Coverage: from the Medicare Coverage Database downloads, join each article&apos;s HCPCS codes to its covered ICD-10 codes and save as <code>policy_id, title, hcpcs, icd10</code>.</li>
@@ -70,9 +71,9 @@ export default async function CodeSetsPage() {
             <>
               <ActionForm action={importCodeSetAction} className="flex flex-wrap items-end gap-3 text-sm">
                 <label className="block"><span className="label">Code set</span>
-                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
+                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="telehealth">Medicare telehealth services list (CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
                 </label>
-                <label className="block"><span className="label">Year (ICD-10-CM fiscal year or fee schedule year)</span><input name="year" className="input w-28" inputMode="numeric" placeholder={String(currentFiscalYear())} maxLength={4} /></label>
+                <label className="block"><span className="label">Year (ICD-10-CM fiscal year; fee schedule or telehealth list year)</span><input name="year" className="input w-28" inputMode="numeric" placeholder={String(currentFiscalYear())} maxLength={4} /></label>
                 <label className="block"><span className="label">Conversion factor (RVU file, if not in it)</span><input name="conversionFactor" className="input w-32" inputMode="decimal" placeholder="e.g. 33.4009" /></label>
                 <label className="block"><span className="label">Label</span><input name="label" className="input" placeholder="2026 Q4 practitioner PTP, part 1" /></label>
                 <label className="block"><span className="label">File (up to 4 MB)</span><input type="file" name="file" accept=".txt,.csv,.tsv" className="input" required /></label>

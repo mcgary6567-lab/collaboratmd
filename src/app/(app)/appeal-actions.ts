@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { CAN_ADJUST, requireRole } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { draftAppeal, markAppealSent, saveAppeal } from "@/server/appeals";
+import { recordAppealDecision, type Decision } from "@/server/appeal-levels";
 
 const fail = (e: unknown): FormResult => ({ ok: false, message: e instanceof Error ? e.message : "Something went wrong" });
 
@@ -42,5 +43,17 @@ export async function markSentAction(denialId: string, letterId: string, _prev: 
     return { ok: true, message: "Marked sent; the denial is now appealed" };
   } catch (e) {
     return fail(e);
+  }
+}
+
+export async function appealDecisionAction(levelId: string, denialId: string, _prev: FormResult, fd: FormData): Promise<FormResult> {
+  const s = await requireRole(CAN_WRITE);
+  try {
+    const r = await recordAppealDecision(await getDb(), s.practiceId, levelId, String(fd.get("decision") ?? "") as Decision, String(fd.get("decidedOn") ?? ""), s.userId);
+    revalidatePath(`/denials/${denialId}/appeal`);
+    revalidatePath("/denials");
+    return { ok: true, message: r.next ? `Recorded. Next: ${r.next.name}, due ${r.next.dueOn}.` : "Recorded." };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not record it" };
   }
 }

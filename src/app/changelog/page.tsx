@@ -9,6 +9,20 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-09-29",
+    title: "Drug codes, payer takebacks, appeal levels, ABNs and the 60-day rule",
+    items: [
+      "NDC, quantity and unit on drug lines, sent on the 837P and printed on the CMS-1500",
+      "Payer takebacks on an 835 (PLB) post to the claim they are for; interest is shown with the check",
+      "Coverage checked automatically for tomorrow's appointments, with a note for the front desk",
+      "Appeal levels with their deadlines, including Medicare's five levels",
+      "Advance Beneficiary Notices recorded per patient; GA added to covered Medicare lines and checked on claims",
+      "Medicare and Medicaid overpayments show their 60-day return deadline, with a reminder before it passes",
+      "Telehealth checks: place of service, modifiers and Medicare's telehealth list",
+      "Inpatient procedure codes (ICD-10-PCS) on facility claims, and a plain-paper UB-04 to print",
+    ],
+  },
+  {
     date: "2026-09-28",
     title: "Medicare pricing, who pays first, therapy and anesthesia, passkeys",
     items: [

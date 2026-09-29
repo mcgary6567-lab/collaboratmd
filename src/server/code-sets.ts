@@ -15,20 +15,20 @@
  * simply do not fire.
  */
 import { isDemoEmail, onProduction } from "@/lib/demo";
-import { and, desc, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
-import type { ScrubFinding } from "@/lib/scrub/rules";
+import { TELEHEALTH_POS, type ScrubFinding } from "@/lib/scrub/rules";
 import { parseCsv } from "@/lib/import/csv";
 import { normalizeDate } from "@/lib/import/patients";
 import { hcpcsFindings, icdFindings, icdYearLoaded, importHcpcs, importIcd10 } from "./code-catalog";
 import { importGpcis, importRvus } from "./mpfs";
 import { importAnesthesiaBaseUnits } from "./time-units";
 
-const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads } = schema;
+const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads, medicareTelehealthCodes } = schema;
 
-export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia";
-export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia"];
+export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia" | "telehealth";
+export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia", "telehealth"];
 
 /** Platform operators, by email: the only people who can replace national code sets. */
 export function isPlatformOperator(email: string | null | undefined) {
@@ -106,6 +106,31 @@ export function parseCoverage(text: string): { rows: CoverageRow[]; skipped: num
   return { rows, skipped };
 }
 
+export type TelehealthRow = { code: string; status: string | null };
+/**
+ * CMS's list of Medicare telehealth services for a year, saved as CSV: a code
+ * column (HCPCS), a status (permanent or provisional) and, when present, the
+ * column saying whether audio only can meet the requirements.
+ */
+export function parseTelehealthList(text: string): { rows: TelehealthRow[]; skipped: number } {
+  const t = tableFrom(text, [/hcpcs|code/i]);
+  if (!t) throw new Error("Not a telehealth list: expected an HCPCS or code column");
+  const h = t.headers;
+  const [c, st, audio] = [col(h, /hcpcs|code/i), col(h, /status/i), col(h, /audio/i)];
+  const rows: TelehealthRow[] = [];
+  let skipped = 0;
+  const seen = new Set<string>();
+  for (const r of t.rows) {
+    const hc = code(r[c]);
+    if (!/^[0-9A-Z]{5}$/.test(hc) || seen.has(hc)) { skipped++; continue; }
+    seen.add(hc);
+    const status = st >= 0 ? (r[st] ?? "").trim().slice(0, 60) : "";
+    const audioOnly = audio >= 0 && /^y/i.test((r[audio] ?? "").trim());
+    rows.push({ code: hc, status: [status, audioOnly ? "audio-only allowed" : ""].filter(Boolean).join("; ") || null });
+  }
+  return { rows, skipped };
+}
+
 /* ------------------------------ Loading ------------------------------ */
 
 async function inChunks<T>(rows: T[], size: number, fn: (chunk: T[]) => Promise<unknown>) {
@@ -120,7 +145,15 @@ export async function importCodeSet(db: Db, set: CodeSet, text: string, label: s
   if (set === "anesthesia") return importAnesthesiaBaseUnits(db, text, label, loadedBy);
   let added = 0;
   let skipped = 0;
-  if (set === "ncci_ptp") {
+  if (set === "telehealth") {
+    if (!Number.isInteger(year) || year! < 2020) throw new Error("Give the calendar year of the telehealth list, e.g. 2026");
+    const p = parseTelehealthList(text);
+    skipped = p.skipped;
+    // A year's list replaces the earlier load for that year: codes CMS removed must not linger.
+    if (p.rows.length) await db.delete(medicareTelehealthCodes).where(eq(medicareTelehealthCodes.year, year!));
+    await inChunks(p.rows, 1000, (chunk) => db.insert(medicareTelehealthCodes).values(chunk.map((r) => ({ ...r, year: year! }))).onConflictDoNothing());
+    added = p.rows.length;
+  } else if (set === "ncci_ptp") {
     const p = parsePtp(text);
     skipped = p.skipped;
     await inChunks(p.rows, 1000, (chunk) => db.insert(ncciPtp).values(chunk).onConflictDoUpdate({ target: [ncciPtp.column1, ncciPtp.column2, ncciPtp.effective], set: { deletion: sql`excluded.deletion`, modifierIndicator: sql`excluded.modifier_indicator`, rationale: sql`excluded.rationale` } }));
@@ -166,12 +199,38 @@ export type CodeSetClaim = {
   payerType: string;
   dateOfService: string;
   diagnoses: string[];
+  placeOfService?: string;
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number }[];
 };
 
 export async function codeSetFindings(db: Db, c: CodeSetClaim): Promise<ScrubFinding[]> {
-  const [dx, level2] = await Promise.all([icdFindings(db, c.dateOfService, c.diagnoses), hcpcsFindings(db, c.dateOfService, c.lines)]);
-  return [...dx, ...level2, ...(await ncciFindings(db, c))];
+  const [dx, level2, tele] = await Promise.all([icdFindings(db, c.dateOfService, c.diagnoses), hcpcsFindings(db, c.dateOfService, c.lines), telehealthFindings(db, c)]);
+  return [...dx, ...level2, ...tele, ...(await ncciFindings(db, c))];
+}
+
+/**
+ * Medicare pays for telehealth only for the services on its telehealth list
+ * for that calendar year, and audio-only only for those the list allows. With
+ * no list loaded for the year, this does not fire.
+ */
+async function telehealthFindings(db: Db, c: CodeSetClaim): Promise<ScrubFinding[]> {
+  if (c.payerType !== "medicare") return [];
+  const tele = (m: string[]) => m.some((x) => ["95", "93", "FQ"].includes(x.toUpperCase()));
+  const pos = TELEHEALTH_POS.has(c.placeOfService ?? "");
+  const lines = c.lines.filter((l) => pos || tele(l.modifiers));
+  if (!lines.length) return [];
+  const year = Number(c.dateOfService.slice(0, 4));
+  const listed = await db.select().from(medicareTelehealthCodes).where(eq(medicareTelehealthCodes.year, year));
+  if (!listed.length) return [];
+  const byCode = new Map(listed.map((r) => [r.code, r.status ?? ""]));
+  const out: ScrubFinding[] = [];
+  for (const l of lines) {
+    const code = l.cpt.toUpperCase();
+    const field = `lines.${l.lineNumber}.cpt`;
+    if (!byCode.has(code)) out.push({ rule: "TELEHEALTH_LIST", severity: "warning", field, message: `Line ${l.lineNumber}: ${code} is not on Medicare's ${year} telehealth services list; Medicare will deny it as telehealth` });
+    else if (l.modifiers.some((m) => ["93", "FQ"].includes(m.toUpperCase())) && !/audio/i.test(byCode.get(code)!)) out.push({ rule: "TELEHEALTH_LIST", severity: "warning", field, message: `Line ${l.lineNumber}: Medicare's ${year} telehealth list does not allow ${code} by audio only (modifier 93 or FQ)` });
+  }
+  return out;
 }
 
 async function ncciFindings(db: Db, c: CodeSetClaim): Promise<ScrubFinding[]> {

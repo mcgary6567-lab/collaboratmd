@@ -1,5 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { abnFindings } from "./abn";
 import { mspFindings } from "./msp";
+import { postProviderAdjustments } from "./plb";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { scrubClaim, hasBlockingErrors, type ScrubClaim, type ScrubFinding } from "@/lib/scrub/rules";
@@ -68,7 +70,7 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null, cliaNumber: b.practice.cliaNumber },
     encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi,
       relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber },
-    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, minutes: l.minutes })),
+    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, minutes: l.minutes, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity })),
     payer: { timelyFilingDays: b.payer.timelyFilingDays, type: b.payer.type },
     today,
   };
@@ -117,11 +119,12 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
   );
   const enrolled = enrollmentFinding(enrollment, b.encounter.dateOfService, `Dr. ${b.provider.firstName} ${b.provider.lastName}`, b.payer.name);
   const national = await codeSetFindings(db, {
-    payerType: b.payer.type, dateOfService: b.encounter.dateOfService, diagnoses: b.encounter.diagnoses,
+    payerType: b.payer.type, dateOfService: b.encounter.dateOfService, diagnoses: b.encounter.diagnoses, placeOfService: b.encounter.placeOfService,
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units })),
   });
   const msp = await mspFindings(db, { patientId: b.patient.id, payerType: b.payer.type, payerSequence: b.claim.payerSequence, mspType: b.insurance.mspType });
-  return { findings: [...general, ...edits.findings, ...national, ...msp, ...(enrolled ? [enrolled] : [])], edits };
+  const abn = await abnFindings(db, { patientId: b.patient.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })) });
+  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
@@ -455,7 +458,7 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   if (!remit) throw new Error("Remittance not found");
   if (remit.posted) return remit.postingSummary;
   const parsed = parseEdi835(remit.raw835);
-  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number; secondaryBilled?: number; crossovers?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
+  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number; secondaryBilled?: number; crossovers?: number; providerAdjustments?: { takenBackCents: number; interestCents: number; unmatched: number; other: number } } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
   const readyForSecondary: string[] = [];
 
   for (const rc of parsed.claims) {
@@ -551,6 +554,8 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
       await db.insert(claimEvents).values({ claimId: id, status: "paid", source: "system", message: `Secondary claim not created: ${e instanceof Error ? e.message : "error"}` });
     }
   }
+  // Money taken back for earlier claims, interest and carried balances, from the PLB segments.
+  if (parsed.providerAdjustments.length) summary.providerAdjustments = await postProviderAdjustments(db, remit, parsed, userId);
   await db.update(remittances).set({ posted: true, postingSummary: summary }).where(eq(remittances.id, remittanceId));
   return summary;
 }

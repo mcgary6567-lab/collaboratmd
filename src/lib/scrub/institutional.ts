@@ -6,7 +6,7 @@
  */
 import type { ScrubFinding } from "./rules";
 import { isValidNpi } from "./rules";
-import { isInpatient, type Institutional } from "@/lib/edi/x837i";
+import { isInpatient, isPcsCode, type Institutional } from "@/lib/edi/x837i";
 
 export type InstitutionalScrubInput = {
   institutional: Institutional | null;
@@ -49,6 +49,14 @@ export function scrubInstitutional(c: InstitutionalScrubInput): ScrubFinding[] {
     if (!i.admissionSource) err("ADMIT_SOURCE", "Inpatient bills need the point of origin (UB-04 FL15)", "institutional.admissionSource");
     if (!i.admittingDiagnosis) warn("ADMIT_DX", "Inpatient bills should carry the admitting diagnosis", "institutional.admittingDiagnosis");
   }
+  (i.procedures ?? []).forEach((p, k) => {
+    const which = k === 0 ? "Principal procedure" : `Procedure ${k + 1}`;
+    if (!isPcsCode(p.code)) err("PCS_FORMAT", `${which}: "${p.code}" is not an ICD-10-PCS code (seven characters, no I or O)`, "institutional.procedures");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date ?? "")) err("PCS_DATE", `${which}: enter the date it was performed`, "institutional.procedures");
+    else if (i.statementFrom && i.statementTo && (p.date < (i.admissionDate ?? i.statementFrom) || p.date > i.statementTo)) err("PCS_DATE", `${which}: ${p.date} is outside the stay`, "institutional.procedures");
+  });
+  if ((i.procedures?.length ?? 0) > 25) err("PCS_MAX", "An 837I carries at most 25 ICD-10-PCS procedures", "institutional.procedures");
+  if (i.procedures?.length && !isInpatient(tob)) warn("PCS_OUTPATIENT", "ICD-10-PCS procedure codes are for inpatient bills; outpatient procedures go on the lines as HCPCS", "institutional.procedures");
   if (!c.diagnoses.length) err("PRINCIPAL_DX", "Enter the principal diagnosis", "diagnoses");
   if (!isValidNpi(c.billingNpi)) err("BILLING_NPI", "The facility's NPI fails its check digit", "practice.npi");
   if (!isValidNpi(c.attendingNpi)) err("ATTENDING_NPI", "The attending provider's NPI fails its check digit", "provider.npi");

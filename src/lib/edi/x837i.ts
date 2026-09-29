@@ -27,7 +27,12 @@ export interface Institutional {
   /** UB-04 FL17 discharge status, e.g. 01 home, 03 skilled nursing, 20 expired, 30 still a patient. */
   patientStatus: string;
   admittingDiagnosis?: string | null;
+  /** ICD-10-PCS inpatient procedures (UB-04 FL74), principal first, each with the date it was done. */
+  procedures?: { code: string; date: string }[] | null;
 }
+
+/** ICD-10-PCS: seven characters, digits and letters except I and O. */
+export const isPcsCode = (code: string) => /^[0-9A-HJ-NP-Z]{7}$/.test(code.toUpperCase());
 
 export interface Edi837IInput {
   controlNumber: string;
@@ -105,6 +110,14 @@ export function buildEdi837I(input: Edi837IInput): string {
   body.push(["HI", `ABK:${icd(input.claim.diagnoses[0])}`]);
   if (inst.admittingDiagnosis) body.push(["HI", `ABJ:${icd(inst.admittingDiagnosis)}`]);
   if (input.claim.diagnoses.length > 1) body.push(["HI", ...input.claim.diagnoses.slice(1, 25).map((c) => `ABF:${icd(c)}`)]);
+  // ICD-10-PCS procedures: BBR the principal, BBQ the others (up to 12 per HI segment, 24 in all), each with its date.
+  const procs = inst.procedures ?? [];
+  if (procs.length) {
+    const pcs = (q: string, p: { code: string; date: string }) => `${q}:${p.code.toUpperCase()}:D8:${d8(p.date)}`;
+    body.push(["HI", pcs("BBR", procs[0])]);
+    const others = procs.slice(1, 25);
+    for (let k = 0; k < others.length; k += 12) body.push(["HI", ...others.slice(k, k + 12).map((p) => pcs("BBQ", p))]);
+  }
   // 2310A attending provider
   body.push(["NM1", "71", "1", input.attending.lastName, input.attending.firstName, "", "", "", "XX", input.attending.npi]);
   body.push(["PRV", "AT", "PXC", input.attending.taxonomy]);

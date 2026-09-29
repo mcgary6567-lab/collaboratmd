@@ -265,6 +265,9 @@ const encounterSchema = z.object({
         dxPointers: z.array(z.number().int().min(1)).min(1),
         description: z.string().optional(),
         minutes: z.number().int().min(0).max(1440).nullable().optional(),
+        ndc: z.string().max(20).nullable().optional(),
+        ndcUnit: z.string().max(2).nullable().optional(),
+        ndcQuantity: z.number().min(0).max(100000).nullable().optional(),
       }),
     )
     .min(1)

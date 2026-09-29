@@ -95,7 +95,7 @@ export function buildClaimEdi(
       accident: accidentOf(bundle.encounter),
       dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses, attachments,
     },
-    lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService, minutes: l.minutes })),
+    lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService, minutes: l.minutes, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity })),
     otherPayer,
     serviceFacility,
   });

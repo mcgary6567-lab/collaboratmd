@@ -16,6 +16,7 @@ import { parseEdi835 } from "@/lib/edi/x835";
 import { practiceConfig } from "./integrations";
 import { applyInbound277, importRemittance, postRemittance } from "./claims";
 import { notify } from "./notifications";
+import { plbForPractice } from "./plb";
 
 const { clearinghousePolls, inboundTransactions, claims, practices } = schema;
 const MAX_PAGES = 10;
@@ -60,7 +61,7 @@ export async function pollRemittances(db: Db, practiceId: string, opts: { now?: 
           const parsed = parseEdi835(item.x12);
           const numbers = parsed.claims.map((c) => c.patientControlNumber).filter(Boolean);
           const ours = numbers.length ? await db.select({ id: claims.id }).from(claims).where(and(eq(claims.practiceId, practiceId), inArray(claims.controlNumber, numbers))) : [];
-          if (!ours.length) {
+          if (!ours.length && !(await plbForPractice(db, practiceId, parsed))) {
             note = "No claims in this 835 belong to this practice";
             summary.skipped++;
           } else {

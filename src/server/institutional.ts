@@ -6,7 +6,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
-import type { Institutional } from "@/lib/edi/x837i";
+import { isPcsCode, type Institutional } from "@/lib/edi/x837i";
 import { createEncounterWithClaim } from "./encounters";
 import { rescrubClaim } from "./claims";
 
@@ -46,13 +46,24 @@ function placeFor(tob: string) {
   return ({ "11": "21", "12": "21", "13": "22", "14": "22", "21": "31", "22": "31", "71": "72", "73": "50", "74": "62", "75": "62", "76": "53", "83": "24", "85": "22" } as Record<string, string>)[f] ?? "99";
 }
 
-export type InstitutionalInput = Institutional & {
+export type InstitutionalInput = Omit<Institutional, "procedures"> & {
+  procedures?: { code: string; date: string }[];
   patientId: string;
   attendingProviderId: string;
   diagnoses: string[];
   /** chargeCents is per unit, as on every service line. */
   lines: { revenueCode: string; hcpcs?: string; modifiers?: string[]; units: number; chargeCents: number }[];
 };
+
+/** Cleans entered ICD-10-PCS procedures: blank rows dropped, dots and spaces removed, a bad code refused before the claim is made. */
+export function pcsProcedures(rows: { code: string; date: string }[]) {
+  const out = rows.map((p) => ({ code: p.code.replace(/[\s.-]/g, "").toUpperCase(), date: p.date.trim() })).filter((p) => p.code);
+  for (const p of out) {
+    if (!isPcsCode(p.code)) throw new Error(`${p.code} is not an ICD-10-PCS code: seven letters and digits (no I or O), like 0DTJ4ZZ`);
+    if (!p.date) throw new Error(`Enter the date procedure ${p.code} was performed`);
+  }
+  return out.length ? out : null;
+}
 
 export async function createInstitutionalClaim(db: Db, practiceId: string, input: InstitutionalInput, userId?: string) {
   const lines = input.lines
@@ -62,6 +73,7 @@ export async function createInstitutionalClaim(db: Db, practiceId: string, input
   const diagnoses = input.diagnoses.map((d) => d.trim().toUpperCase()).filter(Boolean);
   if (!diagnoses.length) throw new Error("Enter the principal diagnosis");
   if (!/^\d{4}$/.test(input.typeOfBill)) throw new Error("Choose the type of bill");
+  const procedures = pcsProcedures(input.procedures ?? []);
   const [attending] = await db.select({ id: providers.id }).from(providers).where(and(eq(providers.id, input.attendingProviderId), eq(providers.practiceId, practiceId))).limit(1);
   if (!attending) throw new Error("Choose the attending provider");
 
@@ -76,6 +88,7 @@ export async function createInstitutionalClaim(db: Db, practiceId: string, input
     admissionDate: input.admissionDate || null, admissionHour: input.admissionHour?.replace(":", "") || null,
     admissionType: input.admissionType || null, admissionSource: input.admissionSource || null,
     patientStatus: input.patientStatus, admittingDiagnosis: input.admittingDiagnosis?.trim().toUpperCase() || null,
+    procedures,
   };
   await db.update(claims).set({ claimType: "institutional", institutional }).where(eq(claims.id, claim.id));
   await db.insert(claimEvents).values({ claimId: claim.id, status: claim.status, source: "user", message: `Institutional claim (UB-04, type of bill ${input.typeOfBill})` });

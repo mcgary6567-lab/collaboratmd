@@ -1,7 +1,8 @@
 "use client";
 
+import { NDC_UNITS, fmtNdc, isDrugCode } from "@/lib/codes/ndc";
 import { TIMED_THERAPY_CODES, isAnesthesiaCode } from "@/lib/time-units";
-import { useActionState, useState } from "react";
+import { Fragment, useActionState, useState } from "react";
 import { Plus, Trash } from "lucide-react";
 import { editClaimAction } from "@/app/(app)/claim-edit-actions";
 import { Alert, Field } from "@/components/ui";
@@ -9,7 +10,7 @@ import { PosOptions } from "@/components/code-pickers";
 import { CodeList, useCodeSearch } from "@/components/code-search";
 import { money } from "@/lib/utils";
 
-type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string; minutes?: string };
+type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string; minutes?: string; ndc?: string; ndcUnit?: string; ndcQuantity?: string };
 
 
 export function ClaimEditForm({
@@ -19,7 +20,7 @@ export function ClaimEditForm({
   icds,
 }: {
   claimId: string;
-  initial: { dateOfService: string; placeOfService: string; diagnoses: string[]; lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description: string | null; minutes?: number | null }[] };
+  initial: { dateOfService: string; placeOfService: string; diagnoses: string[]; lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description: string | null; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[] };
   cpts: { code: string; description: string; fee: number }[];
   icds: { code: string; description: string }[];
 }) {
@@ -30,7 +31,7 @@ export function ClaimEditForm({
   const pxSearch = useCodeSearch("px", cpts);
   const [dx, setDx] = useState<string[]>(initial.diagnoses.length ? initial.diagnoses : [""]);
   const [lines, setLines] = useState<Line[]>(
-    initial.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers.join(", "), units: l.units, charge: (l.chargeCents / 100).toFixed(2), dxPointers: l.dxPointers.join(","), description: l.description ?? "", minutes: l.minutes ? String(l.minutes) : "" })),
+    initial.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers.join(", "), units: l.units, charge: (l.chargeCents / 100).toFixed(2), dxPointers: l.dxPointers.join(","), description: l.description ?? "", minutes: l.minutes ? String(l.minutes) : "", ndc: l.ndc ? fmtNdc(l.ndc) : "", ndcUnit: l.ndcUnit ?? "UN", ndcQuantity: l.ndcQuantity ? String(l.ndcQuantity) : "" })),
   );
   const update = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const total = lines.reduce((a, l) => a + (parseFloat(l.charge) || 0) * (l.units || 1), 0);
@@ -43,6 +44,9 @@ export function ClaimEditForm({
       modifiers: l.modifiers.split(",").map((m) => m.trim()).filter(Boolean),
       units: Number(l.units) || 1,
       minutes: Number(l.minutes) || null,
+      ndc: isDrugCode(l.cpt) ? l.ndc || null : null,
+      ndcUnit: isDrugCode(l.cpt) ? l.ndcUnit || "UN" : null,
+      ndcQuantity: isDrugCode(l.cpt) ? Number(l.ndcQuantity) || null : null,
       chargeCents: Math.round((parseFloat(l.charge) || 0) * 100),
       dxPointers: l.dxPointers.split(",").map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n)),
       description: l.description || pxSearch.describe(l.cpt),
@@ -90,7 +94,8 @@ export function ClaimEditForm({
             <thead><tr><th>#</th><th>CPT</th><th>Modifiers</th><th>Units</th><th>Minutes</th><th>Charge ($)</th><th>Dx ptr</th><th /></tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={i}>
+                <Fragment key={i}>
+                <tr>
                   <td className="text-slate-500">{i + 1}</td>
                   <td className="w-32">
                     <input list="cpt-edit" className="input font-mono" value={l.cpt} onChange={(e) => {
@@ -107,6 +112,19 @@ export function ClaimEditForm({
                   <td className="w-24"><input className="input" value={l.dxPointers} onChange={(e) => update(i, { dxPointers: e.target.value })} /></td>
                   <td>{lines.length > 1 && <button type="button" aria-label="Remove line" className="text-slate-500 hover:text-red-600" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}><Trash className="h-4 w-4" /></button>}</td>
                 </tr>
+                {isDrugCode(l.cpt) && (
+                  <tr>
+                    <td />
+                    <td colSpan={7}>
+                      <div className="flex flex-wrap items-end gap-3 text-sm">
+                        <label className="block"><span className="label">NDC</span><input className="input w-40 font-mono" value={l.ndc ?? ""} placeholder="12345-6789-01" onChange={(e) => update(i, { ndc: e.target.value })} /></label>
+                        <label className="block"><span className="label">Quantity</span><input type="number" min={0} step="0.001" className="input w-24" value={l.ndcQuantity ?? ""} onChange={(e) => update(i, { ndcQuantity: e.target.value })} /></label>
+                        <label className="block"><span className="label">Unit</span><select className="select w-44" value={l.ndcUnit ?? "UN"} onChange={(e) => update(i, { ndcUnit: e.target.value })}>{NDC_UNITS.map(([u, n]) => <option key={u} value={u}>{u}: {n}</option>)}</select></label>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

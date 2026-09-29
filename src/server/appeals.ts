@@ -9,6 +9,7 @@ import { schema } from "@/db";
 import { draftAppealBody } from "@/lib/ai/appeal";
 import { fillPlaceholders, templateLetter, wrapBody } from "@/lib/appeals";
 import { practiceConfig } from "./integrations";
+import { levelFiled } from "./appeal-levels";
 
 const { appealLetters, denials, claims, patients, patientInsurances, payers, practices, encounters, charges, providers, claimEvents } = schema;
 
@@ -85,4 +86,5 @@ export async function markAppealSent(db: Db, practiceId: string, letterId: strin
   const [denial] = await db.update(denials).set({ status: "appealed" }).where(eq(denials.id, letter.denialId)).returning();
   await db.insert(claimEvents).values({ claimId: denial.claimId, status: "appealed", source: "user", message: `Appeal letter sent for CARC ${denial.carc}` });
   await db.insert(schema.auditLog).values({ practiceId, userId: userId ?? null, action: "appeal_sent", entity: "denial", entityId: denial.id });
+  await levelFiled(db, practiceId, denial.id, letterId);
 }

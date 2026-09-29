@@ -2,8 +2,8 @@ import Link from "next/link";
 import { demoLink } from "@/lib/demo";
 import type { Metadata } from "next";
 import {
-  ArrowRight, BadgeCheck, Brain, CalendarDays, CreditCard, EyeOff, FileSearch, Gauge, KeyRound, Landmark, ChartLine, Lock,
-  Radar, ReceiptText, ScanLine, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, WandSparkles, Zap,
+  ArrowRight, BadgeCheck, Brain, CalendarDays, ClipboardCheck, CreditCard, EyeOff, FileSearch, FileText, Gauge, Hourglass, KeyRound, Landmark, Layers, ChartLine, Lock,
+  Radar, ReceiptText, Scale, ScanLine, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Video, WandSparkles, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { absolute: "CollaboratMD: medical billing and revenue cycle management" },
   description:
-    "Get paid faster with fewer denials. Eligibility, coding help, NCCI-checked claims with denial risk scores, 837P/I/D and 835, appeals, missed-charge and underpayment recovery, cash forecasting, a patient payment portal, SSO and analytics in one platform.",
+    "Get paid faster with fewer denials. Eligibility, coding help, NCCI-checked claims with denial risk scores, Medicare rules built in (fee schedule, ABNs, appeal levels, the 60-day overpayment rule), 837P/I/D and 835, paper CMS-1500 and UB-04, underpayment recovery, cash forecasting, a patient payment portal, SSO and analytics in one platform.",
 };
 
 /** Features that only work once the practice connects its own account with an outside service say which. */
@@ -35,6 +35,9 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Online booking requests, confirmed by your staff" },
       { name: "Online check-in with insurance updates and signed notices" },
       { name: "Eligibility (270/271), single or whole schedule", needs: "clearinghouse" },
+      { name: "Coverage checked the day before every appointment", needs: "clearinghouse" },
+      { name: "Medicare Secondary Payer questions and ABNs (CMS-R-131) per patient" },
+      { name: "NPI lookup from the CMS registry" },
       { name: "Appointment reminders by text and email", needs: "Twilio / Resend" },
       { name: "Lab orders and results over HL7" },
       { name: "Prior authorization tracking with units" },
@@ -59,10 +62,16 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "837P claims, 999 and 277CA acknowledgments" },
       { name: "Secondary claims billed automatically" },
       { name: "Edit, correct and void claims with an audit trail" },
-      { name: "Facility claims: 837I / UB-04 with revenue codes" },
+      { name: "Facility claims: 837I / UB-04 with revenue codes and ICD-10-PCS procedures" },
       { name: "Electronic prior authorization (278)", needs: "clearinghouse" },
       { name: "Dental claims: 837D with tooth, surfaces and quadrant" },
       { name: "NCCI edits and Medicare coverage checks" },
+      { name: "ICD-10-CM and HCPCS checked for the date of service" },
+      { name: "NDC, quantity and unit on drug lines" },
+      { name: "Telehealth checked against Medicare's list; therapy and anesthesia by the minute" },
+      { name: "Paper claims: CMS-1500 on the red form, plain-paper UB-04" },
+      { name: "Any clearinghouse: claims out and responses in as files" },
+      { name: "MIPS quality codes added to qualifying claims" },
       { name: "Payer rules suggested from your own denials" },
       { name: "Claim attachments (PWK) with a fax cover sheet" },
     ],
@@ -73,6 +82,11 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
     items: [
       { name: "835 remittance auto-posting by line" },
       { name: "Underpayments checked against contracts, with multiple-procedure and modifier reductions" },
+      { name: "Medicare claims priced from the fee schedule for your locality" },
+      { name: "Payer takebacks (835 PLB) posted to the claim they are for" },
+      { name: "Appeal levels with deadlines, Medicare's five included" },
+      { name: "60-day return deadline on Medicare and Medicaid overpayments" },
+      { name: "Medicare crossovers recognized, never billed twice" },
       { name: "Bank deposits matched to ERAs" },
       { name: "Denials in plain English with next steps" },
       { name: "Appeal letters in one click", needs: "AI key, optional" },
@@ -126,6 +140,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Notifications, daily digest and a setup guide" },
       { name: "Custom roles, session limits and office-network allowlists" },
       { name: "Two-factor sign-in, required per practice if you choose" },
+      { name: "Passkeys: sign in with a fingerprint or face" },
       { name: "Team page with invites and one-click removal" },
       { name: "Compliance center: access reviews, BAAs, audit export" },
       { name: "REST API and signed webhooks" },
@@ -168,6 +183,40 @@ const SMART = [
   },
 ];
 
+/** Medicare and Medicaid rules the product applies; the ones that need CMS's yearly files say so on the page. */
+const MEDICARE = [
+  {
+    icon: Scale,
+    title: "Medicare pricing for your locality",
+    body: "Every paid Medicare claim is checked against the physician fee schedule for your locality, at the office or facility rate, with the multiple-procedure reduction. Contracts can be set as a percentage of Medicare.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Who pays first, asked and enforced",
+    body: "The Medicare Secondary Payer questions decide the billing order. A claim sent in the wrong order is stopped, and a claim Medicare already crossed over to a supplemental insurer is not billed again.",
+  },
+  {
+    icon: FileText,
+    title: "ABNs that match the claim",
+    body: "Record the patient's choice on form CMS-R-131. GA is added to the lines the notice covers, and a claim that contradicts the notice is stopped before it goes out.",
+  },
+  {
+    icon: Layers,
+    title: "Every appeal level, every deadline",
+    body: "Medicare's five levels, from redetermination to federal court, each due the right number of days after the last decision. Other payers follow their own appeal window.",
+  },
+  {
+    icon: Hourglass,
+    title: "The 60-day overpayment rule",
+    body: "A Medicare or Medicaid overpayment shows the date it must be returned, with a reminder before it passes. Money a payer takes back from a later check is posted to the claim it belongs to.",
+  },
+  {
+    icon: Video,
+    title: "Telehealth, drugs and time",
+    body: "Place of service and modifiers checked against Medicare's telehealth list, NDCs on drug lines, the 8-minute rule for therapy and minutes for anesthesia.",
+  },
+];
+
 const WORKFLOW = [
   { icon: CalendarDays, title: "Schedule and verify", body: "Book the visit, check coverage for the whole day, and send a reminder with an online check-in link." },
   { icon: Stethoscope, title: "Capture and code", body: "Charges priced from your fee schedule, with coding help for the visit level and diagnoses." },
@@ -195,7 +244,9 @@ const STANDARDS = [
   "X12 005010X224A2 (837D)",
   "X12 999 and 277CA acknowledgments",
   "HL7 v2.5.1 ADT, DFT, ORM, ORU",
-  "ICD-10-CM · CPT · HCPCS · CDT",
+  "ICD-10-CM · ICD-10-PCS · CPT · HCPCS · CDT · NDC",
+  "CMS-1500 and UB-04 printing",
+  "Medicare fee schedule (RVU and GPCI)",
   "NCCI PTP and MUE edits",
   "OpenID Connect, SAML 2.0 and SCIM 2.0",
   "HL7 FHIR R4 (patients and encounters)",
@@ -203,7 +254,7 @@ const STANDARDS = [
 ];
 
 const SECURITY = [
-  { icon: KeyRound, text: "Two-factor sign-in, required per practice if you choose" },
+  { icon: KeyRound, text: "Two-factor or passkey sign-in, required per practice if you choose" },
   { icon: Lock, text: "Account lockout after repeated failed sign-ins" },
   { icon: ShieldCheck, text: "Built-in roles, and custom roles that can only narrow them" },
   { icon: UsersRound, text: "Single sign-on and SCIM: access ends when someone leaves" },
@@ -236,9 +287,9 @@ export default async function LandingPage() {
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-green-500/40 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-16 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center">
-            <a href="#platform" className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
+            <a href="#medicare" className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
               <Sparkles className="h-3.5 w-3.5" />
-              New: cash forecast, missed-charge recovery, single sign-on and dental claims
+              New: Medicare rules built in, from the fee schedule and ABNs to appeal levels and the 60-day rule
               <ArrowRight className="h-3.5 w-3.5" />
             </a>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
@@ -248,7 +299,7 @@ export default async function LandingPage() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
               The complete revenue cycle for medical practices and billing companies. Verify coverage,
-              code the visit, check every claim against NCCI and your payers before it goes out, post remittances,
+              code the visit, check every claim against NCCI, Medicare&apos;s rules and your payers before it goes out, post remittances,
               match deposits, recover what was missed or underpaid, forecast cash and let patients pay from their phone.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -364,6 +415,30 @@ export default async function LandingPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ----------------------------------------------------- medicare */}
+      <section id="medicare" className="mx-auto max-w-7xl scroll-mt-20 px-6 pt-20 lg:pt-28">
+        <div className="max-w-2xl">
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">Medicare and Medicaid</span>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">The government&apos;s rules, built in</h2>
+          <p className="mt-4 text-lg leading-relaxed text-slate-600">
+            Medicare and Medicaid have rules commercial payers do not, and deadlines that carry penalties. CollaboratMD
+            applies them on every claim and every payment, and says which rule each warning comes from.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {MEDICARE.map(({ icon: Icon, title, body }) => (
+            <div key={title} className="rounded-2xl border border-slate-200 bg-white p-6">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-700"><Icon className="h-5 w-5" /></span>
+              <h3 className="mt-4 font-bold text-slate-900">{title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-sm text-slate-500">
+          Checks built on CMS files (the fee schedule, the telehealth list, ICD-10-CM and HCPCS) run once that year&apos;s files are loaded.
+        </p>
       </section>
 
       {/* ------------------------------------------------ capabilities */}

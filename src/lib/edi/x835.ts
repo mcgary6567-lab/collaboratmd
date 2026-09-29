@@ -45,6 +45,12 @@ export interface Remit835 {
   paymentDate: string; // YYYY-MM-DD
   totalPaidCents: number;
   claims: RemitClaim[];
+  /**
+   * PLB: adjustments to the whole payment rather than one claim. A positive
+   * amount reduces the check (WO: taking back an earlier overpayment, FB: a
+   * balance carried forward); a negative one adds to it (L6: interest).
+   */
+  providerAdjustments: { reason: string; reference: string; amountCents: number }[];
 }
 
 function toCents(v: string | undefined): number {
@@ -67,6 +73,7 @@ export function parseEdi835(raw: string): Remit835 {
     paymentDate: "",
     totalPaidCents: 0,
     claims: [],
+    providerAdjustments: [],
   };
 
   let current: RemitClaim | null = null;
@@ -117,6 +124,15 @@ export function parseEdi835(raw: string): Remit835 {
         };
         currentLine = null;
         remit.claims.push(current);
+        break;
+      case "PLB":
+        // After the claims: provider id, fiscal period date, then up to six reason:reference and amount pairs.
+        for (let i = 3; i + 1 < seg.length; i += 2) {
+          const [reason, ...ref] = (seg[i] ?? "").split(delimiters.component);
+          if (reason) remit.providerAdjustments.push({ reason, reference: ref.join(delimiters.component), amountCents: toCents(seg[i + 1]) });
+        }
+        current = null;
+        currentLine = null;
         break;
       case "NM1":
         if (current && !currentLine && seg[1] === "TT") current.crossoverPayer = (seg[3] ?? "").trim() || "the supplemental insurer";

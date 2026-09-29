@@ -5,6 +5,7 @@
  * unit-tested without a database and evaluated in under a millisecond.
  * "error" blocks submission; "warning" allows submission with a note.
  */
+import { isDrugCode, isNdcUnit } from "@/lib/codes/ndc";
 import { isQualityCode } from "@/lib/codes/quality";
 import { POS_CODES } from "@/lib/codes/pos";
 import { CLIA_RE, isLabCode } from "@/lib/codes/lab";
@@ -20,7 +21,7 @@ export interface ScrubClaim {
     /** Work and accident details (box 10, CLM11), and the insurer's claim number for workers' comp and auto. */
     relatedEmployment?: boolean; relatedAuto?: boolean; autoAccidentState?: string | null; relatedOther?: boolean; accidentDate?: string | null; propertyClaimNumber?: string | null;
   };
-  lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; minutes?: number | null }[];
+  lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
   payer: { timelyFilingDays: number; type?: string | null };
   /** Frequency and replacement reference; absent means an original claim. */
   claim?: { frequencyCode: string; originalPayerClaimNumber?: string | null };
@@ -66,6 +67,8 @@ const CPT_RE = /^(\d{5}|[A-V]\d{4})$/; // CPT or HCPCS level II
 const MODIFIER_RE = /^[A-Z0-9]{2}$/;
 // The full CMS list (lib/codes/pos.ts): what charge entry offers is what the scrubber accepts.
 const VALID_POS = POS_CODES;
+export const TELEHEALTH_POS = new Set(["02", "10"]);
+export const TELEHEALTH_MODIFIERS = new Set(["95", "93", "FQ", "GT", "GQ", "FR"]);
 
 const rules: Record<string, Rule> = {
   PAT_REQUIRED: (c) => {
@@ -107,6 +110,16 @@ const rules: Record<string, Rule> = {
     c.encounter.referringNpi && !isValidNpi(c.encounter.referringNpi)
       ? [{ rule: "REFERRING_NPI", severity: "error", message: `Referring provider NPI ${c.encounter.referringNpi} fails check-digit validation`, field: "encounter.referringNpi" }]
       : [],
+  NDC: (c) => c.lines.flatMap((l) => {
+    const field = `lines.${l.lineNumber}.ndc`;
+    if (l.ndc) {
+      if (!/^\d{11}$/.test(l.ndc)) return [{ rule: "NDC", severity: "error" as const, message: `Line ${l.lineNumber}: ${l.ndc} is not an 11-digit NDC`, field }];
+      if (!isNdcUnit(l.ndcUnit) || !(Number(l.ndcQuantity) > 0)) return [{ rule: "NDC", severity: "error" as const, message: `Line ${l.lineNumber}: give the drug quantity and its unit (UN, ML, GR, F2 or ME) with the NDC`, field }];
+      return [];
+    }
+    if (!isDrugCode(l.cpt)) return [];
+    return [{ rule: "NDC", severity: c.payer.type === "medicaid" ? "error" as const : "warning" as const, message: `Line ${l.lineNumber}: drug code ${l.cpt} needs the NDC from the package${c.payer.type === "medicaid" ? " (Medicaid requires it)" : "; most payers require it"}`, field }];
+  }),
   THERAPY_MODIFIER: (c) =>
     c.lines
       .filter((l) => isTherapyCode(l.cpt) && !l.modifiers.some((m) => THERAPY_MODIFIERS.includes(m.toUpperCase())))
@@ -152,6 +165,22 @@ const rules: Record<string, Rule> = {
     c.payer.type === "medicare" && c.lines.some((l) => l.modifiers.includes("GZ"))
       ? [{ rule: "MEDICARE_GZ", severity: "warning", message: "A line has modifier GZ: Medicare will likely deny it and, without a signed ABN, the patient cannot be billed. Use GA when an ABN is on file.", field: "lines.modifiers" }]
       : [],
+  // Telehealth: POS 02 (not at home) or 10 (at home), 95 for audio and video, 93 (FQ at a clinic) for audio only.
+  TELEHEALTH: (c) => {
+    const out: ScrubFinding[] = [];
+    const pos = c.encounter.placeOfService;
+    const upper = c.lines.map((l) => ({ l, m: l.modifiers.map((x) => x.toUpperCase()) }));
+    for (const { l, m } of upper) {
+      if (m.includes("95") && (m.includes("93") || m.includes("FQ"))) out.push({ rule: "TELEHEALTH_MODIFIER", severity: "error", message: `Line ${l.lineNumber}: 95 means audio and video, 93 and FQ mean audio only; use one`, field: `lines.${l.lineNumber}.modifiers` });
+    }
+    if (c.payer.type === "medicare" && upper.some(({ m }) => m.includes("GT"))) {
+      out.push({ rule: "TELEHEALTH_GT", severity: "warning", message: "Medicare stopped using GT in 2018 (except critical access hospitals billing method II): bill place of service 02 or 10 and modifier 95 or 93 as needed", field: "lines.modifiers" });
+    }
+    if (TELEHEALTH_POS.has(pos) && c.payer.type !== "medicare" && !upper.some(({ m }) => m.some((x) => TELEHEALTH_MODIFIERS.has(x)))) {
+      out.push({ rule: "TELEHEALTH_MODIFIER", severity: "warning", message: `Place of service ${pos} is telehealth; most plans other than Medicare also want modifier 95 (audio and video) or 93 (audio only) on each line. Check this payer's policy.`, field: "lines.modifiers" });
+    }
+    return out;
+  },
   // Traditional Medicare takes the Medicare Beneficiary Identifier; the old SSN-based HICN is refused.
   MEDICARE_MBI: (c) =>
     c.payer.type === "medicare" && c.insurance.memberId?.trim() && !isValidMbi(c.insurance.memberId)

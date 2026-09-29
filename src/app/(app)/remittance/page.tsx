@@ -8,7 +8,8 @@ import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { RemittanceTools } from "./tools";
 import { pollBlocker, pollStatus } from "@/server/era-poll";
 import { eraGaps } from "@/server/transaction-enrollment";
-import { pollNowAction } from "@/app/(app)/era-actions";
+import { matchTakebackAction, pollNowAction } from "@/app/(app)/era-actions";
+import { listProviderAdjustments, PLB_REASON } from "@/server/plb";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 
 export const metadata: Metadata = { title: "Remittance" };
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RemittancePage() {
   const s = await requireSession();
+  const plb = await listProviderAdjustments(await getDb(), s.practiceId);
   const db = await getDb();
   const rows = await db.select().from(schema.remittances).where(eq(schema.remittances.practiceId, s.practiceId)).orderBy(desc(schema.remittances.receivedAt)).limit(100);
   const [blocker, poll, gaps] = await Promise.all([pollBlocker(db, s.practiceId), pollStatus(db, s.practiceId), eraGaps(db, s.practiceId)]);
@@ -76,6 +78,33 @@ export default async function RemittancePage() {
           </table></div>
         )}
       </Card>
+      {plb.length > 0 && (
+        <Card title="Payer adjustments to whole checks (PLB)" className="mt-6">
+          <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">Money a payer took back from a check for an earlier claim, interest it added, and balances it carried forward. A takeback goes on the claim it names; one we could not match waits here.</p>
+          <div tabIndex={0} role="region" aria-label="Payer adjustments" className="overflow-x-auto">
+            <table className="table table-stack">
+              <thead><tr><th>Check</th><th>What</th><th>Reference</th><th className="text-right">Amount</th><th>Claim</th></tr></thead>
+              <tbody>{plb.map((r) => (
+                <tr key={r.adj.id}>
+                  <td data-label="Check" className="whitespace-nowrap text-xs">{r.payerName} {r.checkNumber}<span className="block text-slate-500">{fmtDate(r.paymentDate)}</span></td>
+                  <td data-label="What">{PLB_REASON[r.adj.reason] ?? r.adj.reason} <span className="font-mono text-xs text-slate-500">{r.adj.reason}</span></td>
+                  <td data-label="Reference" className="font-mono text-xs">{r.adj.reference ?? ""}</td>
+                  <td data-label="Amount" className="text-right"><Money cents={-r.adj.amountCents} /></td>
+                  <td data-label="Claim">
+                    {r.controlNumber ? <span className="font-mono text-xs">{r.controlNumber}</span>
+                      : (r.adj.reason === "WO" || r.adj.reason === "72") && r.adj.amountCents > 0 ? (
+                        <ActionForm action={matchTakebackAction.bind(null, r.adj.id)} className="flex items-end gap-2">
+                          <input name="claim" className="input w-32 py-1 text-xs" placeholder="Claim number" aria-label="Claim the takeback is for" required />
+                          <SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Post</SubmitButton>
+                        </ActionForm>
+                      ) : <span className="text-xs text-slate-500">-</span>}
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       {rows[0] && (
         <Card title={`Latest 835 (${rows[0].checkNumber})`} className="mt-6">
           <pre tabIndex={0} aria-label="Raw 835 file" className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-sky-200">{rows[0].raw835}</pre>

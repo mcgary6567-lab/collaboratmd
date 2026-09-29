@@ -37,7 +37,7 @@ export async function paperClaim(db: Db, practiceId: string, claimId: string, to
     priorAuth: b.claim.authorizationNumber,
     resubmission: (b.claim.frequencyCode === "7" || b.claim.frequencyCode === "8") && b.claim.originalPayerClaimNumber ? { code: b.claim.frequencyCode, originalRef: b.claim.originalPayerClaimNumber } : null,
     diagnoses: b.encounter.diagnoses,
-    lines: b.lines.map((l) => ({ from: b.encounter.dateOfService, pos: b.encounter.placeOfService, cpt: l.cpt, modifiers: l.modifiers, pointers: l.dxPointers, chargeCents: l.chargeCents, units: l.units, renderingNpi: b.provider.npi })),
+    lines: b.lines.map((l) => ({ from: b.encounter.dateOfService, pos: b.encounter.placeOfService, cpt: l.cpt, modifiers: l.modifiers, pointers: l.dxPointers, chargeCents: l.chargeCents, units: l.units, renderingNpi: b.provider.npi, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity })),
     totalCents: b.claim.totalCents,
     paidCents: 0,
     billing: {

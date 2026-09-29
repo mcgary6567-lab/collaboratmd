@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { getAppeal } from "@/server/appeals";
+import { appealLevelsFor } from "@/server/appeal-levels";
+import { appealDecisionAction } from "@/app/(app)/appeal-actions";
 import { practiceConfig } from "@/server/integrations";
 import { draftAppealAction, markSentAction, saveAppealAction } from "@/app/(app)/appeal-actions";
 import { ActionForm, PrintButton, SubmitButton } from "@/components/action-form";
@@ -19,13 +21,16 @@ export default async function AppealPage({ params }: { params: Promise<{ id: str
   const s = await requireSession();
   const db = await getDb();
   let data;
+  let levels: Awaited<ReturnType<typeof appealLevelsFor>> = [];
   try {
     data = await getAppeal(db, s.practiceId, id);
+    levels = await appealLevelsFor(db, s.practiceId, id);
   } catch {
     notFound();
   }
   const { denial, claim, patient, payer, letter } = data;
   const aiOn = !!(await practiceConfig(db, s.practiceId)).anthropic;
+  const medicareNote = payer.type === "medicare" ? "Medicare: 120 days to ask for redetermination, then 180 days for reconsideration, then 60 days for each later level, each counted from the decision before. A hearing before a judge also needs a minimum amount in dispute, set each year." : "The usual path; the plan or your contract sets the actual levels and deadlines.";
 
   return (
     <>
@@ -67,6 +72,35 @@ export default async function AppealPage({ params }: { params: Promise<{ id: str
             <p className="text-sm text-slate-800">{denial.explanation}</p>
             {denial.appealDeadline && <p className="mt-2 text-sm font-semibold">Appeal by {fmtDate(denial.appealDeadline + "T00:00:00")}</p>}
             <Link href={`/claims/${claim.id}`} className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:underline">Open the claim</Link>
+          </Card>
+          <Card title="Appeal levels">
+            <ol className="space-y-3 text-sm">
+              {levels.map((l) => (
+                <li key={l.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{l.level}. {l.name}</span>
+                    {l.decision ? <Badge tone={l.decision === "overturned" ? "green" : l.decision === "partial" ? "amber" : "red"}>{l.decision === "overturned" ? "Won" : l.decision === "partial" ? "Partly won" : "Upheld"}</Badge> : l.filedOn ? <Badge tone="blue">Filed</Badge> : <Badge tone="amber">To file</Badge>}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                    {l.dueOn && !l.filedOn && <>File by {fmtDate(l.dueOn)}. </>}
+                    {l.filedOn && <>Filed {fmtDate(l.filedOn)}. </>}
+                    {l.decidedOn && <>Decided {fmtDate(l.decidedOn)}.</>}
+                  </p>
+                  {l.filedOn && !l.decision && (
+                    <ActionForm action={appealDecisionAction.bind(null, l.id, id)} className="mt-2 space-y-2">
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        <label className="flex items-center gap-1"><input type="radio" name="decision" value="overturned" required /> Won</label>
+                        <label className="flex items-center gap-1"><input type="radio" name="decision" value="partial" /> Partly won</label>
+                        <label className="flex items-center gap-1"><input type="radio" name="decision" value="upheld" /> Denial upheld</label>
+                      </div>
+                      <label className="block text-xs"><span className="label">Date of the decision letter</span><input type="date" name="decidedOn" className="input" required /></label>
+                      <SubmitButton className="btn btn-secondary text-xs" pendingLabel="Saving...">Record the decision</SubmitButton>
+                    </ActionForm>
+                  )}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-2 text-xs text-slate-500">{medicareNote}</p>
           </Card>
           <Card title="How the draft is written">
             <p className="text-sm text-slate-600">

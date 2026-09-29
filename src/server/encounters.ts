@@ -1,4 +1,6 @@
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { abnModifiers } from "./abn";
+import { normalizeNdc } from "@/lib/codes/ndc";
 import { isQualityCode } from "@/lib/codes/quality";
 import type { Db } from "@/db";
 import { schema } from "@/db";
@@ -18,11 +20,19 @@ export interface NewEncounterInput {
   placeOfService: string;
   locationId?: string | null;
   diagnoses: string[];
-  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null }[];
+  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
   /** The provider who referred the patient, when the payer needs one on the claim. */
   referring?: { lastName: string; firstName?: string; npi: string } | null;
   /** Related to work or an accident: box 10 of the claim form, CLM11 on the 837. */
   accident?: AccidentInput | null;
+}
+
+/** A line's drug code columns: the NDC in its 11-digit form, with unit and quantity; nothing when none was entered. */
+export function ndcColumns(l: { ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }) {
+  if (!l.ndc?.trim()) return { ndc: null, ndcUnit: null, ndcQuantity: null };
+  const ndc = normalizeNdc(l.ndc);
+  if (!ndc) throw new Error(`${l.ndc} is not an NDC: enter it as printed on the package (for example 12345-6789-01)`);
+  return { ndc, ndcUnit: (l.ndcUnit || "UN").toUpperCase(), ndcQuantity: l.ndcQuantity && l.ndcQuantity > 0 ? l.ndcQuantity : 1 };
 }
 
 export type AccidentInput = { employment: boolean; auto: boolean; autoState?: string | null; other: boolean; date?: string | null; claimNumber?: string | null; employer?: string | null };
@@ -46,6 +56,13 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
   if (ref && !isValidNpi(ref.npi)) throw new Error("The referring provider's NPI fails its check digit");
   if (ref && !ref.lastName.trim()) throw new Error("Enter the referring provider's last name");
   const accident = accidentColumns(input.accident);
+  // A signed ABN (option 1) for a Medicare patient puts GA on the lines it covers.
+  const [primary] = await db.select({ type: schema.payers.type }).from(schema.patientInsurances).innerJoin(schema.payers, eq(schema.payers.id, schema.patientInsurances.payerId))
+    .where(and(eq(schema.patientInsurances.patientId, input.patientId), eq(schema.patientInsurances.active, true))).orderBy(asc(schema.patientInsurances.rank)).limit(1);
+  if (primary?.type === "medicare") {
+    const mods = await abnModifiers(db, input.patientId, input.dateOfService, input.lines);
+    input = { ...input, lines: input.lines.map((l, i) => ({ ...l, modifiers: mods[i] })) };
+  }
   for (const l of input.lines) if (!(l.chargeCents > 0) && !isQualityCode(l.cpt)) throw new Error(`Enter a charge for ${l.cpt}`);
   const [enc] = await db
     .insert(encounters)
@@ -66,7 +83,7 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
     .returning();
   let n = 1;
   for (const l of input.lines) {
-    await db.insert(charges).values({ encounterId: enc.id, lineNumber: n++, cpt: l.cpt.trim(), modifiers: l.modifiers.map((m) => m.toUpperCase().trim()).filter(Boolean), units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null, minutes: l.minutes || null });
+    await db.insert(charges).values({ encounterId: enc.id, lineNumber: n++, cpt: l.cpt.trim(), modifiers: l.modifiers.map((m) => m.toUpperCase().trim()).filter(Boolean), units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null, minutes: l.minutes || null, ...ndcColumns(l) });
   }
   if (input.appointmentId) await db.update(appointments).set({ status: "completed" }).where(eq(appointments.id, input.appointmentId));
   const claim = await createClaimForEncounter(db, enc.id, userId);

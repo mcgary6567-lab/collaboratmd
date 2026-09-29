@@ -159,6 +159,10 @@ export interface Edi837Input {
     dateOfService: string;
     /** Anesthesia is reported in minutes (SV103 MJ) instead of units. */
     minutes?: number | null;
+    /** A drug line's 11-digit NDC, unit and quantity (2410 LIN/CTP). */
+    ndc?: string | null;
+    ndcUnit?: string | null;
+    ndcQuantity?: number | null;
   }[];
 }
 
@@ -245,6 +249,11 @@ export function buildEdi837P(input: Edi837Input): string {
     const inMinutes = isAnesthesiaCode(line.cpt) && line.minutes;
     s.push(["SV1", sv1, money(line.chargeCents), inMinutes ? "MJ" : "UN", inMinutes ? String(line.minutes) : String(line.units), "", "", line.dxPointers.slice(0, 4).join(":")]);
     s.push(["DTP", "472", "D8", d8(line.dateOfService)]);
+    // 2410 drug identification: the NDC, then the quantity of drug in its unit.
+    if (line.ndc) {
+      s.push(["LIN", "", "N4", line.ndc]);
+      s.push(["CTP", "", "", "", String(line.ndcQuantity ?? 1), line.ndcUnit ?? "UN"]);
+    }
   });
   const segmentCount = s.length - 2 + 1; // ST through SE inclusive
   s.push(["SE", String(segmentCount), "0001"]);

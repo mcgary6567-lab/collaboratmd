@@ -24,7 +24,7 @@ export type Cms1500Input = {
   priorAuth?: string | null;
   resubmission?: { code: string; originalRef: string } | null;
   diagnoses: string[];
-  lines: { from: string; to?: string; pos: string; cpt: string; modifiers: string[]; pointers: number[]; chargeCents: number; units: number; renderingNpi: string }[];
+  lines: { from: string; to?: string; pos: string; cpt: string; modifiers: string[]; pointers: number[]; chargeCents: number; units: number; renderingNpi: string; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
   totalCents: number;
   paidCents: number;
   billing: { name: string; address1: string; city: string; state: string; zip: string; phone?: string | null; npi: string; taxId: string; taxIdIsSsn?: boolean };
@@ -156,6 +156,8 @@ export function cms1500Pages(c: Cms1500Input): Field[][] {
       at(58, centsOf(lineCents));
       at(61, String(l.units), i === 0 ? "24G" : undefined);
       at(70, l.renderingNpi, i === 0 ? "24J" : undefined);
+      // The shaded line above: a drug's NDC with its unit and quantity (N4, then the 11 digits, a space, unit and quantity).
+      if (l.ndc) page.push({ line: line - 1, col: 1, text: `N4${l.ndc} ${(l.ndcUnit ?? "UN").toUpperCase()}${l.ndcQuantity ?? 1}` });
     });
     // 28 total and 29 amount paid, on the last form only
     if (last) {

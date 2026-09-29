@@ -28,6 +28,9 @@ import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 import { appointmentReminder, balanceReminder, langOf, payLink, sameDayReminder, visitTime } from "@/lib/i18n/messages";
 import { clockDay, practiceNow } from "./practice-time";
+import { verifySchedule } from "./patients";
+import { notify } from "./notifications";
+import { overpaymentDeadlineAlerts } from "./recovery";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
 
@@ -208,6 +211,25 @@ export async function sendWeeklyReport(db: Db, practiceId: string) {
   return { recipients: admins.length, sent };
 }
 
+/**
+ * Checks coverage for everyone on tomorrow's schedule (on the practice's
+ * clock), and tells the front desk who needs attention before they arrive:
+ * coverage not active, no insurance on file, or a payer that did not answer.
+ */
+export async function checkTomorrowsCoverage(db: Db, practiceId: string, now = new Date()) {
+  const tomorrow = new Date(clockDay(await practiceNow(db, practiceId, now)).getTime() + 86_400_000);
+  const r = await verifySchedule(db, practiceId, tomorrow);
+  if (r.problems.length) {
+    const day = tomorrow.toISOString().slice(0, 10);
+    await notify(db, practiceId, {
+      kind: "coverage_tomorrow", dedupeKey: `coverage-${day}`, href: `/scheduling?date=${day}`,
+      title: `${r.problems.length} patient${r.problems.length === 1 ? "" : "s"} on tomorrow's schedule need${r.problems.length === 1 ? "s" : ""} a coverage check`,
+      body: r.problems.slice(0, 5).map((p) => `${p.name}: ${p.message}`).join("\n"),
+    });
+  }
+  return { checked: r.checked, active: r.active, inactive: r.inactive, errors: r.errors, noInsurance: r.noInsurance, skipped: r.skipped };
+}
+
 /** Everything the daily job does for one practice, per its switches. */
 export async function runDailyForPractice(db: Db, practiceId: string, origin: string, now = new Date()) {
   const [practice] = await db.select().from(practices).where(eq(practices.id, practiceId)).limit(1);
@@ -226,12 +248,14 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.appointmentReminders) await step("appointmentReminders", () => appointmentReminders(db, practiceId, origin, now));
   if (s.sameDayReminders) await step("sameDayReminders", () => sameDayReminders(db, practiceId, now));
   if (s.balanceReminders) await step("balanceReminders", () => balanceReminders(db, practiceId, origin));
+  if (s.eligibilityTomorrow) await step("eligibilityTomorrow", () => checkTomorrowsCoverage(db, practiceId, now));
   if (s.claimFollowUp) await step("claimFollowUp", () => runFollowUp(db, practiceId));
   if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));
   if (await hasActiveRules(db, practiceId)) await step("workRules", () => applyRules(db, practiceId, { now }));
   if (practice.policies?.smallBalanceCents) await step("smallBalances", () => adjustSmallBalances(db, practiceId, { now }));
   if (!(await pollBlocker(db, practiceId))) await step("eraPoll", () => pollRemittances(db, practiceId, { now }));
   await step("dailyChecks", () => runDailyChecks(db, practiceId, now));
+  await step("overpayment60", () => overpaymentDeadlineAlerts(db, practiceId, now));
   if (await getFhir(db, practiceId)) await step("fhirSync", () => syncFhir(db, practiceId, { now }));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));

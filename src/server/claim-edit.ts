@@ -11,6 +11,7 @@
  * A claim a payer has already decided is changed with a corrected claim
  * instead, which is what payers require.
  */
+import { ndcColumns } from "./encounters";
 import { isQualityCode } from "@/lib/codes/quality";
 import { money } from "@/lib/utils";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -27,7 +28,7 @@ export interface ClaimEdit {
   dateOfService: string;
   placeOfService: string;
   diagnoses: string[];
-  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null }[];
+  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
 }
 
 function validate(e: ClaimEdit) {
@@ -45,8 +46,8 @@ function validate(e: ClaimEdit) {
   return dx;
 }
 
-const describe = (l: { cpt: string; modifiers: string[]; units: number; chargeCents: number; minutes?: number | null }) =>
-  `${l.cpt}${l.modifiers.length ? `-${l.modifiers.join("-")}` : ""} x${l.units}${l.minutes ? ` (${l.minutes} min)` : ""} ${money(l.chargeCents * l.units)}`;
+const describe = (l: { cpt: string; modifiers: string[]; units: number; chargeCents: number; minutes?: number | null; ndc?: string | null }) =>
+  `${l.cpt}${l.modifiers.length ? `-${l.modifiers.join("-")}` : ""} x${l.units}${l.minutes ? ` (${l.minutes} min)` : ""}${l.ndc ? ` NDC ${l.ndc}` : ""} ${money(l.chargeCents * l.units)}`;
 
 export async function editClaim(db: Db, practiceId: string, claimId: string, edit: ClaimEdit, userId?: string) {
   const [claim] = await db.select().from(claims).where(and(eq(claims.id, claimId), eq(claims.practiceId, practiceId))).limit(1);
@@ -60,7 +61,7 @@ export async function editClaim(db: Db, practiceId: string, claimId: string, edi
 
   const [enc] = await db.select().from(encounters).where(eq(encounters.id, claim.encounterId)).limit(1);
   const oldLines = await db.select().from(charges).where(eq(charges.encounterId, claim.encounterId)).orderBy(asc(charges.lineNumber));
-  const newLines = edit.lines.map((l, i) => ({ ...l, cpt: l.cpt.trim().toUpperCase(), modifiers: l.modifiers.map((m) => m.trim().toUpperCase()).filter(Boolean), lineNumber: i + 1 }));
+  const newLines = edit.lines.map((l, i) => ({ ...l, ...ndcColumns(l), cpt: l.cpt.trim().toUpperCase(), modifiers: l.modifiers.map((m) => m.trim().toUpperCase()).filter(Boolean), lineNumber: i + 1 }));
 
   const changes: string[] = [];
   if (enc.dateOfService !== edit.dateOfService) changes.push(`Date of service ${enc.dateOfService} → ${edit.dateOfService}`);
@@ -95,7 +96,7 @@ export async function editClaim(db: Db, practiceId: string, claimId: string, edi
     for (const l of newLines) {
       const [c] = await db
         .insert(charges)
-        .values({ encounterId: enc.id, lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null, minutes: l.minutes || null })
+        .values({ encounterId: enc.id, lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null, minutes: l.minutes || null, ...ndcColumns(l) })
         .returning();
       // A quality code is reported at $0.00 and posts nothing.
       if (l.chargeCents * l.units > 0) await db.insert(ledgerEntries).values({ practiceId, patientId: claim.patientId, claimId, chargeId: c.id, type: "charge", amountCents: l.chargeCents * l.units, postedBy: userId ?? null, note: `${l.cpt} x${l.units}` });

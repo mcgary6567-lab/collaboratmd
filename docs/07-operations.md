@@ -259,3 +259,35 @@ Settings → Quality measures: each practice enters the measures it reports from
 ## Code search at full size
 
 Diagnosis and HCPCS word search use a full-text index; code search is a range on the primary key. The load test adds 74,000 diagnosis codes and fails if either search reads the whole table.
+
+## Drug lines (NDC)
+
+A J-code line takes the NDC from the package (any printed layout: 4-4-2, 5-3-2, 5-4-1; stored as the 11-digit 5-4-2 form), the quantity and its unit (UN, ML, GR, F2, ME). It goes on the 837P as LIN*N4 and CTP (loop 2410) and in the shaded part of the CMS-1500 line. A J-code without an NDC is an error for Medicaid and a warning otherwise.
+
+## Payer takebacks (835 PLB)
+
+When a payer takes back an earlier overpayment from a later check (PLB WO or 72), posting the 835 posts the takeback to the claim its reference names (control number or payer claim number) as a reversal. Interest (L6) and other provider-level adjustments are listed with the check on the Remittance page. A takeback whose claim cannot be found notifies the practice and waits on the Remittance page to be matched by hand.
+
+## Coverage for tomorrow's appointments
+
+Settings → Automation → "Check coverage for tomorrow's appointments" runs the eligibility check for everyone on the next day's schedule (on the practice's clock) and notifies the front desk about anyone with inactive coverage, no insurance, or no answer from the payer.
+
+## Appeal levels
+
+Each denial's appeal page shows its levels. For Medicare: redetermination (120 days), QIC reconsideration (180 days from the decision), ALJ hearing, Medicare Appeals Council and federal court (60 days each). For other payers: the payer's appeal window, then a second level and external review, as a guide only (the plan or contract decides). Recording the payer's decision either resolves the denial or opens the next level with its deadline.
+
+## Advance Beneficiary Notices (ABN)
+
+A Medicare patient's page has an ABN card: prepare a notice (services, reason, estimated cost), print its details to copy onto CMS's own form CMS-R-131 (the official form must be used; the link is on the print page), then record the option the patient checked and the date signed. A new Medicare claim gets GA on lines covered by a signed option 1 (and loses GZ). Claim checks: GA without a signed notice (error), option 2 (the patient asked not to bill Medicare, error), and a signed option 1 without GA (warning).
+
+## The 60-day overpayment rule
+
+Medicare and Medicaid overpayments must be reported and returned within 60 days of being identified. On Billing → Credits each such overpayment shows its deadline; the clock starts on the day the payment that caused it was posted, and a biller can correct the identified date (it is audit logged). The daily job notifies when one is within 15 days of its deadline or late. A claim that is no longer overpaid stops its clock. The 2024 rule's suspension for a good-faith investigation (up to 180 days) is the practice's judgment: record it as a later identified date.
+
+## Telehealth
+
+Claim checks: 95 with 93 or FQ on the same line (error); GT on a Medicare claim (warning: Medicare retired it); POS 02 or 10 without a telehealth modifier for payers other than Medicare (warning). Load CMS's **List of Telehealth Services** each year (Settings → Code sets, `telehealth`, CSV with the HCPCS, status and audio-only columns, and the calendar year). Then a Medicare telehealth line whose code is not on that year's list, or billed audio-only (93/FQ) where the list does not allow it, gets a warning. With no list loaded for the year, that check does not run.
+
+## Inpatient procedures and the UB-04
+
+Facility claim entry takes up to six ICD-10-PCS procedures with dates (principal first), sent on the 837I as HI*BBR and HI*BBQ. Codes are checked for format (seven characters, no I or O) and dates within the stay; procedure codes on an outpatient bill get a warning. An institutional claim's "Printable UB-04 (plain paper)" button lays the claim out by form locator for review or for a payer that accepts a plain copy. It is not aligned to the red OCR form, so payers that scan paper UB-04s will not accept it: send the 837I.

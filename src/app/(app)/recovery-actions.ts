@@ -6,7 +6,7 @@ import { getDb, schema } from "@/db";
 import { CAN_ADJUST, CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { createClaimForEncounter } from "@/server/claims";
-import { approveRefund, cancelRefund, dismissMissedCharge, issueRefund, markDisputed, recordRecovery, requestRefund } from "@/server/recovery";
+import { approveRefund, cancelRefund, dismissMissedCharge, issueRefund, markDisputed, recordRecovery, requestRefund, setOverpaymentIdentified } from "@/server/recovery";
 
 const fail = (e: unknown, fallback: string): FormResult => ({ ok: false, message: e instanceof Error ? e.message : fallback });
 const cents = (v: FormDataEntryValue | null) => Math.round(Number(String(v ?? "").replace(/[$,\s]/g, "")) * 100);
@@ -103,5 +103,16 @@ export async function claimMissedEncounterAction(encounterId: string, _prev: For
     return { ok: true, message: `Claim ${claim.controlNumber} created and scrubbed; submit it from Claims` };
   } catch (e) {
     return fail(e, "Could not create the claim");
+  }
+}
+
+export async function overpaymentIdentifiedAction(claimId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
+  const s = await requireRole(CAN_ADJUST);
+  try {
+    await setOverpaymentIdentified(await getDb(), s.practiceId, claimId, String(formData.get("identifiedOn") ?? ""), s.userId);
+    revalidatePath("/billing/credits");
+    return { ok: true, message: "Date corrected; the 60-day deadline moved with it." };
+  } catch (e) {
+    return fail(e, "Could not save the date");
   }
 }

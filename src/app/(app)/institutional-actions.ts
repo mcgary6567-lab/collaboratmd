@@ -32,6 +32,7 @@ export async function createInstitutionalAction(_prev: FormResult, formData: For
       admissionSource: f("admitSource") || null,
       patientStatus: f("status"),
       admittingDiagnosis: f("admitDx") || null,
+      procedures: formData.getAll("pcs").map((code, i) => ({ code: String(code), date: String(formData.getAll("pcsDate")[i] ?? "") })),
       diagnoses: f("diagnoses").split(/[,\s]+/),
       lines: revenue.map((r, i) => ({ revenueCode: r, hcpcs: hcpcs[i], units: Number(units[i]) || 1, chargeCents: Math.round(Number(String(unitCharge[i] ?? "").replace(/[$,]/g, "")) * 100) || 0 })).filter((l) => l.revenueCode.trim()),
     }, s.userId);

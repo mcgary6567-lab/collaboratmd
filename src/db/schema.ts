@@ -113,6 +113,8 @@ export type AutomationSettings = {
   claimFollowUp?: boolean;
   autopay?: boolean;
   denialAgent?: boolean;
+  /** Each evening, check coverage for the next day's appointments. */
+  eligibilityTomorrow?: boolean;
 };
 
 export const automationRuns = pgTable("automation_runs", {
@@ -309,6 +311,10 @@ export const charges = pgTable("charges", {
   lineNumber: integer("line_number").notNull(),
   /** Minutes, for time-based codes: therapy (8-minute rule) and anesthesia (reported in minutes). */
   minutes: integer("minutes"),
+  /** A drug line's National Drug Code (11 digits), unit (UN, ML, GR, F2, ME) and quantity: 2410 LIN/CTP, required by Medicaid and many payers. */
+  ndc: text("ndc"),
+  ndcUnit: text("ndc_unit"),
+  ndcQuantity: numeric("ndc_quantity", { mode: "number" }),
   cpt: text("cpt").notNull(),
   modifiers: jsonb("modifiers").$type<string[]>().notNull().default([]),
   units: integer("units").notNull().default(1),
@@ -1943,3 +1949,60 @@ export const qualityMeasures = pgTable("quality_measures", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("quality_measures_practice_idx").on(t.practiceId)]);
+
+/** Provider-level adjustments in an 835 (PLB): money a payer takes back for other claims, interest, and balances carried forward. */
+export const remittanceAdjustments = pgTable("remittance_adjustments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  remittanceId: uuid("remittance_id").notNull().references(() => remittances.id),
+  reason: text("reason").notNull(),
+  reference: text("reference"),
+  amountCents: integer("amount_cents").notNull(),
+  claimId: uuid("claim_id").references(() => claims.id),
+  posted: boolean("posted").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("remittance_adjustments_remit_idx").on(t.remittanceId), index("remittance_adjustments_claim_idx").on(t.claimId)]);
+
+/** Each level of an appeal: filed, due, and what the payer decided. */
+export const appealLevels = pgTable("appeal_levels", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  denialId: uuid("denial_id").notNull().references(() => denials.id),
+  level: integer("level").notNull(),
+  name: text("name").notNull(),
+  dueOn: date("due_on"),
+  filedOn: date("filed_on"),
+  decision: text("decision"),
+  decidedOn: date("decided_on"),
+  letterId: uuid("letter_id").references(() => appealLetters.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("appeal_levels_denial_idx").on(t.denialId)]);
+
+/** Advance Beneficiary Notices: a Medicare patient told in writing that Medicare may not pay, and their choice. */
+export const abns = pgTable("abns", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  serviceDate: date("service_date").notNull(),
+  services: jsonb("services").$type<{ code: string; description: string; estimatedCents: number }[]>().notNull(),
+  reason: text("reason").notNull(),
+  option: integer("option"),
+  signedOn: date("signed_on"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("abns_patient_idx").on(t.patientId, t.serviceDate)]);
+
+/** When an insurance overpayment on a claim was identified: the 60-day refund clock for Medicare and Medicaid starts here. */
+export const overpaymentIdentifications = pgTable("overpayment_identifications", {
+  claimId: uuid("claim_id").primaryKey().references(() => claims.id),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  identifiedOn: date("identified_on").notNull(),
+  identifiedBy: uuid("identified_by").references(() => users.id),
+});
+
+/** CMS's list of Medicare telehealth services, by year. */
+export const medicareTelehealthCodes = pgTable("medicare_telehealth_codes", {
+  year: integer("year").notNull(),
+  code: text("code").notNull(),
+  status: text("status"),
+}, (t) => [primaryKey({ columns: [t.year, t.code] })]);

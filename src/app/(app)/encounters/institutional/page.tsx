@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 const ADMIT_TYPES = [["1", "1 Emergency"], ["2", "2 Urgent"], ["3", "3 Elective"], ["4", "4 Newborn"], ["5", "5 Trauma"], ["9", "9 Unknown"]];
 const ADMIT_SOURCES = [["1", "1 Non-health-care point of origin"], ["2", "2 Clinic or physician's office"], ["4", "4 Transfer from a hospital"], ["5", "5 Transfer from SNF or ICF"], ["6", "6 Transfer from another health care facility"], ["7", "7 Emergency room"], ["9", "9 Information not available"]];
 const LINES = 8;
+const PROCEDURES = 6;
 
 export default async function InstitutionalEntryPage() {
   const s = await requireSession();
@@ -66,6 +67,18 @@ export default async function InstitutionalEntryPage() {
             </label>
             <label className="block text-sm"><span className="label">Admitting diagnosis (FL69)</span><input name="admitDx" className="input font-mono" placeholder="R07.9" /></label>
           </div>
+        </Card>
+
+        <Card title="Inpatient procedures (ICD-10-PCS, FL74)">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: PROCEDURES }, (_, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <label className="block text-sm"><span className="label">{i === 0 ? "Principal procedure" : `Procedure ${i + 1}`}</span><input name="pcs" className="input w-32 font-mono uppercase" placeholder={i === 0 ? "0DTJ4ZZ" : ""} maxLength={8} /></label>
+                <label className="block text-sm"><span className="label">Date</span><input type="date" name="pcsDate" className="input" max={today} /></label>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Inpatient bills only: outpatient procedures go on the revenue lines as HCPCS. Seven characters, no I or O. Blank rows are ignored.</p>
         </Card>
 
         <Card title="Diagnoses and revenue lines">

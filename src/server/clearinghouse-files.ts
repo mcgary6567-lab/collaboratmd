@@ -14,6 +14,7 @@ import { parseEdi835 } from "@/lib/edi/x835";
 import { describeSyntaxError, parse999 } from "@/lib/edi/x999";
 import { applyInbound277, importRemittance, postRemittance, previewClaimEdi } from "./claims";
 import { money } from "@/lib/utils";
+import { plbForPractice } from "./plb";
 
 const { claims, claimEvents, auditLog, inboundTransactions } = schema;
 
@@ -122,7 +123,7 @@ export async function importResponseFile(db: Db, practiceId: string, text: strin
     const parsed = parseEdi835(raw);
     const numbers = parsed.claims.map((c) => c.patientControlNumber).filter(Boolean);
     const ours = numbers.length ? await db.select({ id: claims.id }).from(claims).where(and(eq(claims.practiceId, practiceId), inArray(claims.controlNumber, numbers))) : [];
-    if (!ours.length) throw new Error("None of the claims in this 835 belong to this practice");
+    if (!ours.length && !(await plbForPractice(db, practiceId, parsed))) throw new Error("None of the claims in this 835 belong to this practice");
     remittanceId = await importRemittance(db, practiceId, raw, userId);
     await postRemittance(db, remittanceId, userId);
     note = `835: ${parsed.claims.length} claim${parsed.claims.length === 1 ? "" : "s"}, ${money(parsed.totalPaidCents)} posted`;
