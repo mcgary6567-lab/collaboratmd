@@ -16,6 +16,7 @@ export async function importCodeSetAction(_prev: FormResult, formData: FormData)
   if (set === "icd10cm" && !year) return { ok: false, message: "Give the fiscal year of the ICD-10-CM file, e.g. 2027" };
   if ((set === "mpfs_rvu" || set === "mpfs_gpci") && !year) return { ok: false, message: "Give the calendar year of the Medicare fee schedule file, e.g. 2026" };
   if (set === "telehealth" && !year) return { ok: false, message: "Give the calendar year of the Medicare telehealth list, e.g. 2026" };
+  if (set === "hcc" && !year) return { ok: false, message: "Give the payment year of the HCC mapping, e.g. 2026" };
   const cf = Number(formData.get("conversionFactor") ?? "") || undefined;
   const file = formData.get("file");
   if (!(file instanceof File) || !file.size) return { ok: false, message: "Choose the file" };

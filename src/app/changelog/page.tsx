@@ -10,6 +10,18 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-29",
+    title: "Care gaps, card on file, timely filing proof, payer refund demands",
+    items: [
+      "Proof of timely filing assembled from your submissions and acknowledgments, and added to timely filing appeals",
+      "Care gaps: annual wellness visits due (with reminders), chronic care management candidates, and HCC recapture",
+      "Card on file: patients can authorize charges after insurance up to a limit, with a notice three days before each one",
+      "Modifier 25 and 59 use per provider, with a sample of claims to review",
+      "Payer refund demands tracked to their deadlines, with a dispute letter, and settled when the payer takes the money back",
+      "A primary EOB page rebuilt from the 835, to send with paper claims to secondary payers",
+    ],
+  },
+  {
+    date: "2026-09-29",
     title: "Duplicate claims, No Surprises Act disputes, sliding fees, contract and lag reports",
     items: [
       "The same service billed twice to the same payer is stopped before it goes out, unless a repeat modifier explains it",

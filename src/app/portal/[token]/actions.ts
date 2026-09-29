@@ -38,7 +38,9 @@ export async function payAction(token: string, _prev: FormResult, formData: Form
   try {
     const amountCents = Math.round(parseFloat(String(formData.get("amount") ?? "0")) * 100);
     const planId = String(formData.get("planId") ?? "") || null;
-    const r = await startPortalPayment(v.db, v.link.id, { amountCents, planId, autopay: formData.get("autopay") === "on", origin: await siteOrigin(), token });
+    const keepCard = formData.get("keepCard") === "on";
+    const keepCardMaxCents = keepCard ? Math.round(parseFloat(String(formData.get("keepCardMax") ?? "0")) * 100) : undefined;
+    const r = await startPortalPayment(v.db, v.link.id, { amountCents, planId, autopay: formData.get("autopay") === "on", keepCard, keepCardMaxCents, origin: await siteOrigin(), token });
     url = r.url;
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong" };

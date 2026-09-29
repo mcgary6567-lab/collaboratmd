@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
-import { EM_ESTABLISHED, EM_NEW, levelShift, productivity, sampleVisits } from "@/server/productivity";
+import { EM_ESTABLISHED, EM_NEW, levelShift, modifierUsage, productivity, sampleModifierClaims, sampleVisits } from "@/server/productivity";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 
@@ -22,7 +22,7 @@ function MixRow({ label, mix, codes }: { label: string; mix: { total: number; pc
 }
 
 /** Work RVUs per provider and each provider's E/M level mix against the practice's, with a random sample for chart review. */
-export default async function ProductivityPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; sample?: string }> }) {
+export default async function ProductivityPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; sample?: string; modsample?: string }> }) {
   const s = await requireRole(["admin"]);
   const q = await searchParams;
   const today = new Date().toISOString().slice(0, 10);
@@ -32,6 +32,10 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
   const report = await productivity(db, s.practiceId, from, to);
   const sampleFor = report.providers.find((p) => p.id === q.sample);
   const sample = sampleFor ? await sampleVisits(db, s.practiceId, sampleFor.id, from, to) : [];
+  const mods = await modifierUsage(db, s.practiceId, from, to);
+  const modFor = mods.providers.find((p) => p.id === q.modsample);
+  const modSample = modFor ? await sampleModifierClaims(db, s.practiceId, modFor.id, from, to) : [];
+  const rate = (v: number | null) => (v === null ? "-" : `${v}%`);
   const qs = (extra: string) => `/reports/productivity?from=${from}&to=${to}${extra}`;
 
   return (
@@ -93,6 +97,42 @@ export default async function ProductivityPage({ searchParams }: { searchParams:
         </Card>
       </div>
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">A provider half a level or more from the practice&apos;s established-visit average is marked. A different mix can have good reasons (specialty, sicker patients); it is a prompt to review a sample of charts, not a finding.</p>
+
+      <Card title="Modifier use (25, and 59 or XE/XS/XP/XU)" className="mt-6">
+        <div tabIndex={0} role="region" aria-label="Modifier use by provider" className="overflow-x-auto">
+          <table className="table table-stack text-sm">
+            <thead><tr><th>Provider</th><th className="text-right">E/M lines</th><th className="text-right">With 25</th><th className="text-right">Procedure lines</th><th className="text-right">With 59/X</th><th /></tr></thead>
+            <tbody>
+              <tr><td data-label="Provider">Whole practice</td><td data-label="E/M lines" /><td data-label="With 25" className="text-right tabular-nums">{rate(mods.practice.rate25)}</td><td data-label="Procedure lines" /><td data-label="With 59/X" className="text-right tabular-nums">{rate(mods.practice.rate59)}</td><td /></tr>
+              {mods.providers.map((p) => {
+                const high25 = p.rate25 !== null && mods.practice.rate25 !== null && p.em >= 20 && p.rate25 >= mods.practice.rate25 * 1.5 && p.rate25 - mods.practice.rate25 >= 5;
+                const high59 = p.rate59 !== null && mods.practice.rate59 !== null && p.procs >= 20 && p.rate59 >= mods.practice.rate59 * 1.5 && p.rate59 - mods.practice.rate59 >= 5;
+                return (
+                  <tr key={p.id}>
+                    <td data-label="Provider">{p.name}</td>
+                    <td data-label="E/M lines" className="text-right tabular-nums">{p.em}</td>
+                    <td data-label="With 25" className={`text-right tabular-nums ${high25 ? "font-semibold text-amber-800" : ""}`}>{rate(p.rate25)}</td>
+                    <td data-label="Procedure lines" className="text-right tabular-nums">{p.procs}</td>
+                    <td data-label="With 59/X" className={`text-right tabular-nums ${high59 ? "font-semibold text-amber-800" : ""}`}>{rate(p.rate59)}</td>
+                    <td data-label="Review"><Link href={qs(`&modsample=${p.id}`)} className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-300">Sample 10 claims</Link></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Rates half again above the practice&apos;s (and 5 points or more) are marked. Both modifiers are common audit targets: 25 needs a significant, separately documented E/M; 59 and the X modifiers need a distinct session, site or encounter.</p>
+        {modFor && (
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold">Random sample: {modFor.name}</h3>
+            {modSample.length === 0 ? <p className="text-sm text-slate-600">No claims with these modifiers in the period.</p> : (
+              <ul className="divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                {modSample.map((v) => <li key={v.encounterId} className="flex flex-wrap justify-between gap-2 py-2"><span>{fmtDate(v.dateOfService)} · {v.patient} · <span className="font-mono text-xs">{v.codes}</span></span>{v.claimId ? <Link href={`/claims/${v.claimId}`} className="font-mono text-brand-700 hover:underline dark:text-brand-300">{v.controlNumber}</Link> : null}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+      </Card>
 
       {sampleFor && (
         <Card title={`Random sample: ${sampleFor.name}`} className="mt-6">

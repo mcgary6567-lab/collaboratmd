@@ -33,6 +33,8 @@ import { notify } from "./notifications";
 import { overpaymentDeadlineAlerts } from "./recovery";
 import { recordsRequestAlerts } from "./records-requests";
 import { nsaDeadlineAlerts } from "./nsa-disputes";
+import { refundDemandAlerts } from "./refund-demands";
+import { cardOnFileCharges } from "./card-on-file";
 import { applySlidingFees } from "./sliding-fee";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
@@ -262,6 +264,9 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   await step("overpayment60", () => overpaymentDeadlineAlerts(db, practiceId, now));
   await step("recordsRequests", () => recordsRequestAlerts(db, practiceId, now));
   await step("nsaDeadlines", () => nsaDeadlineAlerts(db, practiceId, now));
+  await step("refundDemands", () => refundDemandAlerts(db, practiceId, now));
+  const [authorized] = await db.select({ id: schema.savedCards.id }).from(schema.savedCards).where(and(eq(schema.savedCards.practiceId, practiceId), isNull(schema.savedCards.removedAt), sql`${schema.savedCards.balanceMaxCents} IS NOT NULL`)).limit(1);
+  if (authorized && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("cardOnFile", () => cardOnFileCharges(db, practiceId, now));
   if ((await db.select({ id: schema.slidingFeeTiers.id }).from(schema.slidingFeeTiers).where(eq(schema.slidingFeeTiers.practiceId, practiceId)).limit(1)).length) await step("slidingFees", () => applySlidingFees(db, practiceId, now));
   if (await getFhir(db, practiceId)) await step("fhirSync", () => syncFhir(db, practiceId, { now }));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));

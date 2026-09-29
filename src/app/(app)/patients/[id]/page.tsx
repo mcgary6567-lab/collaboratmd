@@ -20,6 +20,8 @@ import { latestMspScreening } from "@/server/msp";
 import { AbnCard } from "./abn-card";
 import { CareCard } from "./care-card";
 import { SlidingFeeCard } from "./sliding-fee-card";
+import { CardOnFileCard } from "./card-on-file-card";
+import { cardOnFileFor } from "@/server/card-on-file";
 import { slidingFeeOf } from "@/server/sliding-fee";
 import { careMonths } from "@/server/care-programs";
 import { listAbns } from "@/server/abn";
@@ -64,6 +66,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const mspLast = onMedicare ? await latestMspScreening(db, patient.id) : null;
   const abnList = onMedicare ? await listAbns(db, s.practiceId, patient.id) : [];
   const care = await careMonths(db, s.practiceId, patient.id);
+  const cardOnFile = await cardOnFileFor(db, patient.id);
   const [slidingFee, slidingTiers] = await Promise.all([slidingFeeOf(db, patient.id), db.select({ id: schema.slidingFeeTiers.id }).from(schema.slidingFeeTiers).where(eq(schema.slidingFeeTiers.practiceId, s.practiceId)).limit(1)]);
 
   return (
@@ -205,6 +208,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {!insured && <CoverageSection practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} simulated={!cfg.stedi} />}
           {onMedicare && <MspCard patientId={patient.id} last={mspLast} canWrite={canWrite} timeZone={s.timeZone} />}
           {onMedicare && <AbnCard patientId={patient.id} notices={abnList} canWrite={canWrite} />}
+          {cardOnFile && <CardOnFileCard patientId={patient.id} data={cardOnFile} canWrite={canWrite} />}
           {(slidingFee || slidingTiers.length > 0) && <SlidingFeeCard patientId={patient.id} fee={slidingFee} canWrite={canWrite} />}
           <CareCard patientId={patient.id} data={care} providers={providerList.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}${p.credential ? `, ${p.credential}` : ""}` }))} canWrite={canWrite} />
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}

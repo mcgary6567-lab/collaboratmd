@@ -81,6 +81,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
         <div className="text-sm text-slate-500">{t.yourBalance(d.patient.firstName)}</div>
         <div className="mt-1 text-4xl font-extrabold tracking-tight">{money(Math.max(d.balance, 0))}</div>
         {d.balance < 0 && <p className="mt-1 text-sm text-green-700">{t.credit(money(-d.balance))}</p>}
+        {card?.balanceMaxCents ? <p className="mt-2 text-sm text-slate-600">{t.cardOnFileActive(card.brand ?? "", card.last4 ?? "", money(card.balanceMaxCents))}</p> : null}
         {plan && nextDue && (
           <p className="mt-2 text-sm text-slate-600">
             {t.planNext(money(nextDue.amountCents - nextDue.paidCents), date(nextDue.dueDate + "T00:00:00"))}
@@ -115,6 +116,18 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                     </label>
                   )}
                 </>
+              )}
+              {!card?.balanceMaxCents && (
+                <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+                  <label className="flex items-start gap-2">
+                    <input type="checkbox" name="keepCard" className="mt-1" />
+                    <span>{t.cardOnFileOptIn}</span>
+                  </label>
+                  <label className="block">
+                    <span className="label">{t.cardOnFileMax}</span>
+                    <input name="keepCardMax" type="number" step="1" min="1" max="10000" defaultValue="200" className="input max-w-[10rem]" />
+                  </label>
+                </div>
               )}
               <SubmitButton className="btn btn-primary" pendingLabel={t.openingPayment}>{t.paySecurely}</SubmitButton>
               <p className="flex items-center gap-1 text-xs text-slate-500"><ShieldCheck className="h-3.5 w-3.5" /> {t.stripeNote}</p>

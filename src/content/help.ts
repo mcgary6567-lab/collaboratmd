@@ -90,6 +90,24 @@ export const GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "National code sets", href: "/settings/code-sets" }],
   },
+  "/refund-demands": {
+    title: "Payer refund demands",
+    steps: [
+      "Add each letter asking for money back, with the amount, the claim and the date to answer by.",
+      "Agree (a refund request goes through approval, or the payer offsets it) or dispute it: the dispute letter is written for you.",
+      "A later takeback on an 835 for the claim marks the demand offset, so the money is not returned twice.",
+    ],
+    related: [{ label: "Credits and refunds", href: "/billing/credits" }],
+  },
+  "/reports/care-gaps": {
+    title: "Care gaps",
+    steps: [
+      "Wellness visits due: Medicare patients whose last annual wellness visit was 11 full months ago or more; send reminders in one step.",
+      "Care management candidates: two or more of your chronic condition groups coded in the last year, not enrolled.",
+      "HCC recapture: risk-adjusting conditions coded last year, not yet this year (load CMS's HCC mapping first).",
+    ],
+    related: [{ label: "National code sets", href: "/settings/code-sets" }],
+  },
   "/nsa-disputes": {
     title: "Out-of-network disputes",
     steps: [

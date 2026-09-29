@@ -351,3 +351,27 @@ A Medicaid eligibility response naming a managed care organization (entity Y2 in
 ## Split/shared and teaching visits
 
 Charge entry has "Split/shared visit or teaching setting": the practitioner the facility visit was shared with and the attestation that the billing practitioner did the substantive portion (FS is added to E/M lines), and whether the teaching physician was present for the key portion. Checks: FS required on a shared E/M, the attestation required (Medicare and Medicaid), a warning in office settings, GC requires the teaching physician's presence, GC with GE is refused, and GE on codes outside the primary care exception warns.
+
+## Proof of timely filing
+
+A claim denied for timely filing (CARC 29) has a "Proof of timely filing" page: the first electronic submission date, days after the date of service against the payer's limit, and each 999 and 277CA with its date and code, following any earlier claims it corrected or replaced. Drafting the appeal letter for such a denial adds the same record.
+
+## Care gaps
+
+Reports → Care gaps: Medicare patients due an annual wellness visit (last G0438/G0439 11 full months ago or more, or none here; "Send reminders" texts or emails them, at most once in 60 days, respecting opt-outs), chronic care management candidates (two or more of the practice's chronic condition groups in the last year, not enrolled; the groups start as an editable example list), and HCC recapture (conditions mapped to an HCC coded last year but not yet this year). HCC recapture needs CMS's ICD-10 to HCC mapping loaded as code set `hcc` with its payment year (CSV; the V28 column is used when there are several).
+
+## Card on file
+
+In the patient portal a patient can keep the card they pay with on file, authorizing charges for what they owe after insurance up to a limit they choose. The daily job (when Stripe is connected) sends a notice with the amount and date, then charges three days later no more than the balance still owed and never more than the limit; patients on a payment plan pay through the plan instead. The patient's page shows the card, recent notices and "Stop charging this card".
+
+## Modifier audit
+
+Reports → Productivity also shows each provider's share of E/M lines with 25 and of procedure lines with 59/XE/XS/XP/XU against the practice, marking rates half again above it, with a random sample of claims to review.
+
+## Payer refund demands
+
+Billing → Payer refund demands tracks each payer letter asking for an overpayment back: amount, claim, the date to answer (30 days by default) and any offset date. "Agree" requests the refund when the claim is overpaid on the books (otherwise the payer's offset settles it); "Dispute" records why and writes the letter. A PLB takeback for the claim marks the demand offset. The daily job warns 5 days before the answer date.
+
+## Primary EOB for paper secondary claims
+
+A secondary claim links to "Primary EOB page": the primary payer's adjudication rebuilt from its 835s (charged, allowed, paid, patient share, and each adjustment with its CARC group and reason), to print with the paper CMS-1500 for a secondary payer that does not take electronic coordination of benefits.

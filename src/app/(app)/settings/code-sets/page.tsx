@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Code sets" };
 
 export const dynamic = "force-dynamic";
 
-const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units", telehealth: "Medicare telehealth list" };
+const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units", telehealth: "Medicare telehealth list", hcc: "HCC risk adjustment mapping" };
 
 export default async function CodeSetsPage() {
   const s = await requireSession();
@@ -71,7 +71,7 @@ export default async function CodeSetsPage() {
             <>
               <ActionForm action={importCodeSetAction} className="flex flex-wrap items-end gap-3 text-sm">
                 <label className="block"><span className="label">Code set</span>
-                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="telehealth">Medicare telehealth services list (CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
+                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="telehealth">Medicare telehealth services list (CSV)</option><option value="hcc">HCC mapping (ICD-10 to HCC, CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
                 </label>
                 <label className="block"><span className="label">Year (ICD-10-CM fiscal year; fee schedule or telehealth list year)</span><input name="year" className="input w-28" inputMode="numeric" placeholder={String(currentFiscalYear())} maxLength={4} /></label>
                 <label className="block"><span className="label">Conversion factor (RVU file, if not in it)</span><input name="conversionFactor" className="input w-32" inputMode="decimal" placeholder="e.g. 33.4009" /></label>

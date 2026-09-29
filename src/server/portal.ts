@@ -118,11 +118,12 @@ export async function portalData(db: Db, linkId: string) {
 export async function startPortalPayment(
   db: Db,
   linkId: string,
-  input: { amountCents: number; planId?: string | null; autopay?: boolean; origin: string; token: string },
+  input: { amountCents: number; planId?: string | null; autopay?: boolean; keepCard?: boolean; keepCardMaxCents?: number; origin: string; token: string },
   client?: Pick<Stripe, "createCheckout">,
 ) {
   const data = await portalData(db, linkId);
   if (!data) throw new Error("This link can no longer be used");
+  if (input.keepCard && !(Number.isInteger(input.keepCardMaxCents) && input.keepCardMaxCents! >= 100 && input.keepCardMaxCents! <= 1_000_000)) throw new Error("Enter the most we may charge each time, from $1 to $10,000");
   const stripe = client ?? stripeClient((await practiceConfig(db, data.practice.id)).stripe);
   if (!Number.isInteger(input.amountCents) || input.amountCents < 100) throw new Error("Enter at least $1.00");
   if (input.amountCents > Math.max(data.balance, 0) + data.depositDue && !input.planId) throw new Error("That is more than you owe");
@@ -140,8 +141,11 @@ export async function startPortalPayment(
     successUrl: `${back}?paid=${pay.id}`,
     cancelUrl: back,
     email: data.patient.email,
-    saveCard: !!(plan && input.autopay),
-    metadata: { payment_id: pay.id, practice_id: data.practice.id, autopay: plan && input.autopay ? "1" : "0" },
+    saveCard: !!(plan && input.autopay) || !!input.keepCard,
+    metadata: {
+      payment_id: pay.id, practice_id: data.practice.id, autopay: plan && input.autopay ? "1" : "0",
+      ...(input.keepCard ? { card_on_file: "1", card_on_file_max: String(input.keepCardMaxCents) } : {}),
+    },
     idempotencyKey: `portal-${pay.id}`,
   });
   await db.update(onlinePayments).set({ providerRef: session.id }).where(eq(onlinePayments.id, pay.id));
@@ -181,7 +185,9 @@ export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pic
     await db.update(onlinePayments).set({ ledgerEntryId: entry.id }).where(eq(onlinePayments.id, pay.id));
   }
 
-  if (s.metadata?.autopay === "1" && pay.planId && s.payment_intent) {
+  const autopay = s.metadata?.autopay === "1" && !!pay.planId;
+  const cardOnFile = s.metadata?.card_on_file === "1" ? Number(s.metadata.card_on_file_max) : null;
+  if ((autopay || (cardOnFile && cardOnFile >= 100)) && s.payment_intent) {
     const stripe = client ?? stripeClient((await practiceConfig(db, pay.practiceId)).stripe);
     const pi = await stripe.getPaymentIntent(s.payment_intent);
     if (pi.payment_method && (pi.customer ?? s.customer)) {
@@ -189,8 +195,12 @@ export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pic
       await db.update(savedCards).set({ removedAt: new Date() }).where(and(eq(savedCards.patientId, pay.patientId), isNull(savedCards.removedAt)));
       await db.insert(savedCards).values({
         practiceId: pay.practiceId, patientId: pay.patientId, providerCustomer: (pi.customer ?? s.customer)!, providerMethod: pi.payment_method,
-        brand: pm.card?.brand ?? null, last4: pm.card?.last4 ?? null, expMonth: pm.card?.exp_month ?? null, expYear: pm.card?.exp_year ?? null, autopayPlanId: pay.planId,
+        brand: pm.card?.brand ?? null, last4: pm.card?.last4 ?? null, expMonth: pm.card?.exp_month ?? null, expYear: pm.card?.exp_year ?? null,
+        autopayPlanId: autopay ? pay.planId : null,
+        // The patient's authorization to charge balances after insurance, with its limit.
+        ...(cardOnFile && cardOnFile >= 100 ? { balanceMaxCents: cardOnFile, balanceAuthorizedAt: new Date() } : {}),
       });
+      if (cardOnFile) await db.insert(schema.auditLog).values({ practiceId: pay.practiceId, userId: null, action: "card_on_file_authorized", entity: "patient", entityId: pay.patientId, details: { maxCents: cardOnFile, last4: pm.card?.last4 ?? null } });
     }
   }
   await db.insert(schema.auditLog).values({ practiceId: pay.practiceId, userId: null, action: "online_payment", entity: "patient", entityId: pay.patientId, details: { amountCents: pay.amountCents, planId: pay.planId } });

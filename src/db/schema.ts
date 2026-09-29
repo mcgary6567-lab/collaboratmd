@@ -102,6 +102,8 @@ export type PracticePolicies = {
   refundDualControl?: boolean;
   /** Thresholds for the chart access review (server/access-anomalies.ts); unset ones use its defaults. */
   accessReview?: { chartsPerDay?: number; multiple?: number; minForMultiple?: number; unrelatedPerDay?: number };
+  /** Diagnosis prefixes the practice counts as chronic conditions, for finding care management candidates. */
+  chronicPrefixes?: string[];
 };
 
 export type AutomationSettings = {
@@ -1153,6 +1155,9 @@ export const savedCards = pgTable("saved_cards", {
   expMonth: integer("exp_month"),
   expYear: integer("exp_year"),
   autopayPlanId: uuid("autopay_plan_id").references(() => paymentPlans.id),
+  /** Card on file: the patient authorized charging balances after insurance, up to this much each time. Migration 0059. */
+  balanceMaxCents: integer("balance_max_cents"),
+  balanceAuthorizedAt: timestamp("balance_authorized_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   removedAt: timestamp("removed_at", { withTimezone: true }),
 });
@@ -2145,3 +2150,48 @@ export const patientSlidingFees = pgTable("patient_sliding_fees", {
   expiresOn: date("expires_on").notNull(),
   recordedBy: uuid("recorded_by").references(() => users.id),
 });
+
+/* ------------------------------------------------------------------ */
+/* Round M: card on file, HCC mappings, payer refund demands            */
+/* ------------------------------------------------------------------ */
+
+/** A charge to a card on file, announced to the patient before it is made. */
+export const cardChargeNotices = pgTable("card_charge_notices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  cardId: uuid("card_id").notNull().references(() => savedCards.id),
+  amountCents: integer("amount_cents").notNull(),
+  noticeOn: date("notice_on").notNull(),
+  chargeOn: date("charge_on").notNull(),
+  status: text("status").notNull().default("pending"), // pending | charged | skipped | failed
+  detail: text("detail"),
+  onlinePaymentId: uuid("online_payment_id").references(() => onlinePayments.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("card_charge_notices_patient_idx").on(t.patientId, t.status)]);
+
+/** CMS's ICD-10-CM to HCC mapping (risk adjustment model), by payment year. */
+export const hccMappings = pgTable("hcc_mappings", {
+  year: integer("year").notNull(),
+  icd10: text("icd10").notNull(),
+  hcc: text("hcc").notNull(),
+  label: text("label"),
+}, (t) => [primaryKey({ columns: [t.year, t.icd10, t.hcc] })]);
+
+/** A payer's written demand for a refund of an overpayment, with its dispute and offset dates. */
+export const payerRefundDemands = pgTable("payer_refund_demands", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  amountCents: integer("amount_cents").notNull(),
+  reference: text("reference"),
+  receivedOn: date("received_on").notNull(),
+  disputeBy: date("dispute_by"),
+  offsetOn: date("offset_on"),
+  status: text("status").notNull().default("open"), // open | agreed | disputed | offset | closed
+  refundId: uuid("refund_id").references(() => refunds.id),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("payer_refund_demands_practice_idx").on(t.practiceId, t.status)]);

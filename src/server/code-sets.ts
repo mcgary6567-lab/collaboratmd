@@ -25,10 +25,10 @@ import { hcpcsFindings, icdFindings, icdYearLoaded, importHcpcs, importIcd10 } f
 import { importGpcis, importRvus } from "./mpfs";
 import { importAnesthesiaBaseUnits } from "./time-units";
 
-const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads, medicareTelehealthCodes } = schema;
+const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads, medicareTelehealthCodes, hccMappings } = schema;
 
-export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia" | "telehealth";
-export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia", "telehealth"];
+export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia" | "telehealth" | "hcc";
+export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia", "telehealth", "hcc"];
 
 /** Platform operators, by email: the only people who can replace national code sets. */
 export function isPlatformOperator(email: string | null | undefined) {
@@ -131,6 +131,30 @@ export function parseTelehealthList(text: string): { rows: TelehealthRow[]; skip
   return { rows, skipped };
 }
 
+export type HccRow = { icd10: string; hcc: string; label: string | null };
+/**
+ * CMS's ICD-10-CM to HCC mapping for a payment year, saved as CSV: the
+ * diagnosis code column and the HCC column of the model in use (the V28
+ * column when the file has several), one row per diagnosis and HCC.
+ */
+export function parseHccMapping(text: string): { rows: HccRow[]; skipped: number } {
+  const t = tableFrom(text, [/diagnosis|icd/i, /hcc/i]);
+  if (!t) throw new Error("Not an HCC mapping: expected a diagnosis code column and an HCC column");
+  const h = t.headers;
+  const dx = col(h, /diagnosis\s*code|icd/i) >= 0 ? col(h, /diagnosis\s*code|icd/i) : col(h, /diagnosis/i);
+  const hccCol = col(h, /v28/i) >= 0 ? col(h, /v28/i) : col(h, /hcc/i);
+  const labelCol = col(h, /description|label/i);
+  const rows: HccRow[] = [];
+  let skipped = 0;
+  for (const r of t.rows) {
+    const icd10 = code(r[dx]).replace(".", "");
+    const hcc = (r[hccCol] ?? "").trim().replace(/^HCC\s*/i, "");
+    if (!/^[A-Z][0-9][0-9A-Z]{1,5}$/.test(icd10) || !/^\d{1,4}$/.test(hcc)) { skipped++; continue; }
+    rows.push({ icd10, hcc, label: labelCol >= 0 ? (r[labelCol] ?? "").trim().slice(0, 120) || null : null });
+  }
+  return { rows, skipped };
+}
+
 /* ------------------------------ Loading ------------------------------ */
 
 async function inChunks<T>(rows: T[], size: number, fn: (chunk: T[]) => Promise<unknown>) {
@@ -145,7 +169,14 @@ export async function importCodeSet(db: Db, set: CodeSet, text: string, label: s
   if (set === "anesthesia") return importAnesthesiaBaseUnits(db, text, label, loadedBy);
   let added = 0;
   let skipped = 0;
-  if (set === "telehealth") {
+  if (set === "hcc") {
+    if (!Number.isInteger(year) || year! < 2020) throw new Error("Give the payment year of the HCC mapping, e.g. 2026");
+    const p = parseHccMapping(text);
+    skipped = p.skipped;
+    if (p.rows.length) await db.delete(hccMappings).where(eq(hccMappings.year, year!));
+    await inChunks(p.rows, 1000, (chunk) => db.insert(hccMappings).values(chunk.map((r) => ({ ...r, year: year! }))).onConflictDoNothing());
+    added = p.rows.length;
+  } else if (set === "telehealth") {
     if (!Number.isInteger(year) || year! < 2020) throw new Error("Give the calendar year of the telehealth list, e.g. 2026");
     const p = parseTelehealthList(text);
     skipped = p.skipped;

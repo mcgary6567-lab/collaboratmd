@@ -11,6 +11,7 @@ import { schema } from "@/db";
 import type { Remit835 } from "@/lib/edi/x835";
 import { money } from "@/lib/utils";
 import { notify } from "./notifications";
+import { markDemandOffset } from "./refund-demands";
 
 const { remittanceAdjustments, claims, ledgerEntries, claimEvents, remittances } = schema;
 
@@ -36,6 +37,8 @@ async function postTakeback(db: Db, adjId: string, claim: typeof claims.$inferSe
   await db.insert(ledgerEntries).values({ practiceId: claim.practiceId, patientId: claim.patientId, claimId: claim.id, remittanceId: remit.id, type: "reversal", amountCents, postedBy: userId ?? null, note: `${payer} took back ${money(amountCents)} in check ${remit.checkNumber} (PLB)` });
   await db.insert(claimEvents).values({ claimId: claim.id, status: claim.status, source: "835", message: `${payer} took back ${money(amountCents)} from a later payment (check ${remit.checkNumber})` });
   await db.update(remittanceAdjustments).set({ claimId: claim.id, posted: true }).where(eq(remittanceAdjustments.id, adjId));
+  // The payer took the money itself: a refund demand for this claim is settled.
+  await markDemandOffset(db, claim.id, amountCents);
 }
 
 /** Records a remittance's PLB adjustments and posts each takeback to the claim it names. */

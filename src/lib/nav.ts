@@ -1,8 +1,8 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
   Award, Bot, BuildingComplex, Calculator, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, FolderSearch, Gauge, Gavel, HandCoins,
-  Hospital, Inbox, Landmark, LayoutDashboard, ListChecks, MessageSquare, Network, Radar, Receipt, ReceiptText, Scale, RotateCcwClock, SearchCheck, Settings, SquareCheckBig, Stethoscope,
-  TrendingDown, TriangleAlert, Upload, UserSearch, Users, Wallet, WandSparkles,
+  HeartPulse, Hospital, Inbox, Landmark, LayoutDashboard, ListChecks, MessageSquare, Network, Radar, Receipt, ReceiptText, Scale, RotateCcwClock, SearchCheck, Settings, SquareCheckBig, Stethoscope,
+  TrendingDown, TriangleAlert, Undo2, Upload, UserSearch, Users, Wallet, WandSparkles,
 } from "lucide-react";
 import { settingsFor } from "./settings-sections";
 
@@ -48,6 +48,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/underpayments", label: "Underpayments", icon: TrendingDown },
       { href: "/records-requests", label: "Records requests", icon: FolderSearch },
       { href: "/nsa-disputes", label: "Out-of-network disputes", icon: Scale },
+      { href: "/refund-demands", label: "Payer refund demands", icon: Undo2 },
       { href: "/billing", label: "Patient billing", icon: Wallet },
       { href: "/billing/collections", label: "Collections", icon: Gavel },
       { href: "/billing/missed-charges", label: "Missed charges", icon: SearchCheck },
@@ -66,6 +67,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reports/productivity", label: "Productivity (RVUs)", icon: Gauge, adminOnly: true },
       { href: "/reports/contracts", label: "Contract comparison", icon: Scale },
       { href: "/reports/lag", label: "Charge lag", icon: Clock },
+      { href: "/reports/care-gaps", label: "Care gaps", icon: HeartPulse },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },

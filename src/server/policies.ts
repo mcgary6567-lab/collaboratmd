@@ -30,6 +30,7 @@ export const DEFAULT_POLICIES: Required<{ [K in keyof PracticePolicies]: NonNull
   exportsAdminOnly: false,
   refundDualControl: false,
   accessReview: null,
+  chronicPrefixes: null,
 };
 
 export async function getPolicies(db: Db, practiceId: string): Promise<PracticePolicies> {
@@ -69,11 +70,18 @@ export async function savePolicies(db: Db, practiceId: string, input: PracticePo
   let before: PracticePolicies;
   try { before = validatePolicies(stored); } catch { before = stored; }
   const policies = validatePolicies(input);
-  // Settings saved on other screens live in the same column: keep them (the access review's limits).
-  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}) } }).where(eq(practices.id, practiceId));
+  // Settings saved on other screens live in the same column: keep them (the access review's limits, the chronic condition groups).
+  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}) } }).where(eq(practices.id, practiceId));
   const changed = Object.keys(policies).filter((k) => JSON.stringify(policies[k as keyof PracticePolicies] ?? null) !== JSON.stringify(before[k as keyof PracticePolicies] ?? null));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed, policies } });
   return policies;
+}
+
+/** The diagnosis prefixes the practice counts as chronic conditions (care management candidates). */
+export async function saveChronicPrefixes(db: Db, practiceId: string, prefixes: string[], userId?: string) {
+  const stored = await getPolicies(db, practiceId);
+  await db.update(practices).set({ policies: { ...stored, chronicPrefixes: prefixes } }).where(eq(practices.id, practiceId));
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed: ["chronicPrefixes"], chronicPrefixes: prefixes } });
 }
 
 /** Whether scrub findings stop a claim: errors always, warnings too under strict scrubbing. */

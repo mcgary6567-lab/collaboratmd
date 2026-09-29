@@ -67,6 +67,48 @@ export function levelShift(provider: { total: number; pct: number[] }, practice:
   return Math.round((avg(provider) - avg(practice)) * 100) / 100;
 }
 
+/**
+ * Modifier use, a frequent audit target: the share of E/M lines with 25 (a
+ * separate service the same day as a procedure) and of procedure lines with
+ * 59 or its X subsets (distinct procedural service), per provider and for the
+ * practice.
+ */
+export async function modifierUsage(db: Db, practiceId: string, from: string, to: string) {
+  const { rows } = await db.execute<Row>(sql`
+    SELECT e.provider_id, p.first_name, p.last_name, p.credential,
+      count(*) FILTER (WHERE ch.cpt ~ '^99(2[0-9]{2}|3[0-4][0-9]|4[0-9]{2})$')::text AS em,
+      count(*) FILTER (WHERE ch.cpt ~ '^99(2[0-9]{2}|3[0-4][0-9]|4[0-9]{2})$' AND ch.modifiers ? '25')::text AS em25,
+      count(*) FILTER (WHERE ch.cpt !~ '^99' AND ch.cpt ~ '^[0-9]{5}$')::text AS procs,
+      count(*) FILTER (WHERE ch.cpt !~ '^99' AND ch.cpt ~ '^[0-9]{5}$' AND ch.modifiers ?| array['59', 'XE', 'XS', 'XP', 'XU'])::text AS procs59
+    FROM encounters e JOIN charges ch ON ch.encounter_id = e.id JOIN providers p ON p.id = e.provider_id
+    WHERE e.practice_id = ${practiceId} AND e.date_of_service BETWEEN ${from} AND ${to}
+      AND NOT EXISTS (SELECT 1 FROM claims cl WHERE cl.encounter_id = e.id AND cl.status IN ('void', 'voided'))
+    GROUP BY e.provider_id, p.first_name, p.last_name, p.credential
+    ORDER BY p.last_name`);
+  const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : null);
+  const providers = rows.map((r) => ({
+    id: r.provider_id!, name: `${r.first_name} ${r.last_name}${r.credential ? `, ${r.credential}` : ""}`,
+    em: Number(r.em), em25: Number(r.em25), procs: Number(r.procs), procs59: Number(r.procs59),
+    rate25: pct(Number(r.em25), Number(r.em)), rate59: pct(Number(r.procs59), Number(r.procs)),
+  }));
+  const sum = (k: "em" | "em25" | "procs" | "procs59") => providers.reduce((a, p) => a + p[k], 0);
+  return { providers, practice: { rate25: pct(sum("em25"), sum("em")), rate59: pct(sum("procs59"), sum("procs")) } };
+}
+
+/** A random sample of a provider's claims with modifier 25 or 59/X, for review. */
+export async function sampleModifierClaims(db: Db, practiceId: string, providerId: string, from: string, to: string, n = 10) {
+  const { rows } = await db.execute<Row>(sql`
+    SELECT * FROM (
+      SELECT DISTINCT ON (e.id) e.id AS encounter_id, e.date_of_service::text AS dos, cl.id AS claim_id, cl.control_number, pt.first_name, pt.last_name,
+        string_agg(ch.cpt || CASE WHEN jsonb_array_length(ch.modifiers) > 0 THEN '-' || (SELECT string_agg(m, '-') FROM jsonb_array_elements_text(ch.modifiers) m) ELSE '' END, ', ') OVER (PARTITION BY e.id) AS codes
+      FROM encounters e JOIN charges ch ON ch.encounter_id = e.id JOIN patients pt ON pt.id = e.patient_id LEFT JOIN claims cl ON cl.encounter_id = e.id
+      WHERE e.practice_id = ${practiceId} AND e.provider_id = ${providerId} AND e.date_of_service BETWEEN ${from} AND ${to}
+        AND EXISTS (SELECT 1 FROM charges c2 WHERE c2.encounter_id = e.id AND c2.modifiers ?| array['25', '59', 'XE', 'XS', 'XP', 'XU'])
+      ORDER BY e.id
+    ) v ORDER BY random() LIMIT ${n}`);
+  return rows.map((r) => ({ encounterId: r.encounter_id!, dateOfService: r.dos!, claimId: r.claim_id, controlNumber: r.control_number, patient: `${r.last_name}, ${r.first_name}`, codes: r.codes! }));
+}
+
 /** A random sample of a provider's E/M visits in the period, for an internal chart review. */
 export async function sampleVisits(db: Db, practiceId: string, providerId: string, from: string, to: string, n = 10) {
   const { rows } = await db.execute<Row>(sql`

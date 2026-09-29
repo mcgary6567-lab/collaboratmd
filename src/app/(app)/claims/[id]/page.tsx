@@ -93,6 +93,8 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             )}
             {b.claim.claimType === "professional" && <Link href={`/print/cms1500/${id}`} className="btn btn-secondary">Paper claim (CMS-1500)</Link>}
             {b.claim.claimType === "institutional" && <Link href={`/print/ub04/${id}`} className="btn btn-secondary">Printable UB-04 (plain paper)</Link>}
+            {claimDenials.some((d) => d.carc === "29" || d.category === "timely_filing") && <Link href={`/print/timely-filing/${id}`} className="btn btn-secondary">Proof of timely filing</Link>}
+            {b.claim.payerSequence === "S" && b.claim.primaryClaimId && <Link href={`/print/eob/${b.claim.primaryClaimId}`} className="btn btn-secondary">Primary EOB page</Link>}
             <ClaimActions claimId={id} canSubmit={canSubmit} canRescrub={["draft", "scrub_errors", "ready"].includes(b.claim.status)} />
           </>
         }

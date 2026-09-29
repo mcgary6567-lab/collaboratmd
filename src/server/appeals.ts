@@ -11,6 +11,7 @@ import { fillPlaceholders, templateLetter, wrapBody } from "@/lib/appeals";
 import { practiceConfig } from "./integrations";
 import { levelFiled } from "./appeal-levels";
 import { assertNoOpenRequest } from "./records-requests";
+import { timelyFilingParagraph, timelyFilingProof } from "./timely-filing";
 
 const { appealLetters, denials, claims, patients, patientInsurances, payers, practices, encounters, charges, providers, claimEvents } = schema;
 
@@ -67,9 +68,19 @@ export async function draftAppeal(db: Db, practiceId: string, denialId: string, 
     DENIAL_CODES: `CARC ${d.denial.carc}${d.denial.rarc ? `, RARC ${d.denial.rarc}` : ""}`,
     TODAY: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
   });
+  // A timely filing denial (CARC 29) gets the submission record that answers it.
+  let finalBody = filled;
+  if (d.denial.carc === "29" || d.denial.category === "timely_filing") {
+    const proof = await timelyFilingProof(db, practiceId, d.claim.id);
+    const paragraph = proof ? timelyFilingParagraph(proof) : null;
+    if (paragraph) {
+      const at = finalBody.search(/\n\s*(Sincerely|Respectfully)/);
+      finalBody = at >= 0 ? `${finalBody.slice(0, at)}\n\n${paragraph}\n${finalBody.slice(at)}` : `${finalBody}\n\n${paragraph}`;
+    }
+  }
   const [letter] = await db
     .insert(appealLetters)
-    .values({ practiceId, denialId, body: filled, source: body ? "ai" : "template", createdBy: userId ?? null })
+    .values({ practiceId, denialId, body: finalBody, source: body ? "ai" : "template", createdBy: userId ?? null })
     .returning();
   return letter;
 }
