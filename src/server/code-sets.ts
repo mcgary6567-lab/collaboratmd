@@ -22,11 +22,13 @@ import type { ScrubFinding } from "@/lib/scrub/rules";
 import { parseCsv } from "@/lib/import/csv";
 import { normalizeDate } from "@/lib/import/patients";
 import { hcpcsFindings, icdFindings, icdYearLoaded, importHcpcs, importIcd10 } from "./code-catalog";
+import { importGpcis, importRvus } from "./mpfs";
+import { importAnesthesiaBaseUnits } from "./time-units";
 
 const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads } = schema;
 
-export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs";
-export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs"];
+export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia";
+export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia"];
 
 /** Platform operators, by email: the only people who can replace national code sets. */
 export function isPlatformOperator(email: string | null | undefined) {
@@ -110,9 +112,12 @@ async function inChunks<T>(rows: T[], size: number, fn: (chunk: T[]) => Promise<
   for (let i = 0; i < rows.length; i += size) await fn(rows.slice(i, i + size));
 }
 
-export async function importCodeSet(db: Db, set: CodeSet, text: string, label: string, loadedBy: string, fiscalYear?: number) {
-  if (set === "icd10cm") return importIcd10(db, text, Number(fiscalYear), label, loadedBy);
+export async function importCodeSet(db: Db, set: CodeSet, text: string, label: string, loadedBy: string, year?: number, conversionFactor?: number) {
+  if (set === "icd10cm") return importIcd10(db, text, Number(year), label, loadedBy);
   if (set === "hcpcs") return importHcpcs(db, text, label, loadedBy);
+  if (set === "mpfs_rvu") return importRvus(db, text, Number(year), label, loadedBy, conversionFactor);
+  if (set === "mpfs_gpci") return importGpcis(db, text, Number(year), label, loadedBy);
+  if (set === "anesthesia") return importAnesthesiaBaseUnits(db, text, label, loadedBy);
   let added = 0;
   let skipped = 0;
   if (set === "ncci_ptp") {

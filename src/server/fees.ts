@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { ContractRules } from "@/db/schema";
+import { medicareAllowed, practiceLocality } from "./mpfs";
 
 const { feeSchedules, feeScheduleItems, underpayments, claims, charges, ledgerEntries, payers, patients, cptCodes } = schema;
 
@@ -185,6 +186,35 @@ export async function saveScheduleItems(db: Db, scheduleId: string, items: { cpt
  * Builds a payer contract as a percentage of the practice's standard charges,
  * which is how most commercial contracts are actually written.
  */
+/** For a Medicare claim with no contract: the physician fee schedule's rates and reductions, or null when they are not loaded. */
+async function medicareTermsFor(db: Db, claim: { practiceId: string; payerId: string; encounterId: string }, lines: { cpt: string; modifiers: string[] }[]) {
+  const [payer] = await db.select({ type: payers.type }).from(payers).where(eq(payers.id, claim.payerId)).limit(1);
+  if (payer?.type !== "medicare") return null;
+  const loc = await practiceLocality(db, claim.practiceId);
+  if (!loc) return null;
+  const [enc] = await db.select({ dos: schema.encounters.dateOfService, pos: schema.encounters.placeOfService }).from(schema.encounters).where(eq(schema.encounters.id, claim.encounterId)).limit(1);
+  const { rates, mppr } = await medicareAllowed(db, loc, enc.dos, enc.pos, lines);
+  if (!rates.size) return null;
+  return { rates, mppr, rules: mppr.size ? { mpprPercent: 50 } as ContractRules : null };
+}
+
+/**
+ * A payer contract as a percentage of Medicare's fee schedule in the
+ * practice's locality (office rates), for every code the practice bills that
+ * the schedule prices.
+ */
+export async function contractFromMedicare(db: Db, practiceId: string, payerId: string, percent: number, today = new Date()) {
+  if (!(percent > 0 && percent <= 500)) throw new Error("Percent of Medicare must be between 0 and 500");
+  const loc = await practiceLocality(db, practiceId);
+  if (!loc) throw new Error("Choose the practice's Medicare locality first (Settings, Practice profile)");
+  const std = await standardCharges(db, practiceId);
+  const { rates } = await medicareAllowed(db, loc, today.toISOString().slice(0, 10), "11", [...std.keys()].map((cpt) => ({ cpt })));
+  if (!rates.size) throw new Error("The Medicare fee schedule is not loaded for this year and locality");
+  const schedule = await ensureSchedule(db, practiceId, payerId);
+  await saveScheduleItems(db, schedule.id, [...rates].map(([cpt, allowed]) => ({ cpt, amountCents: Math.round((allowed * percent) / 100) })));
+  return { schedule, codes: rates.size, skipped: std.size - rates.size };
+}
+
 export async function contractFromPercent(db: Db, practiceId: string, payerId: string, percent: number) {
   if (!(percent > 0 && percent <= 200)) throw new Error("Percent must be between 0 and 200");
   const schedule = await ensureSchedule(db, practiceId, payerId);
@@ -206,9 +236,14 @@ export async function checkClaimUnderpayment(db: Db, claimId: string, remittance
   const [claim] = await db.select().from(claims).where(eq(claims.id, claimId)).limit(1);
   if (!claim || !["paid", "partially_paid"].includes(claim.status)) return null;
 
-  const terms = await contractTerms(db, claim.practiceId, claim.payerId);
-  if (terms.rates.size === 0) return null;
+  let terms: { rates: Map<string, number>; mppr: Set<string>; rules: ContractRules | null } = await contractTerms(db, claim.practiceId, claim.payerId);
   const lines = await db.select({ cpt: charges.cpt, units: charges.units, modifiers: charges.modifiers }).from(charges).where(eq(charges.encounterId, claim.encounterId));
+  if (terms.rates.size === 0) {
+    // No contract on file: Medicare's own fee schedule, for the practice's locality, is what it should allow.
+    const medicare = await medicareTermsFor(db, claim, lines);
+    if (!medicare) return null;
+    terms = medicare;
+  }
   const exp = expectedAllowed(lines, terms.rates, terms);
   if (exp.missing.length) return null;
 

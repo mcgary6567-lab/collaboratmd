@@ -9,7 +9,8 @@ import { importPatients, preview, profiles, readTable, type ImportPreview } from
 import { mapColumnsWithAi } from "@/lib/ai/map-columns";
 import { practiceConfig } from "@/server/integrations";
 import type { Mapping } from "@/lib/import/patients";
-import { deleteTemplate, saveTemplate } from "@/server/import-templates";
+import { deleteSharedTemplate, deleteTemplate, saveTemplate, shareTemplate } from "@/server/import-templates";
+import { isPlatformOperator } from "@/server/code-sets";
 
 const fail = (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : "Something went wrong" });
 
@@ -105,5 +106,22 @@ export async function saveImportTemplateAction(name: string, headers: string[], 
 
 export async function deleteImportTemplateAction(id: string): Promise<void> {
   const s = await requireRole(CAN_WRITE);
+  if (id.startsWith("shared:")) {
+    // A shared template belongs to the platform: only its operator removes it.
+    if (isPlatformOperator(s.email)) await deleteSharedTemplate(await getDb(), id);
+    return;
+  }
   await deleteTemplate(await getDb(), s.practiceId, id);
+}
+
+export async function shareImportTemplateAction(templateId: string, _prev: FormResult, fd: FormData): Promise<FormResult> {
+  const s = await requireRole(CAN_WRITE);
+  if (!isPlatformOperator(s.email)) return { ok: false, message: "Only the platform operator can share a template with every practice" };
+  try {
+    const row = await shareTemplate(await getDb(), s.practiceId, templateId, String(fd.get("name") ?? ""), s.email);
+    revalidatePath("/import");
+    return { ok: true, message: `Shared as "${row.name}". Every practice uploading a file with these columns gets it.` };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not share" };
+  }
 }

@@ -14,11 +14,13 @@ export async function importCodeSetAction(_prev: FormResult, formData: FormData)
   if (!CODE_SETS.includes(set)) return { ok: false, message: "Choose which code set this file is" };
   const year = Number(formData.get("year") ?? "");
   if (set === "icd10cm" && !year) return { ok: false, message: "Give the fiscal year of the ICD-10-CM file, e.g. 2027" };
+  if ((set === "mpfs_rvu" || set === "mpfs_gpci") && !year) return { ok: false, message: "Give the calendar year of the Medicare fee schedule file, e.g. 2026" };
+  const cf = Number(formData.get("conversionFactor") ?? "") || undefined;
   const file = formData.get("file");
   if (!(file instanceof File) || !file.size) return { ok: false, message: "Choose the file" };
   if (file.size > 4_000_000) return { ok: false, message: "Files over 4 MB go through the command-line importer (see below)" };
   try {
-    const r = await importCodeSet(await getDb(), set, await file.text(), String(formData.get("label") || file.name), s.email, year);
+    const r = await importCodeSet(await getDb(), set, await file.text(), String(formData.get("label") || file.name), s.email, year, cf);
     revalidatePath("/settings/code-sets");
     return { ok: true, message: `Loaded ${r.added.toLocaleString("en-US")} rows${r.skipped ? `, skipped ${r.skipped.toLocaleString("en-US")} unreadable` : ""}` };
   } catch (e) {

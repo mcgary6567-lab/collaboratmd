@@ -261,9 +261,10 @@ const encounterSchema = z.object({
         cpt: z.string().min(5),
         modifiers: z.array(z.string()),
         units: z.number().int().min(1),
-        chargeCents: z.number().int().min(1),
+        chargeCents: z.number().int().min(0),
         dxPointers: z.array(z.number().int().min(1)).min(1),
         description: z.string().optional(),
+        minutes: z.number().int().min(0).max(1440).nullable().optional(),
       }),
     )
     .min(1)

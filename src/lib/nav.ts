@@ -1,6 +1,6 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
-  Bot, BuildingComplex, Calculator, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, Gavel, HandCoins,
+  Award, Bot, BuildingComplex, Calculator, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, Gavel, HandCoins,
   Hospital, Inbox, Landmark, LayoutDashboard, ListChecks, MessageSquare, Network, Radar, Receipt, ReceiptText, RotateCcwClock, SearchCheck, Settings, SquareCheckBig, Stethoscope,
   TrendingDown, TriangleAlert, Upload, UserSearch, Users, Wallet, WandSparkles,
 } from "lucide-react";
@@ -60,6 +60,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reports", label: "Reports", icon: ChartColumn },
       { href: "/reports/forecast", label: "Cash forecast", icon: ChartLine },
       { href: "/reports/payer-alerts", label: "Payer alerts", icon: Radar },
+      { href: "/reports/quality", label: "Quality (MIPS)", icon: Award },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },

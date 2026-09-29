@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { AddPasskey } from "@/components/passkeys";
+import { listPasskeys } from "@/server/passkeys";
+import { removePasskeyAction } from "@/app/(app)/passkey-actions";
 import Link from "next/link";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { getDb, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { mfaStatus } from "@/server/mfa";
@@ -22,11 +26,12 @@ export const dynamic = "force-dynamic";
 export default async function SecuritySettingsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [status, [practice], withoutMfa, rule] = await Promise.all([
+  const [status, [practice], withoutMfa, rule, keys] = await Promise.all([
     mfaStatus(db, s.userId),
     db.select().from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1),
-    db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(and(eq(schema.users.practiceId, s.practiceId), isNull(schema.users.mfaSecret))),
+    db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(and(eq(schema.users.practiceId, s.practiceId), isNull(schema.users.mfaSecret), sql`NOT EXISTS (SELECT 1 FROM passkeys k WHERE k.user_id = ${schema.users.id})`)),
     mfaRule(db, s),
+    listPasskeys(db, s.userId),
   ]);
   const admin = s.role === "admin";
   const ip = clientIp(await headers());
@@ -37,6 +42,20 @@ export default async function SecuritySettingsPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Two-factor sign-in" className="lg:col-span-2">
           <MfaSetup enabled={status.enabled} recoveryLeft={status.recoveryLeft} locked={rule.required} />
+        </Card>
+        <Card title="Passkeys" className="lg:col-span-2">
+          <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">Sign in with your device&apos;s fingerprint, face or PIN instead of a password and code. A passkey works only on this site, so it cannot be phished, and it counts as two-factor sign-in.</p>
+          {keys.length > 0 && (
+            <ul className="mb-4 divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              {keys.map((k) => (
+                <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span><span className="font-medium">{k.name}</span> <span className="text-xs text-slate-500">added {fmtDate(k.createdAt, s.timeZone)}{k.lastUsedAt ? `, last used ${fmtDateTime(k.lastUsedAt, s.timeZone)}` : ""}</span></span>
+                  <form action={removePasskeyAction.bind(null, k.id)}><button className="btn btn-secondary text-xs">Remove</button></form>
+                </li>
+              ))}
+            </ul>
+          )}
+          <AddPasskey />
         </Card>
         <Card title="Practice policy">
           <div className="space-y-3 text-sm">

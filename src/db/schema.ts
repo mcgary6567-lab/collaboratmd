@@ -53,6 +53,9 @@ export const practices = pgTable("practices", {
   cliaNumber: text("clia_number"),
   /** Paper claim printing: how far to shift the data on a pre-printed CMS-1500, in tenths of a millimetre (right and down). */
   formOffsetX: integer("form_offset_x").notNull().default(0),
+  /** The Medicare payment locality (MAC number and locality number), for the physician fee schedule. */
+  medicareCarrier: text("medicare_carrier"),
+  medicareLocality: text("medicare_locality"),
   formOffsetY: integer("form_offset_y").notNull().default(0),
   /** For 837 files sent through another clearinghouse: the IDs it assigned (ISA06/GS02 and ISA08/GS03). */
   ediSubmitterId: text("edi_submitter_id"),
@@ -220,6 +223,8 @@ export const patientInsurances = pgTable("patient_insurances", {
   subscriberCity: text("subscriber_city"),
   subscriberState: text("subscriber_state"),
   subscriberZip: text("subscriber_zip"),
+  /** When Medicare pays second: the Medicare Secondary Payer type (12 working aged, 13 ESRD, 14 no-fault, 15 workers' comp, 16 public health, 41 black lung, 42 VA, 43 disability, 47 liability), sent as SBR05. */
+  mspType: text("msp_type"),
 });
 
 export const eligibilityChecks = pgTable("eligibility_checks", {
@@ -302,6 +307,8 @@ export const charges = pgTable("charges", {
   id: uuid("id").defaultRandom().primaryKey(),
   encounterId: uuid("encounter_id").notNull().references(() => encounters.id),
   lineNumber: integer("line_number").notNull(),
+  /** Minutes, for time-based codes: therapy (8-minute rule) and anesthesia (reported in minutes). */
+  minutes: integer("minutes"),
   cpt: text("cpt").notNull(),
   modifiers: jsonb("modifiers").$type<string[]>().notNull().default([]),
   units: integer("units").notNull().default(1),
@@ -331,6 +338,8 @@ export const claims = pgTable(
     patientInsuranceId: uuid("patient_insurance_id").notNull().references(() => patientInsurances.id),
     controlNumber: text("control_number").notNull(),
     payerClaimNumber: text("payer_claim_number"),
+    /** Medicare forwarded the claim to this supplemental payer itself (a crossover), so it is not billed again. */
+    crossoverPayer: text("crossover_payer"),
     frequencyCode: text("frequency_code").notNull().default("1"), // 1 original, 7 corrected, 8 void
     /** The claim this one replaces or voids (frequency 7 or 8). */
     originalClaimId: uuid("original_claim_id"),
@@ -1836,3 +1845,101 @@ export const restoreTests = pgTable("restore_tests", {
   recordedBy: text("recorded_by").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Medicare physician fee schedule relative value units (CMS's PPRRVU file), by year. */
+export const mpfsRvus = pgTable("mpfs_rvus", {
+  year: integer("year").notNull(),
+  code: text("code").notNull(),
+  modifier: text("modifier").notNull().default(""),
+  status: text("status"),
+  workRvu: numeric("work_rvu", { mode: "number" }).notNull(),
+  peNonFacility: numeric("pe_non_facility", { mode: "number" }).notNull(),
+  peFacility: numeric("pe_facility", { mode: "number" }).notNull(),
+  mpRvu: numeric("mp_rvu", { mode: "number" }).notNull(),
+  /** Multiple procedure indicator: 2 means the standard 100% / 50% reduction for further procedures that day. */
+  multProc: text("mult_proc"),
+}, (t) => [primaryKey({ columns: [t.year, t.code, t.modifier] })]);
+
+/** Geographic practice cost indices by Medicare locality (CMS's GPCI file), by year. */
+export const mpfsLocalities = pgTable("mpfs_localities", {
+  year: integer("year").notNull(),
+  carrier: text("carrier").notNull(),
+  locality: text("locality").notNull(),
+  name: text("name").notNull(),
+  state: text("state"),
+  workGpci: numeric("work_gpci", { mode: "number" }).notNull(),
+  peGpci: numeric("pe_gpci", { mode: "number" }).notNull(),
+  mpGpci: numeric("mp_gpci", { mode: "number" }).notNull(),
+}, (t) => [primaryKey({ columns: [t.year, t.carrier, t.locality] })]);
+
+/** Each year's conversion factor. */
+export const mpfsYears = pgTable("mpfs_years", {
+  year: integer("year").primaryKey(),
+  conversionFactor: numeric("conversion_factor", { mode: "number" }).notNull(),
+});
+
+/** Anesthesia base units by code (CMS's anesthesia base unit file). */
+export const anesthesiaBaseUnits = pgTable("anesthesia_base_units", {
+  code: text("code").primaryKey(),
+  baseUnits: integer("base_units").notNull(),
+});
+
+/** Medicare Secondary Payer questions asked of a patient on Medicare, and who pays first as a result. */
+export const mspScreenings = pgTable("msp_screenings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  answers: jsonb("answers").$type<Record<string, boolean>>().notNull(),
+  medicarePrimary: boolean("medicare_primary").notNull(),
+  mspType: text("msp_type"),
+  screenedAt: timestamp("screened_at", { withTimezone: true }).defaultNow().notNull(),
+  screenedBy: uuid("screened_by").references(() => users.id),
+}, (t) => [index("msp_screenings_patient_idx").on(t.patientId, t.screenedAt)]);
+
+/** Saved column mappings for spreadsheet imports: a practice's own, or shared by the platform (practiceId null). */
+export const importPresets = pgTable("import_presets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").references(() => practices.id),
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  mapping: jsonb("mapping").$type<Record<string, string>>().notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Passkeys (WebAuthn credentials) people sign in with. */
+export const passkeys = pgTable("passkeys", {
+  id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  publicKey: text("public_key").notNull(),
+  algorithm: integer("algorithm").notNull(),
+  signCount: integer("sign_count").notNull().default(0),
+  transports: jsonb("transports").$type<string[]>(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+}, (t) => [index("passkeys_user_idx").on(t.userId)]);
+
+/** One-time WebAuthn challenges, each good for five minutes. */
+export const passkeyChallenges = pgTable("passkey_challenges", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  challenge: text("challenge").notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  purpose: text("purpose").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+/** Quality measures a practice reports on claims (MIPS), as it defines them from CMS's specifications. */
+export const qualityMeasures = pgTable("quality_measures", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  number: text("number").notNull(),
+  title: text("title").notNull(),
+  eligibleCodes: jsonb("eligible_codes").$type<string[]>().notNull(),
+  dxPrefixes: jsonb("dx_prefixes").$type<string[]>().notNull().default([]),
+  minAge: integer("min_age"),
+  maxAge: integer("max_age"),
+  codes: jsonb("codes").$type<{ code: string; outcome: "met" | "not_met" | "excluded"; label: string }[]>().notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("quality_measures_practice_idx").on(t.practiceId)]);

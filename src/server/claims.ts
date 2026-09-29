@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { mspFindings } from "./msp";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { scrubClaim, hasBlockingErrors, type ScrubClaim, type ScrubFinding } from "@/lib/scrub/rules";
@@ -67,7 +68,7 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null, cliaNumber: b.practice.cliaNumber },
     encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi,
       relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber },
-    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers })),
+    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, minutes: l.minutes })),
     payer: { timelyFilingDays: b.payer.timelyFilingDays, type: b.payer.type },
     today,
   };
@@ -119,7 +120,8 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
     payerType: b.payer.type, dateOfService: b.encounter.dateOfService, diagnoses: b.encounter.diagnoses,
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units })),
   });
-  return { findings: [...general, ...edits.findings, ...national, ...(enrolled ? [enrolled] : [])], edits };
+  const msp = await mspFindings(db, { patientId: b.patient.id, payerType: b.payer.type, payerSequence: b.claim.payerSequence, mspType: b.insurance.mspType });
+  return { findings: [...general, ...edits.findings, ...national, ...msp, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
@@ -160,7 +162,7 @@ export async function createClaimForEncounter(db: Db, encounterId: string, userI
     .returning();
 
   for (const l of lines) {
-    await db.insert(ledgerEntries).values({ practiceId: enc.practiceId, patientId: enc.patientId, claimId: claim.id, chargeId: l.id, type: "charge", amountCents: l.chargeCents * l.units, postedBy: userId ?? null, note: `${l.cpt} x${l.units}` });
+    if (l.chargeCents * l.units > 0) await db.insert(ledgerEntries).values({ practiceId: enc.practiceId, patientId: enc.patientId, claimId: claim.id, chargeId: l.id, type: "charge", amountCents: l.chargeCents * l.units, postedBy: userId ?? null, note: `${l.cpt} x${l.units}` });
   }
   await db.update(encounters).set({ status: "billed" }).where(eq(encounters.id, encounterId));
   await db.insert(claimEvents).values({ claimId: claim.id, status: "draft", source: "system", message: "Claim created from encounter" });
@@ -453,7 +455,7 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   if (!remit) throw new Error("Remittance not found");
   if (remit.posted) return remit.postingSummary;
   const parsed = parseEdi835(remit.raw835);
-  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number; secondaryBilled?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
+  const summary: { matched: number; unmatched: string[]; paidCents: number; deniedCents: number; patientRespCents: number; adjustedCents: number; denials: number; underpaid?: number; reversals?: number; secondaryBilled?: number; crossovers?: number } = { matched: 0, unmatched: [], paidCents: 0, deniedCents: 0, patientRespCents: 0, adjustedCents: 0, denials: 0 };
   const readyForSecondary: string[] = [];
 
   for (const rc of parsed.claims) {
@@ -507,6 +509,12 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
     if (isSecondary) {
       await db.update(claims).set({ status, updatedAt: new Date() }).where(eq(claims.id, claim.primaryClaimId!));
       await db.insert(claimEvents).values({ claimId: claim.primaryClaimId!, status, source: "835", message: `Secondary ${claim.controlNumber} paid ${(rc.paidCents / 100).toFixed(2)}` });
+    } else if (status !== "denied" && isCrossover(rc)) {
+      // Medicare sent the claim on to the supplemental payer itself: billing it again would be a duplicate.
+      const to = rc.crossoverPayer ?? "the patient's supplemental insurer";
+      await db.update(claims).set({ crossoverPayer: to }).where(eq(claims.id, claim.id));
+      await db.insert(claimEvents).values({ claimId: claim.id, status, source: "835", message: `Medicare forwarded this claim to ${to} (crossover); it is not billed to them again` });
+      summary.crossovers = (summary.crossovers ?? 0) + 1;
     } else if (status !== "denied" && rc.patientResponsibilityCents > 0) {
       readyForSecondary.push(claim.id);
     }
@@ -545,6 +553,15 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
   }
   await db.update(remittances).set({ posted: true, postingSummary: summary }).where(eq(remittances.id, remittanceId));
   return summary;
+}
+
+/**
+ * Whether Medicare forwarded the claim to a supplemental payer itself: the
+ * crossover carrier (NM1*TT), claim status 19-21 ("processed as primary,
+ * forwarded"), or remark MA18 or N89.
+ */
+export function isCrossover(rc: { statusCode: string; crossoverPayer?: string; remarks: string[] }) {
+  return !!rc.crossoverPayer || ["19", "20", "21"].includes(rc.statusCode) || rc.remarks.some((r) => r === "MA18" || r === "N89");
 }
 
 /** The primary payer's decision on a claim, as a secondary claim must report it. */

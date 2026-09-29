@@ -11,6 +11,8 @@
  * A claim a payer has already decided is changed with a corrected claim
  * instead, which is what payers require.
  */
+import { isQualityCode } from "@/lib/codes/quality";
+import { money } from "@/lib/utils";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
@@ -25,7 +27,7 @@ export interface ClaimEdit {
   dateOfService: string;
   placeOfService: string;
   diagnoses: string[];
-  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string }[];
+  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null }[];
 }
 
 function validate(e: ClaimEdit) {
@@ -37,14 +39,14 @@ function validate(e: ClaimEdit) {
   for (const [i, l] of e.lines.entries()) {
     if (!/^[A-Z0-9]{5}$/.test(l.cpt.trim().toUpperCase())) throw new Error(`Line ${i + 1}: enter a 5-character procedure code`);
     if (!Number.isInteger(l.units) || l.units < 1) throw new Error(`Line ${i + 1}: units must be at least 1`);
-    if (!Number.isInteger(l.chargeCents) || l.chargeCents <= 0) throw new Error(`Line ${i + 1}: enter a charge`);
+    if (!Number.isInteger(l.chargeCents) || l.chargeCents < 0 || (l.chargeCents === 0 && !isQualityCode(l.cpt))) throw new Error(`Line ${i + 1}: enter a charge`);
     if (!l.dxPointers.length || l.dxPointers.some((p) => p < 1 || p > dx.length)) throw new Error(`Line ${i + 1}: diagnosis pointers must point at diagnoses 1 to ${dx.length}`);
   }
   return dx;
 }
 
-const describe = (l: { cpt: string; modifiers: string[]; units: number; chargeCents: number }) =>
-  `${l.cpt}${l.modifiers.length ? `-${l.modifiers.join("-")}` : ""} x${l.units} $${((l.chargeCents * l.units) / 100).toFixed(2)}`;
+const describe = (l: { cpt: string; modifiers: string[]; units: number; chargeCents: number; minutes?: number | null }) =>
+  `${l.cpt}${l.modifiers.length ? `-${l.modifiers.join("-")}` : ""} x${l.units}${l.minutes ? ` (${l.minutes} min)` : ""} ${money(l.chargeCents * l.units)}`;
 
 export async function editClaim(db: Db, practiceId: string, claimId: string, edit: ClaimEdit, userId?: string) {
   const [claim] = await db.select().from(claims).where(and(eq(claims.id, claimId), eq(claims.practiceId, practiceId))).limit(1);
@@ -93,9 +95,10 @@ export async function editClaim(db: Db, practiceId: string, claimId: string, edi
     for (const l of newLines) {
       const [c] = await db
         .insert(charges)
-        .values({ encounterId: enc.id, lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null })
+        .values({ encounterId: enc.id, lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null, minutes: l.minutes || null })
         .returning();
-      await db.insert(ledgerEntries).values({ practiceId, patientId: claim.patientId, claimId, chargeId: c.id, type: "charge", amountCents: l.chargeCents * l.units, postedBy: userId ?? null, note: `${l.cpt} x${l.units}` });
+      // A quality code is reported at $0.00 and posts nothing.
+      if (l.chargeCents * l.units > 0) await db.insert(ledgerEntries).values({ practiceId, patientId: claim.patientId, claimId, chargeId: c.id, type: "charge", amountCents: l.chargeCents * l.units, postedBy: userId ?? null, note: `${l.cpt} x${l.units}` });
       total += l.chargeCents * l.units;
     }
   }

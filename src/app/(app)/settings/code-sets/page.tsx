@@ -8,6 +8,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader, Stat } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { fiscalYear } from "@/server/code-catalog";
+import { mpfsStatus } from "@/server/mpfs";
 
 /** The fiscal year today is in (October starts the next one). */
 const currentFiscalYear = () => fiscalYear(new Date().toISOString().slice(0, 10));
@@ -16,19 +17,20 @@ export const metadata: Metadata = { title: "Code sets" };
 
 export const dynamic = "force-dynamic";
 
-const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II" };
+const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units" };
 
 export default async function CodeSetsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const status = await codeSetStatus(db);
+  const [status, mpfs] = await Promise.all([codeSetStatus(db), mpfsStatus(db)]);
   const operator = isPlatformOperator(s.email);
 
   return (
     <>
       <PageHeader title="National code sets" subtitle="What every claim is checked against: ICD-10-CM and HCPCS codes, NCCI code pairs, unit limits and Medicare coverage" actions={<Link href="/settings/payer-edits" className="btn btn-secondary">Payer rules</Link>} />
-      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+      <div className="mb-4 grid gap-4 sm:grid-cols-3">
         <Stat label="ICD-10-CM diagnoses" value={status.icd.toLocaleString("en-US")} hint={status.icdYear ? `Fiscal year ${status.icdYear} (through September 30, ${status.icdYear}) is the newest loaded` : "Not loaded: only the built-in common codes, unchecked"} tone={status.icdYear ? (status.icdYear >= currentFiscalYear() ? "good" : "bad") : "bad"} />
+        <Stat label="Medicare fee schedule" value={mpfs.years[0] ? String(mpfs.years[0].year) : "Not loaded"} hint={mpfs.years[0] ? `Conversion factor ${mpfs.years[0].conversionFactor}; ${mpfs.localities} localities` : "Load the RVU and GPCI files to price Medicare claims"} tone={mpfs.years[0] && mpfs.localities ? "good" : "neutral"} />
         <Stat label="HCPCS Level II codes" value={status.hcpcs.toLocaleString("en-US")} hint={status.hcpcs ? "Supplies, drugs and G codes checked on every claim" : "Not loaded: HCPCS codes are not checked"} tone={status.hcpcs ? "good" : "neutral"} />
       </div>
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -52,6 +54,8 @@ export default async function CodeSetsPage() {
           <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
             <li>ICD-10-CM: CMS publishes each fiscal year&apos;s files in the summer (ICD-10-CM page, &quot;Code Descriptions in Tabular Order&quot;). Load <code>icd10cm_order_YYYY.txt</code> with its fiscal year before October 1. Keep loading earlier years&apos; files too if you bill older dates of service.</li>
             <li>HCPCS Level II: CMS&apos;s quarterly Alpha-Numeric HCPCS file. Open the Excel file and save it as CSV.</li>
+            <li>Medicare fee schedule: from CMS&apos;s Physician Fee Schedule relative value files each year, the PPRRVU file and the GPCI file (Addendum E), each saved as CSV, with the calendar year. Practices then choose their locality on the practice profile.</li>
+            <li>Anesthesia base units: CMS&apos;s anesthesia base unit file saved as CSV (code and base units).</li>
             <li>CPT codes and descriptions belong to the American Medical Association and are not loaded here; each practice describes its procedure codes in its own words under Fee schedules.</li>
             <li>NCCI code pairs and unit limits: CMS publishes them quarterly as downloads on the National Correct Coding Initiative pages (practitioner files). Save each table as tab- or comma-separated text.</li>
             <li>Coverage: from the Medicare Coverage Database downloads, join each article&apos;s HCPCS codes to its covered ICD-10 codes and save as <code>policy_id, title, hcpcs, icd10</code>.</li>
@@ -66,9 +70,10 @@ export default async function CodeSetsPage() {
             <>
               <ActionForm action={importCodeSetAction} className="flex flex-wrap items-end gap-3 text-sm">
                 <label className="block"><span className="label">Code set</span>
-                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
+                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
                 </label>
-                <label className="block"><span className="label">Fiscal year (ICD-10-CM)</span><input name="year" className="input w-28" inputMode="numeric" placeholder={String(currentFiscalYear())} maxLength={4} /></label>
+                <label className="block"><span className="label">Year (ICD-10-CM fiscal year or fee schedule year)</span><input name="year" className="input w-28" inputMode="numeric" placeholder={String(currentFiscalYear())} maxLength={4} /></label>
+                <label className="block"><span className="label">Conversion factor (RVU file, if not in it)</span><input name="conversionFactor" className="input w-32" inputMode="decimal" placeholder="e.g. 33.4009" /></label>
                 <label className="block"><span className="label">Label</span><input name="label" className="input" placeholder="2026 Q4 practitioner PTP, part 1" /></label>
                 <label className="block"><span className="label">File (up to 4 MB)</span><input type="file" name="file" accept=".txt,.csv,.tsv" className="input" required /></label>
                 <SubmitButton pendingLabel="Loading...">Load</SubmitButton>

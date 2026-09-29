@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AccidentCard } from "./accident-card";
+import { QualityCard } from "./quality-card";
+import { measuresForClaim } from "@/server/quality";
 import { EDITABLE } from "@/server/claim-edit";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,7 +16,7 @@ import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/serv
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
 import { billAgainAction, billSecondaryAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Card, PageHeader, StatusBadge, PatientLink, Money, Badge } from "@/components/ui";
+import { Alert, Card, PageHeader, StatusBadge, PatientLink, Money, Badge } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { ClaimActions } from "./claim-actions";
 import { WorkPanel } from "@/components/work-panel";
@@ -92,6 +94,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
           </>
         }
       />
+      {b.claim.crossoverPayer && <Alert kind="info">Medicare forwarded this claim to {b.claim.crossoverPayer} (a crossover). It is not billed to them again; their payment arrives on its own remittance.</Alert>}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {risk && (
@@ -315,6 +318,9 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             </div>
           </Card>
 
+          {b.claim.claimType === "professional" && (
+            <QualityCard claimId={id} items={await measuresForClaim(db, s.practiceId, id)} editable={(EDITABLE as readonly string[]).includes(b.claim.status) && b.claim.frequencyCode !== "8" && b.claim.payerSequence !== "S"} />
+          )}
           {b.claim.claimType === "professional" && (
             <AccidentCard
               claimId={id}

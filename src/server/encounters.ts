@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { isQualityCode } from "@/lib/codes/quality";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { createClaimForEncounter } from "./claims";
@@ -17,7 +18,7 @@ export interface NewEncounterInput {
   placeOfService: string;
   locationId?: string | null;
   diagnoses: string[];
-  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string }[];
+  lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null }[];
   /** The provider who referred the patient, when the payer needs one on the claim. */
   referring?: { lastName: string; firstName?: string; npi: string } | null;
   /** Related to work or an accident: box 10 of the claim form, CLM11 on the 837. */
@@ -45,6 +46,7 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
   if (ref && !isValidNpi(ref.npi)) throw new Error("The referring provider's NPI fails its check digit");
   if (ref && !ref.lastName.trim()) throw new Error("Enter the referring provider's last name");
   const accident = accidentColumns(input.accident);
+  for (const l of input.lines) if (!(l.chargeCents > 0) && !isQualityCode(l.cpt)) throw new Error(`Enter a charge for ${l.cpt}`);
   const [enc] = await db
     .insert(encounters)
     .values({
@@ -64,7 +66,7 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
     .returning();
   let n = 1;
   for (const l of input.lines) {
-    await db.insert(charges).values({ encounterId: enc.id, lineNumber: n++, cpt: l.cpt.trim(), modifiers: l.modifiers.map((m) => m.toUpperCase().trim()).filter(Boolean), units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null });
+    await db.insert(charges).values({ encounterId: enc.id, lineNumber: n++, cpt: l.cpt.trim(), modifiers: l.modifiers.map((m) => m.toUpperCase().trim()).filter(Boolean), units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, description: l.description ?? null, minutes: l.minutes || null });
   }
   if (input.appointmentId) await db.update(appointments).set({ status: "completed" }).where(eq(appointments.id, input.appointmentId));
   const claim = await createClaimForEncounter(db, enc.id, userId);

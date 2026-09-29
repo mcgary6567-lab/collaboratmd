@@ -34,6 +34,8 @@ export interface RemitClaim {
   adjustments: Adjustment[];
   remarks: string[];
   lines: RemitServiceLine[];
+  /** NM1*TT: the supplemental payer Medicare forwarded the claim to (a crossover). */
+  crossoverPayer?: string;
 }
 
 export interface Remit835 {
@@ -115,6 +117,9 @@ export function parseEdi835(raw: string): Remit835 {
         };
         currentLine = null;
         remit.claims.push(current);
+        break;
+      case "NM1":
+        if (current && !currentLine && seg[1] === "TT") current.crossoverPayer = (seg[3] ?? "").trim() || "the supplemental insurer";
         break;
       case "CAS":
         if (currentLine) currentLine.adjustments.push(...parseCas(seg));

@@ -7,14 +7,15 @@ import { listSchedules, standardCharges } from "@/server/fees";
 import { listPracticeCodes } from "@/server/code-catalog";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { createContractAction, importPracticeCodesAction, removePracticeCodeAction } from "@/app/(app)/fees-actions";
-import { Badge, Card, Empty, Field, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, Empty, Field, PageHeader } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Fee schedules" };
 
 export const dynamic = "force-dynamic";
 
-export default async function FeeSchedulesPage() {
+export default async function FeeSchedulesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   const s = await requireSession();
   const db = await getDb();
   const [schedules, payers, own, standard] = await Promise.all([
@@ -35,6 +36,7 @@ export default async function FeeSchedulesPage() {
         subtitle="What the practice charges, and what each payer contract says it should be paid"
         actions={<Link href="/settings" className="btn btn-secondary">Back to settings</Link>}
       />
+      {error && <Alert kind="error">{error}</Alert>}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Schedules on file" className="lg:col-span-2">
           {schedules.length === 0 ? (
@@ -81,7 +83,7 @@ export default async function FeeSchedulesPage() {
               )}
               <form action={createContractAction} className="space-y-3">
                 <p className="text-sm text-slate-600">
-                  Most contracts are written as a percentage of standard charges. Start there, then adjust individual codes.
+                  Most contracts are written as a percentage of Medicare or of your standard charges. Start there, then adjust individual codes.
                 </p>
                 <Field label="Payer">
                   <select name="payerId" className="select" required disabled={uncontracted.length === 0}>
@@ -90,8 +92,13 @@ export default async function FeeSchedulesPage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Allowed as % of standard charges">
-                  <input name="percent" type="number" min="1" max="200" step="0.5" defaultValue="60" className="input" required />
+                <fieldset className="space-y-1 text-sm">
+                  <legend className="label">Allowed amounts as a percentage of</legend>
+                  <label className="flex items-center gap-2"><input type="radio" name="basis" value="medicare" defaultChecked /> Medicare&apos;s fee schedule in your locality</label>
+                  <label className="flex items-center gap-2"><input type="radio" name="basis" value="charges" /> Your standard charges</label>
+                </fieldset>
+                <Field label="Percent">
+                  <input name="percent" type="number" min="1" max="500" step="0.5" defaultValue="120" className="input" required />
                 </Field>
                 <button className="btn btn-primary w-full justify-center" disabled={uncontracted.length === 0}>
                   {uncontracted.length === 0 ? "Every payer has a contract" : "Create contract"}

@@ -10,6 +10,7 @@ import { PhoneInput, StateSelect, ZipInput } from "@/components/us-fields";
 import { fmtPhone } from "@/lib/us";
 import { BillingEntityFields } from "./billing-entity";
 import { NpiLookup } from "@/components/npi-lookup";
+import { listLocalities } from "@/server/mpfs";
 
 export const metadata: Metadata = { title: "Practice profile" };
 
@@ -19,6 +20,7 @@ export default async function ProfilePage() {
   const s = await requireSession();
   const [p] = await (await getDb()).select().from(schema.practices).where(eq(schema.practices.id, s.practiceId)).limit(1);
   const admin = s.role === "admin";
+  const localities = await listLocalities(await getDb());
   const field = (name: keyof typeof p, label: string, extra: { placeholder?: string; className?: string; maxLength?: number; inputMode?: "numeric" } = {}) => (
     <label className={`block text-sm ${extra.className ?? ""}`}>
       <span className="label">{label}</span>
@@ -57,6 +59,16 @@ export default async function ProfilePage() {
               <input name="cliaNumber" defaultValue={p.cliaNumber ?? ""} className="input" placeholder="10D1234567" maxLength={10} pattern="\d{2}[Dd]\d{7}" title="Two digits, the letter D, then seven digits" disabled={!admin} />
               <span className="mt-1 block text-xs text-slate-500">Only if you bill lab tests (CPT 80000-89999). Sent with those claims; Medicare rejects them without it.</span>
             </label>
+            {localities.length > 0 && (
+              <label className="block text-sm md:col-span-2">
+                <span className="label">Medicare payment locality</span>
+                <select name="medicareLocality" className="select" defaultValue={p.medicareCarrier && p.medicareLocality ? `${p.medicareCarrier}-${p.medicareLocality}` : ""} disabled={!admin}>
+                  <option value="">Not chosen</option>
+                  {localities.map((l) => <option key={`${l.carrier}-${l.locality}`} value={`${l.carrier}-${l.locality}`}>{l.state ? `${l.state}: ` : ""}{l.name} ({l.carrier}-{l.locality})</option>)}
+                </select>
+                <span className="mt-1 block text-xs text-slate-500">Where the practice sees patients. Medicare&apos;s fee schedule for this area prices underpayment checks on Medicare claims and contracts written as a percentage of Medicare.</span>
+              </label>
+            )}
             <fieldset className="md:col-span-2">
               <legend className="label">Paper claim alignment (CMS-1500)</legend>
               <div className="flex flex-wrap items-end gap-4 text-sm">

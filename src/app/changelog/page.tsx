@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-28",
+    title: "Medicare pricing, who pays first, therapy and anesthesia, passkeys",
+    items: [
+      "The Medicare physician fee schedule for your locality: underpayment checks on Medicare claims, and contracts as a percentage of Medicare",
+      "Medicare Secondary Payer questions decide which plan is billed first; crossovers to supplemental insurers are not billed twice",
+      "Therapy minutes with the 8-minute rule and discipline modifiers; anesthesia billed in minutes",
+      "Text message registration with US carriers (A2P 10DLC or toll-free), checked from your Twilio account; HELP answered automatically",
+      "Sign in with a passkey: no password or code, and it cannot be phished",
+      "MIPS quality measures: codes added to qualifying claims at $0.00, and a quality report",
+      "Import mappings for other systems' exports can be shared with every practice",
+      "Diagnosis search stays instant with the full ICD-10-CM list",
+    ],
+  },
+  {
+    date: "2026-09-28",
     title: "Full code sets, paper claims, and any clearinghouse",
     items: [
       "ICD-10-CM loaded by fiscal year: every diagnosis is checked as billable and valid on the date of service, and searched as you type",

@@ -5,8 +5,10 @@
  * unit-tested without a database and evaluated in under a millisecond.
  * "error" blocks submission; "warning" allows submission with a note.
  */
+import { isQualityCode } from "@/lib/codes/quality";
 import { POS_CODES } from "@/lib/codes/pos";
 import { CLIA_RE, isLabCode } from "@/lib/codes/lab";
+import { ANESTHESIA_MODIFIERS, THERAPY_MODIFIERS, TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode, isTherapyCode } from "@/lib/time-units";
 
 export interface ScrubClaim {
   patient: { firstName: string; lastName: string; dob: string; sex: string; address1?: string | null; zip?: string | null };
@@ -18,7 +20,7 @@ export interface ScrubClaim {
     /** Work and accident details (box 10, CLM11), and the insurer's claim number for workers' comp and auto. */
     relatedEmployment?: boolean; relatedAuto?: boolean; autoAccidentState?: string | null; relatedOther?: boolean; accidentDate?: string | null; propertyClaimNumber?: string | null;
   };
-  lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[] }[];
+  lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; minutes?: number | null }[];
   payer: { timelyFilingDays: number; type?: string | null };
   /** Frequency and replacement reference; absent means an original claim. */
   claim?: { frequencyCode: string; originalPayerClaimNumber?: string | null };
@@ -105,6 +107,24 @@ const rules: Record<string, Rule> = {
     c.encounter.referringNpi && !isValidNpi(c.encounter.referringNpi)
       ? [{ rule: "REFERRING_NPI", severity: "error", message: `Referring provider NPI ${c.encounter.referringNpi} fails check-digit validation`, field: "encounter.referringNpi" }]
       : [],
+  THERAPY_MODIFIER: (c) =>
+    c.lines
+      .filter((l) => isTherapyCode(l.cpt) && !l.modifiers.some((m) => THERAPY_MODIFIERS.includes(m.toUpperCase())))
+      .map((l) => ({ rule: "THERAPY_MODIFIER", severity: c.payer.type === "medicare" ? "error" as const : "warning" as const, message: `Line ${l.lineNumber}: therapy code ${l.cpt} needs GP (physical therapy), GO (occupational) or GN (speech-language)`, field: `lines.${l.lineNumber}.modifiers` })),
+  THERAPY_UNITS: (c) => {
+    if (c.payer.type !== "medicare" && c.payer.type !== "medicaid") return [];
+    const timed = c.lines.filter((l) => TIMED_THERAPY_CODES.has(l.cpt));
+    if (!timed.length) return [];
+    if (timed.some((l) => !l.minutes)) return [{ rule: "THERAPY_UNITS", severity: "warning", message: "Enter the minutes for each timed therapy code, so the units can be checked against the 8-minute rule", field: "lines" }];
+    const allowed = eightMinuteRule(timed.map((l) => ({ code: l.cpt, minutes: l.minutes ?? 0 })));
+    const billed = timed.reduce((a, l) => a + l.units, 0);
+    const most = [...allowed.values()].reduce((a, n) => a + n, 0);
+    return billed > most ? [{ rule: "THERAPY_UNITS", severity: "error", message: `${billed} timed therapy units billed, but ${timed.reduce((a, l) => a + (l.minutes ?? 0), 0)} minutes allow ${most} under the 8-minute rule`, field: "lines" }] : [];
+  },
+  ANESTHESIA: (c) => c.lines.filter((l) => isAnesthesiaCode(l.cpt)).flatMap((l) => [
+    ...(!l.minutes ? [{ rule: "ANESTHESIA_MINUTES", severity: "error" as const, message: `Line ${l.lineNumber}: anesthesia ${l.cpt} is billed in minutes; enter the anesthesia time`, field: `lines.${l.lineNumber}.minutes` }] : []),
+    ...(!l.modifiers.some((m) => ANESTHESIA_MODIFIERS.includes(m.toUpperCase())) ? [{ rule: "ANESTHESIA_MODIFIER", severity: c.payer.type === "medicare" ? "error" as const : "warning" as const, message: `Line ${l.lineNumber}: add who gave the anesthesia (AA, AD, QK, QX, QY or QZ)`, field: `lines.${l.lineNumber}.modifiers` }] : []),
+  ]),
   ACCIDENT_STATE: (c) =>
     c.encounter.relatedAuto && !c.encounter.autoAccidentState
       ? [{ rule: "ACCIDENT_STATE", severity: "error", message: "An auto accident claim needs the state where the accident happened", field: "encounter.autoAccidentState" }]
@@ -215,7 +235,7 @@ const rules: Record<string, Rule> = {
       .map((l) => ({ rule: "LINE_UNITS", severity: "error" as const, message: `Line ${l.lineNumber}: units must be a positive integer`, field: `lines.${l.lineNumber}.units` })),
   LINE_CHARGE: (c) =>
     c.lines
-      .filter((l) => l.chargeCents <= 0)
+      .filter((l) => l.chargeCents <= 0 && !isQualityCode(l.cpt))
       .map((l) => ({ rule: "LINE_CHARGE", severity: "error" as const, message: `Line ${l.lineNumber}: charge amount must be greater than zero`, field: `lines.${l.lineNumber}.chargeCents` })),
   LINE_DX_POINTER: (c) =>
     c.lines

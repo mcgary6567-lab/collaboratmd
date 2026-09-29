@@ -5,6 +5,7 @@
  * for a clearinghouse sandbox. It covers the loops a small practice needs
  * (billing provider, subscriber, payer, claim, diagnoses, service lines).
  */
+import { isAnesthesiaCode } from "@/lib/time-units";
 import { contactPhone } from "./x12";
 import { REL_CODE, subscriberLoops, type Person } from "./subscriber";
 
@@ -131,6 +132,8 @@ export interface Edi837Input {
   };
   /** The workers' comp or auto insurer's claim number (2010BA REF*Y4). */
   propertyClaimNumber?: string | null;
+  /** Medicare as the secondary payer: the MSP type (SBR05). */
+  mspType?: string | null;
   /**
    * Set on a secondary claim: the payer that adjudicated first and what it
    * decided, sent in loops 2320/2330 so the secondary pays only what is left.
@@ -154,6 +157,8 @@ export interface Edi837Input {
     units: number;
     dxPointers: number[];
     dateOfService: string;
+    /** Anesthesia is reported in minutes (SV103 MJ) instead of units. */
+    minutes?: number | null;
   }[];
 }
 
@@ -207,6 +212,7 @@ export function buildEdi837P(input: Edi837Input): string {
     filing: professionalFiling(input.payer.type),
     payer: ["NM1", "PR", "2", input.payer.name, "", "", "", "", "PI", input.payer.payerId],
     propertyClaimNumber: input.propertyClaimNumber,
+    insuranceType: input.mspType,
   }));
   // 2300 claim
   const causes = relatedCauses(input.claim.accident);
@@ -236,7 +242,8 @@ export function buildEdi837P(input: Edi837Input): string {
   input.lines.forEach((line, idx) => {
     s.push(["LX", String(idx + 1)]);
     const sv1 = ["HC", line.cpt, ...line.modifiers.slice(0, 4)].join(":");
-    s.push(["SV1", sv1, money(line.chargeCents), "UN", String(line.units), "", "", line.dxPointers.slice(0, 4).join(":")]);
+    const inMinutes = isAnesthesiaCode(line.cpt) && line.minutes;
+    s.push(["SV1", sv1, money(line.chargeCents), inMinutes ? "MJ" : "UN", inMinutes ? String(line.minutes) : String(line.units), "", "", line.dxPointers.slice(0, 4).join(":")]);
     s.push(["DTP", "472", "D8", d8(line.dateOfService)]);
   });
   const segmentCount = s.length - 2 + 1; // ST through SE inclusive

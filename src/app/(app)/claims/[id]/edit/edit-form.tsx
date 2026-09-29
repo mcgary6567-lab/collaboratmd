@@ -1,5 +1,6 @@
 "use client";
 
+import { TIMED_THERAPY_CODES, isAnesthesiaCode } from "@/lib/time-units";
 import { useActionState, useState } from "react";
 import { Plus, Trash } from "lucide-react";
 import { editClaimAction } from "@/app/(app)/claim-edit-actions";
@@ -8,7 +9,7 @@ import { PosOptions } from "@/components/code-pickers";
 import { CodeList, useCodeSearch } from "@/components/code-search";
 import { money } from "@/lib/utils";
 
-type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string };
+type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string; minutes?: string };
 
 
 export function ClaimEditForm({
@@ -18,7 +19,7 @@ export function ClaimEditForm({
   icds,
 }: {
   claimId: string;
-  initial: { dateOfService: string; placeOfService: string; diagnoses: string[]; lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description: string | null }[] };
+  initial: { dateOfService: string; placeOfService: string; diagnoses: string[]; lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description: string | null; minutes?: number | null }[] };
   cpts: { code: string; description: string; fee: number }[];
   icds: { code: string; description: string }[];
 }) {
@@ -29,7 +30,7 @@ export function ClaimEditForm({
   const pxSearch = useCodeSearch("px", cpts);
   const [dx, setDx] = useState<string[]>(initial.diagnoses.length ? initial.diagnoses : [""]);
   const [lines, setLines] = useState<Line[]>(
-    initial.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers.join(", "), units: l.units, charge: (l.chargeCents / 100).toFixed(2), dxPointers: l.dxPointers.join(","), description: l.description ?? "" })),
+    initial.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers.join(", "), units: l.units, charge: (l.chargeCents / 100).toFixed(2), dxPointers: l.dxPointers.join(","), description: l.description ?? "", minutes: l.minutes ? String(l.minutes) : "" })),
   );
   const update = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const total = lines.reduce((a, l) => a + (parseFloat(l.charge) || 0) * (l.units || 1), 0);
@@ -41,6 +42,7 @@ export function ClaimEditForm({
       cpt: l.cpt.trim(),
       modifiers: l.modifiers.split(",").map((m) => m.trim()).filter(Boolean),
       units: Number(l.units) || 1,
+      minutes: Number(l.minutes) || null,
       chargeCents: Math.round((parseFloat(l.charge) || 0) * 100),
       dxPointers: l.dxPointers.split(",").map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n)),
       description: l.description || pxSearch.describe(l.cpt),
@@ -85,7 +87,7 @@ export function ClaimEditForm({
         <CodeList id="cpt-edit" options={pxSearch.options} />
         <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto">
           <table className="table">
-            <thead><tr><th>#</th><th>CPT</th><th>Modifiers</th><th>Units</th><th>Charge ($)</th><th>Dx ptr</th><th /></tr></thead>
+            <thead><tr><th>#</th><th>CPT</th><th>Modifiers</th><th>Units</th><th>Minutes</th><th>Charge ($)</th><th>Dx ptr</th><th /></tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={i}>
@@ -100,6 +102,7 @@ export function ClaimEditForm({
                   </td>
                   <td className="w-28"><input className="input" value={l.modifiers} onChange={(e) => update(i, { modifiers: e.target.value })} /></td>
                   <td className="w-20"><input type="number" min={1} className="input" value={l.units} onChange={(e) => update(i, { units: Number(e.target.value) })} /></td>
+                  <td className="w-20">{TIMED_THERAPY_CODES.has(l.cpt) || isAnesthesiaCode(l.cpt) ? <input type="number" min={0} max={1440} className="input" value={l.minutes ?? ""} aria-label={`Line ${i + 1} minutes`} onChange={(e) => update(i, { minutes: e.target.value })} /> : <span className="text-xs text-slate-500">-</span>}</td>
                   <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} onChange={(e) => update(i, { charge: e.target.value })} /></td>
                   <td className="w-24"><input className="input" value={l.dxPointers} onChange={(e) => update(i, { dxPointers: e.target.value })} /></td>
                   <td>{lines.length > 1 && <button type="button" aria-label="Remove line" className="text-slate-500 hover:text-red-600" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}><Trash className="h-4 w-4" /></button>}</td>

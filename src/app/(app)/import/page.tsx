@@ -7,6 +7,9 @@ import { Card, PageHeader } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { Importer } from "./importer";
 import { listTemplates } from "@/server/import-templates";
+import { isPlatformOperator } from "@/server/code-sets";
+import { shareImportTemplateAction } from "@/app/(app)/integration-actions";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 
 export const metadata: Metadata = { title: "Import patients" };
 
@@ -15,14 +18,32 @@ export const dynamic = "force-dynamic";
 export default async function ImportPage() {
   const s = await requireSession();
   const db = await getDb();
-  const jobs = await listImportJobs(db, s.practiceId);
+  const [jobs, templates] = await Promise.all([listImportJobs(db, s.practiceId), listTemplates(db, s.practiceId)]);
+  const operator = isPlatformOperator(s.email);
+  const own = templates.filter((t) => !t.id.startsWith("shared:"));
 
   return (
     <>
       <PageHeader title="Import patients" subtitle="Bring a patient list from any EHR or practice management system" />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Importer fields={PATIENT_FIELDS.map(({ key, label }) => ({ key, label }))} maxRows={MAX_IMPORT_ROWS} templates={await listTemplates(await getDb(), s.practiceId)} />
+          <Importer fields={PATIENT_FIELDS.map(({ key, label }) => ({ key, label }))} maxRows={MAX_IMPORT_ROWS} templates={templates} />
+          {operator && own.length > 0 && (
+            <Card title="Share a mapping with every practice" className="mt-6">
+              <p className="mb-3 text-sm text-slate-600">For a mapping made from a real export of another system. Practices uploading a file with the same columns get it applied automatically.</p>
+              <ul className="space-y-3">
+                {own.map((t) => (
+                  <li key={t.id}>
+                    <ActionForm action={shareImportTemplateAction.bind(null, t.id)} className="flex flex-wrap items-end gap-2 text-sm">
+                      <span className="w-full font-medium">{t.name}</span>
+                      <label className="block"><span className="label">Shared name</span><input name="name" className="input" placeholder="e.g. Tebra patient list" required /></label>
+                      <SubmitButton className="btn btn-secondary" pendingLabel="Sharing...">Share</SubmitButton>
+                    </ActionForm>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </div>
         <Card title="Recent imports">
           {jobs.length === 0 ? (

@@ -130,6 +130,21 @@ export async function startSsoSession(db: Db, user: typeof schema.users.$inferSe
   return session;
 }
 
+/**
+ * Signs in a user whose passkey checked out (server/passkeys.ts). A passkey
+ * with user verification is both factors at once, so no code is asked for.
+ * The same account and practice rules as a password sign-in apply.
+ */
+export async function startPasskeySession(db: Db, user: typeof schema.users.$inferSelect): Promise<LoginResult> {
+  if (isDemoEmail(user.email) && !demoOpen()) return { ok: false, error: "This passkey cannot sign in here." };
+  const blocked = await signInBlock(db, user, "password");
+  if (blocked) return { ok: false, error: blocked };
+  const session: Session = { userId: user.id, practiceId: user.practiceId, name: user.name, email: user.email, role: user.role };
+  await issue(db, session);
+  await db.insert(schema.auditLog).values({ practiceId: user.practiceId, userId: user.id, action: "login", entity: "user", entityId: user.id, details: { mfa: "passkey" } });
+  return { ok: true, session };
+}
+
 /** Second step of sign-in: a code from the authenticator app or a recovery code. */
 export async function completeMfaLogin(code: string): Promise<LoginResult> {
   const { isLocked, recordFailure, clearFailures, checkCode } = await import("@/server/mfa");

@@ -137,6 +137,22 @@ async function main() {
     }
   }
 
+  // A full-size ICD-10-CM list (about 74,000 codes), so diagnosis search is measured at real size.
+  {
+    const { n: have } = await one<{ n: number }>(sql`SELECT count(*)::int AS n FROM icd10_codes WHERE code LIKE 'U%'`);
+    if (have < 74_000) {
+      await db.execute(sql`INSERT INTO icd10_codes (code, description, billable, first_year, seen_year)
+        SELECT 'U' || substr(lpad(g::text, 6, '0'), 1, 2) || '.' || substr(lpad(g::text, 6, '0'), 3),
+          (ARRAY['Fracture','Sprain','Infection','Neoplasm','Pain','Contusion','Laceration','Disorder'])[1 + g % 8] || ' of ' ||
+          (ARRAY['left','right','unspecified'])[1 + g % 3] || ' ' || (ARRAY['wrist','ankle','knee','shoulder','hip','elbow','hand','foot','spine','lung'])[1 + (g / 8) % 10] ||
+          ', ' || (ARRAY['initial encounter','subsequent encounter','sequela'])[1 + (g / 80) % 3] || ' ' || g,
+          g % 7 <> 0, 2026, 2027
+        FROM generate_series(1, 74000) g
+        ON CONFLICT (code) DO NOTHING`);
+      console.log("Added 74,000 synthetic diagnosis codes");
+    }
+  }
+
   if (n < TARGET) {
     const t0 = Date.now();
     await load(practiceId, TARGET - n, "LT");
@@ -191,6 +207,7 @@ async function main() {
   const enc = await import("../src/server/encounters");
   const waitlist = await import("../src/server/waitlist");
   const outcomes = await import("../src/server/appointment-outcomes");
+  const catalog = await import("../src/server/code-catalog");
 
   // A sample claim and patient for the single-record screens, and an upcoming time for the waitlist.
   const sample = await one<{ claim: string; patient: string }>(sql`SELECT id AS claim, patient_id AS patient FROM claims WHERE practice_id = ${practiceId} ORDER BY created_at DESC LIMIT 1`);
@@ -206,6 +223,8 @@ async function main() {
     { name: "Denials list", run: (d) => lists.searchDenials(d, practiceId, { status: "open", offset: 0, limit: 50 }), selective: true },
     { name: "One claim (claim page)", run: async (d) => Promise.all([claims.loadClaimBundle(d, sample.claim), claims.getClaimFinancials(d, sample.claim), claims.listAcknowledgments(d, sample.claim)]), selective: true },
     { name: "One patient (patient page)", run: async (d) => Promise.all([patients.getPatient(d, practiceId, sample.patient), billing.patientBalanceCents(d, sample.patient)]), selective: true },
+    { name: "Diagnosis search by code (74k codes)", run: (d) => catalog.searchDiagnoses(d, "U05.12"), selective: true },
+    { name: "Diagnosis search by words (74k codes)", run: (d) => catalog.searchDiagnoses(d, "sprain wris"), selective: true },
     { name: "Dashboard KPIs (12 months)", run: (d) => a.headlineKpis(d, practiceId) },
     { name: "Monthly trend", run: (d) => a.monthlyTrend(d, practiceId) },
     { name: "A/R aging", run: (d) => a.arAging(d, practiceId) },

@@ -28,6 +28,7 @@ const { smsMessages, smsOptOuts, patients, auditLog, appointments, practices } =
 
 export const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "REVOKE", "OPTOUT"];
 export const START_WORDS = ["START", "UNSTOP", "YES"];
+export const HELP_WORDS = ["HELP", "INFO"];
 
 /**
  * Twilio's request signature: HMAC-SHA1 with the account's auth token over the
@@ -96,6 +97,12 @@ export async function receiveSms(db: Db, practiceId: string, params: Record<stri
   let reply: { text: string; answer?: "confirm" | "cancel"; status?: "booked" | "taken"; appointmentId?: string } | null = null;
   if (!keyword && patientId && (CONFIRM_WORDS.includes(word) || CANCEL_WORDS.includes(word))) {
     reply = await answerReminder(db, practiceId, patientId, CONFIRM_WORDS.includes(word) ? "confirm" : "cancel", phone, deps.send);
+  } else if (!keyword && HELP_WORDS.includes(word)) {
+    // Carriers require an answer to HELP: who is texting, how to reach them, and how to stop.
+    const [p] = await db.select({ name: practices.name, phone: practices.phone }).from(practices).where(eq(practices.id, practiceId)).limit(1);
+    const text = `${p?.name ?? "Your provider"}: appointment and billing texts.${p?.phone ? ` Call ${p.phone} for help.` : ""} Msg & data rates may apply. Reply STOP to opt out.`;
+    await db.insert(smsMessages).values({ practiceId, patientId, direction: "out", phone, body: text, status: "sent", readAt: new Date() });
+    reply = { text };
   } else if (!keyword && patientId && BOOK_WORDS.includes(word)) {
     const claim = await claimOffer(db, practiceId, patientId);
     if (claim) {

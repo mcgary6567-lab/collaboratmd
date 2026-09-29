@@ -8,7 +8,7 @@ export async function signIn(page: Page, who = DEMO_ADMIN) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(who.email);
   await page.getByLabel("Password").fill(who.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   // The first sign-in on a fresh server also seeds the demo data (and, on the dev server, compiles the dashboard).
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 120_000 });
 }

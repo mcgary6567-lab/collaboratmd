@@ -85,6 +85,7 @@ export function buildClaimEdi(
     renderingProvider: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
     referringProvider: bundle.encounter.referringNpi && bundle.encounter.referringLastName ? { lastName: bundle.encounter.referringLastName, firstName: bundle.encounter.referringFirstName ?? "", npi: bundle.encounter.referringNpi } : null,
     propertyClaimNumber: bundle.encounter.propertyClaimNumber,
+    mspType: bundle.insurance.mspType,
     payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },
     ...claimParties(bundle.patient, bundle.insurance),
     claim: {
@@ -94,7 +95,7 @@ export function buildClaimEdi(
       accident: accidentOf(bundle.encounter),
       dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses, attachments,
     },
-    lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService })),
+    lines: bundle.lines.map((l) => ({ cpt: l.cpt, modifiers: l.modifiers, chargeCents: l.chargeCents * l.units, units: l.units, dxPointers: l.dxPointers, dateOfService: bundle.encounter.dateOfService, minutes: l.minutes })),
     otherPayer,
     serviceFacility,
   });

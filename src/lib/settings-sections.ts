@@ -41,6 +41,8 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     links: [
       { href: "/settings/connections/doctor", label: "Integration doctor", description: "Check every connected service end to end before going live", adminOnly: true, keywords: "test health diagnose stedi stripe lob twilio fhir" },
       { href: "/settings/connections", label: "Integrations", description: "Clearinghouse, payments, texting, email and AI keys", adminOnly: true, keywords: "stedi stripe twilio resend claude api key" },
+      { href: "/settings/quality", label: "Quality measures", description: "MIPS measures you report on claims, and their codes", adminOnly: true, keywords: "mips quality measure cpt ii g code reporting macra" },
+      { href: "/settings/texting", label: "Text message registration", description: "Register with US carriers (A2P 10DLC or toll-free) so texts arrive", adminOnly: true, keywords: "sms twilio 10dlc a2p toll free carrier registration campaign brand" },
       { href: "/settings/integrations", label: "EHR interfaces", description: "HL7 feeds for patients, charges, orders and results", keywords: "hl7 ehr emr lab" },
       { href: "/settings/fhir", label: "EHR over FHIR", description: "Patients and finished visits from Epic, Oracle Health, athenahealth and others", keywords: "fhir epic cerner athena smart" },
       { href: "/settings/developers", label: "Developers", description: "API keys and webhooks", adminOnly: true, keywords: "rest api webhook" },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getDb } from "@/db";
+import { and, desc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { CAN_WRITE, can, requireSession } from "@/lib/auth";
 import { practiceConfig } from "@/server/integrations";
 import { listThreads, openThread } from "@/server/sms-inbox";
@@ -22,7 +23,11 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
     return <><PageHeader title="Text messages" /><Card><p className="text-sm text-slate-600">Your role{s.customRole ? ` (${s.customRole})` : ""} does not include text messages.</p></Card></>;
   }
   const db = await getDb();
-  const [threads, cfg] = await Promise.all([listThreads(db, s.practiceId), practiceConfig(db, s.practiceId)]);
+  const [threads, cfg, [registration]] = await Promise.all([
+    listThreads(db, s.practiceId), practiceConfig(db, s.practiceId),
+    db.select({ status: schema.integrationChecks.status, detail: schema.integrationChecks.detail }).from(schema.integrationChecks)
+      .where(and(eq(schema.integrationChecks.practiceId, s.practiceId), eq(schema.integrationChecks.checkId, "twilio.registration"))).orderBy(desc(schema.integrationChecks.ranAt)).limit(1),
+  ]);
   const active = phone ? await openThread(db, s.practiceId, phone).catch(() => null) : null;
   const canWrite = (CAN_WRITE as readonly string[]).includes(s.role);
   const current = active ? threads.find((t) => t.phone === active.phone) : null;
@@ -33,6 +38,11 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       {!cfg.twilio && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Texting is not connected. Add your Twilio account under <Link href="/settings/connections" className="font-semibold underline">Settings, Integrations</Link>, then point the number&apos;s incoming-message webhook at the address shown there.
+        </div>
+      )}
+      {cfg.twilio && registration && registration.status !== "pass" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Carrier registration is not approved ({registration.detail}). US carriers may block these texts until it is. See <Link href="/settings/texting" className="font-semibold underline">Text message registration</Link>.
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-3">

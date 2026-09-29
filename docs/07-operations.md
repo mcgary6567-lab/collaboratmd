@@ -224,3 +224,38 @@ The platform Stripe webhook also takes `invoice.finalized`, `invoice.paid`, `inv
 - `/trust/questionnaire` answers the usual vendor security questions (and downloads as CSV). Keep it true: when a control changes, change the answer in `src/content/security-questionnaire.ts`.
 - Record every restore drill (docs/08-restore-drill.md) at `/ops/restore-tests`; the questionnaire shows the latest.
 - Incidents: `docs/12-incident-response.md`.
+
+## Medicare fee schedule
+
+Each year, load CMS's Physician Fee Schedule files on Settings → Code sets (or the importer): the **PPRRVU** file saved as CSV (`mpfs_rvu`, with the calendar year; the conversion factor is read from the file or entered) and the **GPCI** file, Addendum E, saved as CSV (`mpfs_gpci`). Each practice then chooses its **Medicare payment locality** on the practice profile. With both:
+- A paid Medicare claim with no contract on file is checked for underpayment against the fee schedule (office or facility rate by place of service, with the 50% multiple procedure reduction on codes marked for it).
+- A payer contract can be built as a percentage of Medicare (Fee schedules → Add a schedule).
+Anesthesia base units: CMS's file saved as CSV (code, base units), code set `anesthesia`.
+
+## Medicare Secondary Payer and crossovers
+
+A patient on Medicare shows the MSP questions on their page. The first "yes" in CMS's order makes Medicare secondary for that reason and records the MSP type on the Medicare coverage (sent as SBR05 on a Medicare-secondary 837P). Claims to Medicare as primary for a patient whose answers say Medicare is second are stopped (MSP_ORDER); a Medicare-secondary claim without a type is stopped (MSP_TYPE); a patient with Medicare and another plan and no answers in a year gets a warning. When Medicare's 835 says it forwarded the claim to a supplemental payer (NM1*TT, claim status 19-21, or remark MA18/N89), the claim records the crossover and no secondary claim is sent.
+
+## Time-based codes
+
+Charge entry and claim edits take minutes for timed therapy codes and anesthesia. "Units from minutes" applies CMS's 8-minute rule across the visit's timed codes. Checks: therapy codes need GP, GO or GN (error for Medicare); Medicare and Medicaid timed units may not exceed what the minutes allow; anesthesia needs minutes and AA/AD/QK/QX/QY/QZ. Anesthesia goes on the 837P in minutes (SV103 MJ).
+
+## Text message registration
+
+US carriers block unregistered business texts. Settings → Text message registration shows whether the practice's Twilio sender is registered (A2P 10DLC through its messaging service, or toll-free verification), prepares the brand and campaign answers from the practice's details and the texts the system actually sends, and checks again on demand (also part of the integration doctor, check `twilio.registration`). The Messages page warns while registration is not approved. HELP and INFO get an automatic reply with the practice's name and phone; STOP is handled as before.
+
+## Shared import mappings
+
+A practice saves a column mapping after importing a real export from another system. The platform operator can share it (Import patients → Share a mapping with every practice, named after the system and report); every practice whose file has the same columns gets it applied automatically. No mappings are shipped from memory.
+
+## Passkeys
+
+Settings → Sign-in security → Passkeys: add a passkey (fingerprint, face or device PIN). The sign-in page has "Sign in with a passkey". A passkey requires user verification, so it counts as two-factor for the practice's two-factor rules; the usual account rules still apply (deactivated accounts, SSO-only practices, network allowlist). Passkeys are bound to the site's address (APP_URL): they work on the production domain, not on preview deployments.
+
+## Quality measures (MIPS)
+
+Settings → Quality measures: each practice enters the measures it reports from this year's CMS specifications (visit codes, optional diagnoses and ages, and the quality data codes for met / not met / excluded). A qualifying claim shows the measure; choosing an outcome adds the code as a $0.00 line (quality codes are allowed at $0.00 and post nothing). Reports → Quality (MIPS) shows qualifying visits, reporting rate and performance rate per measure.
+
+## Code search at full size
+
+Diagnosis and HCPCS word search use a full-text index; code search is a range on the primary key. The load test adds 74,000 diagnosis codes and fails if either search reads the whole table.

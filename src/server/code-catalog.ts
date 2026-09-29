@@ -12,7 +12,7 @@
  * With no CMS file loaded, the ICD and HCPCS checks do not fire (the demo
  * ships a short list of common codes, unverified).
  */
-import { and, asc, eq, ilike, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, like, lt, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { ScrubFinding } from "@/lib/scrub/rules";
@@ -204,15 +204,24 @@ export async function commonDiagnoses(db: Db, practiceId: string | undefined, li
   return [...rows, ...builtIn.filter((r) => !seen.has(r.code))].slice(0, limit);
 }
 
+/** Words typed as a full-text query where each word may be the start of one: "back pa" matches "back pain". */
+export function prefixQuery(q: string) {
+  const words = q.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1).slice(0, 5);
+  return words.length ? words.map((w) => `${w}:*`).join(" & ") : null;
+}
+
+/** Codes starting with a prefix, as a range the primary key index answers. */
+const codeRange = (column: typeof icd10Codes.code | typeof hcpcsCodes.code, prefix: string) => and(gte(column, prefix), lt(column, `${prefix}~`));
+
 /** Diagnosis search by code or words, billable codes first. */
 export async function searchDiagnoses(db: Db, q: string, limit = 25): Promise<CodeOption[]> {
   const term = q.trim();
   if (term.length < 2) return [];
   const asCode = /^[A-Za-z][0-9]/.test(term);
-  const words = term.split(/\s+/).filter((w) => w.length > 1).slice(0, 4);
-  const where = asCode
-    ? like(icd10Codes.code, `${dotted(term).replace(/[%_]/g, "")}%`)
-    : and(...words.map((w) => ilike(icd10Codes.description, `%${w.replace(/[%_]/g, "")}%`)));
+  const words = prefixQuery(term);
+  if (!asCode && !words) return [];
+  // A code prefix is a range on the primary key; words go through the full-text index (both indexed, so fast on the full list).
+  const where = asCode ? codeRange(icd10Codes.code, dotted(term)) : sql`to_tsvector('english', ${icd10Codes.description}) @@ to_tsquery('english', ${words})`;
   return db.select({ code: icd10Codes.code, description: icd10Codes.description }).from(icd10Codes)
     .where(where).orderBy(sql`${icd10Codes.billable} DESC`, sql`length(${icd10Codes.code})`, asc(icd10Codes.code)).limit(limit);
 }
@@ -227,7 +236,7 @@ export async function searchProcedures(db: Db, practiceId: string, q: string, li
   const builtIn = await db.select({ code: cptCodes.code, description: cptCodes.description }).from(cptCodes)
     .where(isCode ? like(cptCodes.code, `${term.toUpperCase()}%`) : ilike(cptCodes.description, `%${term}%`)).limit(limit);
   const level2 = await db.select({ code: hcpcsCodes.code, description: hcpcsCodes.description }).from(hcpcsCodes)
-    .where(isCode ? like(hcpcsCodes.code, `${term.toUpperCase()}%`) : or(ilike(hcpcsCodes.description, `%${term}%`), ilike(hcpcsCodes.shortDescription, `%${term}%`))).limit(limit);
+    .where(isCode ? codeRange(hcpcsCodes.code, term.toUpperCase()) : prefixQuery(term) ? sql`to_tsvector('english', ${hcpcsCodes.description}) @@ to_tsquery('english', ${prefixQuery(term)})` : sql`false`).limit(limit);
   const seen = new Set<string>();
   return [...own, ...builtIn, ...level2].filter((r) => !seen.has(r.code) && seen.add(r.code)).slice(0, limit);
 }

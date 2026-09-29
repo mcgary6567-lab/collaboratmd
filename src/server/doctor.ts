@@ -11,6 +11,7 @@ import { schema } from "@/db";
 import { validateX12 } from "@/lib/edi/validate";
 import { PROBES, practiceConfig, clearConfigCache, type IntegrationConfig, type Provider } from "./integrations";
 import { getFhir, testFhir } from "./fhir";
+import { smsRegistrationStatus } from "./sms-registration";
 
 const { integrationChecks, claims, automationRuns, practices } = schema;
 
@@ -85,6 +86,15 @@ export const CHECKS: Check[] = [
     },
   },
   { id: "twilio.key", service: "Twilio", name: "Account and number", run: probe("twilio") },
+  {
+    id: "twilio.registration", service: "Twilio", name: "Carrier registration (A2P 10DLC or toll-free)", async run(c) {
+      if (!c.cfg.twilio) return skip("Not connected");
+      const r = await smsRegistrationStatus(c.cfg.twilio, c.http);
+      if (r.status === "approved") return pass(r.detail);
+      if (r.status === "pending") return warn(`${r.detail}: texts may be filtered until it is approved`);
+      return fail(`${r.detail}. US carriers block unregistered business texts; see Settings, Integrations, Text message registration`);
+    },
+  },
   { id: "resend.key", service: "Resend", name: "Key and sending domain", run: probe("resend") },
   { id: "lob.key", service: "Lob", name: "API key accepted", run: probe("lob") },
   {

@@ -37,6 +37,8 @@ export type ProfileInput = {
   cliaNumber?: string;
   /** Paper claim alignment, in millimetres (right and down). */
   formOffsetXmm?: number; formOffsetYmm?: number;
+  /** The Medicare payment locality as "MAC-locality" (e.g. 09102-04), or "" for none. */
+  medicareLocality?: string;
 };
 
 export async function saveProfile(db: Db, practiceId: string, input: ProfileInput, userId?: string) {
@@ -55,7 +57,9 @@ export async function saveProfile(db: Db, practiceId: string, input: ProfileInpu
     ...(input.cliaNumber !== undefined ? { cliaNumber: input.cliaNumber.trim().toUpperCase() || null } : {}),
     ...(input.formOffsetXmm !== undefined ? { formOffsetX: Math.round(input.formOffsetXmm * 10) } : {}),
     ...(input.formOffsetYmm !== undefined ? { formOffsetY: Math.round(input.formOffsetYmm * 10) } : {}),
+    ...(input.medicareLocality !== undefined ? { medicareCarrier: input.medicareLocality.split("-")[0] || null, medicareLocality: input.medicareLocality.split("-")[1] || null } : {}),
   };
+  if (input.medicareLocality && !/^\d{4,5}-\d{2}$/.test(input.medicareLocality)) throw new Error("Choose the Medicare locality from the list");
   for (const o of [v.formOffsetX, v.formOffsetY]) if (o !== undefined && !(Number.isFinite(o) && Math.abs(o) <= 250)) throw new Error("Paper claim alignment is at most 25 mm either way");
   if (input.timeZone && !validTimeZone(input.timeZone)) throw new Error("Choose a valid time zone");
   if (!v.name) throw new Error("Enter the practice's legal name");

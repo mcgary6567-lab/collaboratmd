@@ -15,6 +15,8 @@ import { listProviders } from "@/server/encounters";
 import { practiceConfig } from "@/server/integrations";
 import { InsuranceTools } from "./insurance-tools";
 import { CoverageSection } from "./coverage-section";
+import { MspCard } from "./msp-card";
+import { latestMspScreening } from "@/server/msp";
 import { getPatient } from "@/server/patients";
 import { computeFinancials } from "@/server/claims";
 import { eligibilityAction, patientPaymentAction } from "@/app/(app)/actions";
@@ -52,6 +54,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   ]);
   const canWrite = (CAN_WRITE as readonly string[]).includes(s.role);
   const insured = insurances.some(({ insurance, payer }) => insurance.active && payer.type !== "self_pay");
+  const onMedicare = insurances.some(({ insurance, payer }) => insurance.active && payer.type === "medicare");
+  const mspLast = onMedicare ? await latestMspScreening(db, patient.id) : null;
 
   return (
     <>
@@ -180,6 +184,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             </div>
           )}
           {!insured && <CoverageSection practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} simulated={!cfg.stedi} />}
+          {onMedicare && <MspCard patientId={patient.id} last={mspLast} canWrite={canWrite} timeZone={s.timeZone} />}
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>
         <Card title="Account balance">

@@ -1,5 +1,6 @@
 "use client";
 
+import { TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode } from "@/lib/time-units";
 import { useActionState, useState } from "react";
 import { Trash, Plus } from "lucide-react";
 import { createEncounterAction } from "@/app/(app)/actions";
@@ -11,7 +12,7 @@ import { NpiLookup } from "@/components/npi-lookup";
 import { money } from "@/lib/utils";
 import { PatientPicker, type PatientOption } from "@/components/patient-picker";
 
-type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string };
+type Line = { cpt: string; modifiers: string; units: number; charge: string; dxPointers: string; description: string; minutes?: string };
 
 
 export function ChargeEntryForm({
@@ -63,6 +64,7 @@ export function ChargeEntryForm({
         cpt: l.cpt.trim(),
         modifiers: l.modifiers.split(",").map((m) => m.trim()).filter(Boolean),
         units: Number(l.units) || 1,
+        minutes: Number(l.minutes) || null,
         chargeCents: Math.round((parseFloat(l.charge) || 0) * 100),
         dxPointers: l.dxPointers.split(",").map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n)),
         description: l.description || pxSearch.describe(l.cpt),
@@ -160,6 +162,12 @@ export function ChargeEntryForm({
       <div className="card p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Service lines (CPT / HCPCS)</h2>
+          {lines.some((l) => TIMED_THERAPY_CODES.has(l.cpt)) && (
+            <button type="button" className="btn btn-secondary ml-auto mr-2 text-xs" title="Medicare's 8-minute rule: total timed minutes decide the units" onClick={() => {
+              const units = eightMinuteRule(lines.map((l) => ({ code: l.cpt, minutes: Number(l.minutes) || 0 })));
+              setLines((ls) => ls.map((l) => (units.has(l.cpt) ? { ...l, units: Math.max(units.get(l.cpt)!, 1) } : l)));
+            }}>Units from minutes</button>
+          )}
           <button type="button" className="btn btn-secondary text-xs" onClick={() => setLines((ls) => [...ls, { cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }])}>
             <Plus className="h-3.5 w-3.5" /> Add line
           </button>
@@ -167,7 +175,7 @@ export function ChargeEntryForm({
         <CodeList id="cpt-list" options={pxSearch.options} />
         <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
           <thead>
-            <tr><th>#</th><th>CPT</th><th>Description</th><th>Modifiers</th><th>Units</th><th>Charge ($)</th><th>Dx ptr</th><th></th></tr>
+            <tr><th>#</th><th>CPT</th><th>Description</th><th>Modifiers</th><th>Units</th><th>Minutes</th><th>Charge ($)</th><th>Dx ptr</th><th></th></tr>
           </thead>
           <tbody>
             {lines.map((l, i) => (
@@ -184,6 +192,7 @@ export function ChargeEntryForm({
                 <td className="text-xs text-slate-500">{l.description || pxSearch.describe(l.cpt)}</td>
                 <td className="w-28"><input className="input" placeholder="25, 59" value={l.modifiers} aria-label={`Line ${i + 1} modifiers`} onChange={(e) => updateLine(i, { modifiers: e.target.value })} /></td>
                 <td className="w-20"><input type="number" min={1} className="input" value={l.units} aria-label={`Line ${i + 1} units`} onChange={(e) => updateLine(i, { units: Number(e.target.value) })} /></td>
+                <td className="w-20">{TIMED_THERAPY_CODES.has(l.cpt) || isAnesthesiaCode(l.cpt) ? <input type="number" min={0} max={1440} className="input" value={l.minutes ?? ""} aria-label={`Line ${i + 1} minutes`} onChange={(e) => updateLine(i, { minutes: e.target.value })} /> : <span className="text-xs text-slate-500">-</span>}</td>
                 <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} aria-label={`Line ${i + 1} charge`} onChange={(e) => updateLine(i, { charge: e.target.value })} /></td>
                 <td className="w-24"><input className="input" value={l.dxPointers} aria-label={`Line ${i + 1} diagnosis pointers`} onChange={(e) => updateLine(i, { dxPointers: e.target.value })} /></td>
                 <td>

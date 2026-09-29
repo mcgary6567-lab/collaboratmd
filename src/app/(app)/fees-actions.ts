@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_ADJUST, CAN_WRITE, requireRole, requireSession } from "@/lib/auth";
 import {
-  contractFromPercent, ensureSchedule, saveScheduleItems, scanUnderpayments, setUnderpaymentStatus,
+  contractFromMedicare, contractFromPercent, ensureSchedule, saveScheduleItems, scanUnderpayments, setUnderpaymentStatus,
 } from "@/server/fees";
 import { importContractCsv, saveContractRules } from "@/server/contracts";
 import { importPracticeCodes, removePracticeCode } from "@/server/code-catalog";
@@ -23,10 +23,18 @@ export async function createContractAction(formData: FormData): Promise<void> {
   const s = await requireAdmin();
   const payerId = String(formData.get("payerId") ?? "");
   const percent = Number(formData.get("percent") ?? 0);
+  const basis = String(formData.get("basis") ?? "charges");
   const db = await getDb();
-  const schedule = payerId
-    ? await contractFromPercent(db, s.practiceId, payerId, percent)
-    : await ensureSchedule(db, s.practiceId, null);
+  let schedule: { id: string };
+  try {
+    schedule = !payerId
+      ? await ensureSchedule(db, s.practiceId, null)
+      : basis === "medicare"
+        ? (await contractFromMedicare(db, s.practiceId, payerId, percent)).schedule
+        : await contractFromPercent(db, s.practiceId, payerId, percent);
+  } catch (e) {
+    redirect(`/settings/fees?error=${encodeURIComponent(e instanceof Error ? e.message : "Could not create the contract")}`);
+  }
   revalidatePath("/settings/fees");
   redirect(`/settings/fees/${schedule.id}`);
 }

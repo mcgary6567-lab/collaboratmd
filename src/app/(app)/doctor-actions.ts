@@ -18,3 +18,12 @@ export async function runDoctorAction(_prev: FormResult): Promise<FormResult> {
     return { ok: false, message: e instanceof Error ? e.message : "Could not run the checks" };
   }
 }
+
+/** Runs one check (for example the text registration status) now. */
+export async function runOneCheckAction(checkId: string, _prev: FormResult): Promise<FormResult> {
+  const s = await requireRole(["admin"]);
+  const [r] = await runDoctor(await getDb(), s.practiceId, { userId: s.userId, only: checkId });
+  revalidatePath("/settings/texting");
+  revalidatePath("/settings/connections/doctor");
+  return r ? { ok: r.status !== "fail", message: r.detail } : { ok: false, message: "No such check" };
+}

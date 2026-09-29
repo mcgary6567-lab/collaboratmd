@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { LoginForm } from "./login-form";
+import { PasskeyLogin } from "@/components/passkeys";
 import { LogoMark } from "@/components/logo";
 import { demoOpen } from "@/lib/demo";
 
@@ -22,6 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="card p-6 shadow-xl">
           {created && <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-900">Your practice is ready. Sign in with the email and password you chose; the setup guide takes it from there.</p>}
           <LoginForm />
+          <div className="mt-3"><PasskeyLogin /></div>
           <p className="mt-4 flex justify-center gap-4 text-sm"><Link href="/login/forgot" className="text-brand-700 hover:underline">Forgot password?</Link><Link href="/login/sso" className="font-semibold text-brand-700 hover:underline">Sign in with SSO</Link></p>
           <p className="mt-2 text-center text-sm text-slate-600">New practice? <Link href="/signup" className="font-semibold text-brand-700 hover:underline">Start a free trial</Link></p>
           {demoOpen() && (

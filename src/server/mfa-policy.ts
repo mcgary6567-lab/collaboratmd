@@ -7,6 +7,7 @@
  * People who sign in with single sign-on prove a second factor at their
  * identity provider, so this does not ask them again.
  */
+import { hasPasskey } from "./passkeys";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
@@ -26,7 +27,8 @@ export async function mfaRule(db: Db, who: { userId: string; practiceId: string;
     db.select({ mfaSecret: users.mfaSecret }).from(users).where(eq(users.id, who.userId)).limit(1),
   ]);
   const why = p?.requireMfa ? "everyone" : p?.mfaForPrivileged && privileged(who.role, who.denied) ? "privileged" : null;
-  const enrolled = !!u?.mfaSecret;
+  // A passkey is two factors in one (the device, and its PIN or biometric).
+  const enrolled = !!u?.mfaSecret || (await hasPasskey(db, who.userId));
   return { required: !!why, why, enrolled, mustEnroll: !!why && !enrolled && !who.sso };
 }
 

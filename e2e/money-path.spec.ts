@@ -5,7 +5,7 @@ test("a wrong password is refused and the right one signs in", async ({ page }) 
   await page.goto("/login");
   await page.getByLabel("Email").fill(DEMO_ADMIN.email);
   await page.getByLabel("Password").fill("not-the-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Invalid email or password.")).toBeVisible();
   await signIn(page);
   await expect(page.getByRole("heading", { name: /^Good (morning|afternoon|evening), / })).toBeVisible();
