@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
-import { requireSession } from "@/lib/auth";
+import { CAN_ADJUST, requireSession } from "@/lib/auth";
 import { getAppeal } from "@/server/appeals";
 import { appealLevelsFor } from "@/server/appeal-levels";
 import { appealDecisionAction } from "@/app/(app)/appeal-actions";
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function AppealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await requireSession();
+  const canAdjust = (CAN_ADJUST as readonly string[]).includes(s.role);
   const db = await getDb();
   let data;
   let levels: Awaited<ReturnType<typeof appealLevelsFor>> = [];
@@ -86,7 +87,7 @@ export default async function AppealPage({ params }: { params: Promise<{ id: str
                     {l.filedOn && <>Filed {fmtDate(l.filedOn)}. </>}
                     {l.decidedOn && <>Decided {fmtDate(l.decidedOn)}.</>}
                   </p>
-                  {l.filedOn && !l.decision && (
+                  {l.filedOn && !l.decision && canAdjust && (
                     <ActionForm action={appealDecisionAction.bind(null, l.id, id)} className="mt-2 space-y-2">
                       <div className="flex flex-wrap gap-3 text-xs">
                         <label className="flex items-center gap-1"><input type="radio" name="decision" value="overturned" required /> Won</label>

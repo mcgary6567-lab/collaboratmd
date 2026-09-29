@@ -59,4 +59,3 @@ export const PLACES_OF_SERVICE: [code: string, name: string][] = [
 ];
 
 export const POS_CODES = new Set(PLACES_OF_SERVICE.map(([c]) => c));
-export const posLabel = (code: string) => `${code} - ${PLACES_OF_SERVICE.find(([c]) => c === code)?.[1] ?? "Unknown"}`;

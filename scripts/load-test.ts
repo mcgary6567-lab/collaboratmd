@@ -208,6 +208,15 @@ async function main() {
   const waitlist = await import("../src/server/waitlist");
   const outcomes = await import("../src/server/appointment-outcomes");
   const catalog = await import("../src/server/code-catalog");
+  const productivity = await import("../src/server/productivity");
+  const revenue = await import("../src/server/revenue-reports");
+  const gaps = await import("../src/server/care-gaps");
+  const feeCheck = await import("../src/server/fee-check");
+  const warnings = await import("../src/server/warning-outcomes");
+  const batch = await import("../src/server/batch-appeals");
+  const gfe = await import("../src/server/gfe-variance");
+  const today = new Date().toISOString().slice(0, 10);
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
   // A sample claim and patient for the single-record screens, and an upcoming time for the waitlist.
   const sample = await one<{ claim: string; patient: string }>(sql`SELECT id AS claim, patient_id AS patient FROM claims WHERE practice_id = ${practiceId} ORDER BY created_at DESC LIMIT 1`);
@@ -244,6 +253,19 @@ async function main() {
     { name: "Schedule, one day", run: (d) => enc.listAppointments(d, practiceId, new Date()), selective: true },
     { name: "Waitlist: who can take an opening", run: (d) => waitlist.waitlistCandidates(d, practiceId, opening, [], waitlist.OFFER_TO), selective: true },
     { name: "Confirmations and no-shows (90 days)", run: (d) => outcomes.appointmentOutcomes(d, practiceId), selective: true },
+    // Added with the 2026-09 billing rules: the scrubber's extra checks on one claim, and the new reports.
+    { name: "Scrub one claim (all checks)", run: async (d) => claims.scrubBundle(d, (await claims.loadClaimBundle(d, sample.claim))!), selective: true },
+    { name: "Productivity and E/M mix (90 days)", run: (d) => productivity.productivity(d, practiceId, daysAgo(90), today) },
+    { name: "Modifier 25 and 59 use (90 days)", run: (d) => productivity.modifierUsage(d, practiceId, daysAgo(90), today) },
+    { name: "Charge and submission lag (90 days)", run: (d) => revenue.lagReport(d, practiceId, daysAgo(90), today) },
+    { name: "Contract comparison (12 months)", run: (d) => revenue.contractComparison(d, practiceId, daysAgo(365), today) },
+    { name: "Wellness visits due", run: (d) => gaps.awvGaps(d, practiceId, today) },
+    { name: "Care management candidates", run: (d) => gaps.ccmCandidates(d, practiceId, today) },
+    { name: "Fee schedule check", run: (d) => feeCheck.feeCheck(d, practiceId) },
+    { name: "Warnings that became denials (180 days)", run: (d) => warnings.warningOutcomes(d, practiceId, daysAgo(180), today) },
+    { name: "Batch appeal groups", run: (d) => batch.batchAppealGroups(d, practiceId) },
+    { name: "Medicare and Medicaid overpayment clocks", run: (d) => recovery.overpaymentClocks(d, practiceId) },
+    { name: "Good faith estimate variances", run: (d) => gfe.gfeVariances(d, practiceId) },
   ];
 
   /**

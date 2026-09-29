@@ -1,0 +1,220 @@
+import type { Guide } from "./help";
+
+/** Guides for the menu and settings pages not covered in help.ts (a test keeps every page covered). */
+export const PAGE_GUIDES: Record<string, Guide> = {
+  "/work": {
+    title: "Work queues",
+    steps: [
+      "Rules hand out denials and stuck claims as tasks, each with a due date.",
+      "Add or change rules here, and see how the team is keeping up over the last 30 days.",
+    ],
+    related: [{ label: "Denials", href: "/denials" }, { label: "Claim follow-up", href: "/claims/follow-up" }],
+  },
+  "/admin": {
+    title: "Practice analytics",
+    steps: [
+      "Charges, collections, days in A/R, denial rate and clean claim rate, each against its industry target.",
+      "Use the payer and provider breakdowns to find where money is slow or lost.",
+    ],
+    related: [{ label: "Reports", href: "/reports" }],
+  },
+  "/clients": {
+    title: "All clients",
+    steps: [
+      "Every practice you have access to, with its key numbers side by side.",
+      "Open one to switch into it; your role there is the one that practice gave you.",
+    ],
+  },
+  "/clients/invoicing": {
+    title: "Client invoicing",
+    steps: [
+      "For billing companies: bill each client practice a percent of what you collected for it.",
+      "Invoices cover whole months; set each practice's percent, then issue and track the invoices.",
+    ],
+  },
+  "/check-ins": {
+    title: "Online check-ins",
+    steps: [
+      "What patients submitted before their visit from their phone: insurance changes, signed notices and copays paid.",
+      "Review each submission before the visit; send check-in links from the schedule.",
+    ],
+    related: [{ label: "Scheduling", href: "/scheduling" }],
+  },
+  "/messages": {
+    title: "Text messages",
+    steps: [
+      "Two-way texts with patients, one conversation per patient; replies arrive here.",
+      "Patients who reply STOP are not texted again; only send texts to patients who agreed to them.",
+    ],
+    related: [{ label: "Text message registration", href: "/settings/texting" }],
+  },
+  "/labs": {
+    title: "Labs",
+    steps: [
+      "Lab results to review, and orders still waiting on the lab, sent and received over HL7.",
+      "Set up each lab's connection at the bottom of the page.",
+    ],
+    related: [{ label: "EHR interfaces", href: "/settings/integrations" }],
+  },
+  "/coding": {
+    title: "Coding help",
+    steps: [
+      "Work out the E/M level from time or medical decision making, and find diagnosis codes from plain words.",
+      "AI coding from visit notes is available only after the practice has a BAA with the AI provider.",
+    ],
+    related: [{ label: "Charge entry", href: "/encounters/new" }],
+  },
+  "/encounters/institutional": {
+    title: "Facility claim (UB-04)",
+    steps: [
+      "For hospitals, surgery centers and other facilities: type of bill, statement period, admission details and revenue-code lines.",
+      "Inpatient bills also take ICD-10-PCS procedures. The claim is scrubbed with the institutional rules and sent as an 837I.",
+    ],
+    related: [{ label: "Claims", href: "/claims" }],
+  },
+  "/encounters/dental": {
+    title: "Dental claim (837D)",
+    steps: [
+      "CDT codes with tooth, surfaces and quadrant for each line.",
+      "The claim is checked with the dental rules and sent as an 837D; attachments such as X-rays go with it.",
+    ],
+    related: [{ label: "Claims", href: "/claims" }],
+  },
+  "/reports/warnings": {
+    title: "Warnings that became denials",
+    steps: [
+      "Each scrub warning claims were sent with, by payer, and how often those claims were denied.",
+      "Where the rate is high, block it: a payer edit for that payer, or strict scrubbing for every warning.",
+    ],
+    related: [{ label: "Payer edits", href: "/settings/payer-edits" }],
+  },
+  "/setup": {
+    title: "Setup checklist",
+    steps: [
+      "What the practice still needs before claims go out, and what each setting or yearly file makes possible.",
+      "Work down the list; each item links to where it is set.",
+    ],
+  },
+  "/settings/subscription": {
+    title: "Subscription",
+    steps: ["Your CollaboratMD plan, trial dates and invoices, with links to each invoice and receipt.", "Change or cancel the plan here; a failed payment shows how long before claims pause."],
+  },
+  "/settings/profile": {
+    title: "Practice profile",
+    steps: [
+      "The legal name, NPI, tax ID, address and phone sent as the billing provider on every claim: check them against your enrollment.",
+      "Also here: the Medicare locality (for fee schedule pricing), CLIA number, time zone and paper claim alignment.",
+    ],
+  },
+  "/settings/locations": {
+    title: "Locations",
+    steps: ["Each clinic or facility where you see patients, with its address and place of service.", "A visit's location goes on the claim as the service facility when it differs from the billing address."],
+  },
+  "/settings/providers": {
+    title: "Providers",
+    steps: [
+      "Rendering providers with NPI, taxonomy, specialty and credential; look the NPI up in the CMS registry to fill the rest.",
+      "The credential matters for Medicare: nurse practitioners, physician assistants and clinical nurse specialists are paid 85% under their own NPI.",
+      "Deactivate a provider who leaves; their past claims stay as they were.",
+    ],
+  },
+  "/settings/payers": {
+    title: "Payers",
+    steps: ["Each insurer with its clearinghouse payer ID, type, timely filing limit and appeal window.", "The type (commercial, Medicare, Medicaid, workers' comp, auto) decides which rules apply to its claims."],
+    related: [{ label: "Payer edits", href: "/settings/payer-edits" }],
+  },
+  "/settings/fees": {
+    title: "Fee schedules",
+    steps: [
+      "Your standard charges, and each payer's contracted rates, which underpayment checks compare against.",
+      "Build a contract as a percent of your charges or of Medicare; add your own codes, descriptions and fees from a spreadsheet.",
+    ],
+    related: [{ label: "Fee schedule check", href: "/reports/fee-check" }],
+  },
+  "/settings/enrollment": {
+    title: "Payer enrollment",
+    steps: ["Each provider's enrollment status with each payer, and revalidation dates.", "A claim for a provider not yet enrolled with the payer gets a warning before it goes out."],
+  },
+  "/settings/credentials": {
+    title: "Credentials",
+    steps: ["Licenses, DEA, board certification, malpractice and CAQH for each provider, with expiry dates.", "Reminders go out before anything expires."],
+  },
+  "/settings/policies": {
+    title: "Policies",
+    steps: [
+      "Practice-wide rules: write-off limits for non-administrators, strict scrubbing, risk holds, statement settings, small balance adjustments and refund approval.",
+      "Changes are recorded in the audit log.",
+    ],
+  },
+  "/settings/payer-edits": {
+    title: "Payer edits",
+    steps: [
+      "Rules one payer applies and another does not: prior authorization, required modifiers or diagnoses, unit and frequency limits, codes not covered.",
+      "Rules suggested from your own denials appear at the top; add one and the next claim is checked against it.",
+    ],
+  },
+  "/settings/code-sets": {
+    title: "National code sets",
+    steps: [
+      "CMS's files, loaded by the platform operator: ICD-10-CM, HCPCS, NCCI edits, coverage policies, the physician fee schedule, the telehealth list and the HCC mapping.",
+      "Checks that rely on a file run only once that year's file is loaded; the page shows what is loaded and when.",
+    ],
+  },
+  "/settings/automation": {
+    title: "Automation",
+    steps: ["What runs every morning: reminders, claim follow-up, the denial agent, coverage checks, autopay and reports.", "Turn each on or off; results show in notifications and the automation history."],
+  },
+  "/settings/team": {
+    title: "Team and roles",
+    steps: ["Invite people, choose their role (or a custom role that narrows one), and remove access in one click.", "Signing someone out ends every session they have open."],
+  },
+  "/settings/security": {
+    title: "Sign-in security",
+    steps: ["Require two-factor sign-in, set how long sessions last, and limit sign-in to your office networks.", "Passkeys count as two-factor; \"Sign everyone out\" ends all sessions at once."],
+  },
+  "/settings/sso": {
+    title: "Single sign-on",
+    steps: ["Connect Okta, Entra ID or Google Workspace (OpenID Connect or SAML), and SCIM so leaving staff lose access automatically.", "Test the connection before requiring it for everyone."],
+  },
+  "/settings/quality": {
+    title: "Quality measures",
+    steps: ["The MIPS measures you report, with this year's visit codes and quality data codes from CMS's specifications.", "A qualifying claim then shows the measure, and the outcome is added as a $0.00 line."],
+    related: [{ label: "Quality report", href: "/reports/quality" }],
+  },
+  "/settings/texting": {
+    title: "Text message registration",
+    steps: ["US carriers block unregistered business texts: register your Twilio sender (A2P 10DLC or toll-free) here.", "The answers are prepared from your practice details; check the status again after submitting."],
+  },
+  "/settings/integrations": {
+    title: "EHR interfaces",
+    steps: ["Receive patients and charges from your EHR over HL7 v2, with the integration key your EHR sends.", "Send a test message here to check the connection before going live."],
+  },
+  "/settings/fhir": {
+    title: "EHR over FHIR",
+    steps: ["Connect Epic, Oracle Health, athenahealth and others with SMART backend services to bring in patients and finished visits.", "Visits arrive as charges to review, not as sent claims."],
+  },
+  "/settings/developers": {
+    title: "Developers",
+    steps: ["API keys for your own systems, and webhooks that notify them when claims, payments and patients change.", "Keys are shown once; store them safely and revoke any you no longer use."],
+  },
+  "/settings/audit": {
+    title: "Audit log",
+    steps: ["Every sign-in, change, export and payment, with who and when.", "Search by person, action or record, and export it for a review."],
+  },
+  "/settings/access-review": {
+    title: "Chart access review",
+    steps: ["Charts each person opened in the last 24 hours, against their usual; unusual access is flagged.", "Flags are prompts to look, not findings: review each and record what you found."],
+  },
+  "/settings/close": {
+    title: "Close account",
+    steps: ["Download the whole practice first; closing schedules deletion of all of this practice's data after a notice period.", "Until the date, the closure can be cancelled."],
+  },
+  "/settings/compliance": {
+    title: "Compliance",
+    steps: ["HIPAA Security Rule controls, access reviews, vendors with their business associate agreements, and the audit trail in one place.", "Keep the vendor list and BAAs current as you add services."],
+  },
+  "/settings/menu": {
+    title: "Menu",
+    steps: ["Hide the modules your practice does not use, for everyone.", "Hidden pages still work from links and search; they just leave the menu."],
+  },
+};

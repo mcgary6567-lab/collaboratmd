@@ -47,29 +47,44 @@ export async function exportPlan(db: Db): Promise<ExportPlan> {
     byTable.get(r.table_name)!.push(r.column_name);
   }
   const hasPractice = (t: string) => byTable.get(t)?.includes("practice_id") ?? false;
+  const filters = new Map<string, Source["filter"]>();
+  const tables = [...byTable.keys()].filter((t) => !SKIP_TABLES.has(t) && IDENT.test(t)).sort();
+  for (const t of tables) {
+    if (t === "practices") filters.set(t, "own");
+    else if (hasPractice(t)) filters.set(t, "practice");
+  }
+  // A child row belongs to the practice through its parent (a charge through its encounter), or through a
+  // grandparent (an eligibility check through its insurance, through the patient): a few passes find them.
+  for (let pass = 0; pass < 3; pass++) {
+    for (const t of tables) {
+      if (filters.has(t)) continue;
+      const fk = (fks as { child: string; col: string; parent: string }[]).find((f) => f.child === t && f.parent !== t && filters.has(f.parent) && f.parent !== "practices");
+      if (fk) filters.set(t, { column: fk.col, parent: fk.parent });
+    }
+  }
   const sources: Source[] = [];
   const columns: ExportPlan["columns"] = {};
-  for (const [table, all] of [...byTable].sort(([a], [b]) => a.localeCompare(b))) {
-    if (SKIP_TABLES.has(table) || !IDENT.test(table)) continue;
-    let filter: Source["filter"] | null = null;
-    if (table === "practices") filter = "own";
-    else if (hasPractice(table)) filter = "practice";
-    else {
-      // A child row belongs to the practice through its parent (a charge through its encounter, say).
-      const fk = (fks as { child: string; col: string; parent: string }[]).find((f) => f.child === table && hasPractice(f.parent) && f.parent !== table);
-      if (fk) filter = { column: fk.col, parent: fk.parent };
-    }
+  for (const table of tables) {
+    const filter = filters.get(table);
     if (!filter) continue;
+    const all = byTable.get(table)!;
     sources.push({ table, filter });
     columns[table] = { keep: all.filter((c) => !SECRET_COLUMN.test(c) && !FILE_COLUMNS.has(c)), dropped: all.filter((c) => SECRET_COLUMN.test(c)) };
   }
   return { sources, columns };
 }
 
-function where(s: Source, practiceId: string) {
-  if (s.filter === "own") return sql`WHERE id = ${practiceId}`;
-  if (s.filter === "practice") return sql`WHERE practice_id = ${practiceId}`;
-  return sql`WHERE ${sql.raw(q(s.filter.column))} IN (SELECT id FROM ${sql.raw(q(s.filter.parent))} WHERE practice_id = ${practiceId})`;
+/** The condition that picks a table's rows for the practice, following parents up to one with practice_id. */
+function condition(s: Source, sources: Map<string, Source>, practiceId: string, depth = 0): ReturnType<typeof sql> {
+  if (s.filter === "own") return sql`id = ${practiceId}`;
+  if (s.filter === "practice") return sql`practice_id = ${practiceId}`;
+  const parent = sources.get(s.filter.parent);
+  if (!parent || depth > 4) throw new Error(`No way to reach the practice from ${s.table}`);
+  return sql`${sql.raw(q(s.filter.column))} IN (SELECT id FROM ${sql.raw(q(s.filter.parent))} WHERE ${condition(parent, sources, practiceId, depth + 1)})`;
+}
+
+function where(plan: ExportPlan, s: Source, practiceId: string) {
+  return sql`WHERE ${condition(s, new Map(plan.sources.map((x) => [x.table, x])), practiceId)}`;
 }
 
 const enc = new TextEncoder();
@@ -88,7 +103,7 @@ export async function planExportParts(db: Db, practiceId: string, opts: { chunkR
   const segments: { seg: ExportSegment; rows: number }[] = [];
   for (const s of plan.sources) {
     const table = sql.raw(q(s.table));
-    const { rows: [c] } = await db.execute(sql`SELECT count(*)::int AS n FROM ${table} ${where(s, practiceId)}`);
+    const { rows: [c] } = await db.execute(sql`SELECT count(*)::int AS n FROM ${table} ${where(plan, s, practiceId)}`);
     const n = Number((c as { n: number }).n);
     if (!plan.columns[s.table].keep.includes("id") || n <= chunkRows) {
       segments.push({ seg: { table: s.table, afterId: null, limit: null, label: `tables/${s.table}.csv` }, rows: n });
@@ -97,7 +112,7 @@ export async function planExportParts(db: Db, practiceId: string, opts: { chunkR
     let after: string | null = null;
     for (let k = 1, left = n; left > 0; k++, left -= chunkRows) {
       segments.push({ seg: { table: s.table, afterId: after, limit: chunkRows, label: `tables/${s.table}.part${k}.csv` }, rows: Math.min(chunkRows, left) });
-      const { rows: b }: { rows: unknown[] } = await db.execute(sql`SELECT id::text AS id FROM ${table} ${where(s, practiceId)} ${after === null ? sql`` : sql`AND id > ${after}`} ORDER BY id OFFSET ${chunkRows - 1} LIMIT 1`);
+      const { rows: b }: { rows: unknown[] } = await db.execute(sql`SELECT id::text AS id FROM ${table} ${where(plan, s, practiceId)} ${after === null ? sql`` : sql`AND id > ${after}`} ORDER BY id OFFSET ${chunkRows - 1} LIMIT 1`);
       if (!b.length) break;
       after = (b[0] as { id: string }).id;
     }
@@ -153,8 +168,8 @@ export async function* practiceExport(db: Db, practiceId: string, now = new Date
       const take = seg.limit === null ? PAGE : Math.min(PAGE, seg.limit - n);
       if (take <= 0) break;
       const { rows } = keyed
-        ? await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ${last === null ? sql`` : sql`AND id > ${last}`} ORDER BY id LIMIT ${take}`)
-        : await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(s, practiceId)} ORDER BY 1 LIMIT ${PAGE} OFFSET ${offset}`);
+        ? await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(plan, s, practiceId)} ${last === null ? sql`` : sql`AND id > ${last}`} ORDER BY id LIMIT ${take}`)
+        : await db.execute(sql`SELECT ${cols} FROM ${sql.raw(q(s.table))} ${where(plan, s, practiceId)} ORDER BY 1 LIMIT ${PAGE} OFFSET ${offset}`);
       if (!rows.length) break;
       if (keyed) last = (rows[rows.length - 1] as Record<string, unknown>).id;
       const text = (rows as Record<string, unknown>[]).map((r) => keep.map((c) => csvCell(typeof r[c] === "object" && r[c] !== null && !(r[c] instanceof Date) ? JSON.stringify(r[c]) : r[c])).join(",")).join("\r\n") + "\r\n";

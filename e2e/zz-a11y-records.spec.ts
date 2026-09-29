@@ -36,6 +36,7 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   // A fee schedule, from Settings.
   await page.goto("/settings/fees");
   const createStandard = page.getByRole("button", { name: "Create standard schedule" });
+  await expect(createStandard.or(page.locator("a[href^='/settings/fees/']")).first()).toBeVisible({ timeout: 30_000 });
   if (await createStandard.isVisible()) {
     await createStandard.click();
     // Creating it opens the new schedule.
@@ -58,6 +59,8 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   const invoiceLink = page.locator("a[href^='/clients/invoicing/']").first();
   const invoice = page.getByRole("button", { name: /^Invoice / }).first();
   const issuer = page.locator('input[name="issuerName"]').first();
+  // The page streams in behind a loading state: wait for the terms form, the invoice button or an invoice.
+  await expect(issuer.or(invoice).or(invoiceLink).first()).toBeVisible({ timeout: 30_000 });
   if (await issuer.isVisible()) {
     await issuer.fill("Accessibility Test Billing LLC");
     await page.locator('input[name="ratePct"]').first().fill("6.5");
@@ -76,12 +79,18 @@ test("accessibility: screens for individual records", async ({ page, browser }) 
   await want("lab result", await firstHref(page, "/labs", new RegExp(`^/labs/${ID}$`)));
   await want("underpayment letter", await firstHref(page, "/underpayments", new RegExp(`^/underpayments/letter/${ID}$`)));
 
+  // The printable pages for a paid claim: its EOB from the 835, and its timely filing record.
+  const paidClaim = await firstHref(page, "/claims?status=paid", new RegExp(`^/claims/${ID}$`));
+  await want("paid claim", paidClaim);
+  if (paidClaim) pages.push(paidClaim.replace("/claims/", "/print/eob/"), paidClaim.replace("/claims/", "/print/timely-filing/"));
+
   const problems: string[] = [];
   for (const p of pages) problems.push(...(await check(page, p)));
 
   // A restricted record: opening it asks for a reason first, then opens.
   const gate = page.getByRole("heading", { name: "Restricted record" });
   await page.goto(patient!);
+  await expect(gate.or(page.getByRole("button", { name: "Restrict", exact: true }))).toBeVisible({ timeout: 30_000 });
   if (await gate.isVisible()) {
     // Left restricted by an earlier attempt (a retry, or a kept local database): open it and lift that first.
     await page.getByLabel("Reason").fill("Undoing the restriction an earlier test run left");

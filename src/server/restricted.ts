@@ -89,8 +89,3 @@ export async function recordRestrictedDisclosure(
 export async function restrictedPatientIds(db: Db, practiceId: string) {
   return (await db.select({ id: patients.id }).from(patients).where(and(eq(patients.practiceId, practiceId), eq(patients.restricted, true)))).map((r) => r.id);
 }
-
-export async function restrictedCount(db: Db, practiceId: string) {
-  const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(patients).where(and(eq(patients.practiceId, practiceId), eq(patients.restricted, true)));
-  return Number(r?.n ?? 0);
-}

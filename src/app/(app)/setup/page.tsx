@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { goLivePlan } from "@/server/go-live";
 import { setupSteps } from "@/server/setup";
+import { rulesSetup } from "@/server/setup-rules";
 import { Badge, Card, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Setup checklist" };
@@ -18,7 +19,7 @@ const MORE = ["fees", "contracts", "team", "patients", "ehr", "eligibility", "pa
 export default async function SetupPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [phases, steps] = await Promise.all([goLivePlan(db, s.practiceId), setupSteps(db, s.practiceId)]);
+  const [phases, steps, rules] = await Promise.all([goLivePlan(db, s.practiceId), setupSteps(db, s.practiceId), rulesSetup(db, s.practiceId)]);
   const checked = phases.slice(0, 3).flatMap((p) => p.steps);
   const done = checked.filter((x) => x.done).length;
   const pct = Math.round((done / Math.max(checked.length, 1)) * 100);
@@ -50,7 +51,23 @@ export default async function SetupPage() {
             </ul>
           </Card>
         ))}
-        <Card title="5. Rounding out the setup">
+        <Card title="5. Yearly files and billing rules">
+          <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">Checks that depend on CMS&apos;s yearly files or on your own settings. National files are loaded by CollaboratMD for every practice; the rest are yours.</p>
+          <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+            {rules.map((st) => (
+              <li key={st.key} className="flex items-start gap-3 py-2.5">
+                {st.done ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-700" aria-label="done" /> : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-label="not done" />}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 font-medium">{st.title}{st.national && <Badge>National file</Badge>}{st.optional && <Badge>Optional</Badge>}</div>
+                  <div className="text-slate-600 dark:text-slate-400">{st.detail}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Makes possible: {st.unlocks}</div>
+                </div>
+                {!st.done && !st.national && <Link href={st.href} className="btn btn-secondary shrink-0 text-xs">Set up</Link>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+        <Card title="6. Rounding out the setup">
           <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
             {more.map((st) => (
               <li key={st.key} className="flex items-start gap-3 py-2.5">

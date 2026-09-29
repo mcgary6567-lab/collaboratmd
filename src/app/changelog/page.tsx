@@ -10,6 +10,19 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-29",
+    title: "Setup for yearly files, warnings that became denials, and a hardening pass",
+    items: [
+      "Setup checklist: which yearly CMS files and practice settings are missing, and what each one makes possible",
+      "Warnings that became denials: each scrub warning by payer, how often those claims were denied, and when to block it",
+      "Practice downloads now include coverage checks, and a test fails if a new table is left out of the download or the account deletion",
+      "Sliding fee discounts post only for people allowed to adjust balances; appeal decisions are recorded by the same roles",
+      "Faster reports on large practices: a claim's denials, corrected claims and missed charges are now indexed",
+      "Anesthesia claims show base plus time units once CMS's base unit file is loaded",
+      "Help for every menu and settings page, with a test that keeps it that way; more pages in the accessibility checks",
+    ],
+  },
+  {
+    date: "2026-09-29",
     title: "Fee schedule check, batch appeals, collection safeguards, time-based visits",
     items: [
       "Unlisted and unclassified codes carry their description on the 837P and the CMS-1500, and are stopped without one",

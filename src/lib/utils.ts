@@ -48,10 +48,6 @@ export function daysAgo(d: string | Date): number {
   return Math.floor((Date.now() - date.getTime()) / 86_400_000);
 }
 
-export function yyyymmdd(d: Date): string {
-  return d.toISOString().slice(0, 10).replace(/-/g, "");
-}
-
 export const CLAIM_STATUS_COLORS: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700",
   scrub_errors: "bg-amber-100 text-amber-800",

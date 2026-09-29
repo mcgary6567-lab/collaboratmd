@@ -20,6 +20,10 @@ const APP = [
   "/settings/enrollment", "/settings/fees", "/settings/fhir", "/settings/integrations", "/settings/locations", "/settings/menu",
   "/settings/payer-edits", "/settings/payers", "/settings/policies", "/settings/profile", "/settings/providers", "/settings/security",
   "/settings/sso", "/settings/subscription", "/settings/team",
+  // Added with the 2026-09 billing rules.
+  "/records-requests", "/nsa-disputes", "/refund-demands", "/denials/batch",
+  "/reports/productivity", "/reports/contracts", "/reports/lag", "/reports/care-gaps", "/reports/fee-check", "/reports/warnings", "/reports/quality",
+  "/settings/prompt-pay", "/settings/sliding-fee", "/settings/quality", "/settings/texting",
 ];
 const PUBLIC = [
   "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/trust/questionnaire", "/contact", "/status", "/switch", "/changelog", "/demo",
@@ -55,7 +59,7 @@ for (const vp of VIEWPORTS) {
         // Pages reached from a claim by buttons rather than links.
         if (/^\/claims\/[0-9a-f-]{36}$/.test(path)) queue.push(`${path}/edit`, `${path}/cover`);
         for (const l of await links(page)) if (!seen.has(pattern(l)) && !PUBLIC.includes(l) && !found.includes(l)) { found.push(l); queue.push(l); }
-        if (seen.size > 160) break;
+        if (seen.size > 220) break;
       }
       console.log(`${vp.name}: checked ${seen.size} signed-in screens: ${[...seen].join(" ")}`);
       expect(problems).toEqual([]);

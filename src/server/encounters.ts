@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, eq, gte, lt } from "drizzle-orm";
 import { abnModifiers } from "./abn";
 import { normalizeNdc } from "@/lib/codes/ndc";
 import { isZeroChargeCode } from "@/lib/codes/quality";
@@ -162,15 +162,4 @@ export async function listProviders(db: Db, practiceId: string, includeInactive 
 
 export async function listPayers(db: Db, practiceId: string) {
   return db.select().from(schema.payers).where(eq(schema.payers.practiceId, practiceId)).orderBy(asc(schema.payers.name));
-}
-
-export async function recentEncounters(db: Db, practiceId: string) {
-  return db
-    .select({ encounter: encounters, patient: patients, provider: providers })
-    .from(encounters)
-    .innerJoin(patients, eq(patients.id, encounters.patientId))
-    .innerJoin(providers, eq(providers.id, encounters.providerId))
-    .where(eq(encounters.practiceId, practiceId))
-    .orderBy(desc(encounters.dateOfService))
-    .limit(50);
 }

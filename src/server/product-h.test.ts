@@ -66,7 +66,8 @@ describe("product round", () => {
   it("finds the most specific help guide for a page", () => {
     expect(guideFor("/settings/connections/doctor")?.title).toBe("Integration doctor");
     expect(guideFor("/settings/connections")?.title).toBe("Integrations");
-    expect(guideFor("/settings/team")?.title).toBe("Settings");
+    expect(guideFor("/settings/team")?.title).toBe("Team and roles");
+    expect(guideFor("/settings/not-a-page")?.title).toBe("Settings");
     expect(guideFor("/claims/abc")?.title).toBe("Claims");
     expect(guideFor("/claimsx")).toBeNull();
   });

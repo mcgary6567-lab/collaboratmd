@@ -27,9 +27,3 @@ export async function pendingDocuments(db: Db, practiceId: string, userId: strin
     .where(and(eq(legalAcceptances.practiceId, practiceId), eq(legalAcceptances.userId, userId), inArray(legalAcceptances.document, DOCS)));
   return DOCS.filter((d) => !rows.some((r) => r.document === d && r.version === LEGAL_VERSIONS[d]));
 }
-
-export async function acceptanceHistory(db: Db, practiceId: string) {
-  return db.select({ acceptance: legalAcceptances, name: schema.users.name, email: schema.users.email }).from(legalAcceptances)
-    .innerJoin(schema.users, eq(schema.users.id, legalAcceptances.userId))
-    .where(eq(legalAcceptances.practiceId, practiceId)).orderBy(legalAcceptances.acceptedAt);
-}

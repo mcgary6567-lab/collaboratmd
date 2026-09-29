@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { CAN_WRITE, requireRole } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { assertOwned } from "@/server/tenancy";
 import { recordSlidingFee, saveGuidelines, saveTiers } from "@/server/sliding-fee";
@@ -42,9 +42,13 @@ export async function recordSlidingFeeAction(patientId: string, _prev: FormResul
   try {
     const db = await getDb();
     await assertOwned(db, s.practiceId, "patient", patientId);
-    const r = await recordSlidingFee(db, s.practiceId, patientId, { householdSize: Number(f(fd, "household")), annualIncomeCents: cents(f(fd, "income")), proof: f(fd, "proof"), verifiedOn: f(fd, "verifiedOn") }, s.userId);
+    // Anyone who can edit records verifies income; the discount posts now only for someone who can adjust money,
+    // otherwise tonight's run posts it from the practice's approved tiers.
+    const canAdjust = (CAN_ADJUST as readonly string[]).includes(s.role);
+    const r = await recordSlidingFee(db, s.practiceId, patientId, { householdSize: Number(f(fd, "household")), annualIncomeCents: cents(f(fd, "income")), proof: f(fd, "proof"), verifiedOn: f(fd, "verifiedOn") }, s.userId, { apply: canAdjust });
     revalidatePath(`/patients/${patientId}`);
-    return { ok: true, message: r.discountPercent ? `${r.percent}% of the poverty guideline: ${r.discountPercent}% discount until ${r.expiresOn}${r.posted ? `; ${money(r.posted)} taken off what the patient owes` : ""}` : `${r.percent}% of the poverty guideline: above the sliding fee scale` };
+    const when = r.posted ? `; ${money(r.posted)} taken off what the patient owes` : canAdjust ? "" : "; the discount posts with tonight's run";
+    return { ok: true, message: r.discountPercent ? `${r.percent}% of the poverty guideline: ${r.discountPercent}% discount until ${r.expiresOn}${when}` : `${r.percent}% of the poverty guideline: above the sliding fee scale` };
   } catch (e) {
     return fail(e);
   }

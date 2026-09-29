@@ -52,4 +52,3 @@ export const COMMON_TAXONOMIES: [code: string, name: string][] = [
   ["282N00000X", "General Acute Care Hospital"],
 ];
 
-export const TAXONOMY_RE = /^[0-9]{3}[0-9A-Z]{6}X$/;

@@ -52,10 +52,6 @@ async function signInBlock(db: Db, user: typeof schema.users.$inferSelect, via: 
   return null;
 }
 
-export async function hashPassword(pw: string) {
-  return bcrypt.hash(pw, 10);
-}
-
 export type LoginResult = { ok: true; session: Session } | { ok: false; error: string } | { ok: false; mfa: true };
 
 // Compared against when the email is unknown, so a wrong email takes as long as a wrong password.
@@ -356,10 +352,4 @@ export async function requireRole(roles: readonly string[]): Promise<Session> {
 /** Whether the signed-in user can use a feature (reports, exports, texting). */
 export function can(s: Session, cap: Capability) {
   return allows(s.role, s.denied, cap);
-}
-
-export async function requireCapability(cap: Capability): Promise<Session> {
-  const s = await requireSession();
-  if (!can(s, cap)) throw new Error(`Your role${s.customRole ? ` (${s.customRole})` : ""} does not include this`);
-  return s;
 }

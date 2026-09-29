@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { CAN_ADJUST, CAN_WRITE, requireRole } from "@/lib/auth";
+import { CAN_ADJUST, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { draftAppeal, markAppealSent, saveAppeal } from "@/server/appeals";
 import { recordAppealDecision, type Decision } from "@/server/appeal-levels";
@@ -47,7 +47,7 @@ export async function markSentAction(denialId: string, letterId: string, _prev: 
 }
 
 export async function appealDecisionAction(levelId: string, denialId: string, _prev: FormResult, fd: FormData): Promise<FormResult> {
-  const s = await requireRole(CAN_WRITE);
+  const s = await requireRole(CAN_ADJUST);
   try {
     const r = await recordAppealDecision(await getDb(), s.practiceId, levelId, String(fd.get("decision") ?? "") as Decision, String(fd.get("decidedOn") ?? ""), s.userId);
     revalidatePath(`/denials/${denialId}/appeal`);

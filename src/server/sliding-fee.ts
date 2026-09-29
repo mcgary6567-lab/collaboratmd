@@ -49,7 +49,12 @@ export function slidingFeeFor(g: { baseCents: number; perPersonCents: number }, 
   return { percent, discountPercent: tier?.discountPercent ?? 0 };
 }
 
-export async function recordSlidingFee(db: Db, practiceId: string, patientId: string, input: { householdSize: number; annualIncomeCents: number; proof: string; verifiedOn: string; expiresOn?: string }, userId?: string) {
+/**
+ * Records a verified income. The discount posts now only when `apply` is true
+ * (the user may adjust money); otherwise the daily job posts it from the
+ * practice's approved tiers.
+ */
+export async function recordSlidingFee(db: Db, practiceId: string, patientId: string, input: { householdSize: number; annualIncomeCents: number; proof: string; verifiedOn: string; expiresOn?: string }, userId?: string, opts: { apply?: boolean } = { apply: true }) {
   if (!Number.isInteger(input.householdSize) || input.householdSize < 1 || input.householdSize > 20) throw new Error("Enter the household size");
   if (!Number.isInteger(input.annualIncomeCents) || input.annualIncomeCents < 0) throw new Error("Enter the household's yearly income");
   const proof = input.proof.trim().slice(0, 200);
@@ -65,7 +70,7 @@ export async function recordSlidingFee(db: Db, practiceId: string, patientId: st
   const values = { practiceId, householdSize: input.householdSize, annualIncomeCents: input.annualIncomeCents, percentOfPoverty: r.percent, discountPercent: r.discountPercent, proof, verifiedOn: input.verifiedOn, expiresOn, recordedBy: userId ?? null };
   await db.insert(patientSlidingFees).values({ patientId, ...values }).onConflictDoUpdate({ target: patientSlidingFees.patientId, set: values });
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "sliding_fee_recorded", entity: "patient", entityId: patientId, details: { percentOfPoverty: r.percent, discountPercent: r.discountPercent, guidelinesYear: g.year } });
-  const posted = r.discountPercent ? await applySlidingFee(db, practiceId, patientId, userId) : 0;
+  const posted = r.discountPercent && opts.apply !== false ? await applySlidingFee(db, practiceId, patientId, userId) : 0;
   return { ...r, expiresOn, posted };
 }
 

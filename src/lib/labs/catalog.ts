@@ -81,8 +81,6 @@ export const LABS = [
   { code: "INOFFICE", name: "In-office lab" },
 ] as const;
 
-export type LabCode = (typeof LABS)[number]["code"];
-
 /** HL7 table 0078 abnormal flags from a value and its range. */
 export function abnormalFlag(value: number, low: number | null, high: number | null): "" | "L" | "H" | "LL" | "HH" {
   if (low !== null && value < low) return value < low * 0.7 ? "LL" : "L";

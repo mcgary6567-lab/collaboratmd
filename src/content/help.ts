@@ -3,6 +3,8 @@
  * (the longest match wins). Each is what a new biller or front-desk user needs
  * to get through that screen, not a manual.
  */
+import { PAGE_GUIDES } from "./help-pages";
+
 export type Guide = { title: string; steps: string[]; related?: { label: string; href: string }[] };
 
 export const GUIDES: Record<string, Guide> = {
@@ -240,6 +242,7 @@ export const GUIDES: Record<string, Guide> = {
 };
 
 export function guideFor(path: string): Guide | null {
-  const key = Object.keys(GUIDES).filter((k) => path === k || path.startsWith(`${k}/`)).sort((a, b) => b.length - a.length)[0];
-  return key ? GUIDES[key] : null;
+  const all: Record<string, Guide> = { ...PAGE_GUIDES, ...GUIDES };
+  const key = Object.keys(all).filter((k) => path === k || path.startsWith(`${k}/`)).sort((a, b) => b.length - a.length)[0];
+  return key ? all[key] : null;
 }

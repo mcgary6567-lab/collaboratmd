@@ -407,3 +407,23 @@ Collections → Safeguards before an agency: the practice sets the minimum state
 ## Time-based office visits and prolonged services
 
 On office E/M lines, charge entry takes the total minutes. The scrubber warns when the minutes do not reach the level's CPT minimum (99202-99205: 15/30/45/60; 99212-99215: 10/20/30/40), suggests prolonged service time when 99205 or 99215 runs long (99417 per 15 minutes beyond 60 or 40; Medicare's G2212 from 89 or 69 minutes), refuses 99417 on Medicare claims, and refuses more prolonged units than the minutes support.
+
+## Yearly files and billing rules (setup checklist)
+
+Setup → "5. Yearly files and billing rules" lists what each check needs and whether it is in place. National files (loaded by the platform operator in Settings → Code sets): ICD-10-CM for the current fiscal year (it changes each October 1), the Medicare fee schedule RVUs and GPCIs for the calendar year, the Medicare telehealth list, the HCC mapping, and NCCI edits no older than 100 days. Practice settings: Medicare locality, provider credentials, prompt-pay rules for the practice's state, collection safeguards, chronic condition groups, and (optional) the sliding fee scale. Each item says what it unlocks and links to where it is set.
+
+## Warnings that became denials
+
+Reports → Warnings that became denials: for claims submitted in the period, each scrub warning they went out with, by payer, how many were denied, the most common denial reason, and the practice's overall denial rate for comparison. "Block for this payer" appears when at least 10 claims went out with the warning, 30% or more were denied, and that is at least twice the overall rate. Blocking is done by adding a payer edit, or strict scrubbing for everything. It uses the findings saved when each claim was last scrubbed.
+
+## Practice data coverage
+
+The practice download and account deletion find tables through their foreign keys, up to three levels from the practice (for example coverage checks, through the patient's insurance and the patient). A test (`src/server/hardening.test.ts`) fails when a table cannot be reached from a practice and is not on the list of national or platform tables, so a new table is not left out of either. The deletion record in `practice_deletions` is kept on purpose.
+
+## Who can move money
+
+Recording a sliding fee application is open to staff who can edit; the discount itself posts only for roles that can adjust balances (otherwise it posts with the nightly run). Recording an appeal decision (which can write off the balance) needs the same adjust role.
+
+## Anesthesia units
+
+On a claim with anesthesia lines and minutes, the claim page shows the time units (minutes / 15, to one decimal) and, once CMS's anesthesia base unit file is loaded, the base units and their total. The payer applies its conversion factor to the total.

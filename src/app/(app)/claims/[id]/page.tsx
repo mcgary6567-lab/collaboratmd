@@ -14,6 +14,8 @@ import { RestrictedGate } from "@/components/restricted-gate";
 import { AttachmentsSection } from "./attachments-section";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
 import { openRequestFor } from "@/server/records-requests";
+import { baseUnitsFor } from "@/server/time-units";
+import { anesthesiaTimeUnits, isAnesthesiaCode } from "@/lib/time-units";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
 import { billAgainAction, billSecondaryAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -61,6 +63,9 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
   ]);
   const risk = PRE_SUBMIT.includes(b.claim.status) ? await claimRisk(db, s.practiceId, id) : null;
   const recordsDue = await openRequestFor(db, id);
+  // Anesthesia is billed in minutes; the payer adds the code's base units to the time units.
+  const anesthesia = b.lines.filter((l) => isAnesthesiaCode(l.cpt) && l.minutes);
+  const baseUnits = await baseUnitsFor(db, anesthesia.map((l) => l.cpt));
   const primaryClaim = related.find((r) => r.id === b.claim.primaryClaimId);
   const secondaryClaim = related.find((r) => r.primaryClaimId === id && r.payerSequence === "S");
   const canBillSecondary =
@@ -322,6 +327,16 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
             <div className="mt-3 text-sm text-slate-600">
               <span className="font-semibold">Diagnoses:</span> {b.encounter.diagnoses.map((d, i) => `${i + 1}. ${d}`).join("   ")} · <span className="font-semibold">POS</span> {b.encounter.placeOfService}
             </div>
+            {anesthesia.map((l) => {
+              const base = baseUnits.get(l.cpt);
+              const time = anesthesiaTimeUnits(l.minutes!);
+              return (
+                <p key={l.id} className="mt-1 text-sm text-slate-600">
+                  <span className="font-semibold">Anesthesia, line {l.lineNumber}:</span> {l.minutes} minutes = {time} time units
+                  {base !== undefined ? <> + {base} base units = {Math.round((base + time) * 10) / 10} units, before the payer&apos;s conversion factor</> : <> (load CMS&apos;s anesthesia base units to see the total)</>}
+                </p>
+              );
+            })}
           </Card>
 
           {b.claim.claimType === "professional" && (

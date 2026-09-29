@@ -507,27 +507,6 @@ export async function userWorkload(db: Db, practiceId: string, userId: string): 
   };
 }
 
-/** The denials assigned to a user, most urgent first. */
-export async function myDenialQueue(db: Db, practiceId: string, userId: string, limit = 8) {
-  const { rows } = await db.execute<Record<string, string>>(sql`
-    SELECT d.id, d.carc, d.category, d.amount_cents, d.status, d.appeal_deadline,
-           c.id AS claim_id, c.control_number, p.last_name, p.first_name, py.name AS payer
-    FROM denials d
-    JOIN claims c ON c.id = d.claim_id
-    JOIN patients p ON p.id = c.patient_id
-    JOIN payers py ON py.id = c.payer_id
-    WHERE d.practice_id = ${practiceId} AND d.assigned_to = ${userId}
-      AND d.status IN ('open','in_progress','appealed')
-    ORDER BY d.appeal_deadline NULLS LAST, d.amount_cents DESC LIMIT ${limit}`);
-  return rows.map((r) => ({
-    id: String(r.id), carc: String(r.carc), category: String(r.category),
-    amountCents: n(r.amount_cents), status: String(r.status),
-    appealDeadline: r.appeal_deadline ? String(r.appeal_deadline) : null,
-    claimId: String(r.claim_id), controlNumber: String(r.control_number),
-    patient: `${r.last_name}, ${r.first_name}`, payer: String(r.payer),
-  }));
-}
-
 /** Claims blocked before submission, newest first. */
 export async function claimsNeedingAttention(db: Db, practiceId: string, limit = 8) {
   const { rows } = await db.execute<Record<string, string>>(sql`
