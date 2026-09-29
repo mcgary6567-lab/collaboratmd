@@ -35,7 +35,8 @@ export default async function DenialsPage({ searchParams }: { searchParams: Prom
         title="Denial management"
         subtitle={`${total.toLocaleString()} denials${sp.q ? ` matching "${sp.q}"` : ""} · ${(totalCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} at risk in this status`}
       />
-      <div className="mb-2 flex justify-end">
+      <div className="mb-2 flex justify-end gap-2">
+        <a href="/denials/batch" className="btn btn-secondary text-xs">Batch appeals</a>
         <a href={`/api/export/denials?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]).toString()}`} className="btn btn-secondary text-xs">Export CSV</a>
       </div>
       <form className="mb-3 flex flex-wrap gap-2" action="/denials">

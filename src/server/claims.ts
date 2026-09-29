@@ -27,6 +27,7 @@ import { globalPeriodFindings } from "./global-periods";
 import { assertNoOpenRequest } from "./records-requests";
 import { birthdayRuleFinding, medicaidManagedCareFinding, medicareAdvantageFinding } from "./patients";
 import { duplicateFindings } from "./duplicates";
+import { storeRemitLines } from "./remittance-lines";
 import { enrollmentFinding, enrollmentFor } from "./enrollment";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
@@ -82,7 +83,7 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi,
       relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber,
       sharedWith: b.sharedWith ? { npi: b.sharedWith.npi, name: `${b.sharedWith.firstName} ${b.sharedWith.lastName}` } : null, substantiveAttested: b.encounter.substantiveAttested, teachingPresent: b.encounter.teachingPresent },
-    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, minutes: l.minutes, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity })),
+    lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, minutes: l.minutes, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity, description: l.description })),
     payer: { timelyFilingDays: b.payer.timelyFilingDays, type: b.payer.type },
     today,
   };
@@ -505,6 +506,8 @@ export async function postRemittance(db: Db, remittanceId: string, userId?: stri
       await db.insert(ledgerEntries).values({ ...base, type: "insurance_payment", amountCents: rc.paidCents, note: `${remit.payerName} ${remit.checkNumber}` });
       summary.paidCents += rc.paidCents;
     }
+    // Keep the payer's lines per code, for allowed-amount reports.
+    await storeRemitLines(db, remit, claim, rc);
     const allAdj = [...rc.adjustments, ...rc.lines.flatMap((l) => l.adjustments)];
     // Line-level adjustments take precedence when present; avoid double-posting claim-level duplicates.
     const adjustments = rc.lines.length ? rc.lines.flatMap((l) => l.adjustments) : rc.adjustments;

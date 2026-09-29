@@ -28,7 +28,7 @@ import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 import { appointmentReminder, balanceReminder, langOf, payLink, sameDayReminder, visitTime } from "@/lib/i18n/messages";
 import { clockDay, practiceNow } from "./practice-time";
-import { recheckMedicaidMonthly, verifySchedule } from "./patients";
+import { recheckMedicaidMonthly, recheckYearStart, verifySchedule } from "./patients";
 import { notify } from "./notifications";
 import { overpaymentDeadlineAlerts } from "./recovery";
 import { recordsRequestAlerts } from "./records-requests";
@@ -255,6 +255,7 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.balanceReminders) await step("balanceReminders", () => balanceReminders(db, practiceId, origin));
   if (s.eligibilityTomorrow) await step("eligibilityTomorrow", () => checkTomorrowsCoverage(db, practiceId, now));
   if (s.medicaidMonthly) await step("medicaidMonthly", () => recheckMedicaidMonthly(db, practiceId, now));
+  if (s.yearlyRecheck) await step("yearlyRecheck", () => recheckYearStart(db, practiceId, now));
   if (s.claimFollowUp) await step("claimFollowUp", () => runFollowUp(db, practiceId));
   if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));
   if (await hasActiveRules(db, practiceId)) await step("workRules", () => applyRules(db, practiceId, { now }));

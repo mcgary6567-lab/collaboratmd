@@ -5,6 +5,7 @@
  * for a clearinghouse sandbox. It covers the loops a small practice needs
  * (billing provider, subscriber, payer, claim, diagnoses, service lines).
  */
+import { claimDescription, isUnlistedCode } from "@/lib/codes/unlisted";
 import { isAnesthesiaCode } from "@/lib/time-units";
 import { contactPhone } from "./x12";
 import { REL_CODE, subscriberLoops, type Person } from "./subscriber";
@@ -163,6 +164,8 @@ export interface Edi837Input {
     minutes?: number | null;
     /** A drug line's 11-digit NDC, unit and quantity (2410 LIN/CTP). */
     ndc?: string | null;
+    /** SV101-7: required for unlisted and not-otherwise-classified codes. */
+    description?: string | null;
     ndcUnit?: string | null;
     ndcQuantity?: number | null;
   }[];
@@ -249,7 +252,11 @@ export function buildEdi837P(input: Edi837Input): string {
   // 2400 service lines
   input.lines.forEach((line, idx) => {
     s.push(["LX", String(idx + 1)]);
-    const sv1 = ["HC", line.cpt, ...line.modifiers.slice(0, 4)].join(":");
+    // SV101-7, the description, only for unlisted and unclassified codes; the modifier slots before it stay in place.
+    const describe = isUnlistedCode(line.cpt) && line.description ? claimDescription(line.description) : "";
+    const sv1 = describe
+      ? ["HC", line.cpt, ...[0, 1, 2, 3].map((i) => line.modifiers[i] ?? ""), describe].join(":")
+      : ["HC", line.cpt, ...line.modifiers.slice(0, 4)].join(":");
     const inMinutes = isAnesthesiaCode(line.cpt) && line.minutes;
     s.push(["SV1", sv1, money(line.chargeCents), inMinutes ? "MJ" : "UN", inMinutes ? String(line.minutes) : String(line.units), "", "", line.dxPointers.slice(0, 4).join(":")]);
     s.push(["DTP", "472", "D8", d8(line.dateOfService)]);

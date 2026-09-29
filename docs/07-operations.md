@@ -375,3 +375,35 @@ Billing → Payer refund demands tracks each payer letter asking for an overpaym
 ## Primary EOB for paper secondary claims
 
 A secondary claim links to "Primary EOB page": the primary payer's adjudication rebuilt from its 835s (charged, allowed, paid, patient share, and each adjustment with its CARC group and reason), to print with the paper CMS-1500 for a secondary payer that does not take electronic coordination of benefits.
+
+## Unlisted and unclassified codes
+
+A line with an unlisted procedure code (CPT codes ending in 99, like 17999) or a HCPCS "not otherwise classified" code (J3490, J3590, J9999 and others) needs a description of the service: charge entry shows a field for it, the scrubber stops the claim without it (UNLISTED), the 837P carries it in SV101-7 (with the modifier positions kept) and the CMS-1500 prints it in the shaded part of the line after any NDC.
+
+## Fee schedule check
+
+Reports → Fee schedule check lists codes billed in the last year whose standard charge is below the highest amount a payer allowed per unit (from 835 lines), a payer contract on file, or Medicare's office rate in the practice's locality, with a suggested charge (rounded up to $5). Remittances posted from now on keep their lines; "Read allowed amounts from past remittances" fills in older ones, 500 at a time.
+
+## 835 lines
+
+Posting a remittance now also stores each service line (code, modifiers, units, charged, allowed as charge less CO adjustments, paid, adjustments and remarks) in `remittance_lines`.
+
+## Batch appeals
+
+Denials → Batch appeals groups open denials by payer and reason code (two or more). One letter lists every claim in a group; "Mark all appealed" saves the letter as each denial's appeal and marks each sent, so appeal levels and deadlines continue per claim. Claims whose records a payer is still waiting for are left out.
+
+## Good faith estimate check
+
+Patient billing lists self-pay patients billed $400 or more above their good faith estimate for the same date of service, the level at which the patient can start the No Surprises Act's patient-provider dispute process. Review each before sending the statement.
+
+## Coverage re-checks in January
+
+Settings → Automation → "Re-check coverage in January": every day in January, coverage is checked for patients with a visit in the next 14 days whose insurance has not been checked yet that year, so the new deductible is used and lapsed plans are caught.
+
+## Collection safeguards
+
+Collections → Safeguards before an agency: the practice sets the minimum statements, days since the first statement, balance, and whether financial assistance must be offered first (a sliding fee record counts; otherwise "Record assistance offered today"). Placing an account with an agency is refused, with what is missing, until they are met. Set them to your state's law and your policy; none is assumed.
+
+## Time-based office visits and prolonged services
+
+On office E/M lines, charge entry takes the total minutes. The scrubber warns when the minutes do not reach the level's CPT minimum (99202-99205: 15/30/45/60; 99212-99215: 10/20/30/40), suggests prolonged service time when 99205 or 99215 runs long (99417 per 15 minutes beyond 60 or 40; Medicare's G2212 from 89 or 69 minutes), refuses 99417 on Medicare claims, and refuses more prolonged units than the minutes support.

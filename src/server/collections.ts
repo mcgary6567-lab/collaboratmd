@@ -17,6 +17,7 @@ import { schema } from "@/db";
 import { patientBalanceCents, patientsWithBalances } from "./billing";
 import { createPortalLink } from "./portal";
 import { messagePatient, type MessageResult } from "./messaging";
+import { getPolicies } from "./policies";
 
 const { patientCollections, patients, practices, ledgerEntries, statements, paymentPlans, auditLog } = schema;
 
@@ -46,6 +47,42 @@ export async function collectionCandidates(db: Db, practiceId: string, today = n
     .filter((o) => !onPlan.has(o.patientId) && !inCollections.has(o.patientId))
     .map((o) => ({ ...o, statementCount: Number(byPatient.get(o.patientId)?.n ?? 0), firstStatement: byPatient.get(o.patientId)?.first ?? null }))
     .filter((o) => o.statementCount >= 2 && o.firstStatement !== null && o.firstStatement <= cutoff);
+}
+
+/**
+ * The practice's safeguards before an account goes to an agency (Settings on
+ * the Collections page): a number of statements, days since the first one, a
+ * minimum balance, and financial assistance offered (a sliding fee record
+ * counts). States and nonprofit hospitals' rules differ, so the practice sets
+ * them; none is assumed. Returns what is still missing.
+ */
+export async function collectionsReadiness(db: Db, practiceId: string, patientId: string, now = new Date()) {
+  const rules = (await getPolicies(db, practiceId)).collections ?? {};
+  const missing: string[] = [];
+  const [stmt] = await db.select({ n: sql<number>`count(*)::int`, first: sql<string | null>`min(${statements.statementDate})::text` }).from(statements)
+    .where(and(eq(statements.patientId, patientId), sql`${statements.status} <> 'void'`));
+  const count = Number(stmt?.n ?? 0);
+  if (rules.minStatements && count < rules.minStatements) missing.push(`${rules.minStatements} statements sent (${count} so far)`);
+  if (rules.minDaysSinceFirst) {
+    const days = stmt?.first ? Math.floor((now.getTime() - Date.parse(`${stmt.first}T12:00:00Z`)) / 86_400_000) : 0;
+    if (days < rules.minDaysSinceFirst) missing.push(`${rules.minDaysSinceFirst} days since the first statement (${stmt?.first ? `${days} so far` : "none sent"})`);
+  }
+  const balance = await patientBalanceCents(db, patientId);
+  if (rules.minBalanceCents && balance < rules.minBalanceCents) missing.push(`a balance of at least $${(rules.minBalanceCents / 100).toFixed(2)} (it is $${(balance / 100).toFixed(2)})`);
+  if (rules.requireAssistanceOffer) {
+    const [p] = await db.select({ offered: patients.assistanceOfferedOn }).from(patients).where(eq(patients.id, patientId)).limit(1);
+    const [fee] = await db.select({ id: schema.patientSlidingFees.patientId }).from(schema.patientSlidingFees).where(eq(schema.patientSlidingFees.patientId, patientId)).limit(1);
+    if (!p?.offered && !fee) missing.push("financial assistance offered to the patient (record it on the account)");
+  }
+  return { ready: missing.length === 0, missing };
+}
+
+/** Records that the patient was offered financial assistance (or a sliding fee) on a date. */
+export async function recordAssistanceOffered(db: Db, practiceId: string, patientId: string, on: string, userId?: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) throw new Error("Enter the date assistance was offered");
+  const [p] = await db.update(patients).set({ assistanceOfferedOn: on }).where(and(eq(patients.id, patientId), eq(patients.practiceId, practiceId))).returning();
+  if (!p) throw new Error("Patient not found");
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "assistance_offered", entity: "patient", entityId: patientId, details: { on } });
 }
 
 async function ownCollection(db: Db, practiceId: string, id: string) {
@@ -113,6 +150,8 @@ export async function placeWithAgency(db: Db, practiceId: string, collectionId: 
   if (now < earliest) throw new Error(`The final notice gives the patient until ${earliest.toISOString().slice(0, 10)}; place the account after that`);
   const balance = await patientBalanceCents(db, c.patientId);
   if (balance <= 0) throw new Error("The balance has been paid; close this account instead");
+  const readiness = await collectionsReadiness(db, practiceId, c.patientId, now);
+  if (!readiness.ready) throw new Error(`The practice's collection safeguards are not met yet: ${readiness.missing.join("; ")}`);
   await db.insert(ledgerEntries).values({ practiceId, patientId: c.patientId, type: "bad_debt", amountCents: balance, note: `Bad debt: placed with ${name}`, postedBy: opts.userId ?? null });
   const [row] = await db.update(patientCollections).set({ stage: "agency", agency: name.slice(0, 200), placedAt: now, amountCents: balance }).where(eq(patientCollections.id, c.id)).returning();
   await db.insert(auditLog).values({ practiceId, userId: opts.userId ?? null, action: "collections_placed", entity: "patient", entityId: c.patientId, details: { agency: name, amountCents: balance } });

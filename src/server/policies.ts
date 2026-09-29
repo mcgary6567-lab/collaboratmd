@@ -31,6 +31,7 @@ export const DEFAULT_POLICIES: Required<{ [K in keyof PracticePolicies]: NonNull
   refundDualControl: false,
   accessReview: null,
   chronicPrefixes: null,
+  collections: null,
 };
 
 export async function getPolicies(db: Db, practiceId: string): Promise<PracticePolicies> {
@@ -71,7 +72,7 @@ export async function savePolicies(db: Db, practiceId: string, input: PracticePo
   try { before = validatePolicies(stored); } catch { before = stored; }
   const policies = validatePolicies(input);
   // Settings saved on other screens live in the same column: keep them (the access review's limits, the chronic condition groups).
-  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}) } }).where(eq(practices.id, practiceId));
+  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}), ...(stored.collections ? { collections: stored.collections } : {}) } }).where(eq(practices.id, practiceId));
   const changed = Object.keys(policies).filter((k) => JSON.stringify(policies[k as keyof PracticePolicies] ?? null) !== JSON.stringify(before[k as keyof PracticePolicies] ?? null));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed, policies } });
   return policies;
@@ -82,6 +83,25 @@ export async function saveChronicPrefixes(db: Db, practiceId: string, prefixes: 
   const stored = await getPolicies(db, practiceId);
   await db.update(practices).set({ policies: { ...stored, chronicPrefixes: prefixes } }).where(eq(practices.id, practiceId));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed: ["chronicPrefixes"], chronicPrefixes: prefixes } });
+}
+
+/** The practice's safeguards before an account goes to a collection agency. */
+export async function saveCollectionSafeguards(db: Db, practiceId: string, input: NonNullable<PracticePolicies["collections"]>, userId?: string) {
+  const whole = (v: number | undefined, max: number, what: string) => {
+    if (v === undefined) return undefined;
+    if (!Number.isInteger(v) || v < 0 || v > max) throw new Error(`${what} must be a whole number from 0 to ${max}`);
+    return v;
+  };
+  const collections = {
+    minStatements: whole(input.minStatements, 12, "Statements"),
+    minDaysSinceFirst: whole(input.minDaysSinceFirst, 730, "Days since the first statement"),
+    minBalanceCents: whole(input.minBalanceCents, 10_000_000, "The minimum balance"),
+    requireAssistanceOffer: !!input.requireAssistanceOffer,
+  };
+  const stored = await getPolicies(db, practiceId);
+  await db.update(practices).set({ policies: { ...stored, collections } }).where(eq(practices.id, practiceId));
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed: ["collections"], collections } });
+  return collections;
 }
 
 /** Whether scrub findings stop a claim: errors always, warnings too under strict scrubbing. */

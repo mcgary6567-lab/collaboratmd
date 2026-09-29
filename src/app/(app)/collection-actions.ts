@@ -5,7 +5,8 @@ import { getDb } from "@/db";
 import { CAN_ADJUST, requireRole } from "@/lib/auth";
 import { siteOrigin } from "@/lib/origin";
 import type { FormResult } from "@/components/action-form";
-import { closeCollection, placeWithAgency, sendFinalNotice } from "@/server/collections";
+import { closeCollection, placeWithAgency, recordAssistanceOffered, sendFinalNotice } from "@/server/collections";
+import { saveCollectionSafeguards } from "@/server/policies";
 
 const PATH = "/billing/collections";
 const fail = (e: unknown): FormResult => ({ ok: false, message: e instanceof Error ? e.message : "Something went wrong" });
@@ -47,6 +48,32 @@ export async function closeAction(collectionId: string, _prev: FormResult, formD
     await closeCollection(db, s.practiceId, collectionId, outcome, recovered, { userId: s.userId, note: String(formData.get("note") ?? "") || undefined });
     revalidatePath(PATH);
     return { ok: true, message: outcome === "recalled" ? "Recalled; the unrecovered balance is back on the patient's account" : "Closed" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function assistanceOfferedAction(patientId: string, _prev: FormResult): Promise<FormResult> {
+  const s = await requireRole(CAN_ADJUST);
+  try {
+    await recordAssistanceOffered(await getDb(), s.practiceId, patientId, new Date().toISOString().slice(0, 10), s.userId);
+    revalidatePath(PATH);
+    return { ok: true, message: "Recorded: financial assistance offered today" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function collectionSafeguardsAction(_prev: FormResult, fd: FormData): Promise<FormResult> {
+  const s = await requireRole(["admin"]);
+  const num = (k: string) => (String(fd.get(k) ?? "").trim() === "" ? undefined : Number(fd.get(k)));
+  try {
+    const dollars = num("minBalance");
+    await saveCollectionSafeguards(await getDb(), s.practiceId, {
+      minStatements: num("minStatements"), minDaysSinceFirst: num("minDays"), minBalanceCents: dollars === undefined ? undefined : Math.round(dollars * 100), requireAssistanceOffer: fd.get("assistance") === "on",
+    }, s.userId);
+    revalidatePath(PATH);
+    return { ok: true, message: "Safeguards saved; accounts are checked against them before placement" };
   } catch (e) {
     return fail(e);
   }

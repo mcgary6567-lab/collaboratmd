@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { collectionCandidates, FINAL_NOTICE_DAYS, listCollections } from "@/server/collections";
-import { closeAction, finalNoticeAction, placeAction } from "@/app/(app)/collection-actions";
+import { collectionCandidates, collectionsReadiness, FINAL_NOTICE_DAYS, listCollections } from "@/server/collections";
+import { assistanceOfferedAction, closeAction, collectionSafeguardsAction, finalNoticeAction, placeAction } from "@/app/(app)/collection-actions";
+import { getPolicies } from "@/server/policies";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
@@ -26,6 +27,8 @@ export default async function CollectionsPage() {
   const canEdit = ["admin", "biller"].includes(s.role);
   const open = rows.filter((r) => !r.collection.closedAt);
   const atAgency = open.filter((r) => r.collection.stage === "agency");
+  const safeguards = (await getPolicies(db, s.practiceId)).collections ?? {};
+  const readiness = new Map(await Promise.all(open.filter((r) => r.collection.stage === "final_notice").map(async (r) => [r.collection.id, await collectionsReadiness(db, s.practiceId, r.patient.id)] as const)));
   // A server component renders once per request, so reading the clock here is safe.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
@@ -99,7 +102,15 @@ export default async function CollectionsPage() {
                     </div>
                     {canEdit && !c.closedAt && (
                       <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        {c.stage === "final_notice" && (
+                        {c.stage === "final_notice" && readiness.get(c.id) && !readiness.get(c.id)!.ready ? (
+                          <div className="text-xs text-amber-900">
+                            <p className="font-semibold">Not ready for an agency under your safeguards:</p>
+                            <ul className="list-disc pl-5">{readiness.get(c.id)!.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+                            {readiness.get(c.id)!.missing.some((m) => m.startsWith("financial assistance")) && (
+                              <ActionForm action={assistanceOfferedAction.bind(null, p.id)} className="mt-2"><SubmitButton className="btn btn-secondary text-xs" pendingLabel="Saving...">Record assistance offered today</SubmitButton></ActionForm>
+                            )}
+                          </div>
+                        ) : c.stage === "final_notice" && (
                           readyOn && readyOn.getTime() > now ? (
                             <p className="text-xs text-slate-600">The patient has until {fmtDate(readyOn)} to pay or call before the account can go to an agency.</p>
                           ) : (
@@ -131,6 +142,22 @@ export default async function CollectionsPage() {
                 );
               })}
             </div>
+          )}
+        </Card>
+      </div>
+      <div className="mt-6">
+        <Card title="Safeguards before an agency">
+          <p className="mb-3 text-sm text-slate-600">Set these to match your state&apos;s law and your own policy; an account cannot be placed with an agency until it meets them. Blank means no requirement.</p>
+          {s.role === "admin" ? (
+            <ActionForm action={collectionSafeguardsAction} className="grid gap-3 text-sm sm:grid-cols-4">
+              <label className="block"><span className="label">Statements sent, at least</span><input name="minStatements" type="number" min={0} max={12} defaultValue={safeguards.minStatements ?? ""} className="input" /></label>
+              <label className="block"><span className="label">Days since the first, at least</span><input name="minDays" type="number" min={0} max={730} defaultValue={safeguards.minDaysSinceFirst ?? ""} className="input" /></label>
+              <label className="block"><span className="label">Balance at least ($)</span><input name="minBalance" inputMode="decimal" defaultValue={safeguards.minBalanceCents ? (safeguards.minBalanceCents / 100).toFixed(2) : ""} className="input" /></label>
+              <label className="flex items-end gap-2 pb-2"><input type="checkbox" name="assistance" defaultChecked={!!safeguards.requireAssistanceOffer} /> <span>Financial assistance offered first</span></label>
+              <div className="sm:col-span-4"><SubmitButton pendingLabel="Saving...">Save safeguards</SubmitButton></div>
+            </ActionForm>
+          ) : (
+            <p className="text-sm">{[safeguards.minStatements ? `${safeguards.minStatements} statements` : "", safeguards.minDaysSinceFirst ? `${safeguards.minDaysSinceFirst} days since the first` : "", safeguards.minBalanceCents ? `balance of ${money(safeguards.minBalanceCents)}` : "", safeguards.requireAssistanceOffer ? "assistance offered" : ""].filter(Boolean).join(", ") || "None set"}</p>
           )}
         </Card>
       </div>

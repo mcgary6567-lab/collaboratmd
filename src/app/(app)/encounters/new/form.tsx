@@ -1,7 +1,8 @@
 "use client";
 
 import { NDC_UNITS, isDrugCode } from "@/lib/codes/ndc";
-import { TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode } from "@/lib/time-units";
+import { TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode, isOfficeEm } from "@/lib/time-units";
+import { isUnlistedCode } from "@/lib/codes/unlisted";
 import { Fragment, useActionState, useState } from "react";
 import { Trash, Plus } from "lucide-react";
 import { createEncounterAction } from "@/app/(app)/actions";
@@ -234,7 +235,7 @@ export function ChargeEntryForm({
                 <td className="text-xs text-slate-500">{l.description || pxSearch.describe(l.cpt)}</td>
                 <td className="w-28"><input className="input" placeholder="25, 59" value={l.modifiers} aria-label={`Line ${i + 1} modifiers`} onChange={(e) => updateLine(i, { modifiers: e.target.value })} /></td>
                 <td className="w-20"><input type="number" min={1} className="input" value={l.units} aria-label={`Line ${i + 1} units`} onChange={(e) => updateLine(i, { units: Number(e.target.value) })} /></td>
-                <td className="w-20">{TIMED_THERAPY_CODES.has(l.cpt) || isAnesthesiaCode(l.cpt) ? <input type="number" min={0} max={1440} className="input" value={l.minutes ?? ""} aria-label={`Line ${i + 1} minutes`} onChange={(e) => updateLine(i, { minutes: e.target.value })} /> : <span className="text-xs text-slate-500">-</span>}</td>
+                <td className="w-20">{TIMED_THERAPY_CODES.has(l.cpt) || isAnesthesiaCode(l.cpt) || isOfficeEm(l.cpt) ? <input type="number" min={0} max={1440} className="input" value={l.minutes ?? ""} aria-label={`Line ${i + 1} minutes`} onChange={(e) => updateLine(i, { minutes: e.target.value })} /> : <span className="text-xs text-slate-500">-</span>}</td>
                 <td className="w-28"><input type="number" step="0.01" min={0} className="input" value={l.charge} aria-label={`Line ${i + 1} charge`} onChange={(e) => updateLine(i, { charge: e.target.value })} /></td>
                 <td className="w-24"><input className="input" value={l.dxPointers} aria-label={`Line ${i + 1} diagnosis pointers`} onChange={(e) => updateLine(i, { dxPointers: e.target.value })} /></td>
                 <td>
@@ -254,6 +255,16 @@ export function ChargeEntryForm({
                       <label className="block"><span className="label">Quantity</span><input type="number" min={0} step="0.001" className="input w-24" value={l.ndcQuantity ?? ""} aria-label={`Line ${i + 1} drug quantity`} onChange={(e) => updateLine(i, { ndcQuantity: e.target.value })} /></label>
                       <label className="block"><span className="label">Unit</span><select className="select w-44" value={l.ndcUnit ?? "UN"} aria-label={`Line ${i + 1} drug unit`} onChange={(e) => updateLine(i, { ndcUnit: e.target.value })}>{NDC_UNITS.map(([u, n]) => <option key={u} value={u}>{u}: {n}</option>)}</select></label>
                     </div>
+                  </td>
+                </tr>
+              )}
+              {isUnlistedCode(l.cpt) && (
+                <tr>
+                  <td />
+                  <td colSpan={8}>
+                    <label className="block text-sm"><span className="label">Describe the service (goes on the claim for an unlisted or unclassified code)</span>
+                      <input className="input" maxLength={80} value={l.description} placeholder="Excision of lesion, left forearm, 2.5 cm, by laser" aria-label={`Line ${i + 1} description`} onChange={(e) => updateLine(i, { description: e.target.value })} />
+                    </label>
                   </td>
                 </tr>
               )}

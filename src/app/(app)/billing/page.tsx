@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { gfeVariances } from "@/server/gfe-variance";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import {
@@ -29,6 +30,7 @@ export default async function BillingPage() {
     listPolicies(db, s.practiceId),
     totalPatientBalances(db, s.practiceId),
   ]);
+  const gfeOver = await gfeVariances(db, s.practiceId);
   const active = plans.filter((p) => p.status === "active");
   const defaulted = plans.filter((p) => p.status === "defaulted");
   const onPlans = active.reduce((a, p) => a + p.totalCents - p.paidCents, 0);
@@ -48,6 +50,16 @@ export default async function BillingPage() {
         <Stat label="On payment plans" value={money(onPlans)} hint={`${active.length} active plans`} tone="good" />
         <Stat label="Defaulted plans" value={String(defaulted.length)} hint="Two or more missed installments" tone={defaulted.length ? "bad" : "good"} />
       </div>
+
+      {gfeOver.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">{gfeOver.length} self-pay bill{gfeOver.length === 1 ? " is" : "s are"} $400 or more over the good faith estimate</p>
+          <p className="mt-1">Under the No Surprises Act the patient can dispute a bill that far over the estimate. Review each before its statement goes out.</p>
+          <ul className="mt-2 space-y-1">
+            {gfeOver.slice(0, 10).map((g) => <li key={g.estimateId}><Link href={`/patients/${g.patientId}`} className="font-medium underline">{g.name}</Link>: {g.dateOfService}, estimated {money(g.estimatedCents)}, billed {money(g.billedCents)} ({money(g.overCents)} over)</li>)}
+          </ul>
+        </div>
+      )}
 
       {canPay && (
         <div className="mb-6">

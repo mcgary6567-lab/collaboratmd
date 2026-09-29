@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-29",
+    title: "Fee schedule check, batch appeals, collection safeguards, time-based visits",
+    items: [
+      "Unlisted and unclassified codes carry their description on the 837P and the CMS-1500, and are stopped without one",
+      "Fee schedule check: charges below what a payer allows, with a suggested charge",
+      "Every 835 line kept with its allowed amount, including remittances posted before",
+      "Batch appeals: one letter for a payer's same-reason denials, each still tracked on its own",
+      "Self-pay bills $400 or more over the good faith estimate flagged before statements go out",
+      "Optional coverage re-checks in January, when deductibles reset",
+      "Collection safeguards you set, checked before an account goes to an agency",
+      "Office visit time checked against the level, with prolonged service time (99417, or G2212 for Medicare)",
+    ],
+  },
+  {
+    date: "2026-09-29",
     title: "Care gaps, card on file, timely filing proof, payer refund demands",
     items: [
       "Proof of timely filing assembled from your submissions and acknowledgments, and added to timely filing appeals",

@@ -68,6 +68,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reports/contracts", label: "Contract comparison", icon: Scale },
       { href: "/reports/lag", label: "Charge lag", icon: Clock },
       { href: "/reports/care-gaps", label: "Care gaps", icon: HeartPulse },
+      { href: "/reports/fee-check", label: "Fee schedule check", icon: Receipt },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },

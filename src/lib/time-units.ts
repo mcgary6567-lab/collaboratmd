@@ -58,3 +58,28 @@ export function eightMinuteRule(lines: { code: string; minutes: number }[]): Map
 
 /** Anesthesia time units: minutes over 15, to one decimal place. */
 export const anesthesiaTimeUnits = (minutes: number) => Math.round((minutes / 15) * 10) / 10;
+
+/**
+ * Office and outpatient E/M chosen by total time on the date of the visit:
+ * CPT's minimum minutes for each level (99211 has none).
+ */
+export const EM_TIME_MINIMUM: Record<string, number> = { "99202": 15, "99203": 30, "99204": 45, "99205": 60, "99212": 10, "99213": 20, "99214": 30, "99215": 40 };
+export const isOfficeEm = (code: string) => code in EM_TIME_MINIMUM;
+
+/** The highest office E/M level the minutes support, among the same patient type (new or established). */
+export function levelForMinutes(code: string, minutes: number) {
+  const family = code.startsWith("9920") ? ["99205", "99204", "99203", "99202"] : ["99215", "99214", "99213", "99212"];
+  return family.find((c) => minutes >= EM_TIME_MINIMUM[c]) ?? null;
+}
+
+/**
+ * Prolonged service units for the top office level: CPT's 99417 is each 15
+ * minutes beyond the level's minimum (60 for 99205, 40 for 99215); Medicare's
+ * G2212 is each 15 minutes beyond the top of the old time range (74 and 54),
+ * so it starts at 89 and 69 minutes.
+ */
+export function prolongedUnits(code: string, minutes: number, medicare: boolean) {
+  if (code !== "99205" && code !== "99215") return 0;
+  const from = medicare ? (code === "99205" ? 74 : 54) : EM_TIME_MINIMUM[code];
+  return Math.max(0, Math.floor((minutes - from) / 15));
+}

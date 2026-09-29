@@ -7,9 +7,10 @@
  */
 import { isDrugCode, isNdcUnit } from "@/lib/codes/ndc";
 import { isZeroChargeCode } from "@/lib/codes/quality";
+import { isUnlistedCode } from "@/lib/codes/unlisted";
 import { POS_CODES } from "@/lib/codes/pos";
 import { CLIA_RE, isLabCode } from "@/lib/codes/lab";
-import { ANESTHESIA_MODIFIERS, THERAPY_MODIFIERS, TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode, isTherapyCode } from "@/lib/time-units";
+import { ANESTHESIA_MODIFIERS, EM_TIME_MINIMUM, THERAPY_MODIFIERS, TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode, isOfficeEm, isTherapyCode, levelForMinutes, prolongedUnits } from "@/lib/time-units";
 
 export interface ScrubClaim {
   patient: { firstName: string; lastName: string; dob: string; sex: string; address1?: string | null; zip?: string | null };
@@ -27,7 +28,7 @@ export interface ScrubClaim {
     /** Teaching setting: the teaching physician was present for the key or critical portion. */
     teachingPresent?: boolean;
   };
-  lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
+  lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null; description?: string | null }[];
   payer: { timelyFilingDays: number; type?: string | null };
   /** Frequency and replacement reference; absent means an original claim. */
   claim?: { frequencyCode: string; originalPayerClaimNumber?: string | null };
@@ -135,6 +136,39 @@ const rules: Record<string, Rule> = {
     if (!isDrugCode(l.cpt)) return [];
     return [{ rule: "NDC", severity: c.payer.type === "medicaid" ? "error" as const : "warning" as const, message: `Line ${l.lineNumber}: drug code ${l.cpt} needs the NDC from the package${c.payer.type === "medicaid" ? " (Medicaid requires it)" : "; most payers require it"}`, field }];
   }),
+  // Office E/M chosen by time: the minutes recorded must reach the level, and prolonged time is its own code.
+  EM_TIME: (c) => {
+    const out: ScrubFinding[] = [];
+    const medicare = c.payer.type === "medicare";
+    for (const l of c.lines) {
+      if (!isOfficeEm(l.cpt) || !l.minutes) continue;
+      const need = EM_TIME_MINIMUM[l.cpt];
+      if (l.minutes < need) {
+        const fits = levelForMinutes(l.cpt, l.minutes);
+        out.push({ rule: "EM_TIME", severity: "warning", message: `Line ${l.lineNumber}: ${l.cpt} by time needs ${need} minutes; ${l.minutes} supports ${fits ?? "no level by time"}. Bill ${l.cpt} only if medical decision making supports it.`, field: `lines.${l.lineNumber}.minutes` });
+      }
+    }
+    const top = c.lines.find((l) => (l.cpt === "99205" || l.cpt === "99215") && l.minutes);
+    const billed = (code: string) => c.lines.filter((l) => l.cpt === code).reduce((a, l) => a + l.units, 0);
+    const [p99417, pG2212] = [billed("99417"), billed("G2212")];
+    if (medicare && p99417) out.push({ rule: "PROLONGED", severity: "error", message: "Medicare does not pay 99417: bill prolonged office time as G2212, which starts at 89 minutes (99205) or 69 minutes (99215)", field: "lines" });
+    if (!medicare && pG2212) out.push({ rule: "PROLONGED", severity: "warning", message: "G2212 is Medicare's prolonged service code; most other payers want 99417", field: "lines" });
+    const billedUnits = medicare ? pG2212 : p99417;
+    const code = medicare ? "G2212" : "99417";
+    if (billedUnits) {
+      const allowed = top ? prolongedUnits(top.cpt, top.minutes!, medicare) : 0;
+      if (!top) out.push({ rule: "PROLONGED", severity: "error", message: `${code} goes with 99205 or 99215 chosen by time: record the total minutes on that line`, field: "lines" });
+      else if (billedUnits > allowed) out.push({ rule: "PROLONGED", severity: "error", message: `${billedUnits} unit${billedUnits === 1 ? "" : "s"} of ${code} billed, but ${top.minutes} minutes with ${top.cpt} support ${allowed}`, field: "lines" });
+    } else if (top) {
+      const units = prolongedUnits(top.cpt, top.minutes!, medicare);
+      if (units > 0) out.push({ rule: "PROLONGED", severity: "warning", message: `${top.minutes} minutes with ${top.cpt} support ${units} unit${units === 1 ? "" : "s"} of prolonged service ${code}; add it if the time is documented`, field: "lines" });
+    }
+    return out;
+  },
+  UNLISTED: (c) =>
+    c.lines
+      .filter((l) => isUnlistedCode(l.cpt) && (l.description ?? "").trim().length < 5)
+      .map((l) => ({ rule: "UNLISTED", severity: "error" as const, message: `Line ${l.lineNumber}: ${l.cpt} is an unlisted or unclassified code; describe the service on the line (it goes on the claim), and have the records ready`, field: `lines.${l.lineNumber}.description` })),
   THERAPY_MODIFIER: (c) =>
     c.lines
       .filter((l) => isTherapyCode(l.cpt) && !l.modifiers.some((m) => THERAPY_MODIFIERS.includes(m.toUpperCase())))

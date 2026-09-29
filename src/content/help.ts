@@ -90,6 +90,23 @@ export const GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "National code sets", href: "/settings/code-sets" }],
   },
+  "/reports/fee-check": {
+    title: "Fee schedule check",
+    steps: [
+      "Codes billed in the last year whose standard charge is below what a payer allowed (from its 835 lines), a payer contract, or Medicare's rate.",
+      "A payer pays the lower of its allowed amount and your charge, so raise those charges under Fee schedules; the suggested charge rounds the highest allowed up to $5.",
+      "Read allowed amounts from past remittances once, so older payments count too.",
+    ],
+    related: [{ label: "Fee schedules", href: "/settings/fees" }],
+  },
+  "/denials/batch": {
+    title: "Batch appeals",
+    steps: [
+      "Open denials grouped by payer and reason code; choose a group to see one letter listing every claim.",
+      "Say why the denials are wrong, then mark them all appealed: each denial keeps its own appeal record and deadlines.",
+    ],
+    related: [{ label: "Denials", href: "/denials" }],
+  },
   "/refund-demands": {
     title: "Payer refund demands",
     steps: [

@@ -104,6 +104,8 @@ export type PracticePolicies = {
   accessReview?: { chartsPerDay?: number; multiple?: number; minForMultiple?: number; unrelatedPerDay?: number };
   /** Diagnosis prefixes the practice counts as chronic conditions, for finding care management candidates. */
   chronicPrefixes?: string[];
+  /** Safeguards before an account can be placed with a collection agency; unset means no extra requirement. */
+  collections?: { minStatements?: number; minDaysSinceFirst?: number; minBalanceCents?: number; requireAssistanceOffer?: boolean };
 };
 
 export type AutomationSettings = {
@@ -119,6 +121,8 @@ export type AutomationSettings = {
   eligibilityTomorrow?: boolean;
   /** Re-check Medicaid coverage once a month for patients with visits coming up. Migration 0058 (no column; settings are jsonb). */
   medicaidMonthly?: boolean;
+  /** In January, re-check coverage for patients with a visit coming up, since deductibles reset and plans change. */
+  yearlyRecheck?: boolean;
 };
 
 export const automationRuns = pgTable("automation_runs", {
@@ -203,6 +207,8 @@ export const patients = pgTable(
     preferredLanguage: text("preferred_language").notNull().default("en"),
     /** Opening this patient's records asks for a reason (migration 0049, server/restricted.ts). */
     restricted: boolean("restricted").notNull().default(false),
+    /** When the patient was offered financial assistance (a collections safeguard). Migration 0060. */
+    assistanceOfferedOn: date("assistance_offered_on"),
     fhirId: text("fhir_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -2195,3 +2201,21 @@ export const payerRefundDemands = pgTable("payer_refund_demands", {
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("payer_refund_demands_practice_idx").on(t.practiceId, t.status)]);
+
+/** Each service line of a posted 835: what was charged, allowed, paid and adjusted, per code. */
+export const remittanceLines = pgTable("remittance_lines", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  remittanceId: uuid("remittance_id").notNull().references(() => remittances.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  cpt: text("cpt").notNull(),
+  modifiers: jsonb("modifiers").$type<string[]>().notNull().default([]),
+  units: integer("units").notNull(),
+  chargedCents: integer("charged_cents").notNull(),
+  allowedCents: integer("allowed_cents").notNull(),
+  paidCents: integer("paid_cents").notNull(),
+  adjustments: jsonb("adjustments").$type<{ group: string; reason: string; amountCents: number }[]>().notNull().default([]),
+  remarks: jsonb("remarks").$type<string[]>().notNull().default([]),
+  paymentDate: date("payment_date").notNull(),
+}, (t) => [index("remittance_lines_claim_idx").on(t.claimId), index("remittance_lines_payer_code_idx").on(t.practiceId, t.payerId, t.cpt)]);

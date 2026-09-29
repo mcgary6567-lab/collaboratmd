@@ -321,6 +321,43 @@ export async function recheckMedicaidMonthly(db: Db, practiceId: string, now = n
   return { checked: rows.length, problems: problems.length };
 }
 
+/**
+ * January: deductibles reset and plans change. Each day of the month (on the
+ * practice's clock), coverage is checked for patients with a visit in the next
+ * 14 days whose insurance has not been checked yet this year, so estimates use
+ * the new year's deductible and the front desk hears about lapsed plans early.
+ */
+export async function recheckYearStart(db: Db, practiceId: string, now = new Date(), limit = 100) {
+  const today = clockDay(await practiceNow(db, practiceId, now));
+  if (today.getUTCMonth() !== 0) return { skipped: "Only runs in January", checked: 0, problems: 0 };
+  const from = today.toISOString().slice(0, 10);
+  const to = new Date(today.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const year = from.slice(0, 4);
+  const { rows } = await db.execute<{ ins_id: string; dos: string; name: string }>(sql`
+    SELECT DISTINCT ON (pi.id) pi.id AS ins_id, a.starts_at::date::text AS dos, p.last_name || ', ' || p.first_name AS name
+    FROM appointments a
+    JOIN patients p ON p.id = a.patient_id
+    JOIN patient_insurances pi ON pi.patient_id = p.id AND pi.active
+    JOIN payers py ON py.id = pi.payer_id AND py.type <> 'self_pay'
+    WHERE a.practice_id = ${practiceId} AND a.status <> 'cancelled' AND a.starts_at >= ${from}::date AND a.starts_at < (${to}::date + 1)
+      AND NOT EXISTS (SELECT 1 FROM eligibility_checks ec WHERE ec.patient_insurance_id = pi.id AND to_char(ec.checked_at, 'YYYY') = ${year} AND ec.status <> 'error')
+    ORDER BY pi.id, a.starts_at
+    LIMIT ${limit}`);
+  const problems: { name: string; message: string }[] = [];
+  for (const r of rows) {
+    const check = await runEligibility(db, r.ins_id, r.dos);
+    if (check.status !== "active") problems.push({ name: r.name, message: check.message ?? "Coverage is not active" });
+  }
+  if (problems.length) {
+    await notify(db, practiceId, {
+      kind: "year_start_coverage", dedupeKey: `year-start-${from}`, href: "/scheduling",
+      title: `${problems.length} patient${problems.length === 1 ? "" : "s"} with visits coming up ${problems.length === 1 ? "has" : "have"} no active coverage for the new year`,
+      body: problems.slice(0, 8).map((p) => `${p.name}: ${p.message}`).join("\n"),
+    });
+  }
+  return { checked: rows.length, problems: problems.length };
+}
+
 /** The most recent check for each insurance, for showing coverage beside the schedule. */
 export async function latestChecks(db: Db, patientInsuranceIds: string[]) {
   if (!patientInsuranceIds.length) return new Map<string, typeof eligibilityChecks.$inferSelect>();
