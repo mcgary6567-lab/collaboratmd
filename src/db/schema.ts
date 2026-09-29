@@ -115,6 +115,8 @@ export type AutomationSettings = {
   denialAgent?: boolean;
   /** Each evening, check coverage for the next day's appointments. */
   eligibilityTomorrow?: boolean;
+  /** Re-check Medicaid coverage once a month for patients with visits coming up. Migration 0058 (no column; settings are jsonb). */
+  medicaidMonthly?: boolean;
 };
 
 export const automationRuns = pgTable("automation_runs", {
@@ -296,6 +298,11 @@ export const encounters = pgTable("encounters", {
   referringNpi: text("referring_npi"),
   /** The physician supervising the service (2310D NM1*DQ, box 17 DQ). Migration 0057. */
   supervisingProviderId: uuid("supervising_provider_id").references(() => providers.id),
+  /** A split/shared facility visit: the other practitioner, and the attestation that the billing one did the substantive portion (FS). Migration 0058. */
+  sharedWithProviderId: uuid("shared_with_provider_id").references(() => providers.id),
+  substantiveAttested: boolean("substantive_attested").notNull().default(false),
+  /** Teaching setting: the teaching physician was present for the key or critical portion (GC). Migration 0058. */
+  teachingPresent: boolean("teaching_present").notNull().default(false),
   /** Whether the condition is related to employment, an auto accident (and its state) or another accident (CLM11, box 10). */
   relatedEmployment: boolean("related_employment").notNull().default(false),
   relatedAuto: boolean("related_auto").notNull().default(false),
@@ -2083,4 +2090,58 @@ export const promptPayRequests = pgTable("prompt_pay_requests", {
   interestCents: integer("interest_cents").notNull(),
   requestedOn: date("requested_on").notNull(),
   receivedCents: integer("received_cents"),
+});
+
+/* ------------------------------------------------------------------ */
+/* Round L: No Surprises Act disputes, sliding fee scale                */
+/* ------------------------------------------------------------------ */
+
+/** An out-of-network payment disputed under the No Surprises Act: open negotiation, then federal IDR. */
+export const nsaDisputes = pgTable("nsa_disputes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  /** When the initial payment or notice of denial arrived; open negotiation must start within 30 business days. */
+  initialResponseOn: date("initial_response_on").notNull(),
+  offerCents: integer("offer_cents"),
+  negotiationStartedOn: date("negotiation_started_on"),
+  idrInitiatedOn: date("idr_initiated_on"),
+  status: text("status").notNull().default("open"), // open | negotiating | idr | settled | closed
+  outcome: text("outcome"),
+  settledCents: integer("settled_cents"),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("nsa_disputes_practice_idx").on(t.practiceId, t.status)]);
+
+/** The HHS poverty guidelines for a year, as the practice enters them. */
+export const povertyGuidelines = pgTable("poverty_guidelines", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  year: integer("year").notNull(),
+  /** Household of one, and each additional person. */
+  baseCents: integer("base_cents").notNull(),
+  perPersonCents: integer("per_person_cents").notNull(),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.year] })]);
+
+/** Sliding fee discount tiers: households at or below maxPercent of the poverty guideline get the discount. */
+export const slidingFeeTiers = pgTable("sliding_fee_tiers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  maxPercent: integer("max_percent").notNull(),
+  discountPercent: integer("discount_percent").notNull(),
+  label: text("label"),
+});
+
+/** A patient's verified sliding fee eligibility. */
+export const patientSlidingFees = pgTable("patient_sliding_fees", {
+  patientId: uuid("patient_id").primaryKey().references(() => patients.id),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  householdSize: integer("household_size").notNull(),
+  annualIncomeCents: integer("annual_income_cents").notNull(),
+  percentOfPoverty: integer("percent_of_poverty").notNull(),
+  discountPercent: integer("discount_percent").notNull(),
+  proof: text("proof").notNull(),
+  verifiedOn: date("verified_on").notNull(),
+  expiresOn: date("expires_on").notNull(),
+  recordedBy: uuid("recorded_by").references(() => users.id),
 });

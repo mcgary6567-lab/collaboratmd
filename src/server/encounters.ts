@@ -25,6 +25,11 @@ export interface NewEncounterInput {
   referring?: { lastName: string; firstName?: string; npi: string } | null;
   /** The physician who supervised the service (loop 2310D), one of the practice's providers. */
   supervisingProviderId?: string | null;
+  /** A split/shared facility visit: the other practitioner, and the attestation that the billing one did the substantive portion. */
+  sharedWithProviderId?: string | null;
+  substantiveAttested?: boolean;
+  /** Teaching setting: the teaching physician was present for the key or critical portion (GC). */
+  teachingPresent?: boolean;
   /** Related to work or an accident: box 10 of the claim form, CLM11 on the 837. */
   accident?: AccidentInput | null;
 }
@@ -64,6 +69,14 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
     const [sup] = await db.select({ id: providers.id }).from(providers).where(and(eq(providers.id, supervisingProviderId), eq(providers.practiceId, practiceId))).limit(1);
     if (!sup) throw new Error("Choose the supervising provider from the list");
   }
+  const sharedWithProviderId = input.sharedWithProviderId || null;
+  if (sharedWithProviderId) {
+    if (sharedWithProviderId === input.providerId) throw new Error("A split/shared visit is shared with another practitioner: choose the other one");
+    const [other] = await db.select({ id: providers.id }).from(providers).where(and(eq(providers.id, sharedWithProviderId), eq(providers.practiceId, practiceId))).limit(1);
+    if (!other) throw new Error("Choose the practitioner the visit was shared with from the list");
+    // A split/shared E/M carries FS.
+    input = { ...input, lines: input.lines.map((l) => (/^99(2[0-9]{2}|3[0-4][0-9]|4[0-9]{2})$/.test(l.cpt) && !l.modifiers.map((m) => m.toUpperCase()).includes("FS") ? { ...l, modifiers: [...l.modifiers, "FS"] } : l)) };
+  }
   // A signed ABN (option 1) for a Medicare patient puts GA on the lines it covers.
   const [primary] = await db.select({ type: schema.payers.type }).from(schema.patientInsurances).innerJoin(schema.payers, eq(schema.payers.id, schema.patientInsurances.payerId))
     .where(and(eq(schema.patientInsurances.patientId, input.patientId), eq(schema.patientInsurances.active, true))).orderBy(asc(schema.patientInsurances.rank)).limit(1);
@@ -87,6 +100,9 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
       referringFirstName: ref?.firstName?.trim().slice(0, 35) || null,
       referringNpi: ref?.npi ?? null,
       supervisingProviderId,
+      sharedWithProviderId,
+      substantiveAttested: !!sharedWithProviderId && !!input.substantiveAttested,
+      teachingPresent: !!input.teachingPresent,
       ...accident,
     })
     .returning();

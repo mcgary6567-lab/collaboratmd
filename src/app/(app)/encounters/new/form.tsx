@@ -42,6 +42,7 @@ export function ChargeEntryForm({
   const pxSearch = useCodeSearch("px", cpts);
   const [referring, setReferring] = useState({ lastName: "", firstName: "", npi: "" });
   const [supervisingId, setSupervisingId] = useState("");
+  const [shared, setShared] = useState({ withId: "", attested: false, teaching: false });
   const [accident, setAccident] = useState({ employment: false, auto: false, autoState: "", other: false, date: "", claimNumber: "", employer: "" });
   const setAcc = (patch: Partial<typeof accident>) => setAccident((a) => ({ ...a, ...patch }));
   const [lines, setLines] = useState<Line[]>([{ cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }]);
@@ -60,6 +61,9 @@ export function ChargeEntryForm({
     diagnoses: dx.map((d) => d.trim()).filter(Boolean),
     referring: referring.npi.trim() || referring.lastName.trim() ? referring : null,
     supervisingProviderId: supervisingId && supervisingId !== providerId ? supervisingId : null,
+    sharedWithProviderId: shared.withId && shared.withId !== providerId ? shared.withId : null,
+    substantiveAttested: shared.attested,
+    teachingPresent: shared.teaching,
     accident: accident.employment || accident.auto || accident.other || accident.claimNumber.trim() ? accident : null,
     lines: lines
       .filter((l) => l.cpt.trim())
@@ -125,6 +129,25 @@ export function ChargeEntryForm({
               </select>
             </Field>
             <p className="self-end text-xs text-slate-500 dark:text-slate-400">Sent as the supervising provider (loop 2310D, box 17 DQ). Some payers require it for services by residents, therapists or providers not yet credentialed with them.</p>
+          </div>
+        </details>
+        <details className="sm:col-span-2 lg:col-span-4">
+          <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-300">Split/shared visit or teaching setting</summary>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Field label="Visit shared with (hospital or nursing facility)">
+              <select className="select" value={shared.withId} onChange={(e) => setShared((x) => ({ ...x, withId: e.target.value }))}>
+                <option value="">Not shared</option>
+                {providers.filter((p) => p.id !== providerId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <label className="flex items-start gap-2 self-end text-sm">
+              <input type="checkbox" className="mt-1" checked={shared.attested} disabled={!shared.withId} onChange={(e) => setShared((x) => ({ ...x, attested: e.target.checked }))} />
+              <span>The billing practitioner performed the substantive portion (more than half the time, or the substantive part of decision making). FS is added.</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" className="mt-1" checked={shared.teaching} onChange={(e) => setShared((x) => ({ ...x, teaching: e.target.checked }))} />
+              <span>Teaching setting: the teaching physician was present for the key or critical portion (add GC to the lines).</span>
+            </label>
           </div>
         </details>
         <details className="sm:col-span-2 lg:col-span-4">

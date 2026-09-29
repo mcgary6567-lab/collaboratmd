@@ -22,6 +22,10 @@ export interface ScrubClaim {
     dateOfService: string; placeOfService: string; diagnoses: string[]; referringNpi?: string | null;
     /** Work and accident details (box 10, CLM11), and the insurer's claim number for workers' comp and auto. */
     relatedEmployment?: boolean; relatedAuto?: boolean; autoAccidentState?: string | null; relatedOther?: boolean; accidentDate?: string | null; propertyClaimNumber?: string | null;
+    /** Split/shared facility visit: the other practitioner, and the attestation that the billing one did the substantive portion. */
+    sharedWith?: { npi: string; name: string } | null; substantiveAttested?: boolean;
+    /** Teaching setting: the teaching physician was present for the key or critical portion. */
+    teachingPresent?: boolean;
   };
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
   payer: { timelyFilingDays: number; type?: string | null };
@@ -70,6 +74,9 @@ const MODIFIER_RE = /^[A-Z0-9]{2}$/;
 // The full CMS list (lib/codes/pos.ts): what charge entry offers is what the scrubber accepts.
 const VALID_POS = POS_CODES;
 export const TELEHEALTH_POS = new Set(["02", "10"]);
+const EM_RE = /^99(2[0-9]{2}|3[0-4][0-9]|4[0-9]{2})$/;
+/** Codes the primary care exception covers (with GE); the full list is CMS's. */
+const PRIMARY_CARE_EXCEPTION = new Set(["99202", "99203", "99211", "99212", "99213", "G0402", "G0438", "G0439"]);
 export const TELEHEALTH_MODIFIERS = new Set(["95", "93", "FQ", "GT", "GQ", "FR"]);
 
 const rules: Record<string, Rule> = {
@@ -186,6 +193,35 @@ const rules: Record<string, Rule> = {
     }
     if (TELEHEALTH_POS.has(pos) && c.payer.type !== "medicare" && !upper.some(({ m }) => m.some((x) => TELEHEALTH_MODIFIERS.has(x)))) {
       out.push({ rule: "TELEHEALTH_MODIFIER", severity: "warning", message: `Place of service ${pos} is telehealth; most plans other than Medicare also want modifier 95 (audio and video) or 93 (audio only) on each line. Check this payer's policy.`, field: "lines.modifiers" });
+    }
+    return out;
+  },
+  // Split/shared E/M in a facility: billed by the practitioner who did the substantive portion, with FS.
+  SPLIT_SHARED: (c) => {
+    const out: ScrubFinding[] = [];
+    const em = c.lines.filter((l) => EM_RE.test(l.cpt));
+    const fs = c.lines.filter((l) => l.modifiers.map((m) => m.toUpperCase()).includes("FS"));
+    const shared = c.encounter.sharedWith;
+    if (!shared) {
+      if (fs.length) out.push({ rule: "SPLIT_SHARED", severity: "warning", message: "FS marks a split/shared visit: name the other practitioner who shared it", field: "encounter.sharedWith" });
+      return out;
+    }
+    const strict = c.payer.type === "medicare" || c.payer.type === "medicaid";
+    if (shared.npi === c.provider.npi) out.push({ rule: "SPLIT_SHARED", severity: "error", message: "The practitioner the visit was shared with is the billing practitioner: choose the other one", field: "encounter.sharedWith" });
+    if (!c.encounter.substantiveAttested) out.push({ rule: "SPLIT_SHARED", severity: strict ? "error" : "warning", message: "Attest that the billing practitioner performed the substantive portion of the visit (more than half the total time, or the substantive part of medical decision making)", field: "encounter.substantiveAttested" });
+    if (["11", "02", "10", "12"].includes(c.encounter.placeOfService)) out.push({ rule: "SPLIT_SHARED", severity: "warning", message: "Split/shared billing applies in facility settings (hospital, skilled nursing). In the office, bill under the practitioner who did the visit, or as incident-to when its rules are met.", field: "encounter.placeOfService" });
+    for (const l of em) if (!l.modifiers.map((m) => m.toUpperCase()).includes("FS")) out.push({ rule: "SPLIT_SHARED", severity: strict ? "error" : "warning", message: `Line ${l.lineNumber}: a split/shared visit carries modifier FS`, field: `lines.${l.lineNumber}.modifiers` });
+    return out;
+  },
+  // Teaching physicians: GC (a resident took part, the teaching physician was present) or GE (primary care exception).
+  TEACHING: (c) => {
+    const out: ScrubFinding[] = [];
+    for (const l of c.lines) {
+      const m = l.modifiers.map((x) => x.toUpperCase());
+      const field = `lines.${l.lineNumber}.modifiers`;
+      if (m.includes("GC") && m.includes("GE")) out.push({ rule: "TEACHING", severity: "error", message: `Line ${l.lineNumber}: GC and GE cannot both apply; GE is only for the primary care exception`, field });
+      else if (m.includes("GC") && !c.encounter.teachingPresent) out.push({ rule: "TEACHING", severity: c.payer.type === "medicare" ? "error" : "warning", message: `Line ${l.lineNumber}: GC says the teaching physician was present for the key or critical portion; record that on the visit`, field });
+      else if (m.includes("GE") && !PRIMARY_CARE_EXCEPTION.has(l.cpt.toUpperCase())) out.push({ rule: "TEACHING", severity: "warning", message: `Line ${l.lineNumber}: GE (primary care exception) covers lower-level visits such as 99202-99203 and 99211-99213 and a few others on CMS's list; ${l.cpt} is probably not one of them`, field });
     }
     return out;
   },

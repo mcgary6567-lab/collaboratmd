@@ -219,6 +219,24 @@ export interface EligibilitySummary {
   message?: string;
   /** The patient is in a Medicare Advantage plan: Medicare itself will not pay; the plan will. */
   medicareAdvantage?: { plan: string; payerId: string | null };
+  /** A Medicaid response naming the managed care organization the patient is enrolled in. */
+  managedCare?: { plan: string; payerId: string | null };
+}
+
+/**
+ * A managed care organization in a Medicaid 271: an entity coded Y2 (managed
+ * care organization) in loop 2120, or an HMO benefit (insurance type HM) that
+ * names its plan, or a plan described as managed care.
+ */
+export function managedCarePlan(r: Response271): { plan: string; payerId: string | null } | null {
+  const mco = r.relatedEntities.find((e) => e.entity === "Y2");
+  if (mco) return { plan: mco.name || "a Medicaid managed care plan", payerId: mco.id || null };
+  for (const [i, b] of r.benefits.entries()) {
+    const described = /MANAGED CARE|(^|[^A-Z])MCO([^A-Z]|$)/i.test(b.planDescription);
+    const e = r.relatedEntities.find((x) => x.benefitIndex === i && ["PRP", "PR", "P5"].includes(x.entity));
+    if ((b.insuranceType === "HM" && e) || described) return { plan: e?.name || b.planDescription || "a Medicaid managed care plan", payerId: e?.id || null };
+  }
+  return null;
 }
 
 /**
@@ -251,9 +269,11 @@ export function summarize271(r: Response271): EligibilitySummary {
   const active = r.benefits.find((b) => b.code === "1");
   const inactive = r.benefits.find((b) => b.code === "6");
   const ma = medicareAdvantagePlan(r) ?? undefined;
+  const mco = managedCarePlan(r) ?? undefined;
   if (!active) return { status: inactive ? "inactive" : "error", planName: inactive?.planDescription || undefined, message: inactive ? "Coverage is not active on the date of service" : "The payer returned no coverage information", ...(ma ? { medicareAdvantage: ma } : {}) };
   return {
     ...(ma ? { medicareAdvantage: ma } : {}),
+    ...(mco ? { managedCare: mco } : {}),
     status: "active",
     planName: active.planDescription || undefined,
     copayCents: find("B")?.amountCents ?? undefined,

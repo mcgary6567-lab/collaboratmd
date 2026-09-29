@@ -274,6 +274,9 @@ const encounterSchema = z.object({
     .max(50),
   referring: z.object({ lastName: z.string().max(60), firstName: z.string().max(35).optional(), npi: z.string().max(12) }).nullable().optional(),
   supervisingProviderId: z.string().uuid().nullable().optional(),
+  sharedWithProviderId: z.string().uuid().nullable().optional(),
+  substantiveAttested: z.boolean().optional(),
+  teachingPresent: z.boolean().optional(),
   accident: accidentSchema.nullable().optional(),
 });
 

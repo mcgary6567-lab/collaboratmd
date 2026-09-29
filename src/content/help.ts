@@ -90,6 +90,39 @@ export const GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "National code sets", href: "/settings/code-sets" }],
   },
+  "/nsa-disputes": {
+    title: "Out-of-network disputes",
+    steps: [
+      "Add the claim when a plan underpays an out-of-network service the No Surprises Act covers, with the date its payment or denial arrived.",
+      "Send CMS's open negotiation notice within 30 business days and record it; negotiation then runs 30 business days.",
+      "Start federal IDR within the 4 business days after that. Business days skip weekends and federal holidays; the daily job warns 5 business days ahead.",
+    ],
+    related: [{ label: "Underpayments", href: "/underpayments" }],
+  },
+  "/reports/contracts": {
+    title: "Contract comparison",
+    steps: [
+      "Each payer's allowed amounts (paid plus patient share) against what Medicare's fee schedule would allow for the same claims.",
+      "Enter a percent of Medicare to see what each payer would have paid at that rate: a starting point for renegotiating.",
+    ],
+    related: [{ label: "Fee schedules", href: "/settings/fees" }],
+  },
+  "/reports/lag": {
+    title: "Charge and submission lag",
+    steps: [
+      "Days from the visit to its charges, and from the charges to the claim going out, by provider.",
+      "A day or two for each is good practice; visits never charged are on Missed charges.",
+    ],
+    related: [{ label: "Missed charges", href: "/billing/missed-charges" }],
+  },
+  "/settings/sliding-fee": {
+    title: "Sliding fee scale",
+    steps: [
+      "Enter the year's HHS poverty guidelines and your board-approved discount tiers.",
+      "On a patient's page, verify household size and income; the tier's discount then comes off what they owe on each claim for a year.",
+    ],
+    related: [{ label: "Patient billing", href: "/billing" }],
+  },
   "/settings/prompt-pay": {
     title: "Prompt-pay law",
     steps: [

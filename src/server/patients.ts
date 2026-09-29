@@ -6,9 +6,12 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { getClearinghouse } from "@/lib/clearinghouse/gateway";
 import { build270, summarize271, type EligibilitySummary } from "@/lib/edi/x270";
+import { birthdayRuleCheck } from "@/lib/cob/birthday-rule";
 import { listAppointments } from "./encounters";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
+import { notify } from "./notifications";
+import { clockDay, practiceNow } from "./practice-time";
 
 const { patients, patientInsurances, payers, eligibilityChecks, encounters, ledgerEntries } = schema;
 
@@ -160,7 +163,7 @@ export async function runEligibility(db: Db, patientInsuranceId: string, service
       oopMaxCents: summary.oopMaxCents ?? null,
       coinsurancePct: summary.coinsurancePct ?? null,
       oopRemainingCents: summary.oopRemainingCents ?? null,
-      response: { transaction: "271", status: summary.status, ...(summary.message ? { message: summary.message } : {}), ...(summary.medicareAdvantage && row.payer.type === "medicare" ? { medicareAdvantage: summary.medicareAdvantage } : {}) },
+      response: { transaction: "271", status: summary.status, ...(summary.message ? { message: summary.message } : {}), ...(summary.medicareAdvantage && row.payer.type === "medicare" ? { medicareAdvantage: summary.medicareAdvantage } : {}), ...(summary.managedCare && row.payer.type === "medicaid" ? { managedCare: summary.managedCare } : {}) },
       serviceDate: date,
       traceNumber,
       request270,
@@ -224,6 +227,8 @@ export async function verifySchedule(db: Db, practiceId: string, day: Date, forc
     if (check.status === "active") {
       out.active++;
       if (ma) out.problems.push({ patientId: appt.patientId, name, message: `Enrolled in a Medicare Advantage plan (${ma.plan}): bill that plan, not Medicare. Update the patient's insurance.` });
+      const mco = managedCareOf(check.response);
+      if (mco) out.problems.push({ patientId: appt.patientId, name, message: `Medicaid says the patient is in a managed care plan (${mco.plan}): bill that plan, not state Medicaid. Update the patient's insurance.` });
     } else {
       if (check.status === "inactive") out.inactive++;
       else out.errors++;
@@ -256,6 +261,66 @@ export async function medicareAdvantageFinding(db: Db, c: { patientInsuranceId: 
     : null;
 }
 
+/** The Medicaid managed care plan an eligibility check found, if any. */
+export function managedCareOf(response: Record<string, unknown> | null | undefined): { plan: string; payerId: string | null } | null {
+  const m = response?.managedCare as { plan?: unknown; payerId?: unknown } | undefined;
+  return m && typeof m.plan === "string" ? { plan: m.plan, payerId: typeof m.payerId === "string" ? m.payerId : null } : null;
+}
+
+/**
+ * Claim check: a claim to state Medicaid for a patient whose Medicaid check in
+ * the same month as the visit named a managed care plan. Medicaid eligibility
+ * is month by month, so only that month's answer counts.
+ */
+export async function medicaidManagedCareFinding(db: Db, c: { patientInsuranceId: string; payerType: string; dateOfService: string }) {
+  if (c.payerType !== "medicaid") return null;
+  const [check] = await db.select().from(eligibilityChecks).where(eq(eligibilityChecks.patientInsuranceId, c.patientInsuranceId)).orderBy(desc(eligibilityChecks.checkedAt)).limit(1);
+  if (!check) return null;
+  const when = check.serviceDate ?? check.checkedAt.toISOString().slice(0, 10);
+  if (when.slice(0, 7) !== c.dateOfService.slice(0, 7)) return null;
+  const mco = managedCareOf(check.response);
+  return mco
+    ? { rule: "MEDICAID_MANAGED_CARE", severity: "error" as const, field: "insurance", message: `Medicaid's eligibility response for ${when.slice(0, 7)} says the patient is enrolled in ${mco.plan}${mco.payerId ? ` (ID ${mco.payerId})` : ""}. State Medicaid will deny this claim: add the plan as the patient's insurance and bill it.` }
+    : null;
+}
+
+/**
+ * Monthly: Medicaid coverage for patients with a visit in the next 30 days,
+ * checked once per calendar month (on the practice's clock), since Medicaid
+ * eligibility and managed care enrollment change month to month.
+ */
+export async function recheckMedicaidMonthly(db: Db, practiceId: string, now = new Date(), limit = 100) {
+  const today = clockDay(await practiceNow(db, practiceId, now));
+  const from = today.toISOString().slice(0, 10);
+  const to = new Date(today.getTime() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const month = from.slice(0, 7);
+  const { rows } = await db.execute<{ ins_id: string; dos: string; patient_id: string; name: string }>(sql`
+    SELECT DISTINCT ON (pi.id) pi.id AS ins_id, a.starts_at::date::text AS dos, p.id AS patient_id, p.last_name || ', ' || p.first_name AS name
+    FROM appointments a
+    JOIN patients p ON p.id = a.patient_id
+    JOIN patient_insurances pi ON pi.patient_id = p.id AND pi.active
+    JOIN payers py ON py.id = pi.payer_id AND py.type = 'medicaid'
+    WHERE a.practice_id = ${practiceId} AND a.status <> 'cancelled' AND a.starts_at >= ${from}::date AND a.starts_at < (${to}::date + 1)
+      AND NOT EXISTS (SELECT 1 FROM eligibility_checks ec WHERE ec.patient_insurance_id = pi.id AND to_char(ec.checked_at, 'YYYY-MM') = ${month} AND ec.status <> 'error')
+    ORDER BY pi.id, a.starts_at
+    LIMIT ${limit}`);
+  const problems: { name: string; message: string }[] = [];
+  for (const r of rows) {
+    const check = await runEligibility(db, r.ins_id, r.dos);
+    const mco = managedCareOf(check.response);
+    if (check.status !== "active") problems.push({ name: r.name, message: check.message ?? "Medicaid coverage is not active" });
+    else if (mco) problems.push({ name: r.name, message: `Enrolled in ${mco.plan}: bill that plan` });
+  }
+  if (problems.length) {
+    await notify(db, practiceId, {
+      kind: "medicaid_monthly", dedupeKey: `medicaid-${month}-${from}`, href: "/patients",
+      title: `${problems.length} Medicaid patient${problems.length === 1 ? "" : "s"} with visits coming up need${problems.length === 1 ? "s" : ""} attention`,
+      body: problems.slice(0, 8).map((p) => `${p.name}: ${p.message}`).join("\n"),
+    });
+  }
+  return { checked: rows.length, problems: problems.length };
+}
+
 /** The most recent check for each insurance, for showing coverage beside the schedule. */
 export async function latestChecks(db: Db, patientInsuranceIds: string[]) {
   if (!patientInsuranceIds.length) return new Map<string, typeof eligibilityChecks.$inferSelect>();
@@ -269,4 +334,13 @@ export async function latestChecks(db: Db, patientInsuranceIds: string[]) {
 
 export async function postPatientPayment(db: Db, practiceId: string, patientId: string, amountCents: number, method: string, userId?: string) {
   await db.insert(ledgerEntries).values({ practiceId, patientId, type: "patient_payment", amountCents, note: `Patient payment (${method})`, postedBy: userId ?? null });
+}
+
+/** Claim check: the birthday rule for a dependent child covered on both parents' commercial plans. */
+export async function birthdayRuleFinding(db: Db, patientId: string, payerSequence: string) {
+  if (payerSequence !== "P") return null;
+  const rows = await db.select({ ins: patientInsurances, payer: payers }).from(patientInsurances).innerJoin(payers, eq(payers.id, patientInsurances.payerId))
+    .where(and(eq(patientInsurances.patientId, patientId), eq(patientInsurances.active, true)));
+  const check = birthdayRuleCheck(rows.map((r) => ({ id: r.ins.id, rank: r.ins.rank, relationship: r.ins.relationship, subscriberDob: r.ins.subscriberDob, payerType: r.payer.type, payerName: r.payer.name })));
+  return check ? { rule: "COB_BIRTHDAY", severity: "warning" as const, field: "insurance", message: check.message } : null;
 }

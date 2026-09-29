@@ -42,9 +42,12 @@ describe("claim controls against a migrated database", () => {
     await t.db.update(schema.patientInsurances).set({ memberId }).where(eq(schema.patientInsurances.id, insuranceId));
   }
 
+  // Each visit gets its own day, so the claims are not duplicates of one another; 70553 keeps the authorization's date.
+  let day = 6;
   async function newClaim(cpt = "99213", chargeCents = 15_000) {
+    const date = cpt === "70553" ? dos : new Date(Date.now() - day++ * 86_400_000).toISOString().slice(0, 10);
     const { claim } = await createEncounterWithClaim(t.db, t.practiceId, {
-      patientId, providerId, dateOfService: dos, placeOfService: "11", diagnoses: ["E11.9"],
+      patientId, providerId, dateOfService: date, placeOfService: "11", diagnoses: ["E11.9"],
       lines: [{ cpt, modifiers: [], units: 1, chargeCents, dxPointers: [1] }],
     });
     return claim;

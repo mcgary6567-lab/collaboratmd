@@ -25,7 +25,8 @@ import { checkClaimUnderpayment } from "./fees";
 import { authsForPatient, consumeAuthorization, rulesForPayer, serviceHistory } from "./payer-edits";
 import { globalPeriodFindings } from "./global-periods";
 import { assertNoOpenRequest } from "./records-requests";
-import { medicareAdvantageFinding } from "./patients";
+import { birthdayRuleFinding, medicaidManagedCareFinding, medicareAdvantageFinding } from "./patients";
+import { duplicateFindings } from "./duplicates";
 import { enrollmentFinding, enrollmentFor } from "./enrollment";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
@@ -46,6 +47,8 @@ export interface ClaimBundle {
   location?: typeof schema.locations.$inferSelect | null;
   /** The supervising physician on the encounter (2310D), when there is one. */
   supervisor?: typeof providers.$inferSelect | null;
+  /** The other practitioner on a split/shared visit. */
+  sharedWith?: typeof providers.$inferSelect | null;
 }
 
 export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBundle | null> {
@@ -64,7 +67,8 @@ export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBun
   if (!row) return null;
   const lines = await db.select().from(charges).where(eq(charges.encounterId, row.encounter.id)).orderBy(asc(charges.lineNumber));
   const [supervisor] = row.encounter.supervisingProviderId ? await db.select().from(providers).where(eq(providers.id, row.encounter.supervisingProviderId)).limit(1) : [];
-  return { ...row, lines, supervisor: supervisor ?? null };
+  const [sharedWith] = row.encounter.sharedWithProviderId ? await db.select().from(providers).where(eq(providers.id, row.encounter.sharedWithProviderId)).limit(1) : [];
+  return { ...row, lines, supervisor: supervisor ?? null, sharedWith: sharedWith ?? null };
 }
 
 function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
@@ -76,7 +80,8 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     supervisor: b.supervisor ? { npi: b.supervisor.npi, credential: b.supervisor.credential, name: `${b.supervisor.firstName} ${b.supervisor.lastName}` } : null,
     practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null, cliaNumber: b.practice.cliaNumber },
     encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi,
-      relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber },
+      relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber,
+      sharedWith: b.sharedWith ? { npi: b.sharedWith.npi, name: `${b.sharedWith.firstName} ${b.sharedWith.lastName}` } : null, substantiveAttested: b.encounter.substantiveAttested, teachingPresent: b.encounter.teachingPresent },
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents, dxPointers: l.dxPointers, minutes: l.minutes, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity })),
     payer: { timelyFilingDays: b.payer.timelyFilingDays, type: b.payer.type },
     today,
@@ -136,7 +141,14 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
   const abn = await abnFindings(db, { patientId: b.patient.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })) });
   const globals = await globalPeriodFindings(db, { practiceId: b.claim.practiceId, patientId: b.patient.id, encounterId: b.encounter.id, dateOfService: b.encounter.dateOfService, payerType: b.payer.type, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })) });
   const advantage = await medicareAdvantageFinding(db, { patientInsuranceId: b.insurance.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService });
-  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...(advantage ? [advantage] : []), ...(enrolled ? [enrolled] : [])], edits };
+  const managed = await medicaidManagedCareFinding(db, { patientInsuranceId: b.insurance.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService });
+  const birthday = await birthdayRuleFinding(db, b.patient.id, b.claim.payerSequence);
+  const dupes = await duplicateFindings(db, {
+    claimId: b.claim.id, originalClaimId: b.claim.originalClaimId, practiceId: b.claim.practiceId, patientId: b.patient.id, payerId: b.payer.id, dateOfService: b.encounter.dateOfService,
+    frequencyCode: b.claim.frequencyCode, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })),
+  });
+  const extra = [advantage, managed, birthday].filter((x): x is NonNullable<typeof x> => !!x);
+  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...dupes, ...extra, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {

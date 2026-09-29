@@ -28,10 +28,12 @@ import { hasDigestSubscribers, sendDigests } from "./notifications";
 import { hasScheduledReports, sendScheduledReports } from "./report-builder";
 import { appointmentReminder, balanceReminder, langOf, payLink, sameDayReminder, visitTime } from "@/lib/i18n/messages";
 import { clockDay, practiceNow } from "./practice-time";
-import { verifySchedule } from "./patients";
+import { recheckMedicaidMonthly, verifySchedule } from "./patients";
 import { notify } from "./notifications";
 import { overpaymentDeadlineAlerts } from "./recovery";
 import { recordsRequestAlerts } from "./records-requests";
+import { nsaDeadlineAlerts } from "./nsa-disputes";
+import { applySlidingFees } from "./sliding-fee";
 
 const { appointments, patients, practices, messageLog, statements, automationRuns, users, tasks, paymentPlans } = schema;
 
@@ -250,6 +252,7 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   if (s.sameDayReminders) await step("sameDayReminders", () => sameDayReminders(db, practiceId, now));
   if (s.balanceReminders) await step("balanceReminders", () => balanceReminders(db, practiceId, origin));
   if (s.eligibilityTomorrow) await step("eligibilityTomorrow", () => checkTomorrowsCoverage(db, practiceId, now));
+  if (s.medicaidMonthly) await step("medicaidMonthly", () => recheckMedicaidMonthly(db, practiceId, now));
   if (s.claimFollowUp) await step("claimFollowUp", () => runFollowUp(db, practiceId));
   if (s.denialAgent) await step("denialAgent", () => runDenialAgent(db, practiceId, { limit: 50 }));
   if (await hasActiveRules(db, practiceId)) await step("workRules", () => applyRules(db, practiceId, { now }));
@@ -258,6 +261,8 @@ export async function runDailyForPractice(db: Db, practiceId: string, origin: st
   await step("dailyChecks", () => runDailyChecks(db, practiceId, now));
   await step("overpayment60", () => overpaymentDeadlineAlerts(db, practiceId, now));
   await step("recordsRequests", () => recordsRequestAlerts(db, practiceId, now));
+  await step("nsaDeadlines", () => nsaDeadlineAlerts(db, practiceId, now));
+  if ((await db.select({ id: schema.slidingFeeTiers.id }).from(schema.slidingFeeTiers).where(eq(schema.slidingFeeTiers.practiceId, practiceId)).limit(1)).length) await step("slidingFees", () => applySlidingFees(db, practiceId, now));
   if (await getFhir(db, practiceId)) await step("fhirSync", () => syncFhir(db, practiceId, { now }));
   if (s.autopay && stripeReady((await practiceConfig(db, practiceId)).stripe)) await step("autopay", () => chargeAutopay(db, practiceId));
   if (s.weeklyReport && now.getUTCDay() === 1) await step("weeklyReport", () => sendWeeklyReport(db, practiceId));

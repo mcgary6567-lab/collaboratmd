@@ -19,9 +19,11 @@ import { MspCard } from "./msp-card";
 import { latestMspScreening } from "@/server/msp";
 import { AbnCard } from "./abn-card";
 import { CareCard } from "./care-card";
+import { SlidingFeeCard } from "./sliding-fee-card";
+import { slidingFeeOf } from "@/server/sliding-fee";
 import { careMonths } from "@/server/care-programs";
 import { listAbns } from "@/server/abn";
-import { getPatient, medicareAdvantageOf } from "@/server/patients";
+import { getPatient, managedCareOf, medicareAdvantageOf } from "@/server/patients";
 import { computeFinancials } from "@/server/claims";
 import { eligibilityAction, patientPaymentAction } from "@/app/(app)/actions";
 import { Card, PageHeader, Badge, Money, Empty, Field } from "@/components/ui";
@@ -62,6 +64,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const mspLast = onMedicare ? await latestMspScreening(db, patient.id) : null;
   const abnList = onMedicare ? await listAbns(db, s.practiceId, patient.id) : [];
   const care = await careMonths(db, s.practiceId, patient.id);
+  const [slidingFee, slidingTiers] = await Promise.all([slidingFeeOf(db, patient.id), db.select({ id: schema.slidingFeeTiers.id }).from(schema.slidingFeeTiers).where(eq(schema.slidingFeeTiers.practiceId, s.practiceId)).limit(1)]);
 
   return (
     <>
@@ -164,6 +167,11 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {latestCheck && (
             <div className={`rounded-lg p-3 text-sm ${latestCheck.status === "active" ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"}`}>
               <div className="font-semibold">Coverage {latestCheck.status} · {fmtDateTime(latestCheck.checkedAt, s.timeZone)}</div>
+              {managedCareOf(latestCheck.response) && (
+                <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
+                  Medicaid says this patient is in a managed care plan ({managedCareOf(latestCheck.response)!.plan}). Bill that plan, not state Medicaid: add it as the patient&apos;s insurance.
+                </p>
+              )}
               {medicareAdvantageOf(latestCheck.response) && (
                 <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
                   Medicare says this patient is in a Medicare Advantage plan ({medicareAdvantageOf(latestCheck.response)!.plan}). Bill that plan, not Medicare: add it as the patient&apos;s insurance.
@@ -197,6 +205,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {!insured && <CoverageSection practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} simulated={!cfg.stedi} />}
           {onMedicare && <MspCard patientId={patient.id} last={mspLast} canWrite={canWrite} timeZone={s.timeZone} />}
           {onMedicare && <AbnCard patientId={patient.id} notices={abnList} canWrite={canWrite} />}
+          {(slidingFee || slidingTiers.length > 0) && <SlidingFeeCard patientId={patient.id} fee={slidingFee} canWrite={canWrite} />}
           <CareCard patientId={patient.id} data={care} providers={providerList.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}${p.credential ? `, ${p.credential}` : ""}` }))} canWrite={canWrite} />
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>

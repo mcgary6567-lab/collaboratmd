@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-29",
+    title: "Duplicate claims, No Surprises Act disputes, sliding fees, contract and lag reports",
+    items: [
+      "The same service billed twice to the same payer is stopped before it goes out, unless a repeat modifier explains it",
+      "The birthday rule for children on both parents' plans",
+      "Out-of-network payment disputes tracked on the No Surprises Act's business-day deadlines",
+      "A sliding fee scale against the poverty guidelines you enter, applied to what eligible patients owe",
+      "Contract comparison: each payer against Medicare's fee schedule, with a what-if rate",
+      "Charge and submission lag by provider",
+      "Medicaid managed care plans caught from the eligibility response, and an optional monthly Medicaid re-check",
+      "Split/shared facility visits (FS) and teaching-physician modifiers (GC, GE) checked",
+    ],
+  },
+  {
+    date: "2026-09-29",
     title: "Global periods, Medicare Advantage, care management, records requests, prompt-pay interest",
     items: [
       "Visits and procedures inside a surgery's global period are caught before the claim goes out; routine post-op visits go in as 99024 at $0.00",

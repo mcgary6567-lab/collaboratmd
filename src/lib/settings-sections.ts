@@ -23,6 +23,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     links: [
       { href: "/settings/policies", label: "Policies", description: "Write-off limits, strict scrubbing, risk holds, statements, small balances", adminOnly: true, keywords: "rules approval limit strict risk statement export refund" },
       { href: "/settings/payer-edits", label: "Payer edits", description: "Your own rules per payer, frequency limits, and ones suggested from denials", keywords: "frequency once per year lifetime" },
+      { href: "/settings/sliding-fee", label: "Sliding fee scale", description: "Discounts by income against the poverty guidelines, for health centers and charity care", keywords: "fqhc charity discount poverty fpl" },
       { href: "/settings/prompt-pay", label: "Prompt-pay law", description: "Your state's deadline for commercial payers, and the interest on late payments", keywords: "late payment interest statute" },
       { href: "/settings/code-sets", label: "National code sets", description: "NCCI edits and Medicare coverage data", adminOnly: true, keywords: "ncci mue lcd" },
       { href: "/settings/automation", label: "Automation", description: "Reminders, follow-up, autopay and reports that run every morning", keywords: "daily cron reminders" },

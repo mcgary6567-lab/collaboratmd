@@ -323,3 +323,31 @@ Reports → Productivity (administrators): work RVUs per provider from the fee s
 ## Prompt-pay interest
 
 Settings → Prompt-pay law: the practice enters its state's statute (days to pay a clean claim, yearly interest, citation). Underpayments then lists commercial payments in the last year that took longer (counted from submission to the first payment), with simple interest on the amount paid, and a letter per payer. "Mark as sent" records the claims so they are asked about once. Self-funded ERISA plans are exempt from state prompt-pay law, and statutes differ on when the clock starts: check before sending.
+
+## Duplicate claims
+
+A claim is checked against the patient's other claims to the same payer for the same date of service. A code already on a claim that was sent (or paid) is stopped (DUPLICATE_CLAIM) unless the line has 76, 77 or 91; one on a denied claim is a warning to send a corrected claim (frequency 7) instead; one on a claim not yet sent is a warning. Voided and clearinghouse-rejected claims, and replacement or void claims in the same chain, are not counted.
+
+## Birthday rule
+
+For a dependent child on two commercial plans (both with the relationship "child" and the subscribers' dates of birth on file), the plan of the parent whose birthday comes first in the calendar year should be primary. A primary claim whose insurance order contradicts that gets a warning (COB_BIRTHDAY). Custody decrees and plans that do not follow the NAIC rule can change the order.
+
+## Out-of-network disputes (No Surprises Act)
+
+Billing → Out-of-network disputes tracks a claim from the plan's initial payment or denial: open negotiation must start within 30 business days (with CMS's standard notice), runs 30 business days, and IDR must start within the following 4 business days. Business days skip weekends and federal holidays (computed by the holiday rules, observed on the nearest weekday). The daily job warns 5 business days before each deadline. The notice and IDR themselves are filed on CMS's forms and portal.
+
+## Sliding fee scale
+
+Settings → Sliding fee scale: the year's HHS poverty guidelines (household of one, and each additional person) and the practice's discount tiers by percent of the guideline. On a patient's page, "Verify income" records household size, income and the proof seen; the tier's discount posts on each claim's patient share arising in the following year, and the daily job keeps it current. Posting is idempotent.
+
+## Contract comparison and charge lag
+
+Reports → Contract comparison: each non-Medicare payer's allowed amounts over a period against Medicare's fee schedule for the same claims (needs the locality and fee schedule files), and what a proposed percent of Medicare would have paid. Reports → Charge lag: days from visit to charges and from charges to submission, by provider.
+
+## Medicaid managed care and monthly checks
+
+A Medicaid eligibility response naming a managed care organization (entity Y2 in loop 2120, or an HMO benefit with its plan) is shown on the patient's page; a claim to state Medicaid in the same month is stopped (MEDICAID_MANAGED_CARE). Settings → Automation → "Re-check Medicaid every month" checks Medicaid patients with a visit in the next 30 days once each month and notifies the front desk of lost coverage or a managed care plan.
+
+## Split/shared and teaching visits
+
+Charge entry has "Split/shared visit or teaching setting": the practitioner the facility visit was shared with and the attestation that the billing practitioner did the substantive portion (FS is added to E/M lines), and whether the teaching physician was present for the key portion. Checks: FS required on a shared E/M, the attestation required (Medicare and Medicaid), a warning in office settings, GC requires the teaching physician's presence, GC with GE is refused, and GE on codes outside the primary care exception warns.
