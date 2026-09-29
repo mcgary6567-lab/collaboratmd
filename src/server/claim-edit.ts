@@ -12,7 +12,7 @@
  * instead, which is what payers require.
  */
 import { ndcColumns } from "./encounters";
-import { isQualityCode } from "@/lib/codes/quality";
+import { isZeroChargeCode } from "@/lib/codes/quality";
 import { money } from "@/lib/utils";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db";
@@ -40,7 +40,7 @@ function validate(e: ClaimEdit) {
   for (const [i, l] of e.lines.entries()) {
     if (!/^[A-Z0-9]{5}$/.test(l.cpt.trim().toUpperCase())) throw new Error(`Line ${i + 1}: enter a 5-character procedure code`);
     if (!Number.isInteger(l.units) || l.units < 1) throw new Error(`Line ${i + 1}: units must be at least 1`);
-    if (!Number.isInteger(l.chargeCents) || l.chargeCents < 0 || (l.chargeCents === 0 && !isQualityCode(l.cpt))) throw new Error(`Line ${i + 1}: enter a charge`);
+    if (!Number.isInteger(l.chargeCents) || l.chargeCents < 0 || (l.chargeCents === 0 && !isZeroChargeCode(l.cpt))) throw new Error(`Line ${i + 1}: enter a charge`);
     if (!l.dxPointers.length || l.dxPointers.some((p) => p < 1 || p > dx.length)) throw new Error(`Line ${i + 1}: diagnosis pointers must point at diagnoses 1 to ${dx.length}`);
   }
   return dx;

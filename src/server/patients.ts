@@ -160,7 +160,7 @@ export async function runEligibility(db: Db, patientInsuranceId: string, service
       oopMaxCents: summary.oopMaxCents ?? null,
       coinsurancePct: summary.coinsurancePct ?? null,
       oopRemainingCents: summary.oopRemainingCents ?? null,
-      response: { transaction: "271", status: summary.status, ...(summary.message ? { message: summary.message } : {}) },
+      response: { transaction: "271", status: summary.status, ...(summary.message ? { message: summary.message } : {}), ...(summary.medicareAdvantage && row.payer.type === "medicare" ? { medicareAdvantage: summary.medicareAdvantage } : {}) },
       serviceDate: date,
       traceNumber,
       request270,
@@ -220,14 +220,40 @@ export async function verifySchedule(db: Db, practiceId: string, day: Date, forc
     }
     const check = await runEligibility(db, ins.id, date);
     out.checked++;
-    if (check.status === "active") out.active++;
-    else {
+    const ma = medicareAdvantageOf(check.response);
+    if (check.status === "active") {
+      out.active++;
+      if (ma) out.problems.push({ patientId: appt.patientId, name, message: `Enrolled in a Medicare Advantage plan (${ma.plan}): bill that plan, not Medicare. Update the patient's insurance.` });
+    } else {
       if (check.status === "inactive") out.inactive++;
       else out.errors++;
       out.problems.push({ patientId: appt.patientId, name, message: check.message ?? (check.status === "inactive" ? "Coverage not active" : "The payer did not answer") });
     }
   }
   return out;
+}
+
+/** The Medicare Advantage plan a Medicare eligibility check found, if any. */
+export function medicareAdvantageOf(response: Record<string, unknown> | null | undefined): { plan: string; payerId: string | null } | null {
+  const ma = response?.medicareAdvantage as { plan?: unknown; payerId?: unknown } | undefined;
+  return ma && typeof ma.plan === "string" ? { plan: ma.plan, payerId: typeof ma.payerId === "string" ? ma.payerId : null } : null;
+}
+
+/**
+ * Claim check: a claim to traditional Medicare for a patient whose latest
+ * Medicare eligibility check (within 90 days of the visit) says they are in a
+ * Medicare Advantage plan. Medicare denies it; the plan should be billed.
+ */
+export async function medicareAdvantageFinding(db: Db, c: { patientInsuranceId: string; payerType: string; dateOfService: string }) {
+  if (c.payerType !== "medicare") return null;
+  const [check] = await db.select().from(eligibilityChecks).where(eq(eligibilityChecks.patientInsuranceId, c.patientInsuranceId)).orderBy(desc(eligibilityChecks.checkedAt)).limit(1);
+  if (!check) return null;
+  const when = check.serviceDate ?? check.checkedAt.toISOString().slice(0, 10);
+  if (Math.abs(Date.parse(`${when}T12:00:00Z`) - Date.parse(`${c.dateOfService}T12:00:00Z`)) > 90 * 86_400_000) return null;
+  const ma = medicareAdvantageOf(check.response);
+  return ma
+    ? { rule: "MEDICARE_ADVANTAGE", severity: "error" as const, field: "insurance", message: `Medicare's eligibility response on ${when} says the patient is in a Medicare Advantage plan (${ma.plan}${ma.payerId ? `, ID ${ma.payerId}` : ""}). Medicare will deny this claim: add the plan as the patient's insurance and bill it.` }
+    : null;
 }
 
 /** The most recent check for each insurance, for showing coverage beside the schedule. */

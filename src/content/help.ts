@@ -72,6 +72,32 @@ export const GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Work queues", href: "/work" }],
   },
+  "/records-requests": {
+    title: "Records requests",
+    steps: [
+      "Add each payer request for medical records (a Medicare ADR, a RAC or TPE review, a commercial audit) with its claim and due date.",
+      "The claim is held from appeals and write-offs until the records are sent, and the daily job reminds you a week before the due date.",
+      "Mark it sent with how it went (esMD, portal, fax), then close it with the outcome.",
+    ],
+    related: [{ label: "Denials", href: "/denials" }],
+  },
+  "/reports/productivity": {
+    title: "Productivity and coding profile",
+    steps: [
+      "Work RVUs per provider from the Medicare fee schedule year loaded for each visit.",
+      "Each provider's E/M level mix beside the practice's; half a level or more away is marked for a closer look.",
+      "Sample 10 visits to compare the documentation with the level billed.",
+    ],
+    related: [{ label: "National code sets", href: "/settings/code-sets" }],
+  },
+  "/settings/prompt-pay": {
+    title: "Prompt-pay law",
+    steps: [
+      "Enter your state's statute: the days a commercial insurer has to pay a clean claim, the interest rate, and the citation.",
+      "Late commercial payments then appear on Underpayments with the interest, and a letter per payer asks for it once.",
+    ],
+    related: [{ label: "Underpayments", href: "/underpayments" }],
+  },
   "/underpayments": {
     title: "Underpayments",
     steps: [

@@ -114,6 +114,8 @@ export interface Response271 {
   rejections: { code: string; reason: string; followUp: string }[];
   planBegin: string;
   benefits: Benefit[];
+  /** Loop 2120: another entity named for a benefit (NM1 between LS and LE), such as the plan that actually covers the patient. */
+  relatedEntities: { entity: string; name: string; id: string; benefitIndex: number }[];
 }
 
 export interface Build271Input {
@@ -163,13 +165,24 @@ export function build271(input: Build271Input): string {
 
 export function parse271(raw: string): Response271 {
   const { segments } = tokenize(raw);
-  const out: Response271 = { traceNumber: "", payerName: "", memberId: "", rejections: [], planBegin: "", benefits: [] };
+  const out: Response271 = { traceNumber: "", payerName: "", memberId: "", rejections: [], planBegin: "", benefits: [], relatedEntities: [] };
+  let inLoop2120 = false;
   for (const s of segments) {
     switch (s[0]) {
       case "TRN":
         if (s[1] === "2") out.traceNumber = s[2] ?? "";
         break;
+      case "LS":
+        inLoop2120 = true;
+        break;
+      case "LE":
+        inLoop2120 = false;
+        break;
       case "NM1":
+        if (inLoop2120) {
+          out.relatedEntities.push({ entity: s[1] ?? "", name: [s[3], s[4]].filter(Boolean).join(" "), id: s[9] ?? "", benefitIndex: out.benefits.length - 1 });
+          break;
+        }
         if (s[1] === "PR") out.payerName = s[3] ?? "";
         if (s[1] === "IL") out.memberId = s[9] ?? "";
         break;
@@ -204,6 +217,22 @@ export interface EligibilitySummary {
   oopRemainingCents?: number;
   coinsurancePct?: number;
   message?: string;
+  /** The patient is in a Medicare Advantage plan: Medicare itself will not pay; the plan will. */
+  medicareAdvantage?: { plan: string; payerId: string | null };
+}
+
+/**
+ * A Medicare Advantage enrollment in a Medicare 271: a benefit whose insurance
+ * type is HN (HMO, Medicare risk) or whose plan says Medicare Advantage, with
+ * the plan named in loop 2120 when the payer sends it.
+ */
+export function medicareAdvantagePlan(r: Response271): { plan: string; payerId: string | null } | null {
+  for (const [i, b] of r.benefits.entries()) {
+    if (b.insuranceType !== "HN" && !/MEDICARE ADVANTAGE|PART C\b/i.test(b.planDescription)) continue;
+    const e = r.relatedEntities.find((x) => x.benefitIndex === i && ["PRP", "PR", "P5"].includes(x.entity)) ?? r.relatedEntities.find((x) => x.benefitIndex === i);
+    return { plan: e?.name || b.planDescription || "a Medicare Advantage plan", payerId: e?.id || null };
+  }
+  return null;
 }
 
 /**
@@ -221,8 +250,10 @@ export function summarize271(r: Response271): EligibilitySummary {
   const find = (code: string, period?: string) => ind.find((b) => b.code === code && (period === undefined || b.timePeriod === period));
   const active = r.benefits.find((b) => b.code === "1");
   const inactive = r.benefits.find((b) => b.code === "6");
-  if (!active) return { status: inactive ? "inactive" : "error", planName: inactive?.planDescription || undefined, message: inactive ? "Coverage is not active on the date of service" : "The payer returned no coverage information" };
+  const ma = medicareAdvantagePlan(r) ?? undefined;
+  if (!active) return { status: inactive ? "inactive" : "error", planName: inactive?.planDescription || undefined, message: inactive ? "Coverage is not active on the date of service" : "The payer returned no coverage information", ...(ma ? { medicareAdvantage: ma } : {}) };
   return {
+    ...(ma ? { medicareAdvantage: ma } : {}),
     status: "active",
     planName: active.planDescription || undefined,
     copayCents: find("B")?.amountCents ?? undefined,

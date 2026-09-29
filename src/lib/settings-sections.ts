@@ -22,7 +22,8 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
     title: "Billing rules",
     links: [
       { href: "/settings/policies", label: "Policies", description: "Write-off limits, strict scrubbing, risk holds, statements, small balances", adminOnly: true, keywords: "rules approval limit strict risk statement export refund" },
-      { href: "/settings/payer-edits", label: "Payer edits", description: "Your own rules per payer, and ones suggested from denials" },
+      { href: "/settings/payer-edits", label: "Payer edits", description: "Your own rules per payer, frequency limits, and ones suggested from denials", keywords: "frequency once per year lifetime" },
+      { href: "/settings/prompt-pay", label: "Prompt-pay law", description: "Your state's deadline for commercial payers, and the interest on late payments", keywords: "late payment interest statute" },
       { href: "/settings/code-sets", label: "National code sets", description: "NCCI edits and Medicare coverage data", adminOnly: true, keywords: "ncci mue lcd" },
       { href: "/settings/automation", label: "Automation", description: "Reminders, follow-up, autopay and reports that run every morning", keywords: "daily cron reminders" },
       { href: "/work", label: "Work queues", description: "Rules that assign denials and stuck claims, with due dates", keywords: "assignment sla tasks" },

@@ -84,6 +84,7 @@ export function buildClaimEdi(
     },
     renderingProvider: { lastName: bundle.provider.lastName, firstName: bundle.provider.firstName, npi: bundle.provider.npi, taxonomy: bundle.provider.taxonomy },
     referringProvider: bundle.encounter.referringNpi && bundle.encounter.referringLastName ? { lastName: bundle.encounter.referringLastName, firstName: bundle.encounter.referringFirstName ?? "", npi: bundle.encounter.referringNpi } : null,
+    supervisingProvider: bundle.supervisor && bundle.supervisor.npi !== bundle.provider.npi ? { lastName: bundle.supervisor.lastName, firstName: bundle.supervisor.firstName, npi: bundle.supervisor.npi } : null,
     propertyClaimNumber: bundle.encounter.propertyClaimNumber,
     mspType: bundle.insurance.mspType,
     payer: { name: bundle.payer.name, payerId: bundle.payer.payerId, type: bundle.payer.type },

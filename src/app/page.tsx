@@ -2,8 +2,8 @@ import Link from "next/link";
 import { demoLink } from "@/lib/demo";
 import type { Metadata } from "next";
 import {
-  ArrowRight, BadgeCheck, Brain, CalendarDays, ClipboardCheck, CreditCard, EyeOff, FileSearch, FileText, Gauge, Hourglass, KeyRound, Landmark, Layers, ChartLine, Lock,
-  Radar, ReceiptText, Scale, ScanLine, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Video, WandSparkles, Zap,
+  ArrowRight, BadgeCheck, Brain, CalendarDays, ClipboardCheck, CreditCard, EyeOff, FileSearch, FileText, Gauge, HeartPulse, Hourglass, KeyRound, Landmark, Layers, ChartLine, Lock,
+  Radar, ReceiptText, Scale, ScanLine, Scissors, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Video, WandSparkles, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -35,7 +35,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Online booking requests, confirmed by your staff" },
       { name: "Online check-in with insurance updates and signed notices" },
       { name: "Eligibility (270/271), single or whole schedule", needs: "clearinghouse" },
-      { name: "Coverage checked the day before every appointment", needs: "clearinghouse" },
+      { name: "Coverage checked the day before every appointment, Medicare Advantage flagged", needs: "clearinghouse" },
       { name: "Medicare Secondary Payer questions and ABNs (CMS-R-131) per patient" },
       { name: "NPI lookup from the CMS registry" },
       { name: "Appointment reminders by text and email", needs: "Twilio / Resend" },
@@ -72,6 +72,8 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Paper claims: CMS-1500 on the red form, plain-paper UB-04" },
       { name: "Any clearinghouse: claims out and responses in as files" },
       { name: "MIPS quality codes added to qualifying claims" },
+      { name: "Surgical global periods, frequency limits and supervising providers checked" },
+      { name: "Chronic care management and remote monitoring billed from logged minutes" },
       { name: "Payer rules suggested from your own denials" },
       { name: "Claim attachments (PWK) with a fax cover sheet" },
     ],
@@ -87,6 +89,8 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Appeal levels with deadlines, Medicare's five included" },
       { name: "60-day return deadline on Medicare and Medicaid overpayments" },
       { name: "Medicare crossovers recognized, never billed twice" },
+      { name: "Records requests (ADR, RAC, audits) tracked to their due date" },
+      { name: "Prompt-pay interest on late commercial payments, under your state's statute" },
       { name: "Bank deposits matched to ERAs" },
       { name: "Denials in plain English with next steps" },
       { name: "Appeal letters in one click", needs: "AI key, optional" },
@@ -127,6 +131,7 @@ const CAPABILITIES: { group: string; icon: typeof Zap; items: Capability[] }[] =
       { name: "Ctrl+K search, shortcuts, dark mode, phone layout" },
       { name: "Report builder, and questions answered as reports" },
       { name: "8-week cash forecast and payer behavior alerts" },
+      { name: "Work RVUs per provider and an E/M coding profile for internal audits" },
       { name: "Work queues with assignment rules and SLAs" },
       { name: "Client invoicing for billing companies" },
       { name: "Accounting journal export and month-end close" },
@@ -215,6 +220,21 @@ const MEDICARE = [
     title: "Telehealth, drugs and time",
     body: "Place of service and modifiers checked against Medicare's telehealth list, NDCs on drug lines, the 8-minute rule for therapy and minutes for anesthesia.",
   },
+  {
+    icon: Scissors,
+    title: "Surgical global periods",
+    body: "A visit inside a surgery's 10- or 90-day global period is caught before the claim goes out, with the modifier it needs, and routine follow-ups go in as 99024 at $0.00.",
+  },
+  {
+    icon: SearchCheck,
+    title: "Medicare Advantage, caught at the desk",
+    body: "When Medicare's eligibility answer says the patient is in a Medicare Advantage plan, the front desk sees the plan and a claim to traditional Medicare is stopped.",
+  },
+  {
+    icon: HeartPulse,
+    title: "Care management by the minute",
+    body: "Chronic care management, behavioral health integration and remote monitoring: consent on file, minutes logged through the month, and one claim when it ends.",
+  },
 ];
 
 const WORKFLOW = [
@@ -289,7 +309,7 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <a href="#medicare" className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
               <Sparkles className="h-3.5 w-3.5" />
-              New: Medicare rules built in, from the fee schedule and ABNs to appeal levels and the 60-day rule
+              New: Medicare rules built in, from global periods and Medicare Advantage to ABNs and the 60-day rule
               <ArrowRight className="h-3.5 w-3.5" />
             </a>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">

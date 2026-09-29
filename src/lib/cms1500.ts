@@ -21,6 +21,8 @@ export type Cms1500Input = {
   otherInsurance: boolean;
   accident: { employment: boolean; auto: boolean; autoState?: string | null; other: boolean; date?: string | null; propertyClaimNumber?: string | null };
   referring?: { lastName: string; firstName: string; npi: string } | null;
+  /** Box 17 holds one provider: the referring one (DN) when there is one, otherwise the supervising one (DQ). */
+  supervising?: { lastName: string; firstName: string; npi: string } | null;
   priorAuth?: string | null;
   resubmission?: { code: string; originalRef: string } | null;
   diagnoses: string[];
@@ -104,7 +106,8 @@ export function cms1500Pages(c: Cms1500Input): Field[][] {
   // 14: date of injury, qualifier 431 (onset of current symptoms or illness)
   if (c.accident.date && (c.accident.employment || c.accident.auto || c.accident.other)) { put(32, 3, mdy(c.accident.date), "14"); put(32, 16, "431"); }
   // 17, 17b
-  if (c.referring) { put(34, 1, "DN", "17"); put(34, 4, name(c.referring.lastName, c.referring.firstName).slice(0, 24)); put(34, 34, c.referring.npi, "17b"); }
+  const box17 = c.referring ? { q: "DN", p: c.referring } : c.supervising ? { q: "DQ", p: c.supervising } : null;
+  if (box17) { put(34, 1, box17.q, "17"); put(34, 4, name(box17.p.lastName, box17.p.firstName).slice(0, 24)); put(34, 34, box17.p.npi, "17b"); }
   // 20: outside lab
   put(36, 57, X, "20");
   // 21: ICD indicator 0 (ICD-10), then A-L across three rows of four

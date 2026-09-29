@@ -6,6 +6,7 @@ import { listUnderpayments, underpaymentSummary } from "@/server/fees";
 import { scanUnderpaymentsAction, underpaymentStatusAction } from "@/app/(app)/fees-actions";
 import { recordRecoveryAction } from "@/app/(app)/recovery-actions";
 import { disputeGroups, LETTER_MAX } from "@/server/recovery";
+import { interestByPayer, listPromptPayRules } from "@/server/prompt-pay";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, Empty, Money, PageHeader, PatientLink, Stat } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
@@ -26,11 +27,14 @@ export default async function UnderpaymentsPage({ searchParams }: { searchParams
   const status = TABS.some((t) => t.status === requested) ? requested! : "open";
   const s = await requireSession();
   const db = await getDb();
-  const [rows, summary, letters] = await Promise.all([
+  const [rows, summary, letters, rules, groups] = await Promise.all([
     listUnderpayments(db, s.practiceId, status),
     underpaymentSummary(db, s.practiceId),
     status === "open" ? disputeGroups(db, s.practiceId) : Promise.resolve([]),
+    listPromptPayRules(db, s.practiceId),
+    interestByPayer(db, s.practiceId),
   ]);
+  const promptPay = { configured: rules.length > 0, state: rules.map((r) => r.state).join(", "), groups };
   const open = summary.open ?? { count: 0, varianceCents: 0 };
   const appealed = summary.appealed ?? { count: 0, varianceCents: 0 };
   const recovered = summary.recovered ?? { count: 0, varianceCents: 0 };
@@ -64,6 +68,23 @@ export default async function UnderpaymentsPage({ searchParams }: { searchParams
           </Link>
         ))}
       </div>
+
+      <Card title="Late payments (prompt-pay interest)" className="mb-6">
+        {!promptPay.configured ? (
+          <p className="text-sm text-slate-600">Enter your state&apos;s prompt-pay statute to see which commercial payments were late and the interest owed. <Link href="/settings/prompt-pay" className="font-semibold text-brand-700 hover:underline">Set it up</Link></p>
+        ) : promptPay.groups.length === 0 ? (
+          <p className="text-sm text-slate-600">No commercial payments in the last year were later than {promptPay.state} law allows, or all have been asked about.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {promptPay.groups.map((g) => (
+              <Link key={g.payerId} href={`/underpayments/interest/${g.payerId}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:border-brand-300 hover:bg-brand-50">
+                <span className="font-semibold text-slate-900">{g.payerName}</span>
+                <span className="ml-2 text-slate-500">{g.count} late · {money(g.cents)} interest</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {letters.length > 0 && (
         <Card title="Dispute letters" className="mb-6">

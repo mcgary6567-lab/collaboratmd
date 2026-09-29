@@ -291,3 +291,35 @@ Claim checks: 95 with 93 or FQ on the same line (error); GT on a Medicare claim 
 ## Inpatient procedures and the UB-04
 
 Facility claim entry takes up to six ICD-10-PCS procedures with dates (principal first), sent on the 837I as HI*BBR and HI*BBQ. Codes are checked for format (seven characters, no I or O) and dates within the stay; procedure codes on an outpatient bill get a warning. An institutional claim's "Printable UB-04 (plain paper)" button lays the claim out by form locator for review or for a payer that accepts a plain copy. It is not aligned to the red OCR form, so payers that scan paper UB-04s will not accept it: send the 837I.
+
+## Surgical global periods
+
+CMS's RVU file carries each code's global days (GLOB DAYS: 000, 010, 090). Once that year's file is loaded, a claim for a patient whose earlier encounter in this practice had a 10- or 90-day procedure is checked: an E/M visit inside the window needs 24, 25 or 57 (an error for Medicare and Medicaid, a warning otherwise), and another procedure needs 58, 78 or 79 (warning). Routine post-op visits go in as 99024 at $0.00, which the scrubber and charge entry accept.
+
+## Medicare Advantage
+
+A Medicare eligibility response that shows a Medicare Advantage plan (insurance type HN, or a plan named as Medicare Advantage, with the plan from loop 2120) is shown on the patient page and in tomorrow's coverage check. A claim to traditional Medicare within 90 days of such a response is stopped (MEDICARE_ADVANTAGE): add the plan as the patient's insurance and bill it. Stedi's JSON response is read for the insurance type and plan text; its related-entity fields are not mapped yet, so the plan's ID may be missing there.
+
+## Supervising provider and practitioner credentials
+
+Providers have a credential (Settings → Providers). Medicare underpayment checks expect 85% of the fee schedule for NPs, PAs and CNSs billing under their own NPI. Charge entry takes a supervising provider, sent in 837P loop 2310D (NM1*DQ) and in box 17 with DQ when there is no referring provider. The supervising provider must differ from the rendering one and pass the NPI check.
+
+## Monthly care programs
+
+A patient's page has Monthly care programs: record consent (required before billing), then log minutes through the month for CCM by clinical staff (99490, 99439 up to twice), CCM by the practitioner (99491), BHI (99484) or RPM treatment management (99457, 99458 up to twice). After the month ends, "Bill" creates one claim dated the month's last day, at the practice's standard charges, under the practitioner who logged the most time. CCM needs two or more conditions; staff and practitioner CCM are not both billed for a month; a billed month takes no more time.
+
+## Frequency limits
+
+Settings → Payer edits has a Frequency limit rule: a code at most N times in D days per patient (0 days for a lifetime), for one payer or all. The patient's earlier encounters (not voided) are counted. Enter the limits from CMS's or the payer's policy.
+
+## Records requests
+
+Records requests (Billing menu) tracks each payer request for medical records: Medicare ADR, RAC, TPE (45 days by default) and commercial audits (30 days), or the date on the letter. A claim with an open request cannot be written off or appealed until the records are marked sent. The daily job notifies a week before the due date and when it is past.
+
+## Productivity and coding profile
+
+Reports → Productivity (administrators): work RVUs per provider from the fee schedule year loaded for each visit, each provider's E/M level mix against the practice's, and a random sample of 10 visits for an internal chart review. A mix half a level or more from the practice's is marked as a prompt to review, not a finding.
+
+## Prompt-pay interest
+
+Settings → Prompt-pay law: the practice enters its state's statute (days to pay a clean claim, yearly interest, citation). Underpayments then lists commercial payments in the last year that took longer (counted from submission to the first payment), with simple interest on the amount paid, and a letter per payer. "Mark as sent" records the claims so they are asked about once. Self-funded ERISA plans are exempt from state prompt-pay law, and statutes differ on when the clock starts: check before sending.

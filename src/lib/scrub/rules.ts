@@ -6,7 +6,7 @@
  * "error" blocks submission; "warning" allows submission with a note.
  */
 import { isDrugCode, isNdcUnit } from "@/lib/codes/ndc";
-import { isQualityCode } from "@/lib/codes/quality";
+import { isZeroChargeCode } from "@/lib/codes/quality";
 import { POS_CODES } from "@/lib/codes/pos";
 import { CLIA_RE, isLabCode } from "@/lib/codes/lab";
 import { ANESTHESIA_MODIFIERS, THERAPY_MODIFIERS, TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode, isTherapyCode } from "@/lib/time-units";
@@ -14,7 +14,9 @@ import { ANESTHESIA_MODIFIERS, THERAPY_MODIFIERS, TIMED_THERAPY_CODES, eightMinu
 export interface ScrubClaim {
   patient: { firstName: string; lastName: string; dob: string; sex: string; address1?: string | null; zip?: string | null };
   insurance: { memberId: string; payerId: string; relationship: string; subscriber?: { firstName: string | null; lastName: string | null; dob: string | null } | null };
-  provider: { npi: string; taxonomy: string };
+  provider: { npi: string; taxonomy: string; credential?: string | null };
+  /** The supervising physician (2310D), when there is one. */
+  supervisor?: { npi: string; credential?: string | null; name: string } | null;
   practice: { npi: string; taxId: string; phone?: string | null; cliaNumber?: string | null };
   encounter: {
     dateOfService: string; placeOfService: string; diagnoses: string[]; referringNpi?: string | null;
@@ -105,6 +107,12 @@ const rules: Record<string, Rule> = {
     if (clia && CLIA_RE.test(clia)) return [];
     const message = clia ? `CLIA number ${clia} is not valid (2 digits, D, 7 digits)` : "The claim has laboratory tests but the practice has no CLIA number (Settings > Practice profile)";
     return [{ rule: "CLIA", severity: c.payer.type === "medicare" || clia ? "error" : "warning", message, field: "practice.cliaNumber" }];
+  },
+  SUPERVISING: (c) => {
+    if (!c.supervisor) return [];
+    if (!isValidNpi(c.supervisor.npi)) return [{ rule: "SUPERVISING", severity: "error", message: `Supervising provider ${c.supervisor.name}'s NPI ${c.supervisor.npi} fails check-digit validation`, field: "encounter.supervisingProviderId" }];
+    if (c.supervisor.npi === c.provider.npi) return [{ rule: "SUPERVISING", severity: "error", message: "The supervising provider is the same as the rendering provider: leave supervising empty, or choose the physician who supervised", field: "encounter.supervisingProviderId" }];
+    return [];
   },
   REFERRING_NPI: (c) =>
     c.encounter.referringNpi && !isValidNpi(c.encounter.referringNpi)
@@ -264,7 +272,7 @@ const rules: Record<string, Rule> = {
       .map((l) => ({ rule: "LINE_UNITS", severity: "error" as const, message: `Line ${l.lineNumber}: units must be a positive integer`, field: `lines.${l.lineNumber}.units` })),
   LINE_CHARGE: (c) =>
     c.lines
-      .filter((l) => l.chargeCents <= 0 && !isQualityCode(l.cpt))
+      .filter((l) => l.chargeCents <= 0 && !isZeroChargeCode(l.cpt))
       .map((l) => ({ rule: "LINE_CHARGE", severity: "error" as const, message: `Line ${l.lineNumber}: charge amount must be greater than zero`, field: `lines.${l.lineNumber}.chargeCents` })),
   LINE_DX_POINTER: (c) =>
     c.lines

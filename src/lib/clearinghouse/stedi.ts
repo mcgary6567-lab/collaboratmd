@@ -201,5 +201,7 @@ export function toResponse271(r: StediEligibilityResponse): Response271 {
     rejections: (r.errors ?? []).map((e) => ({ code: e.code ?? "", reason: e.description ?? `Rejection ${e.code}`, followUp: e.followupAction ?? "" })),
     planBegin: /^\d{8}$/.test(planBegin) ? `${planBegin.slice(0, 4)}-${planBegin.slice(4, 6)}-${planBegin.slice(6)}` : planBegin,
     benefits,
+    // Stedi's JSON names related entities differently from the X12 loop; not mapped until verified against a live response.
+    relatedEntities: [],
   };
 }

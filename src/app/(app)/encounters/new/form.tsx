@@ -41,6 +41,7 @@ export function ChargeEntryForm({
   const dxSearch = useCodeSearch("dx", icds);
   const pxSearch = useCodeSearch("px", cpts);
   const [referring, setReferring] = useState({ lastName: "", firstName: "", npi: "" });
+  const [supervisingId, setSupervisingId] = useState("");
   const [accident, setAccident] = useState({ employment: false, auto: false, autoState: "", other: false, date: "", claimNumber: "", employer: "" });
   const setAcc = (patch: Partial<typeof accident>) => setAccident((a) => ({ ...a, ...patch }));
   const [lines, setLines] = useState<Line[]>([{ cpt: "", modifiers: "", units: 1, charge: "", dxPointers: "1", description: "" }]);
@@ -58,6 +59,7 @@ export function ChargeEntryForm({
     locationId: locationId || null,
     diagnoses: dx.map((d) => d.trim()).filter(Boolean),
     referring: referring.npi.trim() || referring.lastName.trim() ? referring : null,
+    supervisingProviderId: supervisingId && supervisingId !== providerId ? supervisingId : null,
     accident: accident.employment || accident.auto || accident.other || accident.claimNumber.trim() ? accident : null,
     lines: lines
       .filter((l) => l.cpt.trim())
@@ -111,6 +113,18 @@ export function ChargeEntryForm({
             <Field label="First name"><input className="input" value={referring.firstName} onChange={(e) => setReferring((r) => ({ ...r, firstName: e.target.value }))} autoComplete="off" /></Field>
             <Field label="NPI"><input className="input font-mono" value={referring.npi} onChange={(e) => setReferring((r) => ({ ...r, npi: e.target.value }))} inputMode="numeric" maxLength={10} placeholder="10 digits" autoComplete="off" /></Field>
             <div className="sm:col-span-3"><NpiLookup npi={referring.npi} onFound={(r) => setReferring((x) => ({ ...x, lastName: r.lastName ?? r.name, firstName: r.firstName ?? "" }))} /></div>
+          </div>
+        </details>
+        <details className="sm:col-span-2 lg:col-span-4">
+          <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-300">Supervising provider (a physician supervised this service)</summary>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Field label="Supervising provider">
+              <select className="select" value={supervisingId} onChange={(e) => setSupervisingId(e.target.value)}>
+                <option value="">None</option>
+                {providers.filter((p) => p.id !== providerId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <p className="self-end text-xs text-slate-500 dark:text-slate-400">Sent as the supervising provider (loop 2310D, box 17 DQ). Some payers require it for services by residents, therapists or providers not yet credentialed with them.</p>
           </div>
         </details>
         <details className="sm:col-span-2 lg:col-span-4">

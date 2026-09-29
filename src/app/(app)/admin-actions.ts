@@ -37,7 +37,7 @@ export async function saveProfileAction(_prev: FormResult, fd: FormData): Promis
 export async function saveProviderAction(id: string | null, _prev: FormResult, fd: FormData): Promise<FormResult> {
   const s = await admin();
   try {
-    await saveProvider(await getDb(), s.practiceId, id, { firstName: f(fd, "firstName"), lastName: f(fd, "lastName"), npi: f(fd, "npi"), taxonomy: f(fd, "taxonomy"), specialty: f(fd, "specialty") }, s.userId);
+    await saveProvider(await getDb(), s.practiceId, id, { firstName: f(fd, "firstName"), lastName: f(fd, "lastName"), npi: f(fd, "npi"), taxonomy: f(fd, "taxonomy"), specialty: f(fd, "specialty"), credential: f(fd, "credential") || null }, s.userId);
     revalidatePath("/settings/providers");
     return { ok: true, message: id ? "Provider updated" : "Provider added" };
   } catch (e) {

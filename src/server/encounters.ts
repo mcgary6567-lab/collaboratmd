@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { abnModifiers } from "./abn";
 import { normalizeNdc } from "@/lib/codes/ndc";
-import { isQualityCode } from "@/lib/codes/quality";
+import { isZeroChargeCode } from "@/lib/codes/quality";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { createClaimForEncounter } from "./claims";
@@ -23,6 +23,8 @@ export interface NewEncounterInput {
   lines: { cpt: string; modifiers: string[]; units: number; chargeCents: number; dxPointers: number[]; description?: string; minutes?: number | null; ndc?: string | null; ndcUnit?: string | null; ndcQuantity?: number | null }[];
   /** The provider who referred the patient, when the payer needs one on the claim. */
   referring?: { lastName: string; firstName?: string; npi: string } | null;
+  /** The physician who supervised the service (loop 2310D), one of the practice's providers. */
+  supervisingProviderId?: string | null;
   /** Related to work or an accident: box 10 of the claim form, CLM11 on the 837. */
   accident?: AccidentInput | null;
 }
@@ -56,6 +58,12 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
   if (ref && !isValidNpi(ref.npi)) throw new Error("The referring provider's NPI fails its check digit");
   if (ref && !ref.lastName.trim()) throw new Error("Enter the referring provider's last name");
   const accident = accidentColumns(input.accident);
+  const supervisingProviderId = input.supervisingProviderId || null;
+  if (supervisingProviderId) {
+    if (supervisingProviderId === input.providerId) throw new Error("The supervising provider is the one who performed the service; leave supervising empty");
+    const [sup] = await db.select({ id: providers.id }).from(providers).where(and(eq(providers.id, supervisingProviderId), eq(providers.practiceId, practiceId))).limit(1);
+    if (!sup) throw new Error("Choose the supervising provider from the list");
+  }
   // A signed ABN (option 1) for a Medicare patient puts GA on the lines it covers.
   const [primary] = await db.select({ type: schema.payers.type }).from(schema.patientInsurances).innerJoin(schema.payers, eq(schema.payers.id, schema.patientInsurances.payerId))
     .where(and(eq(schema.patientInsurances.patientId, input.patientId), eq(schema.patientInsurances.active, true))).orderBy(asc(schema.patientInsurances.rank)).limit(1);
@@ -63,7 +71,7 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
     const mods = await abnModifiers(db, input.patientId, input.dateOfService, input.lines);
     input = { ...input, lines: input.lines.map((l, i) => ({ ...l, modifiers: mods[i] })) };
   }
-  for (const l of input.lines) if (!(l.chargeCents > 0) && !isQualityCode(l.cpt)) throw new Error(`Enter a charge for ${l.cpt}`);
+  for (const l of input.lines) if (!(l.chargeCents > 0) && !isZeroChargeCode(l.cpt)) throw new Error(`Enter a charge for ${l.cpt}`);
   const [enc] = await db
     .insert(encounters)
     .values({
@@ -78,6 +86,7 @@ export async function createEncounterWithClaim(db: Db, practiceId: string, input
       referringLastName: ref?.lastName.trim().slice(0, 60) ?? null,
       referringFirstName: ref?.firstName?.trim().slice(0, 35) || null,
       referringNpi: ref?.npi ?? null,
+      supervisingProviderId,
       ...accident,
     })
     .returning();

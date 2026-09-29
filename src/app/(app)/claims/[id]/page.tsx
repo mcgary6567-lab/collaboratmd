@@ -13,6 +13,7 @@ import { restrictedAccess } from "@/server/restricted";
 import { RestrictedGate } from "@/components/restricted-gate";
 import { AttachmentsSection } from "./attachments-section";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
+import { openRequestFor } from "@/server/records-requests";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
 import { billAgainAction, billSecondaryAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -59,6 +60,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
       .where(and(eq(schema.patientInsurances.patientId, b.claim.patientId), eq(schema.patientInsurances.active, true), eq(schema.patientInsurances.rank, 2))).limit(1),
   ]);
   const risk = PRE_SUBMIT.includes(b.claim.status) ? await claimRisk(db, s.practiceId, id) : null;
+  const recordsDue = await openRequestFor(db, id);
   const primaryClaim = related.find((r) => r.id === b.claim.primaryClaimId);
   const secondaryClaim = related.find((r) => r.primaryClaimId === id && r.payerSequence === "S");
   const canBillSecondary =
@@ -95,6 +97,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
           </>
         }
       />
+      {recordsDue && <Alert kind="error">The payer asked for this claim&apos;s medical records, due {fmtDate(recordsDue.dueOn)}. Appeals and write-offs are held until they are sent. <Link href="/records-requests" className="font-semibold underline">Records requests</Link></Alert>}
       {b.claim.crossoverPayer && <Alert kind="info">Medicare forwarded this claim to {b.claim.crossoverPayer} (a crossover). It is not billed to them again; their payment arrives on its own remittance.</Alert>}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

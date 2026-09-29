@@ -18,8 +18,10 @@ import { CoverageSection } from "./coverage-section";
 import { MspCard } from "./msp-card";
 import { latestMspScreening } from "@/server/msp";
 import { AbnCard } from "./abn-card";
+import { CareCard } from "./care-card";
+import { careMonths } from "@/server/care-programs";
 import { listAbns } from "@/server/abn";
-import { getPatient } from "@/server/patients";
+import { getPatient, medicareAdvantageOf } from "@/server/patients";
 import { computeFinancials } from "@/server/claims";
 import { eligibilityAction, patientPaymentAction } from "@/app/(app)/actions";
 import { Card, PageHeader, Badge, Money, Empty, Field } from "@/components/ui";
@@ -59,6 +61,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const onMedicare = insurances.some(({ insurance, payer }) => insurance.active && payer.type === "medicare");
   const mspLast = onMedicare ? await latestMspScreening(db, patient.id) : null;
   const abnList = onMedicare ? await listAbns(db, s.practiceId, patient.id) : [];
+  const care = await careMonths(db, s.practiceId, patient.id);
 
   return (
     <>
@@ -161,6 +164,11 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {latestCheck && (
             <div className={`rounded-lg p-3 text-sm ${latestCheck.status === "active" ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"}`}>
               <div className="font-semibold">Coverage {latestCheck.status} · {fmtDateTime(latestCheck.checkedAt, s.timeZone)}</div>
+              {medicareAdvantageOf(latestCheck.response) && (
+                <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
+                  Medicare says this patient is in a Medicare Advantage plan ({medicareAdvantageOf(latestCheck.response)!.plan}). Bill that plan, not Medicare: add it as the patient&apos;s insurance.
+                </p>
+              )}
               {latestCheck.status === "active" ? (
                 <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs">
                   <span>Plan: {latestCheck.planName}</span>
@@ -189,6 +197,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {!insured && <CoverageSection practiceId={s.practiceId} patientId={patient.id} canWrite={canWrite} simulated={!cfg.stedi} />}
           {onMedicare && <MspCard patientId={patient.id} last={mspLast} canWrite={canWrite} timeZone={s.timeZone} />}
           {onMedicare && <AbnCard patientId={patient.id} notices={abnList} canWrite={canWrite} />}
+          <CareCard patientId={patient.id} data={care} providers={providerList.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}${p.credential ? `, ${p.credential}` : ""}` }))} canWrite={canWrite} />
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>
         <Card title="Account balance">

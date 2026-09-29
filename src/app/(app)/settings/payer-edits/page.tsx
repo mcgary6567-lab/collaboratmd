@@ -15,7 +15,8 @@ export const metadata: Metadata = { title: "Payer edits" };
 
 export const dynamic = "force-dynamic";
 
-function detail(kind: string, params: { modifiers?: string[]; dxPrefixes?: string[]; maxUnits?: number }) {
+function detail(kind: string, params: { modifiers?: string[]; dxPrefixes?: string[]; maxUnits?: number; maxCount?: number; periodDays?: number }) {
+  if (kind === "frequency") return `At most ${params.maxCount} ${params.periodDays ? `in ${params.periodDays} days` : "in a lifetime"} per patient`;
   if (kind === "modifier_required") return `One of ${params.modifiers?.join(", ")}`;
   if (kind === "dx_required") return `Dx starting ${params.dxPrefixes?.join(", ")}`;
   if (kind === "max_units") return `At most ${params.maxUnits} per line`;
@@ -129,6 +130,14 @@ export default async function PayerEditsPage() {
                 <Field label="Unit limit (for a unit rule)">
                   <input name="maxUnits" type="number" min={1} className="input" />
                 </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Times allowed (frequency rule)">
+                    <input name="maxCount" type="number" min={1} className="input" />
+                  </Field>
+                  <Field label="In how many days (0 = lifetime)">
+                    <input name="periodDays" type="number" min={0} className="input" />
+                  </Field>
+                </div>
                 <Field label="When it fails">
                   <select name="severity" className="input">
                     <option value="error">Block the claim</option>

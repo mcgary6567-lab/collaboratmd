@@ -94,6 +94,8 @@ export interface Edi837Input {
   renderingProvider: { lastName: string; firstName: string; npi: string; taxonomy: string };
   /** The referring provider, sent in loop 2310A when present. */
   referringProvider?: { lastName: string; firstName: string; npi: string } | null;
+  /** The supervising provider, sent in loop 2310D (NM1*DQ) when present. */
+  supervisingProvider?: { lastName: string; firstName: string; npi: string } | null;
   serviceFacility?: ServiceFacility | null;
   /** `type` (medicare, medicaid, commercial...) sets the claim filing indicator, SBR09. */
   payer: { name: string; payerId: string; type?: string | null };
@@ -241,6 +243,8 @@ export function buildEdi837P(input: Edi837Input): string {
   s.push(["NM1", "82", "1", input.renderingProvider.lastName, input.renderingProvider.firstName, "", "", "", "XX", input.renderingProvider.npi]);
   s.push(["PRV", "PE", "PXC", input.renderingProvider.taxonomy]);
   if (input.serviceFacility) s.push(...serviceFacilityLoop(input.serviceFacility));
+  // 2310D supervising provider
+  if (input.supervisingProvider) s.push(["NM1", "DQ", "1", input.supervisingProvider.lastName, input.supervisingProvider.firstName, "", "", "", "XX", input.supervisingProvider.npi]);
   if (input.otherPayer) s.push(...otherPayerLoops(input.otherPayer, professionalFiling(input.otherPayer.type)));
   // 2400 service lines
   input.lines.forEach((line, idx) => {

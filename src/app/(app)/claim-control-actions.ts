@@ -99,6 +99,8 @@ export async function createPayerEditAction(_prev: FormResult, formData: FormDat
       modifiers: list(formData.get("modifiers")),
       dxPrefixes: list(formData.get("dxPrefixes")),
       maxUnits: Number(formData.get("maxUnits") ?? 0) || null,
+      maxCount: Number(formData.get("maxCount") ?? 0) || null,
+      periodDays: formData.get("periodDays") === null || formData.get("periodDays") === "" ? null : Number(formData.get("periodDays")),
       severity: formData.get("severity") === "warning" ? "warning" : "error",
       message: String(formData.get("message") ?? ""),
     });

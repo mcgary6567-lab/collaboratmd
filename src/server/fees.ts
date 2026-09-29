@@ -3,6 +3,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { ContractRules } from "@/db/schema";
 import { medicareAllowed, practiceLocality } from "./mpfs";
+import { medicarePercentFor } from "@/lib/codes/credentials";
 
 const { feeSchedules, feeScheduleItems, underpayments, claims, charges, ledgerEntries, payers, patients, cptCodes } = schema;
 
@@ -192,9 +193,13 @@ async function medicareTermsFor(db: Db, claim: { practiceId: string; payerId: st
   if (payer?.type !== "medicare") return null;
   const loc = await practiceLocality(db, claim.practiceId);
   if (!loc) return null;
-  const [enc] = await db.select({ dos: schema.encounters.dateOfService, pos: schema.encounters.placeOfService }).from(schema.encounters).where(eq(schema.encounters.id, claim.encounterId)).limit(1);
-  const { rates, mppr } = await medicareAllowed(db, loc, enc.dos, enc.pos, lines);
-  if (!rates.size) return null;
+  const [enc] = await db.select({ dos: schema.encounters.dateOfService, pos: schema.encounters.placeOfService, credential: schema.providers.credential })
+    .from(schema.encounters).innerJoin(schema.providers, eq(schema.providers.id, schema.encounters.providerId)).where(eq(schema.encounters.id, claim.encounterId)).limit(1);
+  const { rates: full, mppr } = await medicareAllowed(db, loc, enc.dos, enc.pos, lines);
+  if (!full.size) return null;
+  // Nurse practitioners, physician assistants and clinical nurse specialists billing under their own NPI are paid 85%.
+  const pct = medicarePercentFor(enc.credential);
+  const rates = pct === 100 ? full : new Map([...full].map(([code, cents]) => [code, Math.round((cents * pct) / 100)]));
   return { rates, mppr, rules: mppr.size ? { mpprPercent: 50 } as ContractRules : null };
 }
 

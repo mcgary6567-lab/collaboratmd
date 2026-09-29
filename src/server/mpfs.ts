@@ -45,14 +45,14 @@ function table(text: string, first: RegExp, isData: (cells: string[]) => boolean
   return { header: header.map((h) => h.toUpperCase().replace(/\s+/g, " ")), rows: parsed.rows.slice(skip) };
 }
 
-export type RvuRow = { code: string; modifier: string; status: string | null; workRvu: number; peNonFacility: number; peFacility: number; mpRvu: number; multProc: string | null };
+export type RvuRow = { code: string; modifier: string; status: string | null; workRvu: number; peNonFacility: number; peFacility: number; mpRvu: number; multProc: string | null; globalDays: string | null };
 
 /** CMS's PPRRVU file saved as CSV. Returns the rows and the conversion factor it lists, if any. */
 export function parseRvuFile(text: string) {
   const t = table(text, /HCPCS/i, (r) => /^[0-9A-Z]{5}$/.test((r[0] ?? "").trim()));
   if (!t) throw new Error("Not a Medicare RVU file: no header with HCPCS");
   const at = (re: RegExp, not?: RegExp) => t.header.findIndex((h) => re.test(h) && !(not && not.test(h)));
-  const c = { code: at(/^HCPCS/), mod: at(/^MOD/), status: at(/STATUS/), work: at(/WORK/), peNon: at(/NON-?\s?FAC.*PE|PE.*NON-?\s?FAC/, /TOTAL|INDICATOR|NA /), peFac: at(/FAC.*PE|PE.*FAC/, /NON|TOTAL|INDICATOR|NA /), mp: at(/^MP|MALPRACTICE|MP RVU/, /TOTAL/), cf: at(/CONV/), multProc: at(/MULT/) };
+  const c = { code: at(/^HCPCS/), mod: at(/^MOD/), status: at(/STATUS/), work: at(/WORK/), peNon: at(/NON-?\s?FAC.*PE|PE.*NON-?\s?FAC/, /TOTAL|INDICATOR|NA /), peFac: at(/FAC.*PE|PE.*FAC/, /NON|TOTAL|INDICATOR|NA /), mp: at(/^MP|MALPRACTICE|MP RVU/, /TOTAL/), cf: at(/CONV/), multProc: at(/MULT/), glob: at(/GLOB/) };
   if ([c.code, c.work, c.peNon, c.peFac, c.mp].some((i) => i < 0)) throw new Error("The RVU file needs HCPCS, work RVU, non-facility PE RVU, facility PE RVU and MP RVU columns");
   const rows: RvuRow[] = [];
   let skipped = 0;
@@ -62,7 +62,7 @@ export function parseRvuFile(text: string) {
     const [w, pn, pf, mp] = [num(r[c.work]), num(r[c.peNon]), num(r[c.peFac]), num(r[c.mp])];
     if (!/^[0-9A-Z]{5}$/.test(code) || w === null || pn === null || pf === null || mp === null) { skipped++; continue; }
     if (conversionFactor === null && c.cf >= 0) conversionFactor = num(r[c.cf]);
-    rows.push({ code, modifier: c.mod >= 0 ? (r[c.mod] ?? "").trim().toUpperCase() : "", status: c.status >= 0 ? (r[c.status] ?? "").trim() || null : null, workRvu: w, peNonFacility: pn, peFacility: pf, mpRvu: mp, multProc: c.multProc >= 0 ? (r[c.multProc] ?? "").trim() || null : null });
+    rows.push({ code, modifier: c.mod >= 0 ? (r[c.mod] ?? "").trim().toUpperCase() : "", status: c.status >= 0 ? (r[c.status] ?? "").trim() || null : null, workRvu: w, peNonFacility: pn, peFacility: pf, mpRvu: mp, multProc: c.multProc >= 0 ? (r[c.multProc] ?? "").trim() || null : null, globalDays: c.glob >= 0 ? (r[c.glob] ?? "").trim().toUpperCase() || null : null });
   }
   return { rows, skipped, conversionFactor: conversionFactor && conversionFactor > 1 ? conversionFactor : null };
 }

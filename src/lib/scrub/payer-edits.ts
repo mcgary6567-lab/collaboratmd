@@ -12,7 +12,7 @@
  */
 import type { ScrubFinding } from "./rules";
 
-export type PayerEditKind = "auth_required" | "modifier_required" | "dx_required" | "max_units" | "not_covered";
+export type PayerEditKind = "auth_required" | "modifier_required" | "dx_required" | "max_units" | "not_covered" | "frequency";
 
 export const EDIT_KINDS: { kind: PayerEditKind; label: string; help: string }[] = [
   { kind: "auth_required", label: "Prior authorization required", help: "The code needs an authorization on file that covers the date of service." },
@@ -20,13 +20,14 @@ export const EDIT_KINDS: { kind: PayerEditKind; label: string; help: string }[] 
   { kind: "dx_required", label: "Qualifying diagnosis required", help: "The claim must include a diagnosis starting with one of the listed codes." },
   { kind: "max_units", label: "Unit limit", help: "The code may not be billed with more units than the limit on one line." },
   { kind: "not_covered", label: "Not covered", help: "The payer does not cover the code." },
+  { kind: "frequency", label: "Frequency limit", help: "The code may be billed at most so many times for a patient in a number of days (0 days for a lifetime), counting the patient's earlier claims." },
 ];
 
 export interface PayerEditRule {
   id: string;
   kind: string;
   cpt: string | null;
-  params: { modifiers?: string[]; dxPrefixes?: string[]; maxUnits?: number };
+  params: { modifiers?: string[]; dxPrefixes?: string[]; maxUnits?: number; maxCount?: number; periodDays?: number };
   severity: string;
   message: string;
 }
@@ -46,6 +47,8 @@ export interface EditClaim {
   dateOfService: string;
   diagnoses: string[];
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number }[];
+  /** The patient's earlier services (other encounters, not voided), for frequency limits. */
+  history?: { cpt: string; dateOfService: string }[];
 }
 
 export interface EditResult {
@@ -120,6 +123,22 @@ export function evaluatePayerEdits(claim: EditClaim, rules: PayerEditRule[], aut
         for (const l of lines) {
           if (l.units > max) {
             findings.push({ rule: "PAYER_UNITS", severity: sev, message: `Line ${l.lineNumber} (${l.cpt}): ${rule.message}`, field: `lines.${l.lineNumber}.units` });
+          }
+        }
+        break;
+      }
+      case "frequency": {
+        const max = rule.params.maxCount ?? Infinity;
+        const days = rule.params.periodDays ?? 0;
+        const from = days > 0 ? new Date(Date.parse(`${claim.dateOfService}T12:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10) : "";
+        const prior = (claim.history ?? []).filter((h) => h.cpt === rule.cpt && h.dateOfService <= claim.dateOfService && (!from || h.dateOfService > from));
+        let count = prior.length;
+        for (const l of lines) {
+          count += 1;
+          if (count > max) {
+            const last = prior.map((h) => h.dateOfService).sort().at(-1);
+            const window = days > 0 ? `in ${days} days` : "in a lifetime";
+            findings.push({ rule: "PAYER_FREQUENCY", severity: sev, message: `Line ${l.lineNumber} (${l.cpt}): ${rule.message} (at most ${max} ${window}; ${prior.length} already billed${last ? `, last on ${last}` : ""})`, field: `lines.${l.lineNumber}.cpt` });
           }
         }
         break;

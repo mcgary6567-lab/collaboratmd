@@ -1,6 +1,6 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
-  Award, Bot, BuildingComplex, Calculator, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, Gavel, HandCoins,
+  Award, Bot, BuildingComplex, Calculator, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, FolderSearch, Gauge, Gavel, HandCoins,
   Hospital, Inbox, Landmark, LayoutDashboard, ListChecks, MessageSquare, Network, Radar, Receipt, ReceiptText, RotateCcwClock, SearchCheck, Settings, SquareCheckBig, Stethoscope,
   TrendingDown, TriangleAlert, Upload, UserSearch, Users, Wallet, WandSparkles,
 } from "lucide-react";
@@ -46,6 +46,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/denials", label: "Denials", icon: TriangleAlert },
       { href: "/denials/agent", label: "Denial agent", icon: Bot },
       { href: "/underpayments", label: "Underpayments", icon: TrendingDown },
+      { href: "/records-requests", label: "Records requests", icon: FolderSearch },
       { href: "/billing", label: "Patient billing", icon: Wallet },
       { href: "/billing/collections", label: "Collections", icon: Gavel },
       { href: "/billing/missed-charges", label: "Missed charges", icon: SearchCheck },
@@ -61,6 +62,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reports/forecast", label: "Cash forecast", icon: ChartLine },
       { href: "/reports/payer-alerts", label: "Payer alerts", icon: Radar },
       { href: "/reports/quality", label: "Quality (MIPS)", icon: Award },
+      { href: "/reports/productivity", label: "Productivity (RVUs)", icon: Gauge, adminOnly: true },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },

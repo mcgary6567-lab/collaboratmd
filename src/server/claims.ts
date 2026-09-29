@@ -22,7 +22,10 @@ import { getClearinghouse, type RemitRequest, type SubmissionResult } from "@/li
 import { explainDenial } from "@/lib/ai/explain";
 import { carcCategory } from "@/lib/codes/carc";
 import { checkClaimUnderpayment } from "./fees";
-import { authsForPatient, consumeAuthorization, rulesForPayer } from "./payer-edits";
+import { authsForPatient, consumeAuthorization, rulesForPayer, serviceHistory } from "./payer-edits";
+import { globalPeriodFindings } from "./global-periods";
+import { assertNoOpenRequest } from "./records-requests";
+import { medicareAdvantageFinding } from "./patients";
 import { enrollmentFinding, enrollmentFor } from "./enrollment";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
@@ -41,6 +44,8 @@ export interface ClaimBundle {
   practice: typeof practices.$inferSelect;
   /** Where the visit happened, when the practice has more than one location. */
   location?: typeof schema.locations.$inferSelect | null;
+  /** The supervising physician on the encounter (2310D), when there is one. */
+  supervisor?: typeof providers.$inferSelect | null;
 }
 
 export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBundle | null> {
@@ -58,7 +63,8 @@ export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBun
     .limit(1);
   if (!row) return null;
   const lines = await db.select().from(charges).where(eq(charges.encounterId, row.encounter.id)).orderBy(asc(charges.lineNumber));
-  return { ...row, lines };
+  const [supervisor] = row.encounter.supervisingProviderId ? await db.select().from(providers).where(eq(providers.id, row.encounter.supervisingProviderId)).limit(1) : [];
+  return { ...row, lines, supervisor: supervisor ?? null };
 }
 
 function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
@@ -66,7 +72,8 @@ function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
     claim: { frequencyCode: b.claim.frequencyCode, originalPayerClaimNumber: b.claim.originalPayerClaimNumber },
     patient: { firstName: b.patient.firstName, lastName: b.patient.lastName, dob: b.patient.dob, sex: b.patient.sex, address1: b.patient.address1, zip: b.patient.zip },
     insurance: { memberId: b.insurance.memberId, payerId: b.payer.payerId, relationship: b.insurance.relationship, subscriber: { firstName: b.insurance.subscriberFirstName, lastName: b.insurance.subscriberLastName, dob: b.insurance.subscriberDob } },
-    provider: { npi: b.provider.npi, taxonomy: b.provider.taxonomy },
+    provider: { npi: b.provider.npi, taxonomy: b.provider.taxonomy, credential: b.provider.credential },
+    supervisor: b.supervisor ? { npi: b.supervisor.npi, credential: b.supervisor.credential, name: `${b.supervisor.firstName} ${b.supervisor.lastName}` } : null,
     practice: { npi: b.practice.npi, taxId: b.practice.taxId, phone: b.practice.phone ?? null, cliaNumber: b.practice.cliaNumber },
     encounter: { dateOfService: b.encounter.dateOfService, placeOfService: b.encounter.placeOfService, diagnoses: b.encounter.diagnoses, referringNpi: b.encounter.referringNpi,
       relatedEmployment: b.encounter.relatedEmployment, relatedAuto: b.encounter.relatedAuto, autoAccidentState: b.encounter.autoAccidentState, relatedOther: b.encounter.relatedOther, accidentDate: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber },
@@ -108,11 +115,14 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
     authsForPatient(db, b.claim.practiceId, b.patient.id, b.payer.id),
     enrollmentFor(db, b.provider.id, b.payer.id),
   ]);
+  const limited = [...new Set(rules.filter((r) => r.kind === "frequency" && r.cpt).map((r) => r.cpt!))];
+  const history = limited.length ? await serviceHistory(db, b.claim.practiceId, b.patient.id, b.encounter.id, limited) : [];
   const edits = evaluatePayerEdits(
     {
       dateOfService: b.encounter.dateOfService,
       diagnoses: b.encounter.diagnoses,
       lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units })),
+      history,
     },
     rules,
     auths,
@@ -124,7 +134,9 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
   });
   const msp = await mspFindings(db, { patientId: b.patient.id, payerType: b.payer.type, payerSequence: b.claim.payerSequence, mspType: b.insurance.mspType });
   const abn = await abnFindings(db, { patientId: b.patient.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })) });
-  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...(enrolled ? [enrolled] : [])], edits };
+  const globals = await globalPeriodFindings(db, { practiceId: b.claim.practiceId, patientId: b.patient.id, encounterId: b.encounter.id, dateOfService: b.encounter.dateOfService, payerType: b.payer.type, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })) });
+  const advantage = await medicareAdvantageFinding(db, { patientInsuranceId: b.insurance.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService });
+  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...(advantage ? [advantage] : []), ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
@@ -750,6 +762,7 @@ export async function writeOffClaim(db: Db, claimId: string, reason: string, use
   const fin = await getClaimFinancials(db, claimId);
   const [claim] = await db.select().from(claims).where(eq(claims.id, claimId)).limit(1);
   if (!claim) throw new Error("Claim not found");
+  await assertNoOpenRequest(db, claimId, "write it off");
   if (fin.insuranceBalanceCents > 0) {
     await db.insert(ledgerEntries).values({ practiceId: claim.practiceId, patientId: claim.patientId, claimId, type: "write_off", amountCents: fin.insuranceBalanceCents, note: reason, postedBy: userId ?? null });
   }

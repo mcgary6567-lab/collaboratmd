@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-29",
+    title: "Global periods, Medicare Advantage, care management, records requests, prompt-pay interest",
+    items: [
+      "Visits and procedures inside a surgery's global period are caught before the claim goes out; routine post-op visits go in as 99024 at $0.00",
+      "Patients Medicare says are in a Medicare Advantage plan are flagged, and claims to traditional Medicare for them are stopped",
+      "Supervising provider on claims, and provider credentials: Medicare checks expect 85% for NPs, PAs and CNSs",
+      "Chronic care management, behavioral health integration and remote monitoring: consent, minutes through the month, and billing when it ends",
+      "Frequency limits (once a year, once in a lifetime) as payer edits, counted from the patient's own history",
+      "Records requests (ADR, RAC, TPE, audits) tracked to their due date, with the claim held until the records are sent",
+      "Productivity report: work RVUs per provider and each provider's E/M level mix, with a random sample for review",
+      "Prompt-pay interest on late commercial payments under your state's statute, with a letter per payer",
+    ],
+  },
+  {
+    date: "2026-09-29",
     title: "Drug codes, payer takebacks, appeal levels, ABNs and the 60-day rule",
     items: [
       "NDC, quantity and unit on drug lines, sent on the 837P and printed on the CMS-1500",

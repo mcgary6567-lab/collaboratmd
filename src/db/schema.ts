@@ -159,6 +159,8 @@ export const providers = pgTable("providers", {
   taxonomy: text("taxonomy").notNull(),
   specialty: text("specialty").notNull(),
   active: boolean("active").notNull().default(true),
+  /** MD, DO, NP, PA, CNS, CNM or other: NPs, PAs and CNSs are paid 85% of Medicare's fee schedule under their own NPI. Migration 0057. */
+  credential: text("credential"),
 });
 
 export const payers = pgTable("payers", {
@@ -292,6 +294,8 @@ export const encounters = pgTable("encounters", {
   referringLastName: text("referring_last_name"),
   referringFirstName: text("referring_first_name"),
   referringNpi: text("referring_npi"),
+  /** The physician supervising the service (2310D NM1*DQ, box 17 DQ). Migration 0057. */
+  supervisingProviderId: uuid("supervising_provider_id").references(() => providers.id),
   /** Whether the condition is related to employment, an auto accident (and its state) or another accident (CLM11, box 10). */
   relatedEmployment: boolean("related_employment").notNull().default(false),
   relatedAuto: boolean("related_auto").notNull().default(false),
@@ -661,6 +665,9 @@ export type PayerEditParams = {
   modifiers?: string[];
   dxPrefixes?: string[];
   maxUnits?: number;
+  /** Frequency limits: at most maxCount services in periodDays (0 for a lifetime). */
+  maxCount?: number;
+  periodDays?: number;
 };
 
 export const payerEdits = pgTable("payer_edits", {
@@ -1864,6 +1871,8 @@ export const mpfsRvus = pgTable("mpfs_rvus", {
   mpRvu: numeric("mp_rvu", { mode: "number" }).notNull(),
   /** Multiple procedure indicator: 2 means the standard 100% / 50% reduction for further procedures that day. */
   multProc: text("mult_proc"),
+  /** Global surgery days: 000, 010, 090, or XXX/YYY/ZZZ/MMM when the concept does not apply. Migration 0057. */
+  globalDays: text("global_days"),
 }, (t) => [primaryKey({ columns: [t.year, t.code, t.modifier] })]);
 
 /** Geographic practice cost indices by Medicare locality (CMS's GPCI file), by year. */
@@ -2006,3 +2015,72 @@ export const medicareTelehealthCodes = pgTable("medicare_telehealth_codes", {
   code: text("code").notNull(),
   status: text("status"),
 }, (t) => [primaryKey({ columns: [t.year, t.code] })]);
+
+/* ------------------------------------------------------------------ */
+/* Round K: monthly care programs, records requests, prompt pay         */
+/* ------------------------------------------------------------------ */
+
+/** A patient's consent to a monthly care program (CCM, BHI, RPM), which Medicare requires before billing it. */
+export const careProgramConsents = pgTable("care_program_consents", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  program: text("program").notNull(),
+  consentedOn: date("consented_on").notNull(),
+  recordedBy: uuid("recorded_by").references(() => users.id),
+}, (t) => [primaryKey({ columns: [t.patientId, t.program] })]);
+
+/** Minutes spent on a patient in a monthly care program, billed once the month's time is reached. */
+export const careMinutes = pgTable("care_minutes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  program: text("program").notNull(),
+  /** Calendar month, YYYY-MM. */
+  month: text("month").notNull(),
+  performedOn: date("performed_on").notNull(),
+  minutes: integer("minutes").notNull(),
+  note: text("note"),
+  loggedBy: uuid("logged_by").references(() => users.id),
+  claimId: uuid("claim_id").references(() => claims.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("care_minutes_patient_idx").on(t.patientId, t.program, t.month)]);
+
+/** A payer's request for medical records: an additional documentation request, a RAC or commercial audit. */
+export const recordsRequests = pgTable("records_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").references(() => patients.id),
+  claimId: uuid("claim_id").references(() => claims.id),
+  payerId: uuid("payer_id").references(() => payers.id),
+  kind: text("kind").notNull(), // adr | rac | tpe | commercial_audit | other
+  reference: text("reference"),
+  receivedOn: date("received_on").notNull(),
+  dueOn: date("due_on").notNull(),
+  status: text("status").notNull().default("open"), // open | sent | closed
+  sentOn: date("sent_on"),
+  sentVia: text("sent_via"),
+  outcome: text("outcome"),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("records_requests_practice_idx").on(t.practiceId, t.status, t.dueOn)]);
+
+/** A state's prompt-pay statute as the practice reads it: days a commercial payer has to pay a clean claim, and the interest after. */
+export const promptPayRules = pgTable("prompt_pay_rules", {
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  state: text("state").notNull(),
+  days: integer("days").notNull(),
+  annualRatePct: numeric("annual_rate_pct", { mode: "number" }).notNull(),
+  citation: text("citation"),
+}, (t) => [primaryKey({ columns: [t.practiceId, t.state] })]);
+
+/** Interest asked of a payer for a late claim, so it is asked for once. */
+export const promptPayRequests = pgTable("prompt_pay_requests", {
+  claimId: uuid("claim_id").primaryKey().references(() => claims.id),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  daysLate: integer("days_late").notNull(),
+  interestCents: integer("interest_cents").notNull(),
+  requestedOn: date("requested_on").notNull(),
+  receivedCents: integer("received_cents"),
+});

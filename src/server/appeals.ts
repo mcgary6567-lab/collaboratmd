@@ -10,6 +10,7 @@ import { draftAppealBody } from "@/lib/ai/appeal";
 import { fillPlaceholders, templateLetter, wrapBody } from "@/lib/appeals";
 import { practiceConfig } from "./integrations";
 import { levelFiled } from "./appeal-levels";
+import { assertNoOpenRequest } from "./records-requests";
 
 const { appealLetters, denials, claims, patients, patientInsurances, payers, practices, encounters, charges, providers, claimEvents } = schema;
 
@@ -82,6 +83,8 @@ export async function saveAppeal(db: Db, practiceId: string, letterId: string, b
 export async function markAppealSent(db: Db, practiceId: string, letterId: string, userId?: string) {
   const [letter] = await db.select().from(appealLetters).where(and(eq(appealLetters.id, letterId), eq(appealLetters.practiceId, practiceId))).limit(1);
   if (!letter) throw new Error("Letter not found");
+  const [pending] = await db.select({ claimId: denials.claimId }).from(denials).where(eq(denials.id, letter.denialId)).limit(1);
+  if (pending) await assertNoOpenRequest(db, pending.claimId, "send an appeal");
   await db.update(appealLetters).set({ status: "sent", sentAt: new Date() }).where(eq(appealLetters.id, letterId));
   const [denial] = await db.update(denials).set({ status: "appealed" }).where(eq(denials.id, letter.denialId)).returning();
   await db.insert(claimEvents).values({ claimId: denial.claimId, status: "appealed", source: "user", message: `Appeal letter sent for CARC ${denial.carc}` });

@@ -7,22 +7,27 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { TaxonomyInput } from "@/components/code-pickers";
 import { NpiLookup } from "@/components/npi-lookup";
+import { CREDENTIALS, NPP_85 } from "@/lib/codes/credentials";
 
 export const metadata: Metadata = { title: "Providers" };
 
 export const dynamic = "force-dynamic";
 
-type P = { firstName: string; lastName: string; npi: string; taxonomy: string; specialty: string };
+type P = { firstName: string; lastName: string; npi: string; taxonomy: string; specialty: string; credential: string | null };
 
 function ProviderFields({ p }: { p?: P }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-5">
+    <div className="grid gap-2 sm:grid-cols-6">
       <input name="firstName" defaultValue={p?.firstName} placeholder="First name" className="input" required />
       <input name="lastName" defaultValue={p?.lastName} placeholder="Last name" className="input" required />
       <input name="npi" defaultValue={p?.npi} placeholder="NPI (Type 1)" className="input font-mono" maxLength={10} inputMode="numeric" required />
       <TaxonomyInput defaultValue={p?.taxonomy} className="input font-mono" required id={`taxonomy-${p?.npi ?? "new"}`} placeholder="Taxonomy: type a specialty or code" />
       <input name="specialty" defaultValue={p?.specialty} placeholder="Specialty" className="input" required />
-      <div className="sm:col-span-5"><NpiLookup fill={{ firstName: "firstName", lastName: "lastName", taxonomy: "taxonomy", specialty: "specialty" }} /></div>
+      <select name="credential" defaultValue={p?.credential ?? ""} className="input" aria-label="Credential">
+        <option value="">Credential...</option>
+        {CREDENTIALS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+      </select>
+      <div className="sm:col-span-6"><NpiLookup fill={{ firstName: "firstName", lastName: "lastName", taxonomy: "taxonomy", specialty: "specialty" }} /></div>
     </div>
   );
 }
@@ -46,11 +51,12 @@ export default async function ProvidersPage() {
       )}
       <Card>
         <div tabIndex={0} role="region" aria-label="Table (scrolls sideways)" className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Provider</th><th>NPI</th><th>Taxonomy</th><th>Specialty</th><th>Status</th><th /></tr></thead>
+          <thead><tr><th>Provider</th><th>Credential</th><th>NPI</th><th>Taxonomy</th><th>Specialty</th><th>Status</th><th /></tr></thead>
           <tbody>
             {providers.map((p) => (
               <tr key={p.id} className={p.active ? "" : "opacity-60"}>
                 <td className="font-medium">{p.lastName}, {p.firstName}</td>
+                <td>{p.credential ?? ""}{p.credential && NPP_85.has(p.credential) ? <span className="block text-xs text-slate-500">Medicare 85% own NPI</span> : null}</td>
                 <td className="font-mono">{p.npi}</td>
                 <td className="font-mono">{p.taxonomy}</td>
                 <td>{p.specialty}</td>
@@ -75,7 +81,7 @@ export default async function ProvidersPage() {
             ))}
           </tbody>
         </table></div>
-        <p className="mt-3 text-xs text-slate-500">Inactive providers stay on their past claims but leave charge entry and scheduling. NPIs are checked against their check digit.</p>
+        <p className="mt-3 text-xs text-slate-500">Inactive providers stay on their past claims but leave charge entry and scheduling. NPIs are checked against their check digit. The credential sets what Medicare&apos;s fee schedule pays: nurse practitioners, physician assistants and clinical nurse specialists billing under their own NPI are paid 85%.</p>
       </Card>
     </>
   );

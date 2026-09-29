@@ -11,6 +11,7 @@ import { NAV_GROUPS } from "@/lib/nav";
 import { validTimeZone } from "./practice-time";
 import { isUsState, normalizePhone, normalizeZip } from "@/lib/us";
 import { CLIA_RE } from "@/lib/codes/lab";
+import { isCredential } from "@/lib/codes/credentials";
 
 const { practices, providers, payers, users, auditLog } = schema;
 
@@ -79,10 +80,11 @@ export async function saveProfile(db: Db, practiceId: string, input: ProfileInpu
 
 /* ------------------------------ Providers ------------------------------ */
 
-export type ProviderInput = { firstName: string; lastName: string; npi: string; taxonomy: string; specialty: string };
+export type ProviderInput = { firstName: string; lastName: string; npi: string; taxonomy: string; specialty: string; credential?: string | null };
 
 function cleanProvider(input: ProviderInput) {
-  const v = { firstName: input.firstName.trim().slice(0, 60), lastName: input.lastName.trim().slice(0, 60), npi: input.npi.replace(/\D/g, ""), taxonomy: input.taxonomy.trim().toUpperCase(), specialty: input.specialty.trim().slice(0, 80) };
+  const v = { firstName: input.firstName.trim().slice(0, 60), lastName: input.lastName.trim().slice(0, 60), npi: input.npi.replace(/\D/g, ""), taxonomy: input.taxonomy.trim().toUpperCase(), specialty: input.specialty.trim().slice(0, 80), credential: input.credential?.trim().toUpperCase() || null };
+  if (v.credential && !isCredential(v.credential)) throw new Error("Choose the provider's credential from the list");
   if (!v.firstName || !v.lastName) throw new Error("Enter the provider's first and last name");
   if (!isValidNpi(v.npi)) throw new Error("That NPI fails its check digit");
   if (!TAXONOMY.test(v.taxonomy)) throw new Error("Enter the 10-character taxonomy code, e.g. 207Q00000X");

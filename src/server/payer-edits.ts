@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { EDIT_KINDS, type AuthOnFile, type PayerEditRule } from "@/lib/scrub/payer-edits";
@@ -34,6 +34,8 @@ export interface NewEditInput {
   modifiers?: string[];
   dxPrefixes?: string[];
   maxUnits?: number | null;
+  maxCount?: number | null;
+  periodDays?: number | null;
   severity: "error" | "warning";
   message?: string;
 }
@@ -44,6 +46,7 @@ const DEFAULT_MESSAGES: Record<string, string> = {
   dx_required: "This payer requires a qualifying diagnosis for this code",
   max_units: "Units exceed this payer's limit for one line",
   not_covered: "This payer does not cover this code",
+  frequency: "Billed more often than this payer allows",
 };
 
 export async function createPayerEdit(db: Db, practiceId: string, input: NewEditInput) {
@@ -54,7 +57,7 @@ export async function createPayerEdit(db: Db, practiceId: string, input: NewEdit
     const [p] = await db.select({ id: payers.id }).from(payers).where(and(eq(payers.id, input.payerId), eq(payers.practiceId, practiceId))).limit(1);
     if (!p) throw new Error("Payer not found");
   }
-  const params: { modifiers?: string[]; dxPrefixes?: string[]; maxUnits?: number } = {};
+  const params: { modifiers?: string[]; dxPrefixes?: string[]; maxUnits?: number; maxCount?: number; periodDays?: number } = {};
   if (input.kind === "modifier_required") {
     params.modifiers = (input.modifiers ?? []).map((m) => m.trim().toUpperCase()).filter(Boolean);
     if (!params.modifiers.length) throw new Error("List at least one modifier");
@@ -62,6 +65,12 @@ export async function createPayerEdit(db: Db, practiceId: string, input: NewEdit
   if (input.kind === "dx_required") {
     params.dxPrefixes = (input.dxPrefixes ?? []).map((d) => d.trim().toUpperCase()).filter(Boolean);
     if (!params.dxPrefixes.length) throw new Error("List at least one diagnosis code or prefix");
+  }
+  if (input.kind === "frequency") {
+    if (!input.maxCount || input.maxCount < 1 || !Number.isInteger(input.maxCount)) throw new Error("Set how many times the code may be billed (at least 1)");
+    if (input.periodDays === null || input.periodDays === undefined || input.periodDays < 0 || !Number.isInteger(input.periodDays)) throw new Error("Set the period in days (0 for a lifetime)");
+    params.maxCount = input.maxCount;
+    params.periodDays = input.periodDays;
   }
   if (input.kind === "max_units") {
     if (!input.maxUnits || input.maxUnits < 1) throw new Error("Set a unit limit of at least 1");
@@ -149,4 +158,16 @@ export async function cancelAuthorization(db: Db, practiceId: string, id: string
 export async function consumeAuthorization(db: Db, authId: string, units: number) {
   if (units <= 0) return;
   await db.update(authorizations).set({ unitsUsed: sql`${authorizations.unitsUsed} + ${units}` }).where(eq(authorizations.id, authId));
+}
+
+/** The patient's earlier services for the codes that have frequency limits, from other encounters whose claims are not voided. */
+export async function serviceHistory(db: Db, practiceId: string, patientId: string, encounterId: string, codes: string[]) {
+  if (!codes.length) return [];
+  const { charges, encounters } = schema;
+  const rows = await db.select({ cpt: charges.cpt, dateOfService: encounters.dateOfService }).from(charges).innerJoin(encounters, eq(encounters.id, charges.encounterId))
+    .where(and(
+      eq(encounters.practiceId, practiceId), eq(encounters.patientId, patientId), ne(encounters.id, encounterId), inArray(charges.cpt, codes),
+      sql`NOT EXISTS (SELECT 1 FROM claims cl WHERE cl.encounter_id = ${encounters.id} AND cl.status IN ('void', 'voided'))`,
+    ));
+  return rows;
 }
