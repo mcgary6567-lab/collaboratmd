@@ -30,6 +30,18 @@ function migrateOnce(): Promise<{ code: number | null; ms: number; out: string }
   });
 }
 
+/**
+ * On GitHub Actions, the failure also as an annotation: annotations of a public
+ * repository can be read without signing in, unlike the job's log. Only the
+ * error text is included (no connection strings: they are masked secrets-free
+ * local URLs here, and are stripped anyway).
+ */
+function annotate(text: string) {
+  if (!process.env.GITHUB_ACTIONS) return;
+  const clean = text.replace(/postgres(ql)?:\/\/\S+/g, "<database url>").slice(0, 3000);
+  console.log(`::error title=Start-up check failed::${clean.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A")}`);
+}
+
 async function main() {
   const failures: string[] = [];
   const runs = await Promise.all(Array.from({ length: 4 }, migrateOnce));
@@ -71,6 +83,7 @@ async function main() {
 
   if (failures.length) {
     console.error(failures.join("\n\n"));
+    annotate(failures.join("\n\n"));
     process.exit(1);
   }
   console.log("Start-up behind the pooler: OK");
@@ -78,5 +91,6 @@ async function main() {
 
 main().catch((e) => {
   console.error(e);
+  annotate(e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e));
   process.exit(1);
 });

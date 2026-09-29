@@ -173,6 +173,8 @@ jobs:
           INI
           /usr/sbin/pgbouncer -d "$RUNNER_TEMP/pgb/pgbouncer.ini"
           for i in $(seq 1 20); do pg_isready -h 127.0.0.1 -p 6432 && break; sleep 1; done
+          # Fail here, with PgBouncer's own log, rather than as a confusing error in the next step.
+          pg_isready -h 127.0.0.1 -p 6432 || { echo "::error title=PgBouncer did not start::see the log below"; cat "$RUNNER_TEMP/pgb/pgbouncer.log" || true; exit 1; }
       - name: Several starts at once, a blocked start, and a start with nothing to do
         run: npx tsx --tsconfig tsconfig.scripts.json scripts/startup-check.ts
       - name: A large practice (100,000 claims) within time budgets, with no missing indexes
