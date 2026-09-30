@@ -747,7 +747,8 @@ export function computeFinancials(entries: { type: string; amountCents: number }
   const insurancePaidCents = sum("insurance_payment") - sum("reversal");
   const patientPaidCents = sum("patient_payment");
   const adjustmentsCents = sum("adjustment") + sum("write_off");
-  const patientRespCents = sum("transfer_to_patient");
+  // A patient fee (a missed-appointment fee) is owed by the patient like a transfer.
+  const patientRespCents = sum("transfer_to_patient") + sum("patient_fee");
   // Bad debt (sent to a collection agency) comes off what the patient owes, like a discount.
   const discountsCents = sum("discount") + sum("bad_debt");
   const refunds = sum("refund");

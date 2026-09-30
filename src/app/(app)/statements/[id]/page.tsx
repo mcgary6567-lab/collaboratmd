@@ -17,6 +17,7 @@ import { langOf } from "@/lib/i18n/messages";
 import { STATEMENT_TEXT, statementDay } from "@/lib/i18n/statement";
 import { explainShare } from "@/lib/billing/explain";
 import { shareReasons } from "@/server/remittance-lines";
+import { billTo } from "@/server/patient-accounts";
 
 export const metadata: Metadata = { title: "Statement" };
 
@@ -42,6 +43,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   const visits = st.detail.visits;
   // Why the patient owes each visit, from the payer's reasons.
   const reasons = await shareReasons(db, visits.map((v) => v.claimId ?? ""));
+  const guarantor = await billTo(db, patient.id);
   const lob = !!(await practiceConfig(db, s.practiceId)).lob;
   const lang = langOf(patient.preferredLanguage);
   const t = STATEMENT_TEXT[lang];
@@ -98,11 +100,12 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
         <section className="mt-6 grid gap-6 sm:grid-cols-2">
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-slate-500">{t.statementFor}</div>
-            <div className="mt-1 font-semibold text-slate-900">{patient.firstName} {patient.lastName}</div>
+            <div className="mt-1 font-semibold text-slate-900">{(guarantor ?? patient).firstName} {(guarantor ?? patient).lastName}</div>
             <div className="text-slate-600">
-              {patient.address1 && <>{patient.address1}<br /></>}
-              {patient.city && `${patient.city}, ${patient.state} ${patient.zip}`}
+              {(guarantor ?? patient).address1 && <>{(guarantor ?? patient).address1}<br /></>}
+              {(guarantor ?? patient).city && `${(guarantor ?? patient).city}, ${(guarantor ?? patient).state} ${(guarantor ?? patient).zip}`}
             </div>
+            {guarantor && <div className="mt-1 text-xs text-slate-500">{lang === "es" ? `Responsable de la cuenta de ${patient.firstName} ${patient.lastName}` : `Responsible party for ${patient.firstName} ${patient.lastName}`}</div>}
           </div>
           <div className="rounded-xl border-2 border-green-600 bg-green-50 p-5 text-center">
             <div className="text-xs font-bold uppercase tracking-widest text-green-800">{t.amountDue}</div>
@@ -171,10 +174,12 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
               ))}
             </tbody>
           </table></div>
-          {(st.detail.unappliedPaymentsCents > 0 || st.detail.discountsCents > 0) && (
+          {(st.detail.unappliedPaymentsCents > 0 || st.detail.discountsCents > 0 || (st.detail.feesCents ?? 0) > 0 || (st.detail.qmbProtectedCents ?? 0) > 0) && (
             <p className="mt-2 text-xs text-slate-500">
               {st.detail.unappliedPaymentsCents > 0 && t.unapplied(money(st.detail.unappliedPaymentsCents))}
               {st.detail.discountsCents > 0 && t.discounts(money(st.detail.discountsCents))}
+              {(st.detail.feesCents ?? 0) > 0 && (lang === "es" ? ` Incluye ${money(st.detail.feesCents!)} por citas perdidas.` : ` Includes ${money(st.detail.feesCents!)} in missed-appointment fees.`)}
+              {(st.detail.qmbProtectedCents ?? 0) > 0 && (lang === "es" ? " Los deducibles y coseguros de Medicare no se le cobran (beneficiario QMB)." : " Medicare deductibles and coinsurance are not billed to you (Qualified Medicare Beneficiary).")}
             </p>
           )}
         </section>

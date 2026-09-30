@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { CAN_WRITE, requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireSession } from "@/lib/auth";
 import { logPatientView } from "@/lib/log-view";
 import { restrictedAccess } from "@/server/restricted";
 import { RestrictedGate } from "@/components/restricted-gate";
@@ -20,6 +20,7 @@ import { latestMspScreening } from "@/server/msp";
 import { AbnCard } from "./abn-card";
 import { CareCard } from "./care-card";
 import { SlidingFeeCard } from "./sliding-fee-card";
+import { AccountCard } from "./account-card";
 import { CardOnFileCard } from "./card-on-file-card";
 import { cardOnFileFor } from "@/server/card-on-file";
 import { slidingFeeOf } from "@/server/sliding-fee";
@@ -238,6 +239,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {onMedicare && <AbnCard patientId={patient.id} notices={abnList} canWrite={canWrite} />}
           {cardOnFile && <CardOnFileCard patientId={patient.id} data={cardOnFile} canWrite={canWrite} />}
           {(slidingFee || slidingTiers.length > 0) && <SlidingFeeCard patientId={patient.id} fee={slidingFee} canWrite={canWrite} />}
+          <AccountCard db={db} practiceId={s.practiceId} patient={patient} insurances={insurances} canWrite={canWrite} canAdjust={(CAN_ADJUST as readonly string[]).includes(s.role)} />
           <CareCard patientId={patient.id} data={care} providers={providerList.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}${p.credential ? `, ${p.credential}` : ""}` }))} canWrite={canWrite} />
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>

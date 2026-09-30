@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const LABEL: Record<string, string> = {
   charge: "Charges", insurance_payment: "Insurance payments", patient_payment: "Patient payments", adjustment: "Contractual adjustments", write_off: "Write-offs",
-  transfer_to_patient: "To patient responsibility", discount: "Discounts", bad_debt: "Bad debt", refund: "Refunds", reversal: "Recoupments",
+  transfer_to_patient: "To patient responsibility", discount: "Discounts", bad_debt: "Bad debt", refund: "Refunds", reversal: "Recoupments", patient_fee: "Patient fees",
 };
 
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
+import { listChargemaster } from "@/server/chargemaster";
 import { requireSession } from "@/lib/auth";
 import { listProviders } from "@/server/encounters";
 import { PATIENT_STATUS, TYPES_OF_BILL } from "@/server/institutional";
@@ -21,7 +22,8 @@ const PROCEDURES = 6;
 export default async function InstitutionalEntryPage() {
   const s = await requireSession();
   const db = await getDb();
-  const providers = await listProviders(db, s.practiceId);
+  const [providers, cdm] = await Promise.all([listProviders(db, s.practiceId), listChargemaster(db, s.practiceId)]);
+  const items = cdm.filter((c) => c.active);
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -89,15 +91,21 @@ export default async function InstitutionalEntryPage() {
               {Array.from({ length: LINES }, (_, i) => (
                 <tr key={i}>
                   <td className="text-slate-500">{i + 1}</td>
-                  <td><input name="rev" aria-label={`Line ${i + 1} revenue code`} className="input w-24 font-mono" placeholder={i === 0 ? "0450" : ""} maxLength={4} inputMode="numeric" /></td>
-                  <td><input name="hcpcs" aria-label={`Line ${i + 1} HCPCS`} className="input w-28 font-mono" placeholder={i === 0 ? "99284" : ""} maxLength={5} /></td>
+                  <td><input name="rev" list="cdm-rev" aria-label={`Line ${i + 1} revenue code`} className="input w-24 font-mono" placeholder={i === 0 ? "0450" : ""} maxLength={4} inputMode="numeric" /></td>
+                  <td><input name="hcpcs" list="cdm-hcpcs" aria-label={`Line ${i + 1} HCPCS`} className="input w-28 font-mono" placeholder={i === 0 ? "99284" : ""} maxLength={5} /></td>
                   <td><input name="units" aria-label={`Line ${i + 1} units`} className="input w-20" defaultValue="1" inputMode="numeric" /></td>
                   <td><input name="charge" aria-label={`Line ${i + 1} unit charge`} className="input w-32" placeholder={i === 0 ? "850.00" : ""} inputMode="decimal" /></td>
                 </tr>
               ))}
             </tbody>
           </table></div>
-          <p className="mt-2 text-xs text-slate-500">Blank rows are ignored. Common codes: 0450 emergency room, 0300 lab, 0320 radiology, 0360 operating room, 0250 pharmacy, 0120 room and board semi-private, 0710 recovery room.</p>
+          {items.length > 0 && (
+            <>
+              <datalist id="cdm-rev">{[...new Map(items.map((c) => [c.revenueCode, c])).values()].map((c) => <option key={c.revenueCode} value={c.revenueCode}>{c.description}</option>)}</datalist>
+              <datalist id="cdm-hcpcs">{items.filter((c) => c.hcpcs).map((c) => <option key={c.id} value={c.hcpcs!}>{`${c.revenueCode} ${c.description}`}</option>)}</datalist>
+            </>
+          )}
+          <p className="mt-2 text-xs text-slate-500">{items.length > 0 ? "Leave the charge blank to use the chargemaster price for the revenue code and HCPCS. " : ""}Blank rows are ignored. Common codes: 0450 emergency room, 0300 lab, 0320 radiology, 0360 operating room, 0250 pharmacy, 0120 room and board semi-private, 0710 recovery room.</p>
         </Card>
 
         <div className="flex items-center gap-3">

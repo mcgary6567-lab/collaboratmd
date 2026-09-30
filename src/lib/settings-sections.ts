@@ -14,6 +14,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
       { href: "/settings/providers", label: "Providers", description: "Add, edit and deactivate rendering providers", keywords: "doctor physician npi taxonomy" },
       { href: "/settings/payers", label: "Payers", description: "Payer IDs, types, timely filing and appeal windows", keywords: "insurance payer id timely filing" },
       { href: "/settings/fees", label: "Fee schedules", description: "Standard charges and payer contract rates", keywords: "prices contract rates cpt" },
+      { href: "/settings/chargemaster", label: "Chargemaster", description: "Facility items by revenue code, with the standard charges file", keywords: "cdm ub-04 revenue code price transparency hospital" },
       { href: "/settings/enrollment", label: "Payer enrollment", description: "Enrollment status and revalidation dates per payer" },
       { href: "/settings/credentials", label: "Credentials", description: "Licenses, DEA, board, malpractice and CAQH, with expiry reminders", keywords: "license dea caqh malpractice board credentialing" },
     ],

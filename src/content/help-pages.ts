@@ -160,6 +160,54 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Patients", href: "/patients" }],
   },
+  "/billing/cash-close": {
+    title: "Daily cash close",
+    steps: [
+      "At the end of the day, count the cash and checks in the drawer and read the card terminal's batch total; the page shows what was posted for each.",
+      "A difference needs a note before the day closes. Online, card-on-file and agency payments never pass through the desk, so they are shown but not counted.",
+    ],
+    related: [{ label: "Accounting", href: "/billing/accounting" }],
+  },
+  "/billing/missed-fees": {
+    title: "Missed appointment fees",
+    steps: [
+      "Set the no-show and late cancellation fees; online check-in then asks patients to agree, or record a signed policy on the patient's page.",
+      "Charge each missed appointment from the list (once each, never to insurance, never to Medicaid patients), or waive a fee with a reason.",
+    ],
+    related: [{ label: "Scheduling", href: "/scheduling" }],
+  },
+  "/reports/denial-causes": {
+    title: "Denial root causes",
+    steps: [
+      "Each denial gets a cause and the team that owns preventing it (front desk, coding, clinical documentation, billing), guessed from its reason code: confirm or correct it.",
+      "Watch the preventable share month by month, and take the biggest causes to the team that owns them.",
+    ],
+    related: [{ label: "Denials", href: "/denials" }, { label: "Registration quality", href: "/reports/registration" }],
+  },
+  "/reports/agencies": {
+    title: "Collection agencies",
+    steps: [
+      "Post each payment an agency collects: the patient is credited in full, and the agency's commission is recorded so cash matches the agency's check.",
+      "Compare agencies by recovery rate, commission and how fast they collect.",
+    ],
+    related: [{ label: "Collections", href: "/billing/collections" }],
+  },
+  "/reports/compensation": {
+    title: "Provider compensation",
+    steps: [
+      "Set each provider's plan: a percentage of collections, an amount per work RVU, or a base with a bonus over a threshold.",
+      "The worksheet shows each provider's collections, work RVUs and pay for the period. Check it against the employment agreement; it is not payroll.",
+    ],
+    related: [{ label: "Productivity (RVUs)", href: "/reports/productivity" }],
+  },
+  "/settings/chargemaster": {
+    title: "Chargemaster",
+    steps: [
+      "Load your facility's items from a spreadsheet: item code, description, revenue code, HCPCS, charge and cash price. Facility claim lines left without a charge are priced from it.",
+      "Review prices yearly, and download the standard charges file hospitals must publish; check it against CMS's current template before posting.",
+    ],
+    related: [{ label: "Facility claim (UB-04)", href: "/encounters/institutional" }],
+  },
   "/setup": {
     title: "Setup checklist",
     steps: [

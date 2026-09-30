@@ -38,6 +38,7 @@ import { cardOnFileCharges } from "./card-on-file";
 import { applySlidingFees } from "./sliding-fee";
 import { accessRequestAlerts } from "./disclosures";
 import { onInjuryHold } from "./injury-cases";
+import { billableBalanceCents } from "./patient-accounts";
 import { contractReminders } from "./contract-calendar";
 import { scanUnclaimed } from "./unclaimed";
 
@@ -169,6 +170,7 @@ export async function balanceReminders(db: Db, practiceId: string, origin: strin
     if (open) continue;
     if (await alreadySent(db, practiceId, "balance_reminder", o.patientId, 30)) continue;
     if (await onInjuryHold(db, o.patientId)) continue;
+    if ((await billableBalanceCents(db, o.patientId)) < 2_500) continue;
     const [patient] = await db.select().from(patients).where(eq(patients.id, o.patientId)).limit(1);
     const link = await createPortalLink(db, practiceId, o.patientId, undefined, "pay");
     const url = `${origin}${link.path}`;

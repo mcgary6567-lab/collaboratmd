@@ -19,6 +19,7 @@ import { createPortalLink } from "./portal";
 import { messagePatient, type MessageResult } from "./messaging";
 import { getPolicies } from "./policies";
 import { HOLD_MESSAGE, heldPatientIds, onInjuryHold } from "./injury-cases";
+import { billableBalanceCents, qmbPatientIds } from "./patient-accounts";
 
 const { patientCollections, patients, practices, ledgerEntries, statements, paymentPlans, auditLog } = schema;
 
@@ -29,7 +30,14 @@ export type Collection = typeof patientCollections.$inferSelect;
 /** Accounts that have had statements for 60+ days without paying, and are not on a plan or already in collections. */
 export async function collectionCandidates(db: Db, practiceId: string, today = new Date()) {
   const held = await heldPatientIds(db, practiceId);
-  const owing = (await patientsWithBalances(db, practiceId, MIN_BALANCE_CENTS, 500)).filter((o) => !held.has(o.patientId));
+  const qmb = await qmbPatientIds(db, practiceId);
+  const owing: Awaited<ReturnType<typeof patientsWithBalances>> = [];
+  for (const o of await patientsWithBalances(db, practiceId, MIN_BALANCE_CENTS, 500)) {
+    if (held.has(o.patientId)) continue;
+    // Medicare cost-sharing a QMB patient cannot be billed never goes to collections.
+    if (qmb.has(o.patientId)) { const b = await billableBalanceCents(db, o.patientId); if (b < MIN_BALANCE_CENTS) continue; o.balanceCents = b; }
+    owing.push(o);
+  }
   if (!owing.length) return [];
   const ids = owing.map((o) => o.patientId);
   const [stmts, plans, open] = await Promise.all([
@@ -143,7 +151,7 @@ export async function sendFinalNotice(
 }
 
 /** Writes the balance off as bad debt and records the placement with the agency. */
-export async function placeWithAgency(db: Db, practiceId: string, collectionId: string, agency: string, opts: { userId?: string; now?: Date } = {}) {
+export async function placeWithAgency(db: Db, practiceId: string, collectionId: string, agency: string, opts: { userId?: string; now?: Date; commissionPct?: number | null } = {}) {
   const c = await ownCollection(db, practiceId, collectionId);
   if (await onInjuryHold(db, c.patientId)) throw new Error(HOLD_MESSAGE);
   if (c.stage !== "final_notice") throw new Error("Only an account at the final-notice stage can be placed");
@@ -157,7 +165,7 @@ export async function placeWithAgency(db: Db, practiceId: string, collectionId: 
   const readiness = await collectionsReadiness(db, practiceId, c.patientId, now);
   if (!readiness.ready) throw new Error(`The practice's collection safeguards are not met yet: ${readiness.missing.join("; ")}`);
   await db.insert(ledgerEntries).values({ practiceId, patientId: c.patientId, type: "bad_debt", amountCents: balance, note: `Bad debt: placed with ${name}`, postedBy: opts.userId ?? null });
-  const [row] = await db.update(patientCollections).set({ stage: "agency", agency: name.slice(0, 200), placedAt: now, amountCents: balance }).where(eq(patientCollections.id, c.id)).returning();
+  const [row] = await db.update(patientCollections).set({ stage: "agency", agency: name.slice(0, 200), placedAt: now, amountCents: balance, commissionPct: opts.commissionPct ?? null }).where(eq(patientCollections.id, c.id)).returning();
   await db.insert(auditLog).values({ practiceId, userId: opts.userId ?? null, action: "collections_placed", entity: "patient", entityId: c.patientId, details: { agency: name, amountCents: balance } });
   return row;
 }
@@ -179,7 +187,7 @@ export async function closeCollection(db: Db, practiceId: string, collectionId: 
       await db.insert(ledgerEntries).values({ practiceId, patientId: c.patientId, type: "bad_debt", amountCents: -reinstate, note: outcome === "recalled" ? `Recalled from ${c.agency}` : `Recovered by ${c.agency}`, postedBy: opts.userId ?? null });
     }
     if (recoveredCents > 0) {
-      await db.insert(ledgerEntries).values({ practiceId, patientId: c.patientId, type: "patient_payment", amountCents: recoveredCents, note: `Collected by ${c.agency}`, postedBy: opts.userId ?? null });
+      await db.insert(ledgerEntries).values({ practiceId, patientId: c.patientId, type: "patient_payment", paymentMethod: "agency", amountCents: recoveredCents, note: `Collected by ${c.agency}`, postedBy: opts.userId ?? null });
     }
   } else if (recoveredCents > 0) {
     throw new Error("Post the patient's payment in Patient billing; this only closes the notice");
@@ -218,4 +226,61 @@ export async function agencyPlacements(db: Db, practiceId: string) {
     .where(and(eq(patientCollections.practiceId, practiceId), eq(patientCollections.stage, "agency")))
     .orderBy(asc(patientCollections.placedAt));
   return rows;
+}
+
+/* ------------------------------ Agency recoveries ------------------------------ */
+
+/**
+ * A payment the agency collected on a placed account. The patient is credited
+ * with everything they paid (gross); the agency keeps its commission and sends
+ * the rest. The commission is recorded here and reaches the accounting journal
+ * as collection agency fees, so cash matches what the bank received.
+ */
+export async function recordAgencyRecovery(db: Db, practiceId: string, collectionId: string, input: { receivedOn: string; grossCents: number; commissionCents?: number; reference?: string }, userId?: string) {
+  const c = await ownCollection(db, practiceId, collectionId);
+  if (c.stage !== "agency" || c.closedAt) throw new Error("Only an account open with an agency can take a recovery");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.receivedOn)) throw new Error("Enter the date the agency's payment arrived");
+  if (!Number.isInteger(input.grossCents) || input.grossCents <= 0) throw new Error("Enter what the agency collected from the patient");
+  const [{ sofar }] = (await db.execute<{ sofar: string }>(sql`SELECT COALESCE(sum(gross_cents), 0)::text AS sofar FROM agency_recoveries WHERE collection_id = ${collectionId}`)).rows;
+  if (Number(sofar) + input.grossCents > c.amountCents) throw new Error("That is more than was placed with the agency");
+  const commission = input.commissionCents ?? (c.commissionPct ? Math.round((input.grossCents * c.commissionPct) / 100) : 0);
+  if (!Number.isInteger(commission) || commission < 0 || commission > input.grossCents) throw new Error("The commission is between $0 and what was collected");
+  await db.insert(schema.agencyRecoveries).values({ practiceId, collectionId, receivedOn: input.receivedOn, grossCents: input.grossCents, commissionCents: commission, reference: input.reference?.trim().slice(0, 80) || null, createdBy: userId ?? null });
+  // The written-off balance comes back and is paid in full from the patient's side.
+  await db.insert(ledgerEntries).values([
+    { practiceId, patientId: c.patientId, type: "bad_debt", amountCents: -input.grossCents, note: `Recovered by ${c.agency}`, postedBy: userId ?? null },
+    { practiceId, patientId: c.patientId, type: "patient_payment", paymentMethod: "agency", amountCents: input.grossCents, note: `Collected by ${c.agency}${input.reference ? ` (${input.reference.trim().slice(0, 40)})` : ""}`, postedBy: userId ?? null },
+  ]);
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "agency_recovery", entity: "patient", entityId: c.patientId, details: { collectionId, grossCents: input.grossCents, commission } });
+  return { grossCents: input.grossCents, commissionCents: commission, netCents: input.grossCents - commission };
+}
+
+export async function setCommission(db: Db, practiceId: string, collectionId: string, pct: number | null) {
+  await ownCollection(db, practiceId, collectionId);
+  if (pct !== null && (!Number.isFinite(pct) || pct < 0 || pct > 75)) throw new Error("The commission is 0% to 75%");
+  await db.update(patientCollections).set({ commissionPct: pct }).where(eq(patientCollections.id, collectionId));
+}
+
+/** Each agency's results: accounts and dollars placed, collected, its commission, what the practice received, and how fast. */
+export async function agencyPerformance(db: Db, practiceId: string) {
+  const { rows } = await db.execute<Record<string, string | null>>(sql`
+    SELECT pc.agency, count(DISTINCT pc.id)::text AS accounts, COALESCE(sum(pc.amount_cents), 0)::text AS placed,
+      COALESCE(sum(r.gross), 0)::text AS gross, COALESCE(sum(r.commission), 0)::text AS commission,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY r.first_on - pc.placed_at::date) AS median_days
+    FROM patient_collections pc
+    LEFT JOIN (SELECT collection_id, sum(gross_cents) AS gross, sum(commission_cents) AS commission, min(received_on) AS first_on FROM agency_recoveries GROUP BY collection_id) r ON r.collection_id = pc.id
+    WHERE pc.practice_id = ${practiceId} AND pc.placed_at IS NOT NULL AND pc.agency IS NOT NULL
+    GROUP BY pc.agency ORDER BY sum(pc.amount_cents) DESC`);
+  return rows.map((r) => {
+    const placed = Number(r.placed), gross = Number(r.gross), commission = Number(r.commission);
+    return { agency: r.agency!, accounts: Number(r.accounts), placedCents: placed, grossCents: gross, commissionCents: commission, netCents: gross - commission, recoveryRate: placed ? gross / placed : 0, medianDaysToFirst: r.median_days === null ? null : Math.round(Number(r.median_days)) };
+  });
+}
+
+/** Commissions agencies kept in a month, for the accounting journal. */
+export async function commissionsInPeriod(db: Db, practiceId: string, start: Date, end: Date) {
+  const [{ cents }] = (await db.execute<{ cents: string }>(sql`
+    SELECT COALESCE(sum(commission_cents), 0)::text AS cents FROM agency_recoveries
+    WHERE practice_id = ${practiceId} AND received_on >= ${start.toISOString().slice(0, 10)} AND received_on < ${end.toISOString().slice(0, 10)}`)).rows;
+  return Number(cents);
 }

@@ -72,7 +72,7 @@ export async function settleInjuryCase(db: Db, practiceId: string, id: string, i
   if (!isDay(input.settledOn)) throw new Error("Enter the settlement date");
   if (!Number.isInteger(input.paidCents) || input.paidCents < 0) throw new Error("Enter the amount the attorney paid");
   const entries: (typeof ledgerEntries.$inferInsert)[] = [];
-  if (input.paidCents > 0) entries.push({ practiceId, patientId: c.patientId, type: "patient_payment", amountCents: input.paidCents, note: `Personal injury settlement from ${c.attorney}${c.firm ? `, ${c.firm}` : ""} (${input.method.trim().slice(0, 40) || "check"})`, postedBy: userId ?? null });
+  if (input.paidCents > 0) entries.push({ practiceId, patientId: c.patientId, type: "patient_payment", paymentMethod: "settlement", amountCents: input.paidCents, note: `Personal injury settlement from ${c.attorney}${c.firm ? `, ${c.firm}` : ""} (${input.method.trim().slice(0, 40) || "check"})`, postedBy: userId ?? null });
   if (c.reductionAgreedCents) entries.push({ practiceId, patientId: c.patientId, type: "discount", amountCents: c.reductionAgreedCents, note: `Lien reduction agreed with ${c.attorney}`, postedBy: userId ?? null });
   if (entries.length) await db.insert(ledgerEntries).values(entries);
   await db.update(injuryCases).set({ status: "settled", settledOn: input.settledOn, settlementPaidCents: input.paidCents }).where(eq(injuryCases.id, id));

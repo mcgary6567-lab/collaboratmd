@@ -495,6 +495,38 @@ Reports → Registration quality: front-end rejections (277CA member number 164,
 
 Billing → Personal injury cases: open a case when an attorney signs a lien or letter of protection. While it is open the patient's balance is held: statements are refused, and balance reminders, card-on-file charges, collection candidates, final notices and agency placement skip the patient; the patient page shows the hold. Record a reduction the attorney asks for and what is agreed (adjust role), then post the settlement: the payment posts as a patient payment and the agreed reduction as a discount, the case closes and normal billing resumes for anything left. A case closed without a settlement just releases the hold.
 
+## Qualified Medicare Beneficiaries (QMB)
+
+On the patient's page, under Who pays, tick QMB on the Medicare policy with the date it was verified (from the eligibility response or the state). Medicare deductibles, coinsurance and copays on Medicare claims then stay off statements, balance reminders, card-on-file charges, collection candidates and the portal balance, and the statement tells the patient why. Once Medicaid has paid as secondary, "Write it off" posts the rest as a discount, claim by claim. Billing a QMB patient for this cost-sharing is prohibited (Social Security Act 1902(n)(3)(B)).
+
+## Family (guarantor) accounts
+
+Set a guarantor by MRN on the dependent's page (the guarantor must be a patient record, cannot have a guarantor of their own, and a guarantor cannot be someone's dependent). Statements, printed and mailed, are addressed to the guarantor with a "Responsible party for" line. The family's billable balances are listed together, and a family payment is applied to each member oldest first, with anything left as a credit on the guarantor.
+
+## Daily cash close
+
+Billing → Daily cash close: payments posted that day in the practice's time zone, by method. Count the cash and checks and enter the terminal's batch total; any difference needs a note, and closing the same day again updates it. Every payment records its method from migration 0064 on; older ones are read from the note. Online, card-on-file, agency and settlement payments are listed but not counted in the drawer.
+
+## Collection agency recoveries
+
+Reports → Collection agencies: for an account placed with an agency, post each payment the agency reports. The gross amount comes back off bad debt and posts as a patient payment (method "agency"); the commission (entered, or the account's rate) is recorded separately and reaches the accounting journal as Collection agency fees against cash, so cash matches the agency's check. A recovery cannot exceed what was placed. The page compares agencies by recovery rate, commission, net and days to first payment.
+
+## Missed-appointment fees
+
+Billing → Missed appointment fees: set the no-show fee, the late cancellation fee and how many hours before the visit a cancellation is late. Patients agree at online check-in (a bilingual checkbox appears once the policy is set) or the office records a signed policy on the patient's page. No-shows and late cancellations from the last 60 days are listed; a fee can be charged once per appointment, only if the patient agreed before the visit, and never to a patient with active Medicaid. Fees are the patient's own charge (ledger type patient_fee), never billed to insurance, and show on the statement. Waiving posts a discount with the reason. Check state law and payer contracts before setting a policy.
+
+## Denial root causes
+
+Reports → Denial root causes: every denial gets a cause and an owner (front desk, coding, clinical documentation, billing, or the payer), guessed from its category and reason code and correctable on the page. The report shows denied dollars by owner and cause, and the preventable share by month.
+
+## Chargemaster and the standard charges file
+
+Settings → Chargemaster: load facility items from a CSV (item code, description, revenue code, charge; optionally HCPCS, modifiers, cash price, setting). Items with the same code are updated. On a facility (UB-04) claim, a line left without a charge is priced from the chargemaster by revenue code and HCPCS. Mark prices reviewed each year. The standard charges file (admin or biller) is laid out after CMS's version 2 CSV template, with gross charge, cash price, each payer's contracted rate from its fee schedule, and the minimum and maximum; check it against CMS's current template and data dictionary before posting (45 CFR 180.50).
+
+## Provider compensation
+
+Reports → Provider compensation (administrators): set each provider's plan, which is a percentage of collections, an amount per work RVU, or a base plus a bonus above a threshold (dollars of collections, or work RVUs). The worksheet shows each provider's collections on their claims (payments less refunds and reversals) and work RVUs for the period (from the physician fee schedule RVU file), and the resulting pay. It is a worksheet for checking against the employment agreement, not payroll.
+
 ## Internal coding audits
 
 Coding → Coding audits: name an audit, choose the period and how many claims per provider; that many of each provider's billed original claims are picked at random. Someone other than the coder marks each correct or in error (level too high or low, diagnosis, modifier, procedure, units, documentation, other) with the billed and correct code. Each provider's accuracy is shown against a 95% target; below it, the usual step is education and a follow-up audit.

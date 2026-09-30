@@ -15,6 +15,7 @@ import { practiceConfig } from "./integrations";
 import { getStatement } from "./billing";
 import { langOf } from "@/lib/i18n/messages";
 import { STATEMENT_TEXT, statementDay } from "@/lib/i18n/statement";
+import { billTo } from "./patient-accounts";
 
 const { statements, auditLog } = schema;
 const LOB_LETTERS = "https://api.lob.com/v1/letters";
@@ -77,10 +78,12 @@ export async function mailStatement(db: Db, practiceId: string, statementId: str
   if (!lob) throw new Error("Connect Lob under Integrations to mail statements");
   const row = await getStatement(db, practiceId, statementId);
   if (!row) throw new Error("Statement not found");
-  const { statement: st, patient: p, practice: pr } = row;
+  const { statement: st, patient, practice: pr } = row;
+  // A family account's statements go to the guarantor.
+  const p = (await billTo(db, patient.id)) ?? patient;
   if (st.status === "void") throw new Error("This statement is void");
   if (st.mailId) throw new Error("This statement was already mailed");
-  if (!mailable(p)) throw new Error("The patient's mailing address is incomplete");
+  if (!mailable(p)) throw new Error(p.id === patient.id ? "The patient's mailing address is incomplete" : "The guarantor's mailing address is incomplete");
   const zip = (z: string | null) => {
     const d = (z ?? "").replace(/[^\d]/g, "");
     return d.length === 9 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;

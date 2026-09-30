@@ -94,7 +94,7 @@ export async function portalData(db: Db, linkId: string) {
     .limit(1);
   if (!row) return null;
   const { patient, practice } = row;
-  const [balance, stmts, plans, payments, cards, detail] = await Promise.all([
+  const [ledgerBalance, stmts, plans, payments, cards, detail] = await Promise.all([
     patientBalanceCents(db, patient.id),
     db.select().from(statements).where(and(eq(statements.patientId, patient.id), sql`${statements.status} <> 'void'`)).orderBy(desc(statements.createdAt)).limit(12),
     plansForPatient(db, practice.id, patient.id),
@@ -102,6 +102,8 @@ export async function portalData(db: Db, linkId: string) {
     db.select().from(savedCards).where(and(eq(savedCards.patientId, patient.id), isNull(savedCards.removedAt))),
     buildStatementDetail(db, patient.id),
   ]);
+  // A QMB patient's Medicare cost-sharing is not theirs to pay.
+  const balance = ledgerBalance - (detail.qmbProtectedCents ?? 0);
   const onlinePayments = stripeReady((await practiceConfig(db, practice.id)).stripe);
   const deposits = await openDeposits(db, patient.id);
   // Deposits already paid show up as a credit; only what is still owed ahead of the visit can be paid.
@@ -181,7 +183,7 @@ export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pic
   if (pay.planId) {
     await recordPlanPayment(db, pay.practiceId, pay.planId, pay.amountCents, "card online");
   } else {
-    const [entry] = await db.insert(ledgerEntries).values({ practiceId: pay.practiceId, patientId: pay.patientId, type: "patient_payment", amountCents: pay.amountCents, note: `Online card payment (${s.id.slice(-8)})` }).returning();
+    const [entry] = await db.insert(ledgerEntries).values({ practiceId: pay.practiceId, patientId: pay.patientId, type: "patient_payment", paymentMethod: "online", amountCents: pay.amountCents, note: `Online card payment (${s.id.slice(-8)})` }).returning();
     await db.update(onlinePayments).set({ ledgerEntryId: entry.id }).where(eq(onlinePayments.id, pay.id));
   }
 

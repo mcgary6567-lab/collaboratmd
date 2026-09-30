@@ -144,7 +144,7 @@ async function answerReminder(db: Db, practiceId: string, patientId: string, ans
     await db.update(appointments).set({ confirmedAt: new Date(), confirmedVia: "sms" }).where(eq(appointments.id, appt.id));
     text = replyConfirmed(lang, practice, when);
   } else {
-    await db.update(appointments).set({ status: "cancelled" }).where(eq(appointments.id, appt.id));
+    await db.update(appointments).set({ status: "cancelled", cancelledAt: new Date() }).where(eq(appointments.id, appt.id));
     // No patient details in the notification: titles can reach the email digest.
     await notify(db, practiceId, { kind: "appointment_cancelled", title: "An appointment was cancelled by text", body: "The time is open again on the schedule.", href: `/scheduling?date=${appt.startsAt.toISOString().slice(0, 10)}`, dedupeKey: `sms-cancel:${appt.id}` });
     text = replyCancelled(lang, practice, when);

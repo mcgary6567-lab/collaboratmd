@@ -10,10 +10,10 @@ import { and, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { stripeClient, type Stripe } from "@/lib/stripe";
-import { patientBalanceCents } from "./billing";
 import { messagePatient } from "./messaging";
 import { practiceConfig } from "./integrations";
 import { onInjuryHold } from "./injury-cases";
+import { billableBalanceCents } from "./patient-accounts";
 
 const { savedCards, cardChargeNotices, paymentPlans, onlinePayments, ledgerEntries, patients, practices, auditLog } = schema;
 
@@ -36,7 +36,8 @@ export async function cardOnFileCharges(db: Db, practiceId: string, now = new Da
     if (await onInjuryHold(db, card.patientId)) { skipped++; continue; }
     const [plan] = await db.select({ id: paymentPlans.id }).from(paymentPlans).where(and(eq(paymentPlans.patientId, card.patientId), inArray(paymentPlans.status, ["active", "defaulted"]))).limit(1);
     const [pending] = await db.select().from(cardChargeNotices).where(and(eq(cardChargeNotices.cardId, card.id), eq(cardChargeNotices.status, "pending"))).limit(1);
-    const balance = await patientBalanceCents(db, card.patientId);
+    // What can be billed: a QMB patient's Medicare cost-sharing is left out.
+    const balance = await billableBalanceCents(db, card.patientId);
 
     if (!pending) {
       if (plan || balance < 100) continue;
@@ -68,7 +69,7 @@ export async function cardOnFileCharges(db: Db, practiceId: string, now = new Da
         metadata: { payment_id: pay.id }, idempotencyKey: `cof-${pending.id}`,
       });
       if (pi.status === "succeeded") {
-        const [entry] = await db.insert(ledgerEntries).values({ practiceId, patientId: card.patientId, type: "patient_payment", amountCents: amount, note: `Card on file ${card.brand ?? ""} ${card.last4 ?? ""}`.trim() }).returning();
+        const [entry] = await db.insert(ledgerEntries).values({ practiceId, patientId: card.patientId, type: "patient_payment", paymentMethod: "card_on_file", amountCents: amount, note: `Card on file ${card.brand ?? ""} ${card.last4 ?? ""}`.trim() }).returning();
         await db.update(onlinePayments).set({ providerRef: pi.id, status: "paid", paidAt: new Date(), ledgerEntryId: entry.id }).where(eq(onlinePayments.id, pay.id));
         await db.update(cardChargeNotices).set({ status: "charged", onlinePaymentId: pay.id }).where(eq(cardChargeNotices.id, pending.id));
         await db.insert(auditLog).values({ practiceId, userId: null, action: "card_on_file_charged", entity: "patient", entityId: card.patientId, details: { amountCents: amount } });

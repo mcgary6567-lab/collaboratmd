@@ -85,6 +85,12 @@ const PROOF = [
     tag: "Patient identity · registration quality",
   },
   {
+    icon: Landmark,
+    title: "From the claim to the cash drawer",
+    body: "The same ledger runs the daily cash close, agency recoveries with their commissions booked apart, family accounts, missed-appointment fees and provider compensation, so a practice does not keep side spreadsheets for the money that never touches a claim. Rules that protect patients, such as QMB billing protection, are enforced on every statement and collection.",
+    tag: "Cash close · agencies · provider pay · QMB",
+  },
+  {
     icon: Network,
     title: "Built for the billing company",
     body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { getDb } from "@/db";
+import { getPolicies } from "@/server/policies";
 import { LogoMark } from "@/components/logo";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { verifiedFor } from "@/lib/checkin-session";
@@ -91,6 +92,7 @@ export default async function CheckInPage({ params, searchParams }: { params: Pr
 
   const data = await loadCheckin(db, opened.link.id);
   const payOnline = stripeReady((await practiceConfig(db, opened.link.practiceId)).stripe);
+  const fees = (await getPolicies(db, opened.link.practiceId)).missedFees;
   if (!data) return <Shell practice={opened.practiceName} t={t} lang={lang} path={path}><p className="text-sm">{t.notLoaded}</p></Shell>;
   const { patient, appt, insurance } = data;
   const when = appt.startsAt.toLocaleString(lang === "es" ? "es-US" : "en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -141,6 +143,11 @@ export default async function CheckInPage({ params, searchParams }: { params: Pr
           <label className="flex gap-2"><input type="checkbox" name="privacyNotice" required className="mt-1" /> <span>{t.privacyNotice}</span></label>
           <label className="flex gap-2"><input type="checkbox" name="financialPolicy" required className="mt-1" /> <span>{t.financialPolicy}</span></label>
           <label className="flex gap-2"><input type="checkbox" name="assignmentOfBenefits" required className="mt-1" /> <span>{t.assignment}</span></label>
+          {fees && (fees.noShowCents > 0 || fees.lateCancelCents > 0) && (
+            <label className="flex gap-2"><input type="checkbox" name="missedFees" className="mt-1" /> <span>{lang === "es"
+              ? `Entiendo que si no me presento a una cita se cobra ${money(fees.noShowCents)}, y si la cancelo con menos de ${fees.lateCancelHours} horas de anticipación se cobra ${money(fees.lateCancelCents)}. Mi seguro no paga estos cargos.`
+              : `I understand that a missed appointment is charged ${money(fees.noShowCents)}, and cancelling less than ${fees.lateCancelHours} hours ahead is charged ${money(fees.lateCancelCents)}. My insurance does not pay these fees.`}</span></label>
+          )}
           <div className="pt-2">
             <label className="label" htmlFor="signature">{t.signLabel}</label>
             <input id="signature" name="signature" className="input" required minLength={3} autoComplete="name" />

@@ -78,7 +78,7 @@ export async function settleTerminalPayment(db: Db, paymentIntentId: string, exp
   if (expectedPracticeId && row.practiceId !== expectedPracticeId) throw new Error("Payment belongs to another practice");
   const claimed = await db.update(terminalPayments).set({ status: "succeeded", completedAt: new Date() }).where(and(eq(terminalPayments.id, row.id), eq(terminalPayments.status, "waiting"))).returning();
   if (!claimed.length) return row;
-  const [entry] = await db.insert(ledgerEntries).values({ practiceId: row.practiceId, patientId: row.patientId, type: "patient_payment", amountCents: row.amountCents, note: "Patient payment (card, front desk reader)", postedBy: row.createdBy }).returning();
+  const [entry] = await db.insert(ledgerEntries).values({ practiceId: row.practiceId, patientId: row.patientId, type: "patient_payment", paymentMethod: "terminal", amountCents: row.amountCents, note: "Patient payment (card, front desk reader)", postedBy: row.createdBy }).returning();
   await db.update(terminalPayments).set({ ledgerEntryId: entry.id }).where(eq(terminalPayments.id, row.id));
   await db.insert(auditLog).values({ practiceId: row.practiceId, userId: row.createdBy, action: "terminal_payment", entity: "patient", entityId: row.patientId, details: { amountCents: row.amountCents, paymentIntent: paymentIntentId } });
   return { ...claimed[0], ledgerEntryId: entry.id };

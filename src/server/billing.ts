@@ -8,6 +8,7 @@ import { contractRates, standardCharges } from "./fees";
 import { runEligibility } from "./patients";
 import { benefitsToDate } from "./accumulators";
 import { HOLD_MESSAGE, onInjuryHold } from "./injury-cases";
+import { normalizeMethod } from "@/lib/utils";
 
 const {
   patients, patientInsurances, payers, ledgerEntries, claims, encounters, providers, charges, cptCodes, practices,
@@ -28,7 +29,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  * that justify it.
  */
 export const patientBalanceSql = sql`
-  COALESCE(SUM(amount_cents) FILTER (WHERE type = 'transfer_to_patient'), 0)
+  COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('transfer_to_patient', 'patient_fee')), 0)
   - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)
   - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'discount'), 0)
   - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'bad_debt'), 0)
@@ -240,7 +241,7 @@ export async function recordPlanPayment(db: Db, practiceId: string, planId: stri
 
   await db.insert(ledgerEntries).values({
     practiceId, patientId: found.plan.patientId, type: "patient_payment", amountCents,
-    note: `Payment plan payment (${method})`, postedBy: userId ?? null,
+    note: `Payment plan payment (${method})`, postedBy: userId ?? null, paymentMethod: normalizeMethod(method),
   });
 
   const { allocations, leftoverCents } = allocatePayment(found.installments, amountCents);
@@ -280,14 +281,23 @@ async function nextNumber(db: Db, practiceId: string, table: "statements" | "est
  * balance, showing what was billed, what insurance paid and adjusted, and what
  * is left for the patient, in plain terms.
  */
+/** Whether the patient is a Qualified Medicare Beneficiary (marked on an active Medicare policy). */
+export async function isQmb(db: Db, patientId: string) {
+  const [r] = await db.select({ id: patientInsurances.id }).from(patientInsurances).innerJoin(payers, eq(payers.id, patientInsurances.payerId))
+    .where(and(eq(patientInsurances.patientId, patientId), eq(patientInsurances.active, true), eq(patientInsurances.qmb, true), eq(payers.type, "medicare"))).limit(1);
+  return !!r;
+}
+
 export async function buildStatementDetail(db: Db, patientId: string) {
   const rows = await db
     .select({
       claimId: ledgerEntries.claimId, type: ledgerEntries.type, amountCents: ledgerEntries.amountCents,
       dos: encounters.dateOfService, encounterId: encounters.id, provFirst: providers.firstName, provLast: providers.lastName,
+      payerType: payers.type,
     })
     .from(ledgerEntries)
     .leftJoin(claims, eq(claims.id, ledgerEntries.claimId))
+    .leftJoin(payers, eq(payers.id, claims.payerId))
     .leftJoin(encounters, eq(encounters.id, claims.encounterId))
     .leftJoin(providers, eq(providers.id, encounters.providerId))
     .where(eq(ledgerEntries.patientId, patientId));
@@ -295,13 +305,19 @@ export async function buildStatementDetail(db: Db, patientId: string) {
   const visits = new Map<string, StatementVisit & { encounterId: string | null }>();
   let unappliedPaymentsCents = 0;
   let discountsCents = 0;
+  let feesCents = 0;
+  const qmbClaims = new Set<string>();
+  const qmb = await isQmb(db, patientId);
   for (const r of rows) {
     if (!r.claimId) {
       if (r.type === "patient_payment") unappliedPaymentsCents += r.amountCents;
+      else if (r.type === "patient_fee") feesCents += r.amountCents;
       else if (r.type === "discount" || r.type === "bad_debt") discountsCents += r.amountCents;
       else if (r.type === "refund") unappliedPaymentsCents -= r.amountCents;
       continue;
     }
+    // A Qualified Medicare Beneficiary may not be billed Medicare cost-sharing.
+    if (qmb && r.payerType === "medicare") qmbClaims.add(r.claimId);
     let v = visits.get(r.claimId);
     if (!v) {
       v = {
@@ -322,6 +338,11 @@ export async function buildStatementDetail(db: Db, patientId: string) {
     }
   }
 
+  let qmbProtectedCents = 0;
+  for (const id of qmbClaims) {
+    const v = visits.get(id);
+    if (v && v.youOweCents > 0) { qmbProtectedCents += v.youOweCents; v.youOweCents = 0; }
+  }
   const owing = [...visits.values()].filter((v) => v.youOweCents > 0);
   const encIds = owing.map((v) => v.encounterId).filter(Boolean) as string[];
   if (encIds.length) {
@@ -342,11 +363,13 @@ export async function buildStatementDetail(db: Db, patientId: string) {
   // The amount due is the whole account balance, including any visit that was
   // overpaid at claim level and so is not itemized above.
   const allOwed = [...visits.values()].reduce((a, v) => a + v.youOweCents, 0);
-  const amountDue = Math.max(allOwed - unappliedPaymentsCents - discountsCents, 0);
+  const amountDue = Math.max(allOwed + feesCents - unappliedPaymentsCents - discountsCents, 0);
   return {
     visits: visitsOut,
     unappliedPaymentsCents,
     discountsCents,
+    feesCents,
+    qmbProtectedCents,
     totals: {
       chargesCents: sum("chargesCents"),
       insurancePaidCents: sum("insurancePaidCents"),
@@ -372,7 +395,7 @@ export async function generateStatement(db: Db, practiceId: string, patientId: s
       chargesCents: d.totals.chargesCents, insurancePaidCents: d.totals.insurancePaidCents,
       adjustmentsCents: d.totals.adjustmentsCents, patientPaidCents: d.totals.patientPaidCents,
       amountDueCents: d.totals.amountDueCents,
-      detail: { visits: d.visits, unappliedPaymentsCents: d.unappliedPaymentsCents, discountsCents: d.discountsCents },
+      detail: { visits: d.visits, unappliedPaymentsCents: d.unappliedPaymentsCents, discountsCents: d.discountsCents, feesCents: d.feesCents, qmbProtectedCents: d.qmbProtectedCents },
       createdBy: userId ?? null,
     })
     .returning();

@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-30",
+    title: "QMB protection, family accounts, cash close, agency commissions, missed-appointment fees, denial root causes, chargemaster, provider pay",
+    items: [
+      "Qualified Medicare Beneficiaries: Medicare cost-sharing is kept off statements, reminders, card charges and collections, and written off in one step",
+      "Family accounts: a guarantor gets the statements, the family's balances are shown together, and one payment is spread across them",
+      "Daily cash close: cash, checks and cards counted against what was posted, with a note required for any difference",
+      "Collection agency recoveries post in full to the patient, with the agency's commission in the accounting journal and a comparison of agencies",
+      "Missed-appointment fees under a policy the patient agreed to: charged once, never to insurance or Medicaid patients, and waivable with a reason",
+      "Denial root causes by the team that can prevent them, with the preventable share by month",
+      "Chargemaster for facility claims, pricing UB-04 lines, and a standard charges file laid out after CMS's template",
+      "Provider compensation worksheet: collections or work RVUs, with a base and bonus if the plan has one",
+    ],
+  },
+  {
+    date: "2026-09-30",
     title: "Duplicate patients, a locked month-end, provider questions, write-off and registration analysis",
     items: [
       "Duplicate patients found by name and date of birth, member ID or phone, and merged with every visit, claim and payment",

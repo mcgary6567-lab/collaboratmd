@@ -6,6 +6,7 @@ import { CAN_WRITE, requireRole } from "@/lib/auth";
 import type { FormResult } from "@/components/action-form";
 import { assertOwned } from "@/server/tenancy";
 import { createInstitutionalClaim } from "@/server/institutional";
+import { chargemasterPrice } from "@/server/chargemaster";
 
 export async function createInstitutionalAction(_prev: FormResult, formData: FormData): Promise<FormResult> {
   const s = await requireRole(CAN_WRITE);
@@ -20,6 +21,9 @@ export async function createInstitutionalAction(_prev: FormResult, formData: For
     const patientId = f("patientId");
     if (!patientId) return { ok: false, message: "Choose the patient" };
     await assertOwned(db, s.practiceId, "patient", patientId);
+    const entered = revenue.map((r, i) => ({ revenueCode: r, hcpcs: hcpcs[i], units: Number(units[i]) || 1, chargeCents: Math.round(Number(String(unitCharge[i] ?? "").replace(/[$,]/g, "")) * 100) || 0 })).filter((l) => l.revenueCode.trim());
+    // A line left without a charge is priced from the chargemaster.
+    const lines = await Promise.all(entered.map(async (l) => (l.chargeCents ? l : { ...l, chargeCents: (await chargemasterPrice(db, s.practiceId, l.revenueCode, l.hcpcs || null)) ?? 0 })));
     const claim = await createInstitutionalClaim(db, s.practiceId, {
       patientId,
       attendingProviderId: f("attending"),
@@ -34,7 +38,7 @@ export async function createInstitutionalAction(_prev: FormResult, formData: For
       admittingDiagnosis: f("admitDx") || null,
       procedures: formData.getAll("pcs").map((code, i) => ({ code: String(code), date: String(formData.getAll("pcsDate")[i] ?? "") })),
       diagnoses: f("diagnoses").split(/[,\s]+/),
-      lines: revenue.map((r, i) => ({ revenueCode: r, hcpcs: hcpcs[i], units: Number(units[i]) || 1, chargeCents: Math.round(Number(String(unitCharge[i] ?? "").replace(/[$,]/g, "")) * 100) || 0 })).filter((l) => l.revenueCode.trim()),
+      lines,
     }, s.userId);
     claimId = claim.id;
   } catch (e) {

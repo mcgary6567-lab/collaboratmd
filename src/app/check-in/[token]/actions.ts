@@ -38,6 +38,7 @@ export async function submitCheckinAction(token: string, _prev: FormResult, form
         privacyNotice: formData.get("privacyNotice") === "on",
         financialPolicy: formData.get("financialPolicy") === "on",
         assignmentOfBenefits: formData.get("assignmentOfBenefits") === "on",
+        missedFees: formData.get("missedFees") === "on",
         signature: f("signature"),
       },
     });

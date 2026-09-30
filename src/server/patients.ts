@@ -12,6 +12,7 @@ import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
 import { notify } from "./notifications";
 import { clockDay, practiceNow } from "./practice-time";
+import { normalizeMethod } from "@/lib/utils";
 
 const { patients, patientInsurances, payers, eligibilityChecks, encounters, ledgerEntries } = schema;
 
@@ -372,7 +373,7 @@ export async function latestChecks(db: Db, patientInsuranceIds: string[]) {
 }
 
 export async function postPatientPayment(db: Db, practiceId: string, patientId: string, amountCents: number, method: string, userId?: string) {
-  await db.insert(ledgerEntries).values({ practiceId, patientId, type: "patient_payment", amountCents, note: `Patient payment (${method})`, postedBy: userId ?? null });
+  await db.insert(ledgerEntries).values({ practiceId, patientId, type: "patient_payment", amountCents, note: `Patient payment (${method})`, postedBy: userId ?? null, paymentMethod: normalizeMethod(method) });
 }
 
 /** Claim check: the birthday rule for a dependent child covered on both parents' commercial plans. */

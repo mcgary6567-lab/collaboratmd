@@ -33,6 +33,7 @@ export const DEFAULT_POLICIES: Required<{ [K in keyof PracticePolicies]: NonNull
   chronicPrefixes: null,
   collections: null,
   unclaimed: null,
+  missedFees: null,
 };
 
 export async function getPolicies(db: Db, practiceId: string): Promise<PracticePolicies> {
@@ -73,7 +74,7 @@ export async function savePolicies(db: Db, practiceId: string, input: PracticePo
   try { before = validatePolicies(stored); } catch { before = stored; }
   const policies = validatePolicies(input);
   // Settings saved on other screens live in the same column: keep them (the access review's limits, the chronic condition groups).
-  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}), ...(stored.collections ? { collections: stored.collections } : {}), ...(stored.unclaimed ? { unclaimed: stored.unclaimed } : {}) } }).where(eq(practices.id, practiceId));
+  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}), ...(stored.collections ? { collections: stored.collections } : {}), ...(stored.unclaimed ? { unclaimed: stored.unclaimed } : {}), ...(stored.missedFees ? { missedFees: stored.missedFees } : {}) } }).where(eq(practices.id, practiceId));
   const changed = Object.keys(policies).filter((k) => JSON.stringify(policies[k as keyof PracticePolicies] ?? null) !== JSON.stringify(before[k as keyof PracticePolicies] ?? null));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed, policies } });
   return policies;

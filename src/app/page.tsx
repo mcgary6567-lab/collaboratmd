@@ -245,6 +245,36 @@ const SMART = [
     title: "Write-offs that say why",
     body: "Every write-off records its reason, and avoidable ones (late filing, no authorization, coverage not checked) are shown by payer, month and person, apart from contractual adjustments.",
   },
+  {
+    icon: UsersRound,
+    title: "One bill for the family",
+    body: "Name a parent as guarantor and the children's statements go to them, the family's balances are shown together, and one payment is spread across everyone's visits.",
+  },
+  {
+    icon: Landmark,
+    title: "The drawer balances every night",
+    body: "Cash, checks and card batches counted against what was posted that day, by payment method. A difference needs an explanation before the deposit goes to the bank.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Missed-appointment fees, fairly",
+    body: "No-shows and late cancellations are charged only under a policy the patient agreed to first, never to insurance or Medicaid patients, and can be waived with a reason.",
+  },
+  {
+    icon: SearchCheck,
+    title: "Denials fixed where they start",
+    body: "Each denial is traced to its root cause and the team that can prevent it (front desk, coding, documentation or billing), with the preventable share month by month.",
+  },
+  {
+    icon: Scale,
+    title: "Collection agencies compared",
+    body: "Agency payments post in full to the patient's account and the commission is booked on its own, so cash matches the check. See which agency actually recovers more.",
+  },
+  {
+    icon: ChartLine,
+    title: "Provider pay, worked out",
+    body: "Percentage of collections, dollars per work RVU, or a base with a bonus: each provider's pay for the period from the same numbers as the rest of your reports.",
+  },
 ];
 
 /** Medicare and Medicaid rules the product applies; the ones that need CMS's yearly files say so on the page. */
@@ -323,6 +353,16 @@ const MEDICARE = [
     icon: ShieldCheck,
     title: "Audit yourself first",
     body: "A random sample of each provider's claims, checked against the notes by someone other than the coder, with accuracy against a 95% target: the internal review the OIG's compliance guidance expects.",
+  },
+  {
+    icon: HeartPulse,
+    title: "QMB patients protected",
+    body: "Mark a dual-eligible patient as a Qualified Medicare Beneficiary and their Medicare deductibles and coinsurance stay off statements, reminders, card charges and collections, as federal law requires.",
+  },
+  {
+    icon: ReceiptText,
+    title: "Hospital price transparency",
+    body: "A chargemaster with revenue codes prices your facility claims and produces the standard charges file hospitals must publish, laid out after CMS's template, with each payer's contracted rate.",
   },
 ];
 

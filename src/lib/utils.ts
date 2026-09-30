@@ -75,3 +75,11 @@ export const CLAIM_STATUS_LABEL: Record<string, string> = {
 
 /** Any stored status as words: "partially_paid" to "Partially paid". */
 export const statusLabel = (s: string) => CLAIM_STATUS_LABEL[s] ?? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+
+/** A payment method as the daily close groups it: cash, check, card, ach or other. */
+export function normalizeMethod(method: string | null | undefined): string {
+  const m = (method ?? "").trim().toLowerCase();
+  if (m === "cash" || m === "check" || m === "ach") return m;
+  if (m.startsWith("card") || m === "credit" || m === "debit") return "card";
+  return m ? "other" : "card";
+}

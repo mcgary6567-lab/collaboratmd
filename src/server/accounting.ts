@@ -16,6 +16,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
+import { commissionsInPeriod } from "./collections";
 
 const { accountingSettings, periodCloses, auditLog } = schema;
 
@@ -28,6 +29,7 @@ export const ACCOUNTS: Record<string, { label: string; default: string }> = {
   badDebt: { label: "Bad debt", default: "Bad Debt Expense" },
   discounts: { label: "Patient discounts", default: "Patient Discounts" },
   cash: { label: "Cash or undeposited funds", default: "Undeposited Funds" },
+  collectionFees: { label: "Collection agency fees", default: "Collection Agency Fees" },
 };
 type AccountKey = keyof typeof ACCOUNTS;
 
@@ -42,6 +44,9 @@ const POSTING: Record<string, [AccountKey, AccountKey, string]> = {
   discount: ["discounts", "arPatient", "Patient discounts"],
   bad_debt: ["badDebt", "arPatient", "Sent to collections (bad debt)"],
   refund: ["arPatient", "cash", "Refunds to patients"],
+  patient_fee: ["arPatient", "revenue", "Patient fees (missed appointments)"],
+  // Not a ledger type: the commission agencies kept (agency_recoveries), so cash matches what the bank received.
+  agency_commission: ["collectionFees", "cash", "Collection agency commissions"],
   reversal: ["arInsurance", "cash", "Payer recoupments and refunds"],
 };
 
@@ -69,7 +74,10 @@ export async function periodTotals(db: Db, practiceId: string, period: string): 
     SELECT type, sum(amount_cents)::text AS cents FROM ledger_entries
     WHERE practice_id = ${practiceId} AND posted_at >= ${start} AND posted_at < ${end}
     GROUP BY type`);
-  return Object.fromEntries(rows.map((r) => [r.type, Number(r.cents)]));
+  const totals: Record<string, number> = Object.fromEntries(rows.map((r) => [r.type, Number(r.cents)]));
+  const commission = await commissionsInPeriod(db, practiceId, start, end);
+  if (commission) totals.agency_commission = commission;
+  return totals;
 }
 
 export type JournalLine = { account: string; debitCents: number; creditCents: number; memo: string };
@@ -138,7 +146,7 @@ export async function arRollforward(db: Db, practiceId: string, period: string) 
   const lines = Object.entries(POSTING).map(([type, [, , memo]]) => {
     const cents = totals[type] ?? 0;
     return { type, memo, cents, insurance: AR_EFFECT[type].insurance * cents, patient: AR_EFFECT[type].patient * cents };
-  }).filter((l) => l.cents);
+  }).filter((l) => l.cents && (l.insurance || l.patient));
   const closing = {
     insurance: opening.insurance + lines.reduce((a, l) => a + l.insurance, 0),
     patient: opening.patient + lines.reduce((a, l) => a + l.patient, 0),

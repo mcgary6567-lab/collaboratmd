@@ -152,7 +152,7 @@ export async function createAppointment(db: Db, practiceId: string, input: { pat
 }
 
 export async function setAppointmentStatus(db: Db, id: string, status: string) {
-  await db.update(appointments).set({ status }).where(eq(appointments.id, id));
+  await db.update(appointments).set({ status, cancelledAt: status === "cancelled" ? new Date() : null }).where(eq(appointments.id, id));
 }
 
 /** Providers for pickers: active ones unless `includeInactive`. */

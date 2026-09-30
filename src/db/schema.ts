@@ -108,6 +108,8 @@ export type PracticePolicies = {
   collections?: { minStatements?: number; minDaysSinceFirst?: number; minBalanceCents?: number; requireAssistanceOffer?: boolean };
   /** Unclaimed patient credits: the state they are reported to, its dormancy period, and the smallest credit that gets a letter. */
   unclaimed?: { state: string; dormancyMonths: number; letterMinCents: number };
+  /** Missed-appointment fees the practice charges under its signed policy (server/missed-fees.ts). */
+  missedFees?: { noShowCents: number; lateCancelCents: number; lateCancelHours: number };
 };
 
 export type AutomationSettings = {
@@ -219,6 +221,10 @@ export const patients = pgTable(
     /** Who registered the patient, and how: staff | api | hl7 | fhir | import. Recorded from migration 0063 on. */
     createdBy: uuid("created_by").references(() => users.id),
     source: text("source"),
+    /** The person responsible for this patient's bill (a parent for a minor), another patient record. Migration 0064. */
+    guarantorId: uuid("guarantor_id"),
+    /** When the patient agreed to the missed-appointment fee policy (online check-in or signed in the office). Migration 0064. */
+    feePolicySignedOn: date("fee_policy_signed_on"),
   },
   (t) => [
     uniqueIndex("patients_mrn_idx").on(t.practiceId, t.mrn),
@@ -250,6 +256,9 @@ export const patientInsurances = pgTable("patient_insurances", {
   /** Who entered the policy, and how: staff | discovery | checkin | hl7 | fhir | api. Migration 0063. */
   createdBy: uuid("created_by").references(() => users.id),
   source: text("source"),
+  /** Medicare: a Qualified Medicare Beneficiary, who may not be billed Medicare cost-sharing. Migration 0064. */
+  qmb: boolean("qmb").notNull().default(false),
+  qmbVerifiedOn: date("qmb_verified_on"),
 });
 
 export const eligibilityChecks = pgTable("eligibility_checks", {
@@ -287,6 +296,8 @@ export const appointments = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     type: text("type").notNull().default("office_visit"),
     status: text("status").notNull().default("scheduled"), // scheduled | checked_in | completed | no_show | cancelled
+    /** When it was cancelled, for late-cancellation fees. Migration 0064. */
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     /** When the patient confirmed, and how ("sms"): see migration 0049. */
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     confirmedVia: text("confirmed_via"),
@@ -456,6 +467,8 @@ export const ledgerEntries = pgTable(
     postedAt: timestamp("posted_at", { withTimezone: true }).defaultNow().notNull(),
     /** For write-offs: why (server/write-offs.ts WRITE_OFF_CATEGORIES). Migration 0063. */
     writeOffCategory: text("write_off_category"),
+    /** For payments: cash | check | card | ach | online | terminal | card_on_file | agency | settlement. Migration 0064. */
+    paymentMethod: text("payment_method"),
   },
   (t) => [index("ledger_claim_idx").on(t.claimId), index("ledger_patient_idx").on(t.patientId)],
 );
@@ -475,6 +488,9 @@ export const denials = pgTable("denials", {
   appealDeadline: date("appeal_deadline"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  /** Why it happened and whose process prevents it (server/denial-causes.ts); set by staff, else inferred. Migration 0064. */
+  rootCause: text("root_cause"),
+  rootOwner: text("root_owner"),
 });
 
 /* ------------------------------------------------------------------ */
@@ -641,7 +657,7 @@ export const statements = pgTable("statements", {
   adjustmentsCents: integer("adjustments_cents").notNull(),
   patientPaidCents: integer("patient_paid_cents").notNull(),
   amountDueCents: integer("amount_due_cents").notNull(),
-  detail: jsonb("detail").$type<{ visits: StatementVisit[]; unappliedPaymentsCents: number; discountsCents: number }>().notNull(),
+  detail: jsonb("detail").$type<{ visits: StatementVisit[]; unappliedPaymentsCents: number; discountsCents: number; feesCents?: number; qmbProtectedCents?: number }>().notNull(),
   status: text("status").notNull().default("generated"), // generated | sent | void
   channel: text("channel"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
@@ -1286,6 +1302,8 @@ export const patientCollections = pgTable("patient_collections", {
   stage: text("stage").notNull(),
   amountCents: integer("amount_cents").notNull(),
   agency: text("agency"),
+  /** What the agency keeps of what it collects (migration 0064). */
+  commissionPct: numeric("commission_pct", { precision: 5, scale: 2, mode: "number" }),
   finalNoticeAt: timestamp("final_notice_at", { withTimezone: true }),
   placedAt: timestamp("placed_at", { withTimezone: true }),
   closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -1537,7 +1555,7 @@ export type CheckinInsurance = {
   groupNumber: string;
   relationship: string;
 };
-export type CheckinConsents = { privacyNotice: boolean; financialPolicy: boolean; assignmentOfBenefits: boolean; signature: string; signedAt: string };
+export type CheckinConsents = { privacyNotice: boolean; financialPolicy: boolean; assignmentOfBenefits: boolean; signature: string; signedAt: string; missedFees?: boolean };
 
 export const checkinSubmissions = pgTable("checkin_submissions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -2376,4 +2394,65 @@ export const codingAuditItems = pgTable("coding_audit_items", {
   note: text("note"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+});
+
+/** The front desk's end of day: counted cash and checks and the card batch against payments posted, by method. Migration 0064. */
+export const cashCloses = pgTable("cash_closes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  day: date("day").notNull(),
+  expected: jsonb("expected").$type<Record<string, number>>().notNull(),
+  countedCashCents: integer("counted_cash_cents").notNull().default(0),
+  countedChecksCents: integer("counted_checks_cents").notNull().default(0),
+  cardBatchCents: integer("card_batch_cents").notNull().default(0),
+  depositReference: text("deposit_reference"),
+  notes: text("notes"),
+  closedBy: uuid("closed_by").references(() => users.id),
+  closedAt: timestamp("closed_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** What a collection agency collected on an account, its commission, and what it sent the practice. Migration 0064. */
+export const agencyRecoveries = pgTable("agency_recoveries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  collectionId: uuid("collection_id").notNull().references(() => patientCollections.id),
+  receivedOn: date("received_on").notNull(),
+  grossCents: integer("gross_cents").notNull(),
+  commissionCents: integer("commission_cents").notNull(),
+  reference: text("reference"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** A facility chargemaster item: revenue code, procedure code and gross charge (UB-04 lines, price transparency). Migration 0064. */
+export const chargemasterItems = pgTable("chargemaster_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  itemCode: text("item_code").notNull(),
+  description: text("description").notNull(),
+  revenueCode: text("revenue_code").notNull(),
+  hcpcs: text("hcpcs"),
+  modifiers: text("modifiers"),
+  priceCents: integer("price_cents").notNull(),
+  cashPriceCents: integer("cash_price_cents"),
+  setting: text("setting").notNull().default("both"), // inpatient | outpatient | both
+  active: boolean("active").notNull().default(true),
+  reviewedOn: date("reviewed_on"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** How a provider is paid: a share of collections, an amount per work RVU, or a base with a bonus over a threshold. Migration 0064. */
+export const compPlans = pgTable("comp_plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  kind: text("kind").notNull(), // collections | wrvu | base_bonus_collections | base_bonus_wrvu
+  baseCents: integer("base_cents").notNull().default(0),
+  collectionsPct: numeric("collections_pct", { precision: 5, scale: 2, mode: "number" }),
+  perRvuCents: integer("per_rvu_cents"),
+  threshold: numeric("threshold", { precision: 12, scale: 2, mode: "number" }),
+  effectiveFrom: date("effective_from").notNull(),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

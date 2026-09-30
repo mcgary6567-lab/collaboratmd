@@ -197,6 +197,8 @@ export async function submitCheckin(db: Db, linkId: string, input: CheckinInput)
     })
     .returning();
   await db.update(checkinLinks).set({ completedAt: new Date() }).where(eq(checkinLinks.id, linkId));
+  // Agreeing to the missed-appointment policy here is what lets the practice charge its fees later.
+  if (input.consents.missedFees) await db.update(schema.patients).set({ feePolicySignedOn: new Date().toISOString().slice(0, 10) }).where(eq(schema.patients.id, link.patientId));
   await db.insert(schema.auditLog).values({ practiceId: link.practiceId, userId: null, action: "patient_checkin", entity: "appointment", entityId: link.appointmentId, details: { submissionId: submission.id } });
   return submission;
 }

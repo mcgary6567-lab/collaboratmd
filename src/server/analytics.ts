@@ -96,7 +96,7 @@ export async function headlineKpis(db: Db, practiceId: string, months = 12): Pro
       )
       SELECT
         (SELECT COALESCE(SUM(balance), 0) FROM claim_balance WHERE balance > 0)::bigint AS insurance_ar,
-        (SELECT COALESCE(SUM(amount_cents) FILTER (WHERE type = 'transfer_to_patient'), 0)
+        (SELECT COALESCE(SUM(amount_cents) FILTER (WHERE type IN ('transfer_to_patient', 'patient_fee')), 0)
               - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'patient_payment'), 0)
               - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'discount'), 0)
               - COALESCE(SUM(amount_cents) FILTER (WHERE type = 'bad_debt'), 0)
