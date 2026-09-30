@@ -207,6 +207,16 @@ const SMART = [
     title: "Payers that change, caught early",
     body: "Each payer's last 30 days are compared with its previous 90: more denials, slower payment, lower payment or a denial reason that suddenly spikes. Alerts need real volume, so noise stays out.",
   },
+  {
+    icon: ReceiptText,
+    title: "Bills patients understand",
+    body: "Each balance says why in plain English or Spanish, from the payer's own reasons: deductible, coinsurance, copay, not covered. Estimates use the deductible left today, and patients get a year-end receipt for their HSA or taxes.",
+  },
+  {
+    icon: Scale,
+    title: "Contracts renegotiated on time",
+    body: "Each payer contract's renewal and notice dates, with reminders before the notice window closes, next to what that payer underpaid you and allowed per code, so you go into the negotiation with numbers.",
+  },
 ];
 
 /** Medicare and Medicaid rules the product applies; the ones that need CMS's yearly files say so on the page. */
@@ -255,6 +265,21 @@ const MEDICARE = [
     icon: HeartPulse,
     title: "Care management by the minute",
     body: "Chronic care management, behavioral health integration and remote monitoring: consent on file, minutes logged through the month, and one claim when it ends.",
+  },
+  {
+    icon: FileSearch,
+    title: "October 1, handled",
+    body: "When the new ICD-10-CM year arrives, you get the codes your practice uses that it deletes or splits, where they sit on open visits, authorizations and lab orders, and what replaces them. Each claim is checked against the codes in force on its date of service.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Ordering providers, checked",
+    body: "Medicare denies lab, imaging and equipment claims when the ordering practitioner is not enrolled to order them. The referring NPI is checked against CMS's ordering and referring file before the claim goes out.",
+  },
+  {
+    icon: Hourglass,
+    title: "Auditors and patients answered on time",
+    body: "ADRs, RAC and TPE reviews are tracked to their due dates and the records sent are logged. Patients' HIPAA requests for their records or an accounting of disclosures run on their 30- and 60-day clocks.",
   },
 ];
 

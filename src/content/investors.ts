@@ -111,5 +111,6 @@ export const DIFFERENTIATORS = [
   "Native X12 generation and parsing, with CARC and RARC preserved on every service line",
   "An append-only financial ledger: corrections post as reversals and history is never rewritten",
   "Every headline metric reported against its industry benchmark, computed in SQL at full ledger scale",
+  "Payer, federal and state deadlines (overpayments, disputes, appeals, HIPAA requests) tracked as work, not left to a calendar",
   "Published per-provider pricing, with front desk, billing and admin seats free",
 ];

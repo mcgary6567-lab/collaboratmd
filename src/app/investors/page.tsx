@@ -33,8 +33,8 @@ const PROOF = [
   {
     icon: Binary,
     title: "Native X12, not a conversion layer",
-    body: "Generates 837P claims and 270 eligibility requests, and parses 999 and 277CA acknowledgments, 271 responses and 835 remittances directly, with CARC and RARC codes preserved on every service line. Segment-level tests catch a change that would alter a segment before it ships.",
-    tag: "837P · 835 · 270/271 · 999 · 277CA",
+    body: "Generates professional, facility and dental claims, eligibility, claim status and prior authorization requests, and parses the acknowledgments, responses and 835 remittances that come back, with CARC and RARC codes preserved on every service line. Segment-level tests catch a change that would alter a segment before it ships.",
+    tag: "837P · 837I · 837D · 835 · 270/271 · 276/277 · 278 · 999 · 277CA",
   },
   {
     icon: ScanLine,
@@ -57,8 +57,20 @@ const PROOF = [
   {
     icon: Plug,
     title: "Interfaces, not re-keying",
-    body: "HL7 v2 over HTTPS brings patients and charges in from an EHR and lab results back from a lab; lab orders go out as HL7. A practice switching systems imports its patient list from any CSV export, with the columns matched for it.",
-    tag: "HL7 ADT · DFT · ORM · ORU",
+    body: "HL7 v2 over HTTPS and FHIR with SMART backend services bring patients and finished visits in from an EHR, and lab results back from a lab; lab orders go out as HL7. A practice switching systems imports its patient list from any CSV export, with the columns matched for it.",
+    tag: "HL7 ADT · DFT · ORM · ORU · FHIR R4",
+  },
+  {
+    icon: Landmark,
+    title: "The deadlines a practice is held to, tracked for it",
+    body: "The rules that cost practices money when a date slips run as software: Medicare and Medicaid's 60-day overpayment return, No Surprises Act dispute windows, appeal levels, state prompt-pay interest, HIPAA record requests and accountings of disclosures, unclaimed patient credits, payer contract notice dates, and records requests from auditors.",
+    tag: "Compliance as workflow",
+  },
+  {
+    icon: Radar,
+    title: "National code sets, applied by date of service",
+    body: "CMS's yearly and quarterly files load as data: ICD-10-CM with its addenda, HCPCS, NCCI edits, the physician fee schedule, the telehealth list, the HCC mapping and the Medicare ordering and referring file. Each claim is checked against the rules in force on its date of service, so the October 1 code change is a report to work, not a scramble.",
+    tag: "ICD-10-CM · HCPCS · NCCI · MPFS · HCC",
   },
   {
     icon: Network,
@@ -72,7 +84,9 @@ const ENGINEERING = [
   { icon: Database, label: "Postgres with bundled migrations", detail: "Ships inside the build, so serverless deploys never read schema off a disk" },
   { icon: Timer, label: "Reporting computed in SQL", detail: "No row ever leaves the database to be summed in the application" },
   { icon: Layers, label: "Typed end to end", detail: "TypeScript strict, Drizzle ORM, server components and server actions" },
-  { icon: ShieldCheck, label: "Segment-level EDI tests", detail: "X12 and HL7 output is checked segment by segment" },
+  { icon: ShieldCheck, label: "Tested on every change", detail: "Hundreds of unit tests against a migrated database, X12 and HL7 checked segment by segment, and end-to-end runs of the built app" },
+  { icon: Gauge, label: "Load-tested at 100,000 claims", detail: "Every report and the full claim check timed on real Postgres behind a connection pooler, with a budget per query" },
+  { icon: BadgeCheck, label: "Accessible on desktop and phone", detail: "Every signed-in screen checked against WCAG 2.1 AA at both sizes on every change" },
   { icon: Radar, label: "Denial intelligence", detail: "CARC and RARC preserved per line, ranked by dollars at risk" },
   { icon: Workflow, label: "Full lifecycle modeled", detail: "Eligibility, charge capture, scrub, submit, deny, appeal, post; payer adjudication simulated in the demo" },
 ];
