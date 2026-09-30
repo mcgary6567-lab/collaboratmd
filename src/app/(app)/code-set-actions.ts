@@ -13,7 +13,7 @@ export async function importCodeSetAction(_prev: FormResult, formData: FormData)
   const set = String(formData.get("set") ?? "") as CodeSet;
   if (!CODE_SETS.includes(set)) return { ok: false, message: "Choose which code set this file is" };
   const year = Number(formData.get("year") ?? "");
-  if (set === "icd10cm" && !year) return { ok: false, message: "Give the fiscal year of the ICD-10-CM file, e.g. 2027" };
+  if ((set === "icd10cm" || set === "icd10cm_addenda") && !year) return { ok: false, message: "Give the fiscal year of the ICD-10-CM file, e.g. 2027" };
   if ((set === "mpfs_rvu" || set === "mpfs_gpci") && !year) return { ok: false, message: "Give the calendar year of the Medicare fee schedule file, e.g. 2026" };
   if (set === "telehealth" && !year) return { ok: false, message: "Give the calendar year of the Medicare telehealth list, e.g. 2026" };
   if (set === "hcc" && !year) return { ok: false, message: "Give the payment year of the HCC mapping, e.g. 2026" };

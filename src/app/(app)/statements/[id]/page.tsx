@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui";
 import { fmtDate, money } from "@/lib/utils";
 import { langOf } from "@/lib/i18n/messages";
 import { STATEMENT_TEXT, statementDay } from "@/lib/i18n/statement";
+import { explainShare } from "@/lib/billing/explain";
+import { shareReasons } from "@/server/remittance-lines";
 
 export const metadata: Metadata = { title: "Statement" };
 
@@ -38,6 +40,8 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   if (!gate.granted) return <RestrictedGate patientId={patient.id} back={`/statements/${id}`} what="statement" />;
   await logPatientView(s, patient.id, "statement", st.id);
   const visits = st.detail.visits;
+  // Why the patient owes each visit, from the payer's reasons.
+  const reasons = await shareReasons(db, visits.map((v) => v.claimId ?? ""));
   const lob = !!(await practiceConfig(db, s.practiceId)).lob;
   const lang = langOf(patient.preferredLanguage);
   const t = STATEMENT_TEXT[lang];
@@ -154,6 +158,9 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                   <td className="py-2.5 pr-3">
                     {v.services.map((sv) => (
                       <div key={sv.cpt} className="text-slate-700">{sv.description}</div>
+                    ))}
+                    {v.youOweCents > 0 && explainShare(v.claimId ? reasons.get(v.claimId) ?? [] : [], lang, !!v.claimId, v.youOweCents).map((line) => (
+                      <p key={line} className="mt-1 text-xs text-slate-500">{line}</p>
                     ))}
                   </td>
                   <td className="py-2.5 pr-3 text-right tabular-nums">{money(v.chargesCents)}</td>

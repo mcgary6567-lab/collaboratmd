@@ -303,3 +303,8 @@ body {
   .cms1500-root { background: #fff; }
   .cms1500-sheet { page: cms1500; margin: 0; box-shadow: none; page-break-after: always; break-after: page; }
 }
+
+/* Documents printed several to a batch (year-end receipts): one per page. */
+@media print {
+  .print-page-break { break-after: page; border: 0; }
+}

@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/auth";
 import { scheduleRates, standardCharges } from "@/server/fees";
 import { importContractAction, saveContractTermsAction, saveScheduleAction } from "@/app/(app)/fees-actions";
 import { formatModifierRules } from "@/server/contracts";
+import { saveContractDatesAction } from "@/app/(app)/privacy-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, PageHeader } from "@/components/ui";
 import { money } from "@/lib/utils";
@@ -66,6 +67,16 @@ export default async function FeeScheduleEditor({ params }: { params: Promise<{ 
               <p className="text-xs text-slate-500">{mpprCodes.size} code{mpprCodes.size === 1 ? " is" : "s are"} marked for the reduction. Underpayment checks pay the highest one in full and the rest at this percentage. Check the percentages against your contract; payers differ.</p>
               {admin && <SubmitButton pendingLabel="Saving...">Save terms</SubmitButton>}
             </ActionForm>
+          </Card>
+          <Card title="Renewal and notice">
+            <ActionForm action={saveContractDatesAction.bind(null, schedule.id)} className="grid gap-3 text-sm sm:grid-cols-3">
+              <label className="block"><span className="label">Renews on</span><input name="renewsOn" type="date" defaultValue={schedule.renewsOn ?? ""} className="input" disabled={!admin} /></label>
+              <label className="block"><span className="label">Days of notice to renegotiate or end</span><input name="noticeDays" type="number" min="0" max="365" defaultValue={schedule.noticeDays ?? ""} className="input w-28" disabled={!admin} /></label>
+              <label className="block"><span className="label">Scheduled increase (%)</span><input name="escalatorPct" type="number" step="0.01" min="-50" max="50" defaultValue={schedule.escalatorPct ?? ""} className="input w-28" disabled={!admin} /></label>
+              <label className="block sm:col-span-3"><span className="label">Notes (auto-renewal, termination clause, contact)</span><input name="termsNotes" defaultValue={schedule.termsNotes ?? ""} className="input" maxLength={1000} disabled={!admin} /></label>
+              {admin && <div className="sm:col-span-3"><SubmitButton pendingLabel="Saving...">Save dates</SubmitButton></div>}
+            </ActionForm>
+            <p className="mt-2 text-xs leading-6 text-slate-500">Shown on the <Link href="/reports/contract-calendar" className="text-brand-700 underline">contract calendar</Link>, with reminders to administrators before the notice date.</p>
           </Card>
         </div>
       )}

@@ -55,3 +55,17 @@ export async function allowedByCode(db: Db, practiceId: string, from: string, to
     GROUP BY rl.cpt, rl.payer_id, py.name`);
   return rows.map((r) => ({ cpt: r.cpt!, payerId: r.payer_id!, payer: r.payer!, lines: Number(r.n), maxAllowedCents: Math.round(Number(r.max_allowed)), medianAllowedCents: Math.round(Number(r.median_allowed)) }));
 }
+
+/** The patient-responsibility (PR) reasons the payer gave on each claim's lines, for "why do I owe this". */
+export async function shareReasons(db: Db, claimIds: string[]) {
+  const out = new Map<string, { reason: string; amountCents: number }[]>();
+  const ids = [...new Set(claimIds.filter(Boolean))];
+  if (!ids.length) return out;
+  const rows = await db.select({ claimId: remittanceLines.claimId, adjustments: remittanceLines.adjustments }).from(remittanceLines).where(inArray(remittanceLines.claimId, ids));
+  for (const r of rows) {
+    const list = out.get(r.claimId) ?? [];
+    for (const a of r.adjustments) if (a.group === "PR") list.push({ reason: a.reason, amountCents: a.amountCents });
+    out.set(r.claimId, list);
+  }
+  return out;
+}

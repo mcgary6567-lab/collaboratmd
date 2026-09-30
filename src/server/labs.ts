@@ -16,6 +16,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { LABS, LAB_TESTS, abnormalFlag, rangeText, testByCode } from "@/lib/labs/catalog";
+import { ICD10CM_UNDOTTED_RE } from "@/lib/codes/icd";
 import { buildOrm, buildOru, parseOru } from "@/lib/hl7/lab";
 import type { Hl7Message } from "@/lib/hl7/v2";
 
@@ -36,7 +37,7 @@ export async function createLabOrder(db: Db, practiceId: string, input: NewLabOr
   if (!tests.length) throw new Error("Choose at least one test");
   const diagnoses = [...new Set(input.diagnoses.map((d) => d.replace(/\./g, "").trim().toUpperCase()).filter(Boolean))];
   if (!diagnoses.length) throw new Error("Add at least one diagnosis; the lab needs it to bill the patient's insurance");
-  if (diagnoses.some((d) => !/^[A-Z]\d[0-9A-Z]{1,5}$/.test(d))) throw new Error("Diagnoses must be ICD-10-CM codes, e.g. E11.9");
+  if (diagnoses.some((d) => !ICD10CM_UNDOTTED_RE.test(d))) throw new Error("Diagnoses must be ICD-10-CM codes, e.g. E11.9");
 
   const [patient] = await db.select().from(patients).where(and(eq(patients.id, input.patientId), eq(patients.practiceId, practiceId))).limit(1);
   if (!patient) throw new Error("Patient not found");

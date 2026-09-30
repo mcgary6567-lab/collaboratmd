@@ -7,6 +7,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { portalVerifiedFor } from "@/lib/portal-session";
 import { openPortal, portalData } from "@/server/portal";
 import { money } from "@/lib/utils";
+import { explainShare } from "@/lib/billing/explain";
+import { shareReasons } from "@/server/remittance-lines";
 import { patientText } from "@/lib/i18n/patient-server";
 import { formatDate, type Lang, type PatientText } from "@/lib/i18n/patient";
 import { setPatientLangAction } from "@/app/lang-actions";
@@ -70,6 +72,8 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
 
   const d = await portalData(db, o.link.id);
   if (!d) return <Shell practice={o.practiceName} {...shell}><div className="card p-6 text-sm">{t.portalNotLoaded}</div></Shell>;
+  const reasons = await shareReasons(db, d.visits.map((v) => v.claimId ?? ""));
+  const thisYear = new Date().getUTCFullYear();
   const plan = d.plans.find((p) => ["active", "defaulted"].includes(p.plan.status));
   const nextDue = plan?.installments.find((i) => i.status !== "paid");
   const card = d.cards[0];
@@ -151,9 +155,12 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           <h2 className="mb-3 font-semibold">{t.owedFor}</h2>
           <ul className="divide-y divide-slate-200 text-sm">
             {d.visits.map((v, i) => (
-              <li key={i} className="flex justify-between py-2">
-                <span>{t.visitOn(v.dateOfService ? date(v.dateOfService + "T00:00:00") : t.unknownDate)}{v.provider ? ` · ${v.provider}` : ""}</span>
-                <span className="font-medium">{money(v.youOweCents)}</span>
+              <li key={i} className="py-2">
+                <div className="flex justify-between">
+                  <span>{t.visitOn(v.dateOfService ? date(v.dateOfService + "T00:00:00") : t.unknownDate)}{v.provider ? ` · ${v.provider}` : ""}</span>
+                  <span className="font-medium">{money(v.youOweCents)}</span>
+                </div>
+                {explainShare(v.claimId ? reasons.get(v.claimId) ?? [] : [], lang, !!v.claimId, v.youOweCents).map((line) => <p key={line} className="mt-1 text-xs text-slate-600">{line}</p>)}
               </li>
             ))}
           </ul>
@@ -183,6 +190,11 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
               ))}
             </ul>
           )}
+          <p className="mt-3 flex flex-wrap gap-3 text-sm">
+            {[thisYear - 1, thisYear].map((y) => (
+              <a key={y} href={`/portal/${token}/receipt?year=${y}`} className="font-semibold text-brand-700 underline">{lang === "es" ? `Recibo de pagos ${y}` : `Payment receipt, ${y}`}</a>
+            ))}
+          </p>
         </div>
       </div>
 

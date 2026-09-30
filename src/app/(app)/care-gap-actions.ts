@@ -27,7 +27,7 @@ export async function chronicPrefixesAction(_prev: FormResult, fd: FormData): Pr
   const s = await requireRole(["admin"]);
   try {
     const db = await getDb();
-    const list = String(fd.get("prefixes") ?? "").split(/[,\s]+/).map((p) => p.trim().toUpperCase().replace(".", "")).filter((p) => /^[A-Z][0-9][0-9A-Z]{0,5}$/.test(p));
+    const list = String(fd.get("prefixes") ?? "").split(/[,\s]+/).map((p) => p.trim().toUpperCase().replace(".", "")).filter((p) => /^[A-Z][0-9A-Z][0-9A-Z]{0,5}$/.test(p));
     if (!list.length) throw new Error("List diagnosis prefixes such as E11, I10, N18");
     await saveChronicPrefixes(db, s.practiceId, [...new Set(list)].slice(0, 60), s.userId);
     revalidatePath("/reports/care-gaps");

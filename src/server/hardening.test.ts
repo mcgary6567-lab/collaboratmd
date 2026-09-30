@@ -21,7 +21,7 @@ import { rulesSetup } from "./setup-rules";
 const NOT_PRACTICE_DATA = new Set([
   "_migrations", "anesthesia_base_units", "auth_throttle", "code_set_loads", "contact_messages", "coverage_policy_codes", "cpt_codes", "error_events",
   "hcc_mappings", "hcpcs_codes", "heartbeats", "icd10_codes", "medicare_telehealth_codes", "mpfs_localities", "mpfs_rvus", "mpfs_years",
-  "ncci_mue", "ncci_ptp", "ops_alerts", "restore_tests", "saml_requests",
+  "ncci_mue", "ncci_ptp", "ops_alerts", "ordering_referring", "restore_tests", "saml_requests",
 ]);
 
 describe("practice data coverage", () => {

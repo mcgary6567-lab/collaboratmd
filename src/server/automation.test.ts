@@ -64,10 +64,10 @@ describe("daily automation against a migrated database", () => {
     expect(text).toMatch(/Days in A\/R/);
 
     const off = await runDailyForPractice(t.db, t.practiceId, "https://site.test");
-    expect(Object.keys(off)).toEqual(["planStatuses", "dailyChecks", "overpayment60", "recordsRequests", "nsaDeadlines", "refundDemands"]);
+    expect(Object.keys(off)).toEqual(["planStatuses", "dailyChecks", "overpayment60", "recordsRequests", "nsaDeadlines", "refundDemands", "accessRequests", "contractNotices"]);
     await t.db.update(schema.practices).set({ automation: { claimFollowUp: true } }).where(eq(schema.practices.id, t.practiceId));
     const on = await runDailyForPractice(t.db, t.practiceId, "https://site.test");
-    expect(Object.keys(on)).toEqual(["planStatuses", "claimFollowUp", "dailyChecks", "overpayment60", "recordsRequests", "nsaDeadlines", "refundDemands"]);
+    expect(Object.keys(on)).toEqual(["planStatuses", "claimFollowUp", "dailyChecks", "overpayment60", "recordsRequests", "nsaDeadlines", "refundDemands", "accessRequests", "contractNotices"]);
     const runs = await t.db.select().from(schema.automationRuns).where(eq(schema.automationRuns.practiceId, t.practiceId));
     expect(runs).toHaveLength(2);
   });

@@ -106,6 +106,8 @@ export type PracticePolicies = {
   chronicPrefixes?: string[];
   /** Safeguards before an account can be placed with a collection agency; unset means no extra requirement. */
   collections?: { minStatements?: number; minDaysSinceFirst?: number; minBalanceCents?: number; requireAssistanceOffer?: boolean };
+  /** Unclaimed patient credits: the state they are reported to, its dormancy period, and the smallest credit that gets a letter. */
+  unclaimed?: { state: string; dormancyMonths: number; letterMinCents: number };
 };
 
 export type AutomationSettings = {
@@ -482,6 +484,8 @@ export const icd10Codes = pgTable("icd10_codes", {
   /** The first and the latest fiscal year (October to September) whose CMS file listed the code; null for codes not from a CMS file. */
   firstYear: integer("first_year"),
   seenYear: integer("seen_year"),
+  /** The fiscal year the billable flag last changed (CMS addenda); before it, the flag was the opposite. Migration 0062. */
+  changedYear: integer("changed_year"),
 });
 
 /** HCPCS Level II (supplies, drugs, some services), from CMS's public annual file. */
@@ -529,6 +533,11 @@ export const feeSchedules = pgTable("fee_schedules", {
   rules: jsonb("rules").$type<ContractRules>(),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  /** Contract terms (migration 0062): when it renews, days of notice to end or renegotiate, and a scheduled increase. */
+  renewsOn: date("renews_on"),
+  noticeDays: integer("notice_days"),
+  escalatorPct: numeric("escalator_pct", { precision: 5, scale: 2, mode: "number" }),
+  termsNotes: text("terms_notes"),
 });
 
 export const feeScheduleItems = pgTable("fee_schedule_items", {
@@ -2219,3 +2228,68 @@ export const remittanceLines = pgTable("remittance_lines", {
   remarks: jsonb("remarks").$type<string[]>().notNull().default([]),
   paymentDate: date("payment_date").notNull(),
 }, (t) => [index("remittance_lines_claim_idx").on(t.claimId), index("remittance_lines_payer_code_idx").on(t.practiceId, t.payerId, t.cpt)]);
+
+/** A disclosure of a patient's information outside the practice; those not for treatment, payment or operations go in the patient's accounting (45 CFR 164.528). Migration 0062. */
+export const disclosures = pgTable("disclosures", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  disclosedOn: date("disclosed_on").notNull(),
+  recipient: text("recipient").notNull(),
+  recipientAddress: text("recipient_address"),
+  purpose: text("purpose").notNull(),
+  description: text("description").notNull(),
+  source: text("source").notNull().default("manual"), // manual | records_request | access_request
+  sourceId: uuid("source_id"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("disclosures_patient_idx").on(t.practiceId, t.patientId, t.disclosedOn)]);
+
+/** A patient's request for their own records (45 CFR 164.524): 30 days to act, one 30-day extension with notice. Migration 0062. */
+export const accessRequests = pgTable("access_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  kind: text("kind").notNull().default("copy"), // copy | accounting
+  receivedOn: date("received_on").notNull(),
+  dueOn: date("due_on").notNull(),
+  format: text("format"),
+  deliverTo: text("deliver_to"),
+  feeCents: integer("fee_cents").notNull().default(0),
+  extendedOn: date("extended_on"),
+  extensionReason: text("extension_reason"),
+  status: text("status").notNull().default("open"), // open | completed | denied
+  completedOn: date("completed_on"),
+  denialReason: text("denial_reason"),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("access_requests_practice_idx").on(t.practiceId, t.status, t.dueOn)]);
+
+/** A patient credit past the practice's dormancy period: the due-diligence letter, then refund, apply or report as unclaimed property. Migration 0062. */
+export const unclaimedCredits = pgTable("unclaimed_credits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  amountCents: integer("amount_cents").notNull(),
+  lastActivityOn: date("last_activity_on").notNull(),
+  letterSentOn: date("letter_sent_on"),
+  status: text("status").notNull().default("letter_due"), // letter_due | letter_sent | to_report | resolved | reported
+  resolvedOn: date("resolved_on"),
+  resolution: text("resolution"),
+  reportedYear: integer("reported_year"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** CMS's Medicare Order and Referring file: who is enrolled to order or refer, by service type. Migration 0062. */
+export const orderingReferring = pgTable("ordering_referring", {
+  npi: text("npi").primaryKey(),
+  lastName: text("last_name").notNull(),
+  firstName: text("first_name"),
+  partB: boolean("part_b").notNull().default(false),
+  dme: boolean("dme").notNull().default(false),
+  hha: boolean("hha").notNull().default(false),
+  pmd: boolean("pmd").notNull().default(false),
+  hospice: boolean("hospice").notNull().default(false),
+});

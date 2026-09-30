@@ -10,6 +10,7 @@ import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { notify } from "./notifications";
+import { recordDisclosure } from "./disclosures";
 
 const { recordsRequests, claims, patients, payers, auditLog } = schema;
 
@@ -50,6 +51,14 @@ export async function markRecordsSent(db: Db, practiceId: string, id: string, in
   const [row] = await db.update(recordsRequests).set({ status: "sent", sentOn: input.sentOn, sentVia: via }).where(and(eq(recordsRequests.id, id), eq(recordsRequests.practiceId, practiceId))).returning();
   if (!row) throw new Error("Request not found");
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "records_sent", entity: "records_request", entityId: id, details: { sentOn: input.sentOn, via } });
+  // In the disclosure log (for payment, so not in the patient's accounting).
+  if (row.patientId) {
+    const [payer] = row.payerId ? await db.select({ name: payers.name }).from(payers).where(eq(payers.id, row.payerId)).limit(1) : [];
+    await recordDisclosure(db, practiceId, {
+      patientId: row.patientId, disclosedOn: input.sentOn, recipient: payer?.name ?? "The payer", purpose: "payment",
+      description: `Medical records for a ${REQUEST_KINDS[row.kind]?.label ?? "records request"}${row.reference ? ` (${row.reference})` : ""}, sent by ${via}`, source: "records_request", sourceId: id,
+    }, userId);
+  }
   return row;
 }
 

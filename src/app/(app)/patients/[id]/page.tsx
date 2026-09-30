@@ -23,6 +23,7 @@ import { SlidingFeeCard } from "./sliding-fee-card";
 import { CardOnFileCard } from "./card-on-file-card";
 import { cardOnFileFor } from "@/server/card-on-file";
 import { slidingFeeOf } from "@/server/sliding-fee";
+import { benefitsToDate } from "@/server/accumulators";
 import { careMonths } from "@/server/care-programs";
 import { listAbns } from "@/server/abn";
 import { getPatient, managedCareOf, medicareAdvantageOf } from "@/server/patients";
@@ -54,6 +55,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { patient, insurances, checks, visits, ledger } = data;
   const fin = computeFinancials(ledger);
   const latestCheck = checks[0];
+  const toDate = latestCheck?.status === "active" ? await benefitsToDate(db, latestCheck.patientInsuranceId) : null;
   const [payerList, cfg, [waiting], providerList] = await Promise.all([
     db.select({ id: schema.payers.id, name: schema.payers.name, type: schema.payers.type }).from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
     practiceConfig(db, s.practiceId),
@@ -77,6 +79,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         actions={
           <>
             {s.role === "admin" && <Link href={`/patients/${patient.id}/access`} className="btn btn-secondary">Access log</Link>}
+            <Link href={`/print/receipt/${patient.id}?year=${new Date().getUTCFullYear() - 1}`} className="btn btn-secondary">Payment receipt</Link>
+            <Link href={`/print/disclosures/${patient.id}`} className="btn btn-secondary">Accounting of disclosures</Link>
             <Link href={`/encounters/new?patientId=${patient.id}`} className="btn btn-primary">
               New charge
             </Link>
@@ -190,6 +194,13 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                   {latestCheck.oopRemainingCents !== null && <span>OOP remaining: {money(latestCheck.oopRemainingCents)}</span>}
                   {latestCheck.coinsurancePct !== null && <span>Coinsurance: {latestCheck.coinsurancePct}%</span>}
                   {latestCheck.serviceDate && <span>For DOS: {fmtDate(latestCheck.serviceDate + "T00:00:00")}</span>}
+                  {toDate && (toDate.newPlanYear || toDate.appliedOopCents > 0) && (
+                    <span className="col-span-2 mt-1 font-semibold">
+                      Left today (estimate): deductible {toDate.deductibleRemainingCents === null ? "unknown" : money(toDate.deductibleRemainingCents)}
+                      {toDate.oopRemainingCents !== null && <>, out-of-pocket {money(toDate.oopRemainingCents)}</>}
+                      <span className="block font-normal">{toDate.newPlanYear ? "A new plan year: the yearly amounts less what payers applied since January 1." : `Less ${money(toDate.appliedDeductibleCents)} to the deductible and ${money(toDate.appliedOopCents)} patient share on claims processed since the check.`}</span>
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="mt-1 text-xs">{latestCheck.message ?? String((latestCheck.response as { message?: string })?.message ?? "")}</div>

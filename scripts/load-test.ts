@@ -215,6 +215,10 @@ async function main() {
   const warnings = await import("../src/server/warning-outcomes");
   const batch = await import("../src/server/batch-appeals");
   const gfe = await import("../src/server/gfe-variance");
+  const codeChanges = await import("../src/server/code-changes");
+  const calendar = await import("../src/server/contract-calendar");
+  const receipts = await import("../src/server/receipts");
+  const accumulators = await import("../src/server/accumulators");
   const today = new Date().toISOString().slice(0, 10);
   const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
@@ -266,6 +270,11 @@ async function main() {
     { name: "Batch appeal groups", run: (d) => batch.batchAppealGroups(d, practiceId) },
     { name: "Medicare and Medicaid overpayment clocks", run: (d) => recovery.overpaymentClocks(d, practiceId) },
     { name: "Good faith estimate variances", run: (d) => gfe.gfeVariances(d, practiceId) },
+    // Added with the October code changes, privacy, credits and contracts.
+    { name: "Diagnosis code changes", run: (d) => codeChanges.codeChanges(d, practiceId) },
+    { name: "Contract calendar", run: (d) => calendar.contractCalendar(d, practiceId, today) },
+    { name: "Year-end receipts, first batch", run: (d) => receipts.patientsWithPayments(d, practiceId, Number(today.slice(0, 4)), 100) },
+    { name: "Deductible to date (one insurance)", run: async (d) => { const r = await one<{ id: string }>(sql`SELECT patient_insurance_id AS id FROM claims WHERE practice_id = ${practiceId} AND patient_insurance_id IS NOT NULL LIMIT 1`); return accumulators.benefitsToDate(d, r.id); }, selective: true },
   ];
 
   /**

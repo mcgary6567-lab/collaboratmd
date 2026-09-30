@@ -79,6 +79,8 @@ async function connect(): Promise<Runner> {
   fs.mkdirSync(dataDir, { recursive: true });
   const client = new PGlite(dataDir);
   await client.waitReady;
+  // Dates computed in SQL (posted_at::date) follow the session time zone: use UTC, as hosted Postgres does.
+  await client.exec("SET TIME ZONE 'UTC'");
   return { db: drizzlePglite({ client, schema }), exec: async (sql) => void (await client.exec(sql)), shared: false };
 }
 

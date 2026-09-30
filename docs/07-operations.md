@@ -200,7 +200,7 @@ Never commit `.env.local`. To rotate:
 ## Code sets every year
 
 - **ICD-10-CM** changes on **October 1** (and sometimes April 1). CMS publishes the files in the summer on its ICD-10 page ("Code Descriptions in Tabular Order"). Before October 1, load the new year's order file:
-  `npm run import:code-sets -- icd10cm ./icd10cm_order_2027.txt 2027`
+  `npm run import:code-sets -- icd10cm ./icd10cm_order_2027.txt 2027` (with `icd10cm_order_addenda_2027.txt` beside it, which is loaded too; see "ICD-10-CM each October 1" below)
   Each code keeps the first and latest fiscal year that listed it: a new code is refused for earlier dates of service, a deleted one for later dates, and a category (header) code is never billable. Once any year is loaded, every diagnosis on every claim is checked; a date of service in a year not loaded yet gets a warning. Load earlier years' files too if practices bill older dates of service.
 - **HCPCS Level II**: CMS's quarterly Alpha-Numeric HCPCS file, opened in Excel and saved as CSV, loaded under Settings → Code sets (or `npm run import:code-sets -- hcpcs file.csv "2026 Q4"`). Discontinued and not-yet-effective codes are refused for the date of service.
 - **CPT** codes and descriptions belong to the AMA. The product ships only short labels of our own for a few dozen common codes; practices add their own codes, descriptions and fees under Fee schedules (CSV with code, description, fee). Showing AMA CPT descriptions needs an AMA distribution license.
@@ -427,3 +427,42 @@ Recording a sliding fee application is open to staff who can edit; the discount 
 ## Anesthesia units
 
 On a claim with anesthesia lines and minutes, the claim page shows the time units (minutes / 15, to one decimal) and, once CMS's anesthesia base unit file is loaded, the base units and their total. The payer applies its conversion factor to the total.
+
+## ICD-10-CM each October 1: order file and addenda
+
+Load the year's order file and its addenda from the same CMS download ("Code Descriptions in Tabular Order"):
+`npm run import:code-sets -- icd10cm ./icd10cm_order_2027.txt 2027` loads `icd10cm_order_addenda_2027.txt` from the same folder right after it (or load it on its own as code set `icd10cm_addenda`). The addenda say which codes the year added, deleted, or turned from billable into categories (or back), so the year before is known even when it was never loaded: codes not added that year existed the year before, deleted codes stay valid through September 30, and a code whose billable flag changed is checked by the date of service. Before the earliest year the files describe, a code's history is unknown, so a missing or non-billable code only warns.
+
+Code shapes: a letter, then letters or digits (U07.1, C4A.9, and from FY 2027 the two-letter QA chapter such as QA0.0101). The scrubber, the file readers, lab orders, coverage and HCC files, and the diagnosis search all accept them.
+
+Reports → Diagnosis code changes lists the codes the new year deletes or turns into categories that the practice used in the last year or has on open work (visits from October 1 not billed yet, prior authorizations still in force, lab orders awaiting results), with the codes that replace them (the new codes under a split code, or the codes the year added in the same category). Nothing is changed automatically.
+
+## Privacy requests and the disclosure log
+
+Privacy requests (menu, Billing): a patient's request for a copy of their records is due in 30 days, an accounting of disclosures in 60, each extendable once by 30 days with a written reason given before the due date (45 CFR 164.524 and 164.528). Mark it provided (with the fee: reasonable and cost-based; the first accounting in 12 months is free, which is enforced) or denied (with the reason; the patient must get it in writing, with how to have it reviewed). A reminder goes out each day from 7 days before the due date, and each day it is overdue.
+
+Every disclosure is logged with the date, recipient, what was disclosed and why. Records sent for a payer's records request are logged automatically (purpose: payment). The patient's printable accounting (patient page → Accounting of disclosures) covers six years and leaves out treatment, payment, operations, disclosures to the patient and those the patient authorized, as the rule allows. Disclosures outside the app (a subpoena, a public health report) are recorded on the Privacy requests page.
+
+## Unclaimed patient credits
+
+Credits and refunds → Unclaimed credits: the administrator sets the state the credits are reported to, its dormancy period (months without activity on the account) and the smallest credit that gets a due-diligence letter; nothing is assumed, because each state's law differs. Each night (and on "Check for dormant credits now") credits of $1 or more whose last ledger activity is older than the dormancy period open a case. Print the letter and mark it sent; if the patient answers, close the case and refund or apply the credit as usual. With no answer after 30 days (or at once below the letter minimum) the case is ready to report: file it through the state's portal in its format, then "Reported and remitted" (adjust role) posts the credit off the account as a payment to the state. New activity on the account closes the case. Last activity is the latest ledger entry of any kind for the patient.
+
+## Year-end payment receipts
+
+Patient page → Payment receipt (last year by default, with the years either side), Patient billing → Year-end receipts (every patient who paid that year, one per printed page, 100 per batch; restricted records are left out and printed from their own page), and in the patient portal (this year and last). Receipts list payments received and refunds to the patient in the calendar year, in the patient's language; credits remitted to the state are not refunds to the patient and are left out.
+
+## Why the patient owes: explanations on statements and in the portal
+
+Under each visit on a statement and in the portal, the patient-responsibility reasons the payer gave on its 835 lines (group PR) in plain words, largest first: deductible (1), coinsurance (2), copay (3), not covered (96, 204), out of network (242), benefit limit (119), not covered on that date (26, 27), and others by code; in Spanish for Spanish-language patients. When payments, a secondary payer or discounts changed the amount since, a last line says what is owed now. A visit not billed to insurance says so. Mailed statements (Lob) keep their one-page layout without the explanations. Reasons the payer reported only at the claim level are not shown.
+
+## Contract calendar
+
+On a payer contract's fee schedule, "Renewal and notice": the renewal date, the days of notice needed to renegotiate or end it, any scheduled increase and notes. Reports → Contract calendar lists contracts by the next notice date, with each payer's underpayments and allowed amounts over the last 12 months. Administrators get a notification 60, 30 and 7 days before each notice date.
+
+## Deductible and out-of-pocket to date
+
+A coverage check gives the deductible and out-of-pocket left on the day it ran. Between checks, what payers applied on later 835s (PR 1 to the deductible; PR 1, 2 and 3 to the out-of-pocket) is subtracted, and in a new calendar year the amounts start again from the plan's yearly deductible and out-of-pocket maximum. The patient page shows "Left today (estimate)" when it differs from the check, and estimates use it. Plans that do not run on the calendar year are corrected by the next coverage check.
+
+## Medicare ordering and referring
+
+Code set `order_referring`: CMS's Order and Referring file (data.cms.gov, weekly; NPI, last name, first name, and Y/N for Part B, DME, HHA, PMD, hospice), loaded from a terminal (`npm run import:code-sets -- order_referring ./file.csv "label"`); each load replaces the list. On Medicare claims, clinical lab (80000-89999) and imaging (70000-79999) lines need a referring provider enrolled for Part B, and equipment and supply lines (E, K, L, B codes and A4000-A9999) one enrolled for DME: not on the file, or not allowed that kind, is an error. A missing referring provider is flagged only where one is expected (independent lab, place of service 81, or equipment and supplies), since practices billing their own in-office tests order them themselves.

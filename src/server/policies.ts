@@ -32,6 +32,7 @@ export const DEFAULT_POLICIES: Required<{ [K in keyof PracticePolicies]: NonNull
   accessReview: null,
   chronicPrefixes: null,
   collections: null,
+  unclaimed: null,
 };
 
 export async function getPolicies(db: Db, practiceId: string): Promise<PracticePolicies> {
@@ -72,7 +73,7 @@ export async function savePolicies(db: Db, practiceId: string, input: PracticePo
   try { before = validatePolicies(stored); } catch { before = stored; }
   const policies = validatePolicies(input);
   // Settings saved on other screens live in the same column: keep them (the access review's limits, the chronic condition groups).
-  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}), ...(stored.collections ? { collections: stored.collections } : {}) } }).where(eq(practices.id, practiceId));
+  await db.update(practices).set({ policies: { ...policies, ...(stored.accessReview ? { accessReview: stored.accessReview } : {}), ...(stored.chronicPrefixes ? { chronicPrefixes: stored.chronicPrefixes } : {}), ...(stored.collections ? { collections: stored.collections } : {}), ...(stored.unclaimed ? { unclaimed: stored.unclaimed } : {}) } }).where(eq(practices.id, practiceId));
   const changed = Object.keys(policies).filter((k) => JSON.stringify(policies[k as keyof PracticePolicies] ?? null) !== JSON.stringify(before[k as keyof PracticePolicies] ?? null));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed, policies } });
   return policies;
@@ -102,6 +103,19 @@ export async function saveCollectionSafeguards(db: Db, practiceId: string, input
   await db.update(practices).set({ policies: { ...stored, collections } }).where(eq(practices.id, practiceId));
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed: ["collections"], collections } });
   return collections;
+}
+
+/** Where and when unclaimed patient credits are reported: set to the practice's state law, nothing is assumed. */
+export async function saveUnclaimedSettings(db: Db, practiceId: string, input: { state: string; dormancyMonths: number; letterMinCents: number }, userId?: string) {
+  const state = input.state.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(state)) throw new Error("Choose the state the credits are reported to");
+  if (!Number.isInteger(input.dormancyMonths) || input.dormancyMonths < 6 || input.dormancyMonths > 120) throw new Error("The dormancy period is 6 to 120 months");
+  if (!Number.isInteger(input.letterMinCents) || input.letterMinCents < 0 || input.letterMinCents > 100_000) throw new Error("The letter minimum is $0 to $1,000");
+  const unclaimed = { state, dormancyMonths: input.dormancyMonths, letterMinCents: input.letterMinCents };
+  const stored = await getPolicies(db, practiceId);
+  await db.update(practices).set({ policies: { ...stored, unclaimed } }).where(eq(practices.id, practiceId));
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "policies_changed", entity: "practice", entityId: practiceId, details: { changed: ["unclaimed"], unclaimed } });
+  return unclaimed;
 }
 
 /** Whether scrub findings stop a claim: errors always, warnings too under strict scrubbing. */

@@ -6,6 +6,7 @@ import { buildSchedule, allocatePayment, addDays, GRACE_DAYS, DEFAULT_AFTER_MISS
 import { estimateInsured, estimateSelfPay } from "@/lib/billing/estimate";
 import { contractRates, standardCharges } from "./fees";
 import { runEligibility } from "./patients";
+import { benefitsToDate } from "./accumulators";
 
 const {
   patients, patientInsurances, payers, ledgerEntries, claims, encounters, providers, charges, cptCodes, practices,
@@ -494,11 +495,13 @@ export async function createEstimate(db: Db, practiceId: string, input: NewEstim
     chargeCents: fees.get(l.cpt)!, allowedCents: rates.get(l.cpt) ?? fees.get(l.cpt)!,
   }));
   const uncontracted = estLines.filter((l) => !rates.has(l.cpt)).map((l) => l.cpt);
+  // What the payer applied since the check (or the new plan year's full amounts) moves the deductible and out-of-pocket left.
+  const toDate = await benefitsToDate(db, ins.ins.id, input.serviceDate ?? undefined);
   const benefits = {
     copayCents: check.copayCents ?? ins.ins.copayCents,
-    deductibleRemainingCents: check.deductibleRemainingCents ?? 0,
+    deductibleRemainingCents: toDate?.deductibleRemainingCents ?? check.deductibleRemainingCents ?? 0,
     coinsurancePct: check.coinsurancePct ?? 20,
-    oopRemainingCents: check.oopRemainingCents,
+    oopRemainingCents: toDate?.oopRemainingCents ?? check.oopRemainingCents,
   };
   const e = estimateInsured(estLines, benefits);
   const [est] = await db.insert(estimates).values({

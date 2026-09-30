@@ -17,6 +17,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { ScrubFinding } from "@/lib/scrub/rules";
 import { parseCsv } from "@/lib/import/csv";
+import { ICD10CM_UNDOTTED_RE } from "@/lib/codes/icd";
 import { ensureSchedule, saveScheduleItems } from "./fees";
 
 const { icd10Codes, hcpcsCodes, practiceCodes, cptCodes, codeSetLoads } = schema;
@@ -49,11 +50,11 @@ export function parseIcd10(text: string): { rows: IcdRow[]; skipped: number } {
     if (!line.trim()) continue;
     // Order file columns: 1-5 order number, 7-13 code, 15 billable flag, 17-76 short description, 78 on the long one.
     const order = /^\d{5} /.test(line);
-    const plain = order ? null : /^([A-Z][0-9][0-9A-Z]{1,5})\s+(\S.*)$/.exec(line);
+    const plain = order ? null : /^([A-Z][0-9A-Z][0-9A-Z]{1,5})\s+(\S.*)$/.exec(line);
     const code = order ? line.slice(6, 13).trim() : plain?.[1];
     const flag = order ? line.charAt(14) : "1";
     const description = (order ? line.slice(77).trim() || line.slice(16, 76).trim() : plain?.[2])?.trim();
-    if (!code || !description || !/^[A-Z][0-9][0-9A-Z]{1,5}$/.test(code) || !["0", "1"].includes(flag)) { skipped++; continue; }
+    if (!code || !description || !ICD10CM_UNDOTTED_RE.test(code) || !["0", "1"].includes(flag)) { skipped++; continue; }
     rows.push({ code: dotted(code), description: description.slice(0, 300), billable: flag === "1" });
   }
   return { rows, skipped };
@@ -86,17 +87,78 @@ export async function importIcd10(db: Db, text: string, year: number, label: str
   return { added: rows.length, skipped };
 }
 
+export type IcdChange = { kind: "add" | "delete"; code: string; billable: boolean; description: string };
+
+/**
+ * CMS's addenda file for a year (icd10cm_order_addenda_YYYY.txt): lines
+ * "Add:", "Delete:", "Revise from:" and "Revise to:", each with the 0/1
+ * billable flag, the code and its descriptions. A code both deleted and added
+ * changed its billable flag (for example, it became a category with new codes
+ * under it).
+ */
+export function parseIcd10Addenda(text: string): IcdChange[] {
+  const out: IcdChange[] = [];
+  for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
+    const m = /^(Add|Delete):\s+([01])\s+([A-Z][0-9A-Z][0-9A-Z]{1,5})\s+(\S.*)$/.exec(line.trimEnd());
+    if (!m) continue;
+    const parts = m[4].split(/\s{2,}/);
+    out.push({ kind: m[1] === "Add" ? "add" : "delete", code: dotted(m[3]), billable: m[2] === "1", description: (parts[parts.length - 1] ?? "").slice(0, 300) });
+  }
+  return out;
+}
+
+/**
+ * Loads a year's addenda after that year's order file, so the year before is
+ * known too: codes the year did not add existed the year before, codes it
+ * deleted were valid until September 30, and codes whose billable flag changed
+ * keep the year it changed. Without it, loading only the newest year would make
+ * every code look new that year.
+ */
+export async function importIcd10Addenda(db: Db, text: string, year: number, label: string, loadedBy: string) {
+  if (!Number.isInteger(year) || year < 2016 || year > 2100) throw new Error("Give the fiscal year of the addenda, e.g. 2027");
+  const changes = parseIcd10Addenda(text);
+  if (changes.length < 5) throw new Error(`Not an ICD-10-CM addenda file (${changes.length} changes found)`);
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(icd10Codes).where(gte(icd10Codes.seenYear, year));
+  if (Number(n) < 100) throw new Error(`Load the FY ${year} order file first, then its addenda`);
+  const adds = new Map(changes.filter((c) => c.kind === "add").map((c) => [c.code, c]));
+  const deletes = new Map(changes.filter((c) => c.kind === "delete").map((c) => [c.code, c]));
+  const flagChanged = [...adds.keys()].filter((c) => deletes.has(c) && deletes.get(c)!.billable !== adds.get(c)!.billable);
+  const newCodes = [...adds.keys()].filter((c) => !deletes.has(c));
+  const removed = [...deletes.values()].filter((c) => !adds.has(c.code));
+  // Everything in this year's file that it did not add was already there the year before.
+  await db.execute(sql`UPDATE icd10_codes SET first_year = ${year - 1}
+    WHERE seen_year >= ${year} AND first_year = ${year} AND code NOT IN (SELECT jsonb_array_elements_text(${JSON.stringify(newCodes)}::jsonb))`);
+  await inChunks(removed, 500, (chunk) => db.insert(icd10Codes).values(chunk.map((c) => ({ code: c.code, description: c.description, billable: c.billable, firstYear: year - 1, seenYear: year - 1 }))).onConflictDoUpdate({
+    target: icd10Codes.code,
+    set: { firstYear: sql`LEAST(COALESCE(${icd10Codes.firstYear}, ${year - 1}), ${year - 1})`, seenYear: sql`GREATEST(COALESCE(${icd10Codes.seenYear}, ${year - 1}), ${year - 1})` },
+  }));
+  if (flagChanged.length) await db.update(icd10Codes).set({ changedYear: year }).where(inArray(icd10Codes.code, flagChanged));
+  await db.insert(codeSetLoads).values({ codeSet: "icd10cm", label: `FY ${year} addenda: ${label}`.slice(0, 120), rows: changes.length, loadedBy });
+  return { added: newCodes.length, deleted: removed.length, flagChanged: flagChanged.length, skipped: 0 };
+}
+
 /** The newest fiscal year loaded, or null when only the built-in list is there. */
 export async function icdYearLoaded(db: Db) {
-  const [r] = await db.select({ y: sql<number | null>`max(${icd10Codes.seenYear})` }).from(icd10Codes);
-  return r?.y ? Number(r.y) : null;
+  return (await icdYears(db)).latest;
 }
+
+/** The newest fiscal year loaded, and the earliest one the files describe (before it, a code's history is unknown). */
+export async function icdYears(db: Db) {
+  const [r] = await db.select({ latest: sql<number | null>`max(${icd10Codes.seenYear})`, earliest: sql<number | null>`min(${icd10Codes.firstYear})` }).from(icd10Codes);
+  return { latest: r?.latest ? Number(r.latest) : null, earliest: r?.earliest ? Number(r.earliest) : null };
+}
+
+/** Whether a code was billable in a fiscal year, given the year its flag last changed. */
+export const billableIn = (r: { billable: boolean; changedYear: number | null }, fy: number) => (r.changedYear && fy < r.changedYear ? !r.billable : r.billable);
 
 /** Diagnosis checks against the loaded code set, for the date of service. */
 export async function icdFindings(db: Db, dateOfService: string, diagnoses: string[]): Promise<ScrubFinding[]> {
-  const latest = await icdYearLoaded(db);
+  const { latest, earliest } = await icdYears(db);
   if (!latest || !diagnoses.length || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfService)) return [];
   const fy = fiscalYear(dateOfService);
+  const first = earliest ?? latest;
+  // Before the earliest year the files describe, a code's history is unknown: flag what may be wrong, but do not refuse.
+  const unknownYear = fy < first;
   const wanted = [...new Set(diagnoses.map(dotted))];
   const found = new Map((await db.select().from(icd10Codes).where(inArray(icd10Codes.code, wanted))).map((r) => [r.code, r]));
   const out: ScrubFinding[] = [];
@@ -104,13 +166,17 @@ export async function icdFindings(db: Db, dateOfService: string, diagnoses: stri
   for (const dx of wanted) {
     const r = found.get(dx);
     if (!r || r.firstYear === null || r.seenYear === null) {
-      out.push({ rule: "DX_CODE", severity: "error", field, message: `${dx} is not an ICD-10-CM code in the FY ${Math.min(fy, latest)} code set` });
-    } else if (fy < r.firstYear) {
+      out.push(unknownYear
+        ? { rule: "DX_CODE", severity: "warning", field, message: `${dx} is not in the ICD-10-CM files loaded (FY ${first} on); FY ${fy} is not loaded, so check it is valid for this date of service` }
+        : { rule: "DX_CODE", severity: "error", field, message: `${dx} is not an ICD-10-CM code in the FY ${Math.min(fy, latest)} code set` });
+    } else if (fy < r.firstYear && r.firstYear > first) {
       out.push({ rule: "DX_NOT_YET_VALID", severity: "error", field, message: `${dx} takes effect October 1, ${r.firstYear - 1}; the date of service is before that` });
     } else if (r.seenYear < fy && r.seenYear < latest) {
       out.push({ rule: "DX_DELETED", severity: "error", field, message: `${dx} was deleted after FY ${r.seenYear} (September 30, ${r.seenYear}); use its replacement for this date of service` });
-    } else if (!r.billable) {
-      out.push({ rule: "DX_BILLABLE", severity: "error", field, message: `${dx} (${r.description}) is a category, not a billable code: choose a more specific code under it` });
+    } else if (!billableIn(r, fy)) {
+      out.push({ rule: "DX_BILLABLE", severity: unknownYear ? "warning" : "error", field, message: r.changedYear && fy >= r.changedYear && !r.billable
+        ? `${dx} (${r.description}) became a category on October 1, ${r.changedYear - 1}: choose one of the more specific codes under it`
+        : `${dx} (${r.description}) is a category, not a billable code: choose a more specific code under it` });
     }
   }
   if (fy > latest) out.push({ rule: "DX_YEAR_NOT_LOADED", severity: "warning", field, message: `The FY ${fy} ICD-10-CM codes (effective October 1, ${fy - 1}) are not loaded yet, so new and deleted codes for this date of service are not checked` });
@@ -217,7 +283,8 @@ const codeRange = (column: typeof icd10Codes.code | typeof hcpcsCodes.code, pref
 export async function searchDiagnoses(db: Db, q: string, limit = 25): Promise<CodeOption[]> {
   const term = q.trim();
   if (term.length < 2) return [];
-  const asCode = /^[A-Za-z][0-9]/.test(term);
+  // A code starts with a letter and has a digit by the third character (E11, QA0); words do not.
+  const asCode = /^[A-Za-z]([0-9]|[A-Za-z][0-9])/.test(term);
   const words = prefixQuery(term);
   if (!asCode && !words) return [];
   // A code prefix is a range on the primary key; words go through the full-text index (both indexed, so fast on the full list).

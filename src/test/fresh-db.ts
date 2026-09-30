@@ -11,6 +11,8 @@ import type { Db } from "@/db";
 export async function freshDb(opts: { seed: boolean }) {
   const client = new PGlite();
   await client.waitReady;
+  // As hosted Postgres: dates computed in SQL are UTC days, whatever the machine's time zone.
+  await client.exec("SET TIME ZONE 'UTC'");
   for (const m of MIGRATIONS) await client.exec(m.sql);
   const db = drizzle({ client, schema }) as unknown as Db;
   if (opts.seed) {

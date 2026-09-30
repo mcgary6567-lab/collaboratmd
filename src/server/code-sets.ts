@@ -20,15 +20,17 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { TELEHEALTH_POS, type ScrubFinding } from "@/lib/scrub/rules";
 import { parseCsv } from "@/lib/import/csv";
+import { ICD10CM_UNDOTTED_RE } from "@/lib/codes/icd";
 import { normalizeDate } from "@/lib/import/patients";
-import { hcpcsFindings, icdFindings, icdYearLoaded, importHcpcs, importIcd10 } from "./code-catalog";
+import { hcpcsFindings, icdFindings, icdYearLoaded, importHcpcs, importIcd10, importIcd10Addenda } from "./code-catalog";
 import { importGpcis, importRvus } from "./mpfs";
 import { importAnesthesiaBaseUnits } from "./time-units";
+import { importOrderingReferring, orderingFindings } from "./ordering";
 
 const { ncciPtp, ncciMue, coveragePolicyCodes, codeSetLoads, medicareTelehealthCodes, hccMappings } = schema;
 
-export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia" | "telehealth" | "hcc";
-export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia", "telehealth", "hcc"];
+export type CodeSet = "ncci_ptp" | "ncci_mue" | "coverage" | "icd10cm" | "icd10cm_addenda" | "hcpcs" | "mpfs_rvu" | "mpfs_gpci" | "anesthesia" | "telehealth" | "hcc" | "order_referring";
+export const CODE_SETS: CodeSet[] = ["ncci_ptp", "ncci_mue", "coverage", "icd10cm", "icd10cm_addenda", "hcpcs", "mpfs_rvu", "mpfs_gpci", "anesthesia", "telehealth", "hcc", "order_referring"];
 
 /** Platform operators, by email: the only people who can replace national code sets. */
 export function isPlatformOperator(email: string | null | undefined) {
@@ -100,7 +102,7 @@ export function parseCoverage(text: string): { rows: CoverageRow[]; skipped: num
     const policyId = (r[p] ?? "").trim().slice(0, 40);
     const cpt = code(r[c]);
     const icd10 = code(r[d]).replace(".", "");
-    if (!policyId || !/^[0-9A-Z]{5}$/.test(cpt) || !/^[A-Z][0-9][0-9A-Z]{1,5}$/.test(icd10)) { skipped++; continue; }
+    if (!policyId || !/^[0-9A-Z]{5}$/.test(cpt) || !ICD10CM_UNDOTTED_RE.test(icd10)) { skipped++; continue; }
     rows.push({ policyId, title: (ti >= 0 ? r[ti] : "")?.trim().slice(0, 200) || policyId, cpt, icd10 });
   }
   return { rows, skipped };
@@ -149,7 +151,7 @@ export function parseHccMapping(text: string): { rows: HccRow[]; skipped: number
   for (const r of t.rows) {
     const icd10 = code(r[dx]).replace(".", "");
     const hcc = (r[hccCol] ?? "").trim().replace(/^HCC\s*/i, "");
-    if (!/^[A-Z][0-9][0-9A-Z]{1,5}$/.test(icd10) || !/^\d{1,4}$/.test(hcc)) { skipped++; continue; }
+    if (!ICD10CM_UNDOTTED_RE.test(icd10) || !/^\d{1,4}$/.test(hcc)) { skipped++; continue; }
     rows.push({ icd10, hcc, label: labelCol >= 0 ? (r[labelCol] ?? "").trim().slice(0, 120) || null : null });
   }
   return { rows, skipped };
@@ -163,6 +165,8 @@ async function inChunks<T>(rows: T[], size: number, fn: (chunk: T[]) => Promise<
 
 export async function importCodeSet(db: Db, set: CodeSet, text: string, label: string, loadedBy: string, year?: number, conversionFactor?: number) {
   if (set === "icd10cm") return importIcd10(db, text, Number(year), label, loadedBy);
+  if (set === "icd10cm_addenda") return importIcd10Addenda(db, text, Number(year), label, loadedBy);
+  if (set === "order_referring") return importOrderingReferring(db, text, label, loadedBy);
   if (set === "hcpcs") return importHcpcs(db, text, label, loadedBy);
   if (set === "mpfs_rvu") return importRvus(db, text, Number(year), label, loadedBy, conversionFactor);
   if (set === "mpfs_gpci") return importGpcis(db, text, Number(year), label, loadedBy);
@@ -230,13 +234,18 @@ export type CodeSetClaim = {
   payerType: string;
   dateOfService: string;
   diagnoses: string[];
+  /** The referring or ordering practitioner, for Medicare's ordering edits (professional claims). */
+  referring?: { npi: string | null; name: string | null };
   placeOfService?: string;
   lines: { lineNumber: number; cpt: string; modifiers: string[]; units: number }[];
 };
 
 export async function codeSetFindings(db: Db, c: CodeSetClaim): Promise<ScrubFinding[]> {
-  const [dx, level2, tele] = await Promise.all([icdFindings(db, c.dateOfService, c.diagnoses), hcpcsFindings(db, c.dateOfService, c.lines), telehealthFindings(db, c)]);
-  return [...dx, ...level2, ...tele, ...(await ncciFindings(db, c))];
+  const [dx, level2, tele, ordering] = await Promise.all([
+    icdFindings(db, c.dateOfService, c.diagnoses), hcpcsFindings(db, c.dateOfService, c.lines), telehealthFindings(db, c),
+    c.referring !== undefined ? orderingFindings(db, { payerType: c.payerType, placeOfService: c.placeOfService ?? "", referringNpi: c.referring.npi, referringName: c.referring.name, lines: c.lines }) : Promise.resolve([]),
+  ]);
+  return [...dx, ...level2, ...tele, ...ordering, ...(await ncciFindings(db, c))];
 }
 
 /**

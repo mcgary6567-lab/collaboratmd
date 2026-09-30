@@ -9,6 +9,7 @@ import { isDrugCode, isNdcUnit } from "@/lib/codes/ndc";
 import { isZeroChargeCode } from "@/lib/codes/quality";
 import { isUnlistedCode } from "@/lib/codes/unlisted";
 import { POS_CODES } from "@/lib/codes/pos";
+import { ICD10CM_RE } from "@/lib/codes/icd";
 import { CLIA_RE, isLabCode } from "@/lib/codes/lab";
 import { ANESTHESIA_MODIFIERS, EM_TIME_MINIMUM, THERAPY_MODIFIERS, TIMED_THERAPY_CODES, eightMinuteRule, isAnesthesiaCode, isOfficeEm, isTherapyCode, levelForMinutes, prolongedUnits } from "@/lib/time-units";
 
@@ -69,7 +70,7 @@ export function isValidNpi(npi: string): boolean {
   return sum % 10 === 0;
 }
 
-const ICD10_RE = /^[A-TV-Z][0-9][0-9AB](\.?[0-9A-TV-Z]{1,4})?$/i;
+const ICD10_RE = ICD10CM_RE;
 const CPT_RE = /^(\d{5}|[A-V]\d{4})$/; // CPT or HCPCS level II
 const MODIFIER_RE = /^[A-Z0-9]{2}$/;
 // The full CMS list (lib/codes/pos.ts): what charge entry offers is what the scrubber accepts.

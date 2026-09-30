@@ -25,6 +25,7 @@ export async function testDb(opts: { seed?: boolean } = {}) {
     const data = await readFile(seed ? snapshots.seeded : snapshots.empty);
     client = new PGlite({ loadDataDir: new Blob([data]) });
     await client.waitReady;
+    await client.exec("SET TIME ZONE 'UTC'");
     db = drizzle({ client, schema }) as unknown as Db;
   } else {
     ({ client, db } = await freshDb({ seed }));

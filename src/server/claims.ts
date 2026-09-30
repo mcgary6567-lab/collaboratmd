@@ -136,6 +136,7 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
   const enrolled = enrollmentFinding(enrollment, b.encounter.dateOfService, `Dr. ${b.provider.firstName} ${b.provider.lastName}`, b.payer.name);
   const national = await codeSetFindings(db, {
     payerType: b.payer.type, dateOfService: b.encounter.dateOfService, diagnoses: b.encounter.diagnoses, placeOfService: b.encounter.placeOfService,
+    referring: { npi: b.encounter.referringNpi, name: [b.encounter.referringFirstName, b.encounter.referringLastName].filter(Boolean).join(" ") || null },
     lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units })),
   });
   const msp = await mspFindings(db, { patientId: b.patient.id, payerType: b.payer.type, payerSequence: b.claim.payerSequence, mspType: b.insurance.mspType });

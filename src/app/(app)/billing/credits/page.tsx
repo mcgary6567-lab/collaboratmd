@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
-import { CAN_ADJUST, requireSession } from "@/lib/auth";
+import { CAN_ADJUST, CAN_WRITE, requireSession } from "@/lib/auth";
+import { getPolicies } from "@/server/policies";
+import { unclaimedCases } from "@/server/unclaimed";
+import { UnclaimedCard } from "./unclaimed-card";
 import { creditBalances, listRefunds, overpaymentClocks, OVERPAYMENT_DAYS } from "@/server/recovery";
 import { approveRefundAction, cancelRefundAction, issueRefundAction, overpaymentIdentifiedAction, requestRefundAction } from "@/app/(app)/recovery-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -36,6 +39,8 @@ export default async function CreditsPage() {
   const [credits, refunds] = await Promise.all([creditBalances(db, s.practiceId), listRefunds(db, s.practiceId)]);
   const clocks = new Map((await overpaymentClocks(db, s.practiceId, new Date(), credits)).map((c) => [c.claimId, c]));
   const canAdjust = (CAN_ADJUST as readonly string[]).includes(s.role);
+  const policies = await getPolicies(db, s.practiceId);
+  const unclaimed = policies.unclaimed ? await unclaimedCases(db, s.practiceId) : [];
   const isAdmin = s.role === "admin";
   const urgent = [...clocks.values()].filter((c) => c.daysLeft <= 15 && c.overpaidCents > c.pendingCents);
   const late = urgent.filter((c) => c.daysLeft < 0).length;
@@ -177,6 +182,7 @@ export default async function CreditsPage() {
           <p className="mt-3 text-xs text-slate-500">A payer may also take the money back itself by offsetting a later payment; that arrives on an 835 as a reversal and clears the overpayment without a refund here.</p>
         </Card>
       </div>
+      <UnclaimedCard settings={policies.unclaimed} cases={unclaimed} isAdmin={isAdmin} canWrite={(CAN_WRITE as readonly string[]).includes(s.role)} canAdjust={canAdjust} />
     </>
   );
 }

@@ -9,6 +9,21 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-09-30",
+    title: "October 1 code changes, privacy requests, unclaimed credits, contract calendar",
+    items: [
+      "Diagnosis code changes: the codes your practice uses that FY 2027 deletes or splits, where they are on open work, and their replacements",
+      "ICD-10-CM checked by the date of service from the new year's file and its addenda, including the new QA codes; U codes such as U07.1 now pass the format check",
+      "Privacy requests: patients' requests for records and accountings of disclosures on their HIPAA deadlines, with a disclosure log",
+      "Unclaimed patient credits: dormancy you set by state, the due-diligence letter, and the report",
+      "Year-end payment receipts, one patient or all at once, and in the patient portal",
+      "Statements and the portal explain each balance in plain English or Spanish from the payer's reasons",
+      "Contract calendar with renewal and notice dates, and reminders before each notice date",
+      "Deductible and out-of-pocket kept current from the payer's 835s between coverage checks, and used in estimates",
+      "Medicare lab, imaging and equipment claims checked against CMS's ordering and referring file",
+    ],
+  },
+  {
     date: "2026-09-29",
     title: "Setup for yearly files, warnings that became denials, and a hardening pass",
     items: [

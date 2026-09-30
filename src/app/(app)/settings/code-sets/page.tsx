@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Code sets" };
 
 export const dynamic = "force-dynamic";
 
-const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units", telehealth: "Medicare telehealth list", hcc: "HCC risk adjustment mapping" };
+const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure", ncci_mue: "Medically unlikely edits", coverage: "Medicare coverage policies", icd10cm: "ICD-10-CM diagnoses", icd10cm_addenda: "ICD-10-CM addenda", order_referring: "Medicare ordering and referring", hcpcs: "HCPCS Level II", mpfs_rvu: "Medicare fee schedule RVUs", mpfs_gpci: "Medicare localities (GPCI)", anesthesia: "Anesthesia base units", telehealth: "Medicare telehealth list", hcc: "HCC risk adjustment mapping" };
 
 export default async function CodeSetsPage() {
   const s = await requireSession();
@@ -52,7 +52,8 @@ export default async function CodeSetsPage() {
         </Card>
         <Card title="Where the data comes from">
           <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
-            <li>ICD-10-CM: CMS publishes each fiscal year&apos;s files in the summer (ICD-10-CM page, &quot;Code Descriptions in Tabular Order&quot;). Load <code>icd10cm_order_YYYY.txt</code> with its fiscal year before October 1. Keep loading earlier years&apos; files too if you bill older dates of service.</li>
+            <li>ICD-10-CM: CMS publishes each fiscal year&apos;s files in the summer (ICD-10-CM page, &quot;Code Descriptions in Tabular Order&quot;). Load <code>icd10cm_order_YYYY.txt</code> with its fiscal year before October 1, then <code>icd10cm_order_addenda_YYYY.txt</code> from the same download: the addenda say which codes are new, deleted or turned into categories, so dates of service before October 1 are still checked correctly. Keep loading earlier years&apos; files too if you bill older dates of service.</li>
+            <li>Medicare ordering and referring: CMS&apos;s Order and Referring file (data.cms.gov, updated weekly; NPI, name, and Y/N for Part B, DME, home health, power mobility and hospice). It is large, so load it from a terminal. Medicare lab, imaging, equipment and supply lines whose referring practitioner is missing from it, or not allowed to order that kind of service, are stopped.</li>
             <li>HCPCS Level II: CMS&apos;s quarterly Alpha-Numeric HCPCS file. Open the Excel file and save it as CSV.</li>
             <li>Medicare fee schedule: from CMS&apos;s Physician Fee Schedule relative value files each year, the PPRRVU file and the GPCI file (Addendum E), each saved as CSV, with the calendar year. Practices then choose their locality on the practice profile.</li>
             <li>Anesthesia base units: CMS&apos;s anesthesia base unit file saved as CSV (code and base units).</li>
@@ -71,7 +72,7 @@ export default async function CodeSetsPage() {
             <>
               <ActionForm action={importCodeSetAction} className="flex flex-wrap items-end gap-3 text-sm">
                 <label className="block"><span className="label">Code set</span>
-                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="telehealth">Medicare telehealth services list (CSV)</option><option value="hcc">HCC mapping (ICD-10 to HCC, CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option></select>
+                  <select name="set" className="input"><option value="icd10cm">ICD-10-CM order file</option><option value="icd10cm_addenda">ICD-10-CM addenda (after the order file)</option><option value="hcpcs">HCPCS Level II (CSV)</option><option value="mpfs_rvu">Medicare fee schedule RVUs (PPRRVU, CSV)</option><option value="mpfs_gpci">Medicare localities (GPCI, CSV)</option><option value="anesthesia">Anesthesia base units (CSV)</option><option value="telehealth">Medicare telehealth services list (CSV)</option><option value="hcc">HCC mapping (ICD-10 to HCC, CSV)</option><option value="ncci_ptp">NCCI code pairs (PTP)</option><option value="ncci_mue">Unit limits (MUE)</option><option value="coverage">Medicare coverage (policy, hcpcs, icd10)</option><option value="order_referring">Medicare Order and Referring (CSV)</option></select>
                 </label>
                 <label className="block"><span className="label">Year (ICD-10-CM fiscal year; fee schedule or telehealth list year)</span><input name="year" className="input w-28" inputMode="numeric" placeholder={String(currentFiscalYear())} maxLength={4} /></label>
                 <label className="block"><span className="label">Conversion factor (RVU file, if not in it)</span><input name="conversionFactor" className="input w-32" inputMode="decimal" placeholder="e.g. 33.4009" /></label>
@@ -81,7 +82,8 @@ export default async function CodeSetsPage() {
               </ActionForm>
               <p className="mt-3 text-xs text-slate-500">
                 The full ICD-10-CM and quarterly PTP files are larger than an upload allows; load them from a terminal with DATABASE_URL set:
-                <code className="ml-1 rounded bg-slate-100 px-1 text-slate-700">npm run import:code-sets -- icd10cm ./icd10cm_order_2027.txt 2027</code>
+                <code className="ml-1 rounded bg-slate-100 px-1 text-slate-700">npm run import:code-sets -- icd10cm ./icd10cm_order_2027.txt 2027</code> (loads the addenda beside it too)
+                <code className="ml-1 rounded bg-slate-100 px-1 text-slate-700">npm run import:code-sets -- order_referring ./OrderReferring.csv &quot;Order and Referring, 2026-09-26&quot;</code>
                 <code className="ml-1 rounded bg-slate-100 px-1 text-slate-700">npm run import:code-sets -- ncci_ptp ./ccipra-v324r0-f1.txt &quot;2026 Q4 PTP part 1&quot;</code>
               </p>
             </>

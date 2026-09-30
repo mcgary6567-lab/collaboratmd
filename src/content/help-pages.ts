@@ -88,6 +88,30 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Payer edits", href: "/settings/payer-edits" }],
   },
+  "/reports/code-changes": {
+    title: "Diagnosis code changes",
+    steps: [
+      "Each October 1 CMS deletes some ICD-10-CM codes and splits others into more specific ones. This lists the ones your practice uses, and where: visits not billed yet, prior authorizations and lab orders.",
+      "Pick the replacement the documentation supports; visits before October 1 keep the old code. The claim scrubber checks each date of service against its own year.",
+    ],
+    related: [{ label: "Code sets", href: "/settings/code-sets" }],
+  },
+  "/reports/contract-calendar": {
+    title: "Contract calendar",
+    steps: [
+      "Each payer contract's renewal date, the last day to give notice to renegotiate or end it, any scheduled increase, and what that payer underpaid in the last year.",
+      "Enter the dates on each contract's fee schedule; administrators are reminded 60, 30 and 7 days before the notice date.",
+    ],
+    related: [{ label: "Fee schedules", href: "/settings/fees" }, { label: "Contract comparison", href: "/reports/contracts" }],
+  },
+  "/privacy-requests": {
+    title: "Privacy requests",
+    steps: [
+      "Record a patient's request for a copy of their records (due in 30 days) or for an accounting of disclosures (due in 60), extend it once by 30 days with a written reason, then mark it provided or denied.",
+      "Record disclosures made outside treatment, payment and operations (subpoenas, public health reports, oversight agencies); they appear in the patient's printable accounting for six years. Records sent for payer requests are logged automatically.",
+    ],
+    related: [{ label: "Records requests", href: "/records-requests" }],
+  },
   "/setup": {
     title: "Setup checklist",
     steps: [
