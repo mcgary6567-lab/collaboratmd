@@ -13,6 +13,7 @@ import { emit } from "./webhooks";
 import { notify } from "./notifications";
 import { clockDay, practiceNow } from "./practice-time";
 import { normalizeMethod } from "@/lib/utils";
+import { cleanReferral } from "./referrals";
 
 const { patients, patientInsurances, payers, eligibilityChecks, encounters, ledgerEntries } = schema;
 
@@ -63,6 +64,9 @@ export interface NewPatientInput {
   copayCents: number;
   /** The insured person, required when relationship is not "self" (lib/edi/subscriber.ts). */
   subscriber?: SubscriberInput;
+  /** Where the patient heard about the practice (server/referrals.ts). */
+  referralSource?: string | null;
+  referralDetail?: string | null;
 }
 
 /** The insured person's columns for an insurance row: required for a dependent, empty for "self". */
@@ -98,6 +102,7 @@ export async function createPatient(db: Db, practiceId: string, input: NewPatien
       zip: addr.zip,
       createdBy: by.userId ?? null,
       source: by.source ?? "staff",
+      ...cleanReferral(input.referralSource, input.referralDetail),
     })
     .returning();
   if (input.payerId) {
@@ -202,6 +207,7 @@ export async function verifySchedule(db: Db, practiceId: string, day: Date, forc
     if (seen.has(appt.patientId)) continue;
     seen.add(appt.patientId);
     const name = `${patient.lastName}, ${patient.firstName}`;
+    if (patient.addressBadSince) out.problems.push({ patientId: appt.patientId, name, message: "Mail to the patient's address came back: confirm the address at check-in" });
     const [ins] = await db
       .select()
       .from(patientInsurances)

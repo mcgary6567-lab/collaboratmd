@@ -150,6 +150,8 @@ const patientSchema = z.object({
   groupNumber: z.string().optional(),
   relationship: z.enum(["self", "spouse", "child", "other"]).optional(),
   copayCents: z.coerce.number().int().min(0),
+  referralSource: z.string().optional(),
+  referralDetail: z.string().optional(),
   subscriber: z.object({
     firstName: z.string().optional(), lastName: z.string().optional(), dob: z.string().optional(), sex: z.string().optional(),
     address1: z.string().optional(), city: z.string().optional(), state: z.string().optional(), zip: z.string().optional(),

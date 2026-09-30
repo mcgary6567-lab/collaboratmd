@@ -16,6 +16,7 @@ import { getStatement } from "./billing";
 import { langOf } from "@/lib/i18n/messages";
 import { STATEMENT_TEXT, statementDay } from "@/lib/i18n/statement";
 import { billTo } from "./patient-accounts";
+import { heldPatientIds, holdReason } from "./account-holds";
 
 const { statements, auditLog } = schema;
 const LOB_LETTERS = "https://api.lob.com/v1/letters";
@@ -68,9 +69,10 @@ ${more > 0 ? `<tr><td colspan="5">${esc(t.moreVisits(more))}</td></tr>` : ""}</t
   return html;
 }
 
+/** A complete address that mail has not come back from (server/account-review.ts). */
 function mailable(p: StatementRow["patient"]) {
   const zip = (p.zip ?? "").replace(/[^\d]/g, "");
-  return !!(p.address1?.trim() && p.city?.trim() && /^[A-Z]{2}$/i.test(p.state ?? "") && /^\d{5}(\d{4})?$/.test(zip));
+  return !p.addressBadSince && !!(p.address1?.trim() && p.city?.trim() && /^[A-Z]{2}$/i.test(p.state ?? "") && /^\d{5}(\d{4})?$/.test(zip));
 }
 
 export async function mailStatement(db: Db, practiceId: string, statementId: string, opts: { userId?: string; http?: Http } = {}) {
@@ -83,6 +85,9 @@ export async function mailStatement(db: Db, practiceId: string, statementId: str
   const p = (await billTo(db, patient.id)) ?? patient;
   if (st.status === "void") throw new Error("This statement is void");
   if (st.mailId) throw new Error("This statement was already mailed");
+  const hold = await holdReason(db, patient.id);
+  if (hold) throw new Error(hold);
+  if (p.addressBadSince) throw new Error(`Mail to ${p.id === patient.id ? "the patient" : "the guarantor"} came back: correct the address first`);
   if (!mailable(p)) throw new Error(p.id === patient.id ? "The patient's mailing address is incomplete" : "The guarantor's mailing address is incomplete");
   const zip = (z: string | null) => {
     const d = (z ?? "").replace(/[^\d]/g, "");
@@ -118,7 +123,8 @@ export async function mailUnsentStatements(db: Db, practiceId: string, opts: { u
   const rows = await db.select({ id: statements.id, patientId: statements.patientId }).from(statements)
     .where(and(eq(statements.practiceId, practiceId), eq(statements.status, "generated"), isNull(statements.mailId))).limit(opts.limit ?? 200);
   const people = rows.length ? await db.select().from(schema.patients).where(inArray(schema.patients.id, rows.map((r) => r.patientId))) : [];
-  const ok = new Set(people.filter((p) => mailable({ ...p } as StatementRow["patient"])).map((p) => p.id));
+  const held = await heldPatientIds(db, practiceId);
+  const ok = new Set(people.filter((p) => !held.has(p.id) && mailable({ ...p } as StatementRow["patient"])).map((p) => p.id));
   const result = { mailed: 0, skipped: rows.filter((r) => !ok.has(r.patientId)).length, failed: [] as string[] };
   for (const r of rows.filter((x) => ok.has(x.patientId))) {
     try {

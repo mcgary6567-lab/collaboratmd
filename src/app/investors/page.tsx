@@ -91,6 +91,12 @@ const PROOF = [
     tag: "Cash close · agencies · provider pay · QMB",
   },
   {
+    icon: ShieldCheck,
+    title: "The legal edge cases, built in",
+    body: "Bankruptcy stays, deceased patients' estates, returned mail, adult children on a parent's account and HIPAA privacy complaints are handled in the product rather than by staff memory. Each one stops the wrong bill or letter before it goes out, which is where small practices get complaints and fines.",
+    tag: "Bankruptcy · estates · privacy complaints",
+  },
+  {
     icon: Network,
     title: "Built for the billing company",
     body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",

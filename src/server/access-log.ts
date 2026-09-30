@@ -18,7 +18,7 @@ import { schema } from "@/db";
 
 const { auditLog, users, claims, statements, appointments, estimates } = schema;
 
-export type ViewVia = "chart" | "claim" | "statement" | "estimate" | "receipt" | "disclosures" | "unclaimed_letter";
+export type ViewVia = "chart" | "claim" | "statement" | "estimate" | "receipt" | "disclosures" | "unclaimed_letter" | "estate_claim";
 export const REPEAT_WINDOW_MS = 15 * 60_000;
 
 export async function recordView(db: Db, who: { practiceId: string; userId: string }, patientId: string, via: ViewVia, id?: string, now = new Date()) {

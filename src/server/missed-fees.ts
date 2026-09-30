@@ -12,6 +12,7 @@ import { and, desc, eq, gte, inArray, isNull, like, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { getPolicies } from "./policies";
+import { holdReason } from "./account-holds";
 
 const { appointments, patients, practices, patientInsurances, payers, ledgerEntries, auditLog } = schema;
 
@@ -56,7 +57,7 @@ export async function feeCandidates(db: Db, practiceId: string, now = new Date()
     const feeCents = kind === "no_show" ? policy.noShowCents : policy.lateCancelCents;
     if (!feeCents) continue;
     const blocked = !p.feePolicySignedOn || p.feePolicySignedOn > a.startsAt.toISOString().slice(0, 10) ? "The patient had not agreed to the fee policy before the visit"
-      : (await onMedicaid(db, p.id)) ? "Medicaid patients are not charged missed-appointment fees" : null;
+      : (await onMedicaid(db, p.id)) ? "Medicaid patients are not charged missed-appointment fees" : await holdReason(db, p.id);
     out.push({ appointmentId: a.id, patientId: p.id, patient: `${p.lastName}, ${p.firstName}`, startsAt: a.startsAt, kind, feeCents, blocked });
   }
   return { policy, candidates: out };

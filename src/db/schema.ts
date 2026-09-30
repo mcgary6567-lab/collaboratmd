@@ -225,6 +225,14 @@ export const patients = pgTable(
     guarantorId: uuid("guarantor_id"),
     /** When the patient agreed to the missed-appointment fee policy (online check-in or signed in the office). Migration 0064. */
     feePolicySignedOn: date("fee_policy_signed_on"),
+    /** Mail to the address came back; cleared by a trigger when the address changes. Migration 0065. */
+    addressBadSince: date("address_bad_since"),
+    addressBadNote: text("address_bad_note"),
+    /** An adult dependent agreed to keep their bill with the guarantor. Migration 0065. */
+    guarantorAdultConsentOn: date("guarantor_adult_consent_on"),
+    /** Where the patient came from (server/referrals.ts). Migration 0065. */
+    referralSource: text("referral_source"),
+    referralDetail: text("referral_detail"),
   },
   (t) => [
     uniqueIndex("patients_mrn_idx").on(t.practiceId, t.mrn),
@@ -2456,3 +2464,53 @@ export const compPlans = pgTable("comp_plans", {
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Bankruptcy and deceased-patient holds on collection activity. Migration 0065. */
+export const accountHolds = pgTable("account_holds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  kind: text("kind").notNull(), // bankruptcy | deceased
+  status: text("status").notNull().default("open"), // open | closed
+  startedOn: date("started_on").notNull(),
+  details: jsonb("details").$type<Record<string, string>>().notNull().default({}),
+  deadline: date("deadline"),
+  claimFiledOn: date("claim_filed_on"),
+  outcome: text("outcome"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** HIPAA privacy complaints (45 CFR 164.530(d)). Migration 0065. */
+export const privacyComplaints = pgTable("privacy_complaints", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  receivedOn: date("received_on").notNull(),
+  channel: text("channel").notNull(),
+  complainant: text("complainant").notNull(),
+  patientId: uuid("patient_id").references(() => patients.id),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  status: text("status").notNull().default("open"),
+  investigation: text("investigation"),
+  finding: text("finding"),
+  mitigation: text("mitigation"),
+  sanctions: text("sanctions"),
+  respondedOn: date("responded_on"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** What billing cost in a month, by category, for cost to collect. Migration 0065. */
+export const billingCosts = pgTable("billing_costs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  month: text("month").notNull(),
+  category: text("category").notNull(),
+  cents: integer("cents").notNull(),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("billing_costs_month_idx").on(t.practiceId, t.month, t.category)]);

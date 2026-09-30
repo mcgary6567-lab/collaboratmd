@@ -21,6 +21,7 @@ import { AbnCard } from "./abn-card";
 import { CareCard } from "./care-card";
 import { SlidingFeeCard } from "./sliding-fee-card";
 import { AccountCard } from "./account-card";
+import { StatusCard } from "./status-card";
 import { CardOnFileCard } from "./card-on-file-card";
 import { cardOnFileFor } from "@/server/card-on-file";
 import { slidingFeeOf } from "@/server/sliding-fee";
@@ -240,6 +241,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {cardOnFile && <CardOnFileCard patientId={patient.id} data={cardOnFile} canWrite={canWrite} />}
           {(slidingFee || slidingTiers.length > 0) && <SlidingFeeCard patientId={patient.id} fee={slidingFee} canWrite={canWrite} />}
           <AccountCard db={db} practiceId={s.practiceId} patient={patient} insurances={insurances} canWrite={canWrite} canAdjust={(CAN_ADJUST as readonly string[]).includes(s.role)} />
+          <StatusCard db={db} patient={patient} canWrite={canWrite} />
           <CareCard patientId={patient.id} data={care} providers={providerList.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}${p.credential ? `, ${p.credential}` : ""}` }))} canWrite={canWrite} />
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>

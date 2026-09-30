@@ -16,6 +16,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import { buildStatementDetail, isQmb, patientBalanceCents } from "./billing";
 import { normalizeMethod } from "@/lib/utils";
+import { isAdult } from "./account-review";
 
 const { patients, patientInsurances, payers, ledgerEntries, auditLog } = schema;
 
@@ -142,10 +143,15 @@ export async function familyPayment(db: Db, practiceId: string, patientId: strin
   return applied;
 }
 
-/** Who a patient's statement is addressed to: the guarantor when there is one. */
-export async function billTo(db: Db, patientId: string) {
+/**
+ * Who a patient's statement is addressed to: the guarantor when there is one,
+ * unless the patient is now an adult and has not agreed to that
+ * (server/account-review.ts), so a parent is not sent an adult child's bills.
+ */
+export async function billTo(db: Db, patientId: string, now = new Date()) {
   const [p] = await db.select().from(patients).where(eq(patients.id, patientId)).limit(1);
   if (!p?.guarantorId) return null;
+  if (!p.guarantorAdultConsentOn && isAdult(p.dob, now.toISOString().slice(0, 10))) return null;
   const [g] = await db.select().from(patients).where(eq(patients.id, p.guarantorId)).limit(1);
   return g ?? null;
 }

@@ -3,7 +3,7 @@ import { demoLink } from "@/lib/demo";
 import type { Metadata } from "next";
 import {
   ArrowRight, BadgeCheck, Brain, CalendarDays, ClipboardCheck, CreditCard, EyeOff, FileSearch, FileText, Gauge, HeartPulse, Hourglass, KeyRound, Landmark, Layers, ChartLine, Lock,
-  Radar, ReceiptText, Scale, ScanLine, Scissors, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Video, WandSparkles, Zap,
+  Radar, ReceiptText, Scale, ScanLine, Scissors, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Video, Wallet, WandSparkles, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
@@ -275,6 +275,26 @@ const SMART = [
     title: "Provider pay, worked out",
     body: "Percentage of collections, dollars per work RVU, or a base with a bonus: each provider's pay for the period from the same numbers as the rest of your reports.",
   },
+  {
+    icon: Wallet,
+    title: "Collect at the front desk",
+    body: "Copays and old balances collected at check-in against what was due, by location, week and staff member: the cheapest dollar you will ever collect.",
+  },
+  {
+    icon: Send,
+    title: "Mail that reaches someone",
+    body: "Returned mail stops statements to a dead address until it is fixed, and grown children stop receiving bills through their parents unless they agree.",
+  },
+  {
+    icon: UsersRound,
+    title: "Know where patients come from",
+    body: "Ask how each new patient heard about you, then see new patients, visits and collections by source and by referring physician.",
+  },
+  {
+    icon: Gauge,
+    title: "Your cost to collect",
+    body: "Enter what billing costs each month and see it as a share of what you collect, with agency commissions counted for you.",
+  },
 ];
 
 /** Medicare and Medicaid rules the product applies; the ones that need CMS's yearly files say so on the page. */
@@ -363,6 +383,16 @@ const MEDICARE = [
     icon: ReceiptText,
     title: "Hospital price transparency",
     body: "A chargemaster with revenue codes prices your facility claims and produces the standard charges file hospitals must publish, laid out after CMS's template, with each payer's contracted rate.",
+  },
+  {
+    icon: Scale,
+    title: "Bankruptcy and estates handled",
+    body: "A bankruptcy stops every collection step at once, as the automatic stay requires; a death stops billing the patient and turns the balance into an itemized claim against the estate.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Privacy complaints on file",
+    body: "Every HIPAA privacy complaint logged, investigated and answered, with mitigation and sanctions recorded and nothing deleted, as the Privacy Rule requires.",
   },
 ];
 

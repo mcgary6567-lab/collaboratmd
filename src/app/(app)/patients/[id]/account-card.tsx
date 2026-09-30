@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Db } from "@/db";
 import { familyOf, qmbProtected } from "@/server/patient-accounts";
+import { isAdult } from "@/server/account-review";
 import { familyPaymentAction, feePolicySignedAction, setGuarantorAction, setQmbAction, writeOffQmbAction } from "@/app/(app)/finance-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Money } from "@/components/ui";
@@ -12,7 +13,7 @@ type Payer = { name: string; type: string };
 /** Who pays: QMB protection on the Medicare policy, the guarantor and family, and the missed-appointment policy. */
 export async function AccountCard({ db, practiceId, patient, insurances, canWrite, canAdjust }: {
   db: Db; practiceId: string; canWrite: boolean; canAdjust: boolean;
-  patient: { id: string; guarantorId: string | null; feePolicySignedOn: string | null };
+  patient: { id: string; dob: string; guarantorId: string | null; guarantorAdultConsentOn: string | null; feePolicySignedOn: string | null };
   insurances: { insurance: Insurance; payer: Payer }[];
 }) {
   const medicare = insurances.filter((i) => i.insurance.active && i.payer.type === "medicare");
@@ -20,6 +21,7 @@ export async function AccountCard({ db, practiceId, patient, insurances, canWrit
   const [family, protectedCents] = await Promise.all([familyOf(db, practiceId, patient.id), qmb ? qmbProtected(db, patient.id) : Promise.resolve(0)]);
   const guarantor = family?.members.find((m) => m.guarantor && m.id !== patient.id) ?? null;
   const today = new Date().toISOString().slice(0, 10);
+  const adultUnconsented = !!patient.guarantorId && !patient.guarantorAdultConsentOn && isAdult(patient.dob, today);
   return (
     <Card title="Who pays">
       <div className="space-y-4 text-sm">
@@ -42,7 +44,7 @@ export async function AccountCard({ db, practiceId, patient, insurances, canWrit
 
         <div>
           <div className="font-medium">Guarantor</div>
-          {guarantor ? <p><Link href={`/patients/${guarantor.id}`} className="text-brand-700 hover:underline">{guarantor.name}</Link> (MRN {guarantor.mrn}) is responsible for this patient&apos;s bill; statements go to them.</p>
+          {guarantor ? <p><Link href={`/patients/${guarantor.id}`} className="text-brand-700 hover:underline">{guarantor.name}</Link> (MRN {guarantor.mrn}) is responsible for this patient&apos;s bill; {adultUnconsented ? "the patient is now an adult, so statements go to the patient (see Account status)." : "statements go to them."}</p>
             : family ? <p>Guarantor for the family below.</p> : <p className="text-slate-500 dark:text-slate-400">The patient pays their own bill.</p>}
           {canWrite && !(family && !guarantor) && (
             <ActionForm action={setGuarantorAction.bind(null, patient.id)} className="mt-2 flex flex-wrap items-end gap-2">

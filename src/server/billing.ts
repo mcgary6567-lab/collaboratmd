@@ -7,7 +7,7 @@ import { estimateInsured, estimateSelfPay } from "@/lib/billing/estimate";
 import { contractRates, standardCharges } from "./fees";
 import { runEligibility } from "./patients";
 import { benefitsToDate } from "./accumulators";
-import { HOLD_MESSAGE, onInjuryHold } from "./injury-cases";
+import { holdReason } from "./account-holds";
 import { normalizeMethod } from "@/lib/utils";
 
 const {
@@ -382,7 +382,8 @@ export async function buildStatementDetail(db: Db, patientId: string) {
 
 export async function generateStatement(db: Db, practiceId: string, patientId: string, userId?: string) {
   await assertPatient(db, practiceId, patientId);
-  if (await onInjuryHold(db, patientId)) throw new Error(HOLD_MESSAGE);
+  const hold = await holdReason(db, patientId);
+  if (hold) throw new Error(hold);
   const d = await buildStatementDetail(db, patientId);
   if (d.totals.amountDueCents <= 0) throw new Error("This patient has no balance to bill");
   const statementDate = today();

@@ -16,7 +16,7 @@ const { cashCloses, auditLog } = schema;
 export const DESK_METHODS = ["cash", "check", "card"] as const;
 export const METHOD_LABEL: Record<string, string> = {
   cash: "Cash", check: "Checks", card: "Cards at the desk", ach: "Bank transfers (ACH)", online: "Online (portal)", card_on_file: "Card on file", terminal: "Card terminal",
-  agency: "Collection agency", settlement: "Injury settlements", other: "Other",
+  agency: "Collection agency", settlement: "Injury settlements", estate: "Estates", other: "Other",
 };
 
 /** A payment's method: recorded from migration 0064 on, read from the note before that. */

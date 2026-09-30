@@ -5,6 +5,7 @@ import { createPatientAction } from "@/app/(app)/actions";
 import { Field, Alert } from "@/components/ui";
 import { PhoneInput, StateSelect, ZipInput } from "@/components/us-fields";
 import { SubscriberFields } from "@/components/subscriber-fields";
+import { REFERRAL_SOURCES } from "@/lib/referral-sources";
 
 export function NewPatientForm({ payers }: { payers: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(createPatientAction, undefined);
@@ -34,6 +35,13 @@ export function NewPatientForm({ payers }: { payers: { id: string; name: string 
             <Field label="State"><StateSelect /></Field>
             <Field label="ZIP"><ZipInput /></Field>
           </div>
+          <Field label="How did they hear about us?">
+            <select name="referralSource" className="input" defaultValue="">
+              <option value="">Not asked</option>
+              {Object.entries(REFERRAL_SOURCES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </Field>
+          <Field label="Referring doctor or detail"><input name="referralDetail" className="input" autoComplete="off" maxLength={120} /></Field>
         </div>
       </div>
       <div>

@@ -10,6 +10,19 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-30",
+    title: "Bankruptcy and estates, returned mail, adult dependents, front-desk collections, referral sources, privacy complaints, cost to collect",
+    items: [
+      "Bankruptcy and deceased-patient holds stop statements, reminders, card charges and collections; a discharge or estate settlement closes them with the right write-off, and an estate claim letter prints itemized",
+      "Returned mail stops mailings to an address until it is corrected, however it is corrected, and reminds the front desk at the next visit",
+      "Dependents who turn 18 get their own statements unless they agree to keep the guarantor",
+      "Front-desk collections: copays and prior balances collected at the visit against what was due, by location, week and staff",
+      "Referral sources on registration, with new patients, visits and collections by source and by referring physician",
+      "Privacy complaints log, from receipt through investigation, mitigation and the answer",
+      "Cost to collect: monthly billing costs, plus agency commissions, as a share of collections",
+    ],
+  },
+  {
+    date: "2026-09-30",
     title: "QMB protection, family accounts, cash close, agency commissions, missed-appointment fees, denial root causes, chargemaster, provider pay",
     items: [
       "Qualified Medicare Beneficiaries: Medicare cost-sharing is kept off statements, reminders, card charges and collections, and written off in one step",

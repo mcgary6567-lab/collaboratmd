@@ -160,6 +160,54 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Patients", href: "/patients" }],
   },
+  "/billing/holds": {
+    title: "Bankruptcy and estates",
+    steps: [
+      "Record a bankruptcy or a death on the patient's page, under Account status. Statements, reminders, card charges and collections stop at once; a death also cancels future visits.",
+      "File the proof of claim (bankruptcy) or the claim against the estate by its deadline and record the date. When it ends, close it: a discharge writes off what was owed before the filing, and an estate settlement posts what it paid and writes off the rest.",
+    ],
+    related: [{ label: "Personal injury cases", href: "/injury-cases" }],
+  },
+  "/patients/account-review": {
+    title: "Returned mail and adult dependents",
+    steps: [
+      "When a statement comes back, mark it on the patient's page. Nothing more is mailed there until the address is corrected or confirmed, and the schedule check reminds the front desk at the next visit.",
+      "Dependents who have turned 18 are billed on their own account. Record their agreement to keep the guarantor, or move them to their own account.",
+    ],
+    related: [{ label: "Patients", href: "/patients" }],
+  },
+  "/reports/front-desk": {
+    title: "Front-desk collections",
+    steps: [
+      "For each visit, what was due at check-in (the copay and any balance owed before that day) against what was collected that day, by location and week.",
+      "Use it to coach the front desk: collecting at the visit costs far less than a statement later.",
+    ],
+    related: [{ label: "Daily cash close", href: "/billing/cash-close" }],
+  },
+  "/reports/referrals": {
+    title: "Referral sources",
+    steps: [
+      "Ask new patients how they heard about the practice when registering them; add or change it later on the patient's page.",
+      "Compare sources by new patients, visits and what they have paid, and see which physicians refer the most.",
+    ],
+    related: [{ label: "New patient", href: "/patients/new" }],
+  },
+  "/privacy-complaints": {
+    title: "Privacy complaints",
+    steps: [
+      "Log every privacy complaint, however it arrives, even an anonymous one or one you think is unfounded.",
+      "Record the investigation, the finding and what was done about it, then close it when the complainant has been answered. The log is kept for six years.",
+    ],
+    related: [{ label: "Privacy requests", href: "/privacy-requests" }],
+  },
+  "/reports/cost-to-collect": {
+    title: "Cost to collect",
+    steps: [
+      "Each month, enter what billing cost: staff, an outside billing company, software, the clearinghouse, card fees and postage. Collection agency commissions are counted automatically.",
+      "Cost to collect is those costs as a share of what was collected; watch the trend month to month.",
+    ],
+    related: [{ label: "Accounting", href: "/billing/accounting" }],
+  },
   "/billing/cash-close": {
     title: "Daily cash close",
     steps: [

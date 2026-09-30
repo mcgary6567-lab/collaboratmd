@@ -530,3 +530,31 @@ Reports → Provider compensation (administrators): set each provider's plan, wh
 ## Internal coding audits
 
 Coding → Coding audits: name an audit, choose the period and how many claims per provider; that many of each provider's billed original claims are picked at random. Someone other than the coder marks each correct or in error (level too high or low, diagnosis, modifier, procedure, units, documentation, other) with the billed and correct code. Each provider's accuracy is shown against a 95% target; below it, the usual step is education and a follow-up audit.
+
+## Bankruptcy and deceased patients
+
+On the patient's page, under Account status: record a bankruptcy (chapter, case number, court, filing date, proof of claim deadline) or a death (date, executor and address, probate court, estate claim deadline). Either one holds the balance the way a personal injury case does: statements are refused, and balance reminders, card-on-file charges, missed-appointment fees, collection notices, agency placement and mailed statements skip the patient. Recording a death also cancels the patient's future scheduled visits. Billing → Bankruptcy and estates lists open holds by claim deadline; record when the claim was filed, print the claim letter for an estate (itemized by visit from the statement detail), and close the hold: a discharge writes off, as bad debt, the balance owed before the filing date (care after the filing stays owed); a dismissal lets billing resume; an estate settlement posts what the estate paid (method "estate") and writes off the rest.
+
+## Returned mail
+
+Mark "Mail came back" on the patient's page. From then on mailed statements refuse the address (and the unsent-statement batch skips it), the returned-mail list shows the balance and the next visit, and the day's schedule check tells the front desk to confirm the address. A database trigger clears the mark whenever the address changes, whichever way it changes (staff, online check-in, HL7, import); saving the same address confirms it and clears the mark too.
+
+## Adult dependents
+
+A dependent with a guarantor who has turned 18 is billed on their own account: statements, printed and mailed, are addressed to the patient, not the guarantor. Patients → Returned mail and adult dependents lists them; record the patient's agreement to keep the guarantor (a student on a parent's plan, for example), or move them to their own account.
+
+## Front-desk collections
+
+Reports → Front-desk collections: each visit (checked in or completed, one per patient per day) with what was due at check-in (the copay on the patient's primary insurance today, and the balance owed before that day) against what was collected that day. A payment counts toward the copay first, then the prior balance. Card-on-file, agency, settlement and estate payments are left out; online check-in payments count. By location, by week, and payments by who posted them.
+
+## Referral sources
+
+The new-patient form asks how the patient heard about the practice (and the referring doctor or other detail); it can be set later on the patient's page. Reports → Referral sources: new patients registered in the period by source, how many were seen, and what has been billed and collected for them since, with the physicians who referred the most.
+
+## Privacy complaints
+
+Privacy complaints: log every HIPAA privacy complaint (date, channel, who, the patient if any, what it is about). Record the investigation, the finding (substantiated, not substantiated, inconclusive), mitigation and any sanctions; a substantiated complaint needs mitigation before it closes, and closing records when the complainant was answered. Complaints open longer than 30 days are flagged. Nothing is deleted (45 CFR 164.530(d), (j)).
+
+## Cost to collect
+
+Reports → Cost to collect (administrators): enter each month's billing costs by category (billing staff, outside billing company or coders, software, clearinghouse, card fees, postage, eligibility services, other). Collection agency commissions are added from the recoveries posted. Cost to collect is those costs over what was collected (insurance and patient payments less refunds) in the month.

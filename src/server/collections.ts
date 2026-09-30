@@ -18,7 +18,7 @@ import { patientBalanceCents, patientsWithBalances } from "./billing";
 import { createPortalLink } from "./portal";
 import { messagePatient, type MessageResult } from "./messaging";
 import { getPolicies } from "./policies";
-import { HOLD_MESSAGE, heldPatientIds, onInjuryHold } from "./injury-cases";
+import { heldPatientIds, holdReason } from "./account-holds";
 import { billableBalanceCents, qmbPatientIds } from "./patient-accounts";
 
 const { patientCollections, patients, practices, ledgerEntries, statements, paymentPlans, auditLog } = schema;
@@ -123,7 +123,8 @@ export async function sendFinalNotice(
 ): Promise<{ collection: Collection; delivery: MessageResult | null }> {
   const [p] = await db.select().from(patients).where(and(eq(patients.id, patientId), eq(patients.practiceId, practiceId))).limit(1);
   if (!p) throw new Error("Patient not found");
-  if (await onInjuryHold(db, patientId)) throw new Error(HOLD_MESSAGE);
+  const hold = await holdReason(db, patientId);
+  if (hold) throw new Error(hold);
   const [open] = await db.select({ id: patientCollections.id }).from(patientCollections).where(and(eq(patientCollections.patientId, patientId), isNull(patientCollections.closedAt))).limit(1);
   if (open) throw new Error("This account is already in collections");
   const balance = await patientBalanceCents(db, patientId);
@@ -153,7 +154,8 @@ export async function sendFinalNotice(
 /** Writes the balance off as bad debt and records the placement with the agency. */
 export async function placeWithAgency(db: Db, practiceId: string, collectionId: string, agency: string, opts: { userId?: string; now?: Date; commissionPct?: number | null } = {}) {
   const c = await ownCollection(db, practiceId, collectionId);
-  if (await onInjuryHold(db, c.patientId)) throw new Error(HOLD_MESSAGE);
+  const hold = await holdReason(db, c.patientId);
+  if (hold) throw new Error(hold);
   if (c.stage !== "final_notice") throw new Error("Only an account at the final-notice stage can be placed");
   const name = agency.trim();
   if (!name) throw new Error("Name the collection agency");
