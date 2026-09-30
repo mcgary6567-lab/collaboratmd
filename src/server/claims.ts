@@ -32,6 +32,9 @@ import { enrollmentFinding, enrollmentFor } from "./enrollment";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
 import { codeSetFindings } from "./code-sets";
+import { WRITE_OFF_CATEGORIES } from "@/lib/billing/write-off-categories";
+import { queryFindings } from "./coding-queries";
+import { therapyFindings } from "./therapy-threshold";
 
 const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -150,7 +153,11 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
     frequencyCode: b.claim.frequencyCode, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })),
   });
   const extra = [advantage, managed, birthday].filter((x): x is NonNullable<typeof x> => !!x);
-  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...dupes, ...extra, ...(enrolled ? [enrolled] : [])], edits };
+  const [queries, therapy] = await Promise.all([
+    queryFindings(db, b.encounter.id),
+    therapyFindings(db, { patientId: b.patient.id, encounterId: b.encounter.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents })) }),
+  ]);
+  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...dupes, ...extra, ...queries, ...therapy, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {
@@ -714,7 +721,7 @@ async function postReversal(
   }
   const fin = await getClaimFinancials(db, claim.id);
   if (fin.insuranceBalanceCents > 0) {
-    await db.insert(ledgerEntries).values({ ...base, remittanceId: null, type: "write_off", amountCents: fin.insuranceBalanceCents, note: `Charge removed: claim voided by ${voidClaim.controlNumber}` });
+    await db.insert(ledgerEntries).values({ ...base, remittanceId: null, type: "write_off", amountCents: fin.insuranceBalanceCents, note: `Charge removed: claim voided by ${voidClaim.controlNumber}`, writeOffCategory: "void" });
   }
   await db.update(claims).set({ status: "voided", updatedAt: new Date() }).where(eq(claims.id, claim.id));
   await db.update(claims).set({ status: "closed", updatedAt: new Date() }).where(eq(claims.id, voidClaim.id));
@@ -774,13 +781,14 @@ export async function listClaims(db: Db, practiceId: string, status?: string) {
     .limit(200);
 }
 
-export async function writeOffClaim(db: Db, claimId: string, reason: string, userId?: string) {
+export async function writeOffClaim(db: Db, claimId: string, reason: string, userId?: string, category?: string) {
   const fin = await getClaimFinancials(db, claimId);
   const [claim] = await db.select().from(claims).where(eq(claims.id, claimId)).limit(1);
   if (!claim) throw new Error("Claim not found");
   await assertNoOpenRequest(db, claimId, "write it off");
+  if (category !== undefined && !WRITE_OFF_CATEGORIES[category]) throw new Error("Choose why the balance is written off");
   if (fin.insuranceBalanceCents > 0) {
-    await db.insert(ledgerEntries).values({ practiceId: claim.practiceId, patientId: claim.patientId, claimId, type: "write_off", amountCents: fin.insuranceBalanceCents, note: reason, postedBy: userId ?? null });
+    await db.insert(ledgerEntries).values({ practiceId: claim.practiceId, patientId: claim.patientId, claimId, type: "write_off", amountCents: fin.insuranceBalanceCents, note: reason, postedBy: userId ?? null, writeOffCategory: category ?? null });
   }
   await db.update(claims).set({ status: "closed", updatedAt: new Date() }).where(eq(claims.id, claimId));
   await db.insert(claimEvents).values({ claimId, status: "closed", source: "user", message: `Written off: ${reason}` });

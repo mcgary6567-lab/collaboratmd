@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { CAN_WRITE, requireSession } from "@/lib/auth";
@@ -24,6 +24,7 @@ import { CardOnFileCard } from "./card-on-file-card";
 import { cardOnFileFor } from "@/server/card-on-file";
 import { slidingFeeOf } from "@/server/sliding-fee";
 import { benefitsToDate } from "@/server/accumulators";
+import { therapyToDate, thresholdFor } from "@/server/therapy-threshold";
 import { careMonths } from "@/server/care-programs";
 import { listAbns } from "@/server/abn";
 import { getPatient, managedCareOf, medicareAdvantageOf } from "@/server/patients";
@@ -49,6 +50,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const db = await getDb();
   const data = await getPatient(db, s.practiceId, id);
   if (!data) notFound();
+  // A duplicate merged into another record opens the one kept.
+  if (data.patient.mergedInto) redirect(`/patients/${data.patient.mergedInto}`);
   const gate = await restrictedAccess(db, s, id);
   if (!gate.granted) return <RestrictedGate patientId={id} back={`/patients/${id}`} what="chart" />;
   await logPatientView(s, id, "chart");
@@ -70,9 +73,23 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const care = await careMonths(db, s.practiceId, patient.id);
   const cardOnFile = await cardOnFileFor(db, patient.id);
   const [slidingFee, slidingTiers] = await Promise.all([slidingFeeOf(db, patient.id), db.select({ id: schema.slidingFeeTiers.id }).from(schema.slidingFeeTiers).where(eq(schema.slidingFeeTiers.practiceId, s.practiceId)).limit(1)]);
+  const [injury] = await db.select().from(schema.injuryCases).where(and(eq(schema.injuryCases.patientId, patient.id), eq(schema.injuryCases.status, "open"))).limit(1);
+  const thisYear = new Date().getUTCFullYear();
+  const threshold = onMedicare ? await thresholdFor(db, thisYear) : null;
+  const therapyYear = threshold ? { threshold, used: await therapyToDate(db, patient.id, thisYear) } : null;
 
   return (
     <>
+      {injury && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Balance held for a personal injury case: {injury.attorney}{injury.firm ? `, ${injury.firm}` : ""}, lien signed {fmtDate(`${injury.lienSignedOn}T00:00:00`)}. No statements, reminders, card charges or collections until it settles. <Link href="/injury-cases" className="font-semibold underline">Personal injury cases</Link>
+        </div>
+      )}
+      {therapyYear && (therapyYear.used.pt_slp > 0 || therapyYear.used.ot > 0) && (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+          Medicare therapy in {thisYear} (estimate): physical therapy and speech <Money cents={therapyYear.used.pt_slp} />, occupational therapy <Money cents={therapyYear.used.ot} />, against the <Money cents={therapyYear.threshold.kxCents} /> KX threshold for each.
+        </div>
+      )}
       <PageHeader
         title={`${patient.lastName}, ${patient.firstName}`}
         subtitle={`MRN ${patient.mrn} · DOB ${fmtDate(patient.dob + "T00:00:00")} · ${patient.sex}${patient.restricted ? " · Restricted record" : ""}`}

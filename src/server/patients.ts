@@ -76,7 +76,7 @@ export function subscriberColumns(relationship: string, s: SubscriberInput | und
   };
 }
 
-export async function createPatient(db: Db, practiceId: string, input: NewPatientInput) {
+export async function createPatient(db: Db, practiceId: string, input: NewPatientInput, by: { userId?: string; source?: string } = {}) {
   const addr = checkUsAddress(input);
   const subscriber = input.payerId ? subscriberColumns(input.relationship, input.subscriber) : {};
   const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(patients).where(eq(patients.practiceId, practiceId));
@@ -95,10 +95,12 @@ export async function createPatient(db: Db, practiceId: string, input: NewPatien
       city: input.city || null,
       state: addr.state,
       zip: addr.zip,
+      createdBy: by.userId ?? null,
+      source: by.source ?? "staff",
     })
     .returning();
   if (input.payerId) {
-    await db.insert(patientInsurances).values({ patientId: p.id, payerId: input.payerId, memberId: input.memberId.trim(), groupNumber: input.groupNumber || null, rank: 1, relationship: input.relationship, copayCents: input.copayCents, ...subscriber });
+    await db.insert(patientInsurances).values({ patientId: p.id, payerId: input.payerId, memberId: input.memberId.trim(), groupNumber: input.groupNumber || null, rank: 1, relationship: input.relationship, copayCents: input.copayCents, ...subscriber, createdBy: by.userId ?? null, source: by.source ?? "staff" });
   }
   await emit(db, practiceId, "patient.created", { patient_id: p.id, mrn: p.mrn, source: "staff" });
   return p;

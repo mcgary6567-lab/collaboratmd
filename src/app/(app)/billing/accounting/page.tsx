@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
-import { ACCOUNTS, accountNames, closes, journalLines, periodTotals } from "@/server/accounting";
+import { ACCOUNTS, accountNames, arRollforward, closes, journalLines, periodTotals } from "@/server/accounting";
 import { lastMonth } from "@/server/client-billing";
 import { accountNamesAction, closePeriodAction, reopenPeriodAction } from "@/app/(app)/ops-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -23,7 +23,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
   const s = await requireSession();
   const db = await getDb();
   const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(requested ?? "") ? requested! : lastMonth();
-  const [totals, names, closed] = await Promise.all([periodTotals(db, s.practiceId, period), accountNames(db, s.practiceId), closes(db, s.practiceId)]);
+  const [totals, names, closed, roll] = await Promise.all([periodTotals(db, s.practiceId, period), accountNames(db, s.practiceId), closes(db, s.practiceId), arRollforward(db, s.practiceId, period)]);
   const lines = journalLines(totals, names);
   const debits = lines.reduce((a, l) => a + l.debitCents, 0);
   const credits = lines.reduce((a, l) => a + l.creditCents, 0);
@@ -78,7 +78,12 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
                   <span>Closed {fmtDateTime(isClosed.closedAt, s.timeZone)}.</span>
                   {isClosed.changes.length > 0 && <Badge tone="amber">changed since close</Badge>}
                   <ActionForm action={closePeriodAction.bind(null, period)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Close again with today&apos;s figures</SubmitButton></ActionForm>
-                  {s.role === "admin" && <ActionForm action={reopenPeriodAction.bind(null, period)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Reopen</SubmitButton></ActionForm>}
+                  {s.role === "admin" && (
+                    <ActionForm action={reopenPeriodAction.bind(null, period)} className="flex items-end gap-2">
+                      <label className="block"><span className="label">Reason to reopen</span><input name="reason" className="input text-xs" required maxLength={300} /></label>
+                      <SubmitButton className="btn btn-secondary text-xs" pendingLabel="...">Reopen</SubmitButton>
+                    </ActionForm>
+                  )}
                 </div>
               ) : (
                 <ActionForm action={closePeriodAction.bind(null, period)}><SubmitButton className="btn btn-secondary text-xs" pendingLabel="Closing...">Close {period}</SubmitButton></ActionForm>
@@ -90,7 +95,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
         <div className="space-y-6">
           <Card title="Closed months">
             {closed.length === 0 ? (
-              <p className="text-sm text-slate-500">None yet. Closing a month stores its totals, so anything posted into it later stands out here.</p>
+              <p className="text-sm text-slate-500">None yet. Closing a month stores its totals and locks it: nothing can be posted dated into it afterwards, so the books you sent stay as they were. An administrator can reopen a month, with a reason.</p>
             ) : (
               <ul className="space-y-3 text-sm">
                 {closed.map((c) => (
@@ -118,6 +123,20 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
           </Card>
         </div>
       </div>
+
+      <Card title={`A/R rollforward, ${period}`} className="mt-6" actions={roll.reconciles ? <Badge tone="green">reconciles</Badge> : <Badge tone="red">does not reconcile</Badge>}>
+        <div tabIndex={0} role="region" aria-label="A/R rollforward" className="overflow-x-auto"><table className="table">
+          <thead><tr><th /><th className="text-right">Insurance A/R</th><th className="text-right">Patient A/R</th><th className="text-right">Total</th></tr></thead>
+          <tbody>
+            <tr className="font-semibold"><td>Opening, first of the month</td><td className="text-right"><Money cents={roll.opening.insurance} /></td><td className="text-right"><Money cents={roll.opening.patient} /></td><td className="text-right"><Money cents={roll.opening.insurance + roll.opening.patient} /></td></tr>
+            {roll.lines.map((l) => (
+              <tr key={l.type}><td className="pl-6">{LABEL[l.type] ?? l.memo}</td><td className="text-right">{l.insurance ? <Money cents={l.insurance} /> : ""}</td><td className="text-right">{l.patient ? <Money cents={l.patient} /> : ""}</td><td className="text-right"><Money cents={l.insurance + l.patient} /></td></tr>
+            ))}
+            <tr className="font-semibold"><td>Closing, end of the month</td><td className="text-right"><Money cents={roll.closing.insurance} /></td><td className="text-right"><Money cents={roll.closing.patient} /></td><td className="text-right"><Money cents={roll.closing.insurance + roll.closing.patient} /></td></tr>
+          </tbody>
+        </table></div>
+        <p className="mt-2 text-xs text-slate-500">Opening A/R plus the month&apos;s activity, checked against A/R computed straight from the ledger at month end. Moving a balance to patient responsibility takes it off insurance A/R and puts it on patient A/R, so it does not change the total.</p>
+      </Card>
     </>
   );
 }

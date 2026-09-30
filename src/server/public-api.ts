@@ -139,7 +139,7 @@ export async function createPatientFromApi(db: Db, practiceId: string, body: Jso
     address1: str(address.line1) || undefined, city: str(address.city, 80) || undefined, state: str(address.state, 2).toUpperCase() || undefined, zip: str(address.zip, 10) || undefined,
     payerId: payer.id, memberId, groupNumber: str(ins.group_number, 40) || undefined, relationship,
     copayCents: Number.isInteger(ins.copay_cents) ? Math.max(0, Number(ins.copay_cents)) : 0,
-  });
+  }, { source: "api" });
   return getPatient(db, practiceId, p.id);
 }
 

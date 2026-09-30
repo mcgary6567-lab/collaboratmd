@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { schema } from "@/db";
 import { testDb } from "@/test/db";
-import { accountNames, closePeriod, closes, journalCsv, journalLines, periodTotals } from "./accounting";
+import { accountNames, closePeriod, closes, journalCsv, journalLines, periodTotals, reopenPeriod } from "./accounting";
 import { createInvoice, invoiceFee, saveAgreement, setInvoiceStatus } from "./client-billing";
 import { applyRules, productivity, saveRule, slaSummary } from "./work-rules";
 import { assignableUsers } from "./work";
@@ -47,11 +47,17 @@ describe("close, invoicing and work rules against a migrated database", () => {
   });
   afterAll(async () => { await t?.close(); });
 
-  it("closes a month and shows what was posted into it afterwards", async () => {
+  it("closes a month, locks it, and lets an administrator reopen it", async () => {
     await expect(closePeriod(t.db, t.practiceId, "2030-01", t.userId, new Date("2030-01-15"))).rejects.toThrow(/once it has ended/);
     expect(await closePeriod(t.db, t.practiceId, "2030-01", t.userId, new Date("2030-02-02"))).toEqual({ insurance_payment: 500_000, reversal: 20_000, patient_payment: 30_000 });
     expect((await closes(t.db, t.practiceId)).find((c) => c.period === "2030-01")?.changes).toEqual([]);
-    await t.db.insert(schema.ledgerEntries).values({ practiceId: t.practiceId, patientId, type: "patient_payment", amountCents: 1_000, postedAt: new Date("2030-01-31T10:00:00Z") });
+    // The closed month is locked: an entry dated into it is refused by the database.
+    const late = { practiceId: t.practiceId, patientId, type: "patient_payment", amountCents: 1_000, postedAt: new Date("2030-01-31T10:00:00Z") };
+    await expect(t.db.insert(schema.ledgerEntries).values(late)).rejects.toThrow();
+    // Reopened, it takes entries again, and the comparison with the stored totals shows them.
+    await reopenPeriod(t.db, t.practiceId, "2030-01", t.userId, "Late ERA");
+    await t.db.insert(schema.ledgerEntries).values(late);
+    await t.db.insert(schema.periodCloses).values({ practiceId: t.practiceId, period: "2030-01", totals: { insurance_payment: 500_000, reversal: 20_000, patient_payment: 30_000 } });
     expect((await closes(t.db, t.practiceId)).find((c) => c.period === "2030-01")?.changes).toEqual([{ type: "patient_payment", closed: 30_000, now: 31_000 }]);
     expect((await accountNames(t.db, t.practiceId)).cash).toBe("Undeposited Funds");
     expect(await periodTotals(t.db, t.practiceId, "2030-02")).toEqual({ insurance_payment: 99_999 });

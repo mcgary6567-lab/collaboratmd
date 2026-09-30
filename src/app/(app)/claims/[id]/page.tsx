@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { AccidentCard } from "./accident-card";
 import { QualityCard } from "./quality-card";
+import { AskProviderCard } from "./ask-provider-card";
+import { queriesForEncounters } from "@/server/coding-queries";
 import { measuresForClaim } from "@/server/quality";
 import { EDITABLE } from "@/server/claim-edit";
 import Link from "next/link";
@@ -15,6 +17,7 @@ import { AttachmentsSection } from "./attachments-section";
 import { loadClaimBundle, getClaimFinancials, listAcknowledgments } from "@/server/claims";
 import { openRequestFor } from "@/server/records-requests";
 import { baseUnitsFor } from "@/server/time-units";
+import { WRITE_OFF_CATEGORIES } from "@/lib/billing/write-off-categories";
 import { anesthesiaTimeUnits, isAnesthesiaCode } from "@/lib/time-units";
 import { writeOffClaimAction, transferToPatientAction } from "@/app/(app)/actions";
 import { billAgainAction, billSecondaryAction, correctClaimAction, voidClaimAction } from "@/app/(app)/claim-control-actions";
@@ -166,7 +169,8 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                       <button className="btn btn-secondary text-xs">Transfer balance to patient</button>
                     </form>
                     <form action={writeOffClaimAction.bind(null, id)} className="flex gap-1">
-                      <input name="reason" className="input text-xs" placeholder="Write-off reason" required />
+                      <select name="category" className="input text-xs" aria-label="Why" required defaultValue=""><option value="" disabled>Why?</option>{Object.entries(WRITE_OFF_CATEGORIES).filter(([k]) => k !== "void").map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
+                      <input name="reason" className="input text-xs" placeholder="Note" aria-label="Write-off note" required />
                       <button className="btn btn-danger text-xs">Write off</button>
                     </form>
                   </>
@@ -338,6 +342,10 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               );
             })}
           </Card>
+
+          {b.claim.claimType === "professional" && (
+            <AskProviderCard encounterId={b.encounter.id} provider={`${b.provider.firstName} ${b.provider.lastName}`} queries={await queriesForEncounters(db, [b.encounter.id])} canWrite={(CAN_WRITE as readonly string[]).includes(s.role)} />
+          )}
 
           {b.claim.claimType === "professional" && (
             <QualityCard claimId={id} items={await measuresForClaim(db, s.practiceId, id)} editable={(EDITABLE as readonly string[]).includes(b.claim.status) && b.claim.frequencyCode !== "8" && b.claim.payerSequence !== "S"} />

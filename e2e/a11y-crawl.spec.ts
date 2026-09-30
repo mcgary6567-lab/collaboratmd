@@ -26,6 +26,7 @@ const APP = [
   "/settings/prompt-pay", "/settings/sliding-fee", "/settings/quality", "/settings/texting",
   // Added with the 2026-09 privacy, contracts and code changes.
   "/privacy-requests", "/reports/code-changes", "/reports/contract-calendar",
+  "/patients/duplicates", "/coding/queries", "/coding/audits", "/injury-cases", "/reports/write-offs", "/reports/registration",
 ];
 const PUBLIC = [
   "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/trust/questionnaire", "/contact", "/status", "/switch", "/changelog", "/demo",

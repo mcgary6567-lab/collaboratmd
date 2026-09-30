@@ -18,6 +18,7 @@ import { patientBalanceCents, patientsWithBalances } from "./billing";
 import { createPortalLink } from "./portal";
 import { messagePatient, type MessageResult } from "./messaging";
 import { getPolicies } from "./policies";
+import { HOLD_MESSAGE, heldPatientIds, onInjuryHold } from "./injury-cases";
 
 const { patientCollections, patients, practices, ledgerEntries, statements, paymentPlans, auditLog } = schema;
 
@@ -27,7 +28,8 @@ export type Collection = typeof patientCollections.$inferSelect;
 
 /** Accounts that have had statements for 60+ days without paying, and are not on a plan or already in collections. */
 export async function collectionCandidates(db: Db, practiceId: string, today = new Date()) {
-  const owing = await patientsWithBalances(db, practiceId, MIN_BALANCE_CENTS, 500);
+  const held = await heldPatientIds(db, practiceId);
+  const owing = (await patientsWithBalances(db, practiceId, MIN_BALANCE_CENTS, 500)).filter((o) => !held.has(o.patientId));
   if (!owing.length) return [];
   const ids = owing.map((o) => o.patientId);
   const [stmts, plans, open] = await Promise.all([
@@ -113,6 +115,7 @@ export async function sendFinalNotice(
 ): Promise<{ collection: Collection; delivery: MessageResult | null }> {
   const [p] = await db.select().from(patients).where(and(eq(patients.id, patientId), eq(patients.practiceId, practiceId))).limit(1);
   if (!p) throw new Error("Patient not found");
+  if (await onInjuryHold(db, patientId)) throw new Error(HOLD_MESSAGE);
   const [open] = await db.select({ id: patientCollections.id }).from(patientCollections).where(and(eq(patientCollections.patientId, patientId), isNull(patientCollections.closedAt))).limit(1);
   if (open) throw new Error("This account is already in collections");
   const balance = await patientBalanceCents(db, patientId);
@@ -142,6 +145,7 @@ export async function sendFinalNotice(
 /** Writes the balance off as bad debt and records the placement with the agency. */
 export async function placeWithAgency(db: Db, practiceId: string, collectionId: string, agency: string, opts: { userId?: string; now?: Date } = {}) {
   const c = await ownCollection(db, practiceId, collectionId);
+  if (await onInjuryHold(db, c.patientId)) throw new Error(HOLD_MESSAGE);
   if (c.stage !== "final_notice") throw new Error("Only an account at the final-notice stage can be placed");
   const name = agency.trim();
   if (!name) throw new Error("Name the collection agency");

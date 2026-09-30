@@ -178,7 +178,7 @@ export async function approveItem(db: Db, practiceId: string, id: string, userId
     }
     case "write_off":
       await assertWriteOffAllowed(db, practiceId, role, (await getClaimFinancials(db, denial.claimId)).insuranceBalanceCents);
-      await writeOffClaim(db, denial.claimId, `Duplicate: same visit paid on another claim (denial agent, approved)`, userId);
+      await writeOffClaim(db, denial.claimId, `Duplicate: same visit paid on another claim (denial agent, approved)`, userId, "duplicate");
       await db.update(denials).set({ status: "written_off", resolvedAt: new Date() }).where(eq(denials.id, denial.id));
       message = "Duplicate written off.";
       break;

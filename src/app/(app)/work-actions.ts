@@ -133,7 +133,7 @@ export async function bulkClaimsAction(_prev: FormResult, formData: FormData): P
         try {
           // The practice's write-off limit applies to each claim, as it does one at a time.
           await assertWriteOffAllowed(db, s.practiceId, s.role, balance);
-          await writeOffClaim(db, id, reason, s.userId);
+          await writeOffClaim(db, id, reason, s.userId, str(formData, "category") || "other");
           done++;
           cents += balance;
         } catch (e) {

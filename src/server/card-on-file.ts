@@ -13,6 +13,7 @@ import { stripeClient, type Stripe } from "@/lib/stripe";
 import { patientBalanceCents } from "./billing";
 import { messagePatient } from "./messaging";
 import { practiceConfig } from "./integrations";
+import { onInjuryHold } from "./injury-cases";
 
 const { savedCards, cardChargeNotices, paymentPlans, onlinePayments, ledgerEntries, patients, practices, auditLog } = schema;
 
@@ -32,6 +33,7 @@ export async function cardOnFileCharges(db: Db, practiceId: string, now = new Da
   let stripe: Pick<Stripe, "chargeSaved"> | null = client ?? null;
 
   for (const card of cards) {
+    if (await onInjuryHold(db, card.patientId)) { skipped++; continue; }
     const [plan] = await db.select({ id: paymentPlans.id }).from(paymentPlans).where(and(eq(paymentPlans.patientId, card.patientId), inArray(paymentPlans.status, ["active", "defaulted"]))).limit(1);
     const [pending] = await db.select().from(cardChargeNotices).where(and(eq(cardChargeNotices.cardId, card.id), eq(cardChargeNotices.status, "pending"))).limit(1);
     const balance = await patientBalanceCents(db, card.patientId);

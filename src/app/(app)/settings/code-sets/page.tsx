@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getDb } from "@/db";
+import { desc } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import { saveThresholdAction } from "@/app/(app)/review-actions";
 import { requireSession } from "@/lib/auth";
 import { codeSetStatus, isPlatformOperator } from "@/server/code-sets";
 import { importCodeSetAction } from "@/app/(app)/code-set-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, PageHeader, Stat } from "@/components/ui";
-import { fmtDateTime } from "@/lib/utils";
+import { fmtDateTime, money } from "@/lib/utils";
 import { fiscalYear } from "@/server/code-catalog";
 import { mpfsStatus } from "@/server/mpfs";
 
@@ -22,7 +24,7 @@ const LABEL: Record<string, string> = { ncci_ptp: "NCCI procedure-to-procedure",
 export default async function CodeSetsPage() {
   const s = await requireSession();
   const db = await getDb();
-  const [status, mpfs] = await Promise.all([codeSetStatus(db), mpfsStatus(db)]);
+  const [status, mpfs, thresholds] = await Promise.all([codeSetStatus(db), mpfsStatus(db), db.select().from(schema.therapyThresholds).orderBy(desc(schema.therapyThresholds.year)).limit(5)]);
   const operator = isPlatformOperator(s.email);
 
   return (
@@ -89,6 +91,23 @@ export default async function CodeSetsPage() {
             </>
           ) : (
             <p className="text-sm text-slate-600">National code sets are shared by every practice and kept current by CollaboratMD each quarter.</p>
+          )}
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card title="Medicare therapy threshold (KX)">
+          <p className="mb-3 text-sm text-slate-600">Physical therapy with speech-language pathology, and occupational therapy, each per patient per calendar year. Above the threshold a claim needs KX; above the review amount it may be reviewed. CMS publishes both each year in the physician fee schedule final rule.</p>
+          {thresholds.length > 0 ? (
+            <ul className="mb-3 space-y-1 text-sm">{thresholds.map((t) => <li key={t.year}><span className="font-semibold">{t.year}</span>: KX at {money(t.kxCents)}{t.reviewCents ? `, review at ${money(t.reviewCents)}` : ""}</li>)}</ul>
+          ) : <p className="mb-3 text-sm text-slate-500">No year entered, so therapy amounts are not checked.</p>}
+          {operator && (
+            <ActionForm action={saveThresholdAction} className="flex flex-wrap items-end gap-3 text-sm">
+              <label className="block"><span className="label">Year</span><input name="year" type="number" defaultValue={new Date().getUTCFullYear()} className="input w-24" required /></label>
+              <label className="block"><span className="label">KX threshold ($)</span><input name="kx" inputMode="decimal" className="input w-32" required /></label>
+              <label className="block"><span className="label">Targeted review ($)</span><input name="review" inputMode="decimal" className="input w-32" /></label>
+              <SubmitButton pendingLabel="Saving...">Save</SubmitButton>
+            </ActionForm>
           )}
         </Card>
       </div>

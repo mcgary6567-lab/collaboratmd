@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-30",
+    title: "Duplicate patients, a locked month-end, provider questions, write-off and registration analysis",
+    items: [
+      "Duplicate patients found by name and date of birth, member ID or phone, and merged with every visit, claim and payment",
+      "Month-end close locks the month, with an A/R rollforward that has to reconcile to the cent",
+      "Questions to providers hold the claim until they are answered",
+      "Medicare therapy checked against the year's KX threshold and review amount",
+      "Write-offs record why, and a report splits avoidable from contractual and policy write-offs",
+      "Registration quality: rejections and denials traced to the field and to who entered the policy",
+      "Personal injury cases hold the balance under a lien until the settlement is posted",
+      "Internal coding audits: a random sample per provider, scored against the notes",
+    ],
+  },
+  {
+    date: "2026-09-30",
     title: "October 1 code changes, privacy requests, unclaimed credits, contract calendar",
     items: [
       "Diagnosis code changes: the codes your practice uses that FY 2027 deletes or splits, where they are on open work, and their replacements",

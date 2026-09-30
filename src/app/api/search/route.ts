@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { and, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getSession } from "@/lib/auth";
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     db
       .select({ id: patients.id, first: patients.firstName, last: patients.lastName, mrn: patients.mrn, dob: patients.dob })
       .from(patients)
-      .where(and(eq(patients.practiceId, session.practiceId), or(
+      .where(and(eq(patients.practiceId, session.practiceId), isNull(patients.mergedInto), or(
         ilike(patients.lastName, p), ilike(patients.firstName, p), ilike(patients.mrn, p),
         sql`lower(${patients.lastName} || ', ' || ${patients.firstName}) LIKE lower(${p})`,
         sql`lower(${patients.firstName} || ' ' || ${patients.lastName}) LIKE lower(${p})`,

@@ -90,7 +90,7 @@ export async function applyPrimaryInsurance(db: Db, practiceId: string, patientI
     return [];
   }
   if (primary) await db.update(patientInsurances).set({ active: false }).where(eq(patientInsurances.id, primary.id));
-  await db.insert(patientInsurances).values({ patientId, payerId: payer.id, memberId: ins.memberId, groupNumber: ins.groupNumber || null, rank: 1, relationship: ins.relationship });
+  await db.insert(patientInsurances).values({ patientId, payerId: payer.id, memberId: ins.memberId, groupNumber: ins.groupNumber || null, rank: 1, relationship: ins.relationship, source: "hl7" });
   return [primary ? `Primary insurance changed to ${payer.name}` : `Insurance added: ${payer.name}`];
 }
 

@@ -466,3 +466,35 @@ A coverage check gives the deductible and out-of-pocket left on the day it ran. 
 ## Medicare ordering and referring
 
 Code set `order_referring`: CMS's Order and Referring file (data.cms.gov, weekly; NPI, last name, first name, and Y/N for Part B, DME, HHA, PMD, hospice), loaded from a terminal (`npm run import:code-sets -- order_referring ./file.csv "label"`); each load replaces the list. On Medicare claims, clinical lab (80000-89999) and imaging (70000-79999) lines need a referring provider enrolled for Part B, and equipment and supply lines (E, K, L, B codes and A4000-A9999) one enrolled for DME: not on the file, or not allowed that kind, is an error. A missing referring provider is flagged only where one is expected (independent lab, place of service 81, or equipment and supplies), since practices billing their own in-office tests order them themselves.
+
+## Duplicate patients
+
+Patients → Duplicates (or Duplicate patients in the menu) lists pairs that look like one person: the same name and date of birth (ignoring case), the same member ID with the same payer (both "self"), or the same date of birth and a 10-digit phone. Choose the record to keep and merge: every row that points at the duplicate is moved to it, found from the database's foreign keys so new tables are included. Rows with a one-per-patient rule are settled first (a care program consent the kept record already has is dropped, the newer sliding fee verification wins, an open waitlist entry or unclaimed credit case on the duplicate is closed). The ledger's guard allows moving entries only from a record marked as merged into the other, so nothing else can move money between patients. The duplicate stays, marked merged; it leaves lists and search, and opening it opens the record kept. A merge can be run again to finish if it was interrupted. Every merge is in the audit log with the MRNs and what moved.
+
+## Month-end close and the A/R rollforward
+
+Billing → Accounting shows the month's A/R rollforward: opening insurance and patient A/R, each kind of activity, and closing A/R, which must equal A/R computed straight from the ledger at month end ("reconciles"). Closing a month now locks it: the database refuses a ledger entry dated inside a closed month (post it in the current month instead). Only closed months are locked; months before and after still take entries. An administrator can reopen a month with a reason, which is kept in the audit log.
+
+## Questions to providers
+
+On a professional claim, "Questions to the provider": choose the topic (level, diagnosis, laterality, procedure, time, signature, other) and write the question. While it is open the scrubber holds the claim (CODING_QUERY, an error). Record the provider's answer on Coding → Provider questions (or withdraw the question), correct the claim if needed, and scrub it again. The page shows each provider's questions over the last 12 months and the median days to answer.
+
+## Medicare therapy threshold (KX)
+
+The platform operator enters each year's KX threshold and targeted medical review amount (Settings → Code sets; published in the physician fee schedule final rule). For Medicare claims, physical therapy and speech-language pathology (GP, GN) count together and occupational therapy (GO) on its own, per patient per calendar year: Medicare's allowed amount on its 835 lines where they have come back, the charge otherwise. Over the threshold, therapy lines without KX get a warning; over the review amount, a warning that claims may be reviewed. With no amounts entered for the year, nothing is checked. The patient page shows the year's amounts for Medicare patients.
+
+## Write-off analysis
+
+Writing off a claim (one or in bulk) now asks why: timely filing, no authorization, not covered or wrong payer, coding or billing error, medical necessity, small balance, courtesy, uncollectible, duplicate, other. Reports → Write-off analysis splits everything taken off A/R into contractual adjustments, avoidable write-offs, policy write-offs and discounts, bad debt, and no revenue lost (duplicates, voids), with avoidable write-offs by payer, month and who posted them. Older write-offs are sorted by the claim's last denial category or their note.
+
+## Registration quality
+
+Reports → Registration quality: front-end rejections (277CA member number 164, subscriber not found 33, not eligible 88, missing subscriber or patient information 21), coverage checks the payer refused (AAA 72, 75, 76 member ID; 73 name; 58, 71 date of birth) and denials (CARC 31 identity, 140 member ID and name, 26 and 27 coverage dates, 22 and 109 wrong payer), by field and by who entered the policy. New patients and policies record who entered them and how (staff, coverage discovery, online check-in, HL7, API) from migration 0063 on; earlier ones show as "Not recorded".
+
+## Personal injury cases
+
+Billing → Personal injury cases: open a case when an attorney signs a lien or letter of protection. While it is open the patient's balance is held: statements are refused, and balance reminders, card-on-file charges, collection candidates, final notices and agency placement skip the patient; the patient page shows the hold. Record a reduction the attorney asks for and what is agreed (adjust role), then post the settlement: the payment posts as a patient payment and the agreed reduction as a discount, the case closes and normal billing resumes for anything left. A case closed without a settlement just releases the hold.
+
+## Internal coding audits
+
+Coding → Coding audits: name an audit, choose the period and how many claims per provider; that many of each provider's billed original claims are picked at random. Someone other than the coder marks each correct or in error (level too high or low, diagnosis, modifier, procedure, units, documentation, other) with the billed and correct code. Each provider's accuracy is shown against a 95% target; below it, the usual step is education and a follow-up audit.

@@ -19,7 +19,7 @@ import type { SubscriberInput } from "@/lib/subscriber-form";
 
 const { patients, patientInsurances, payers, practices, coverageSearches, auditLog } = schema;
 
-export type NewInsurance = { payerId: string; memberId: string; groupNumber?: string | null; relationship?: string; copayCents?: number | null; makePrimary?: boolean; subscriber?: SubscriberInput };
+export type NewInsurance = { payerId: string; memberId: string; groupNumber?: string | null; relationship?: string; copayCents?: number | null; makePrimary?: boolean; subscriber?: SubscriberInput; source?: string };
 
 /** Adds a policy to a patient. A new primary pushes the others down one rank. */
 export async function addInsurance(db: Db, practiceId: string, patientId: string, input: NewInsurance, userId?: string) {
@@ -40,6 +40,7 @@ export async function addInsurance(db: Db, practiceId: string, patientId: string
   }
   const [row] = await db.insert(patientInsurances).values({
     patientId, payerId: payer.id, memberId, groupNumber: input.groupNumber?.trim().slice(0, 40) || null, rank, relationship, copayCents: input.copayCents ?? 0, ...subscriber,
+    createdBy: userId ?? null, source: input.source ?? "staff",
   }).returning();
   await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "insurance_added", entity: "patient", entityId: patientId, details: { payerId: payer.id, rank } });
   return row;
@@ -108,7 +109,7 @@ export async function addDiscoveredCoverage(db: Db, practiceId: string, searchId
   const [s] = await db.select().from(coverageSearches).where(and(eq(coverageSearches.id, searchId), eq(coverageSearches.practiceId, practiceId))).limit(1);
   if (!s || s.status !== "found" || !s.memberId) throw new Error("Nothing found to add");
   if (s.addedInsuranceId) throw new Error("Already added");
-  const ins = await addInsurance(db, practiceId, s.patientId, { payerId: s.payerId, memberId: s.memberId }, userId);
+  const ins = await addInsurance(db, practiceId, s.patientId, { payerId: s.payerId, memberId: s.memberId, source: "discovery" }, userId);
   await db.update(coverageSearches).set({ addedInsuranceId: ins.id }).where(eq(coverageSearches.id, s.id));
   return ins;
 }

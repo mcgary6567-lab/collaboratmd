@@ -213,6 +213,12 @@ export const patients = pgTable(
     assistanceOfferedOn: date("assistance_offered_on"),
     fhirId: text("fhir_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    /** A duplicate merged into another record points at the one kept (migration 0063, server/patient-merge.ts). */
+    mergedInto: uuid("merged_into"),
+    mergedAt: timestamp("merged_at", { withTimezone: true }),
+    /** Who registered the patient, and how: staff | api | hl7 | fhir | import. Recorded from migration 0063 on. */
+    createdBy: uuid("created_by").references(() => users.id),
+    source: text("source"),
   },
   (t) => [
     uniqueIndex("patients_mrn_idx").on(t.practiceId, t.mrn),
@@ -241,6 +247,9 @@ export const patientInsurances = pgTable("patient_insurances", {
   subscriberZip: text("subscriber_zip"),
   /** When Medicare pays second: the Medicare Secondary Payer type (12 working aged, 13 ESRD, 14 no-fault, 15 workers' comp, 16 public health, 41 black lung, 42 VA, 43 disability, 47 liability), sent as SBR05. */
   mspType: text("msp_type"),
+  /** Who entered the policy, and how: staff | discovery | checkin | hl7 | fhir | api. Migration 0063. */
+  createdBy: uuid("created_by").references(() => users.id),
+  source: text("source"),
 });
 
 export const eligibilityChecks = pgTable("eligibility_checks", {
@@ -445,6 +454,8 @@ export const ledgerEntries = pgTable(
     note: text("note"),
     postedBy: uuid("posted_by").references(() => users.id),
     postedAt: timestamp("posted_at", { withTimezone: true }).defaultNow().notNull(),
+    /** For write-offs: why (server/write-offs.ts WRITE_OFF_CATEGORIES). Migration 0063. */
+    writeOffCategory: text("write_off_category"),
   },
   (t) => [index("ledger_claim_idx").on(t.claimId), index("ledger_patient_idx").on(t.patientId)],
 );
@@ -2292,4 +2303,77 @@ export const orderingReferring = pgTable("ordering_referring", {
   hha: boolean("hha").notNull().default(false),
   pmd: boolean("pmd").notNull().default(false),
   hospice: boolean("hospice").notNull().default(false),
+});
+
+/** A coder's question to the provider about a visit; the claim is held until it is answered. Migration 0063. */
+export const codingQueries = pgTable("coding_queries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  encounterId: uuid("encounter_id").notNull().references(() => encounters.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  topic: text("topic").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer"),
+  status: text("status").notNull().default("open"), // open | answered | withdrawn
+  askedBy: uuid("asked_by").references(() => users.id),
+  askedAt: timestamp("asked_at", { withTimezone: true }).defaultNow().notNull(),
+  answeredBy: uuid("answered_by").references(() => users.id),
+  answeredAt: timestamp("answered_at", { withTimezone: true }),
+});
+
+/** Medicare's yearly therapy threshold (KX modifier) and targeted medical review amount. Migration 0063. */
+export const therapyThresholds = pgTable("therapy_thresholds", {
+  year: integer("year").primaryKey(),
+  kxCents: integer("kx_cents").notNull(),
+  reviewCents: integer("review_cents"),
+  enteredBy: text("entered_by"),
+  enteredAt: timestamp("entered_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** A personal injury case: an attorney's lien or letter of protection holds the balance until settlement. Migration 0063. */
+export const injuryCases = pgTable("injury_cases", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  attorney: text("attorney").notNull(),
+  firm: text("firm"),
+  phone: text("phone"),
+  email: text("email"),
+  caseNumber: text("case_number"),
+  accidentOn: date("accident_on"),
+  lienSignedOn: date("lien_signed_on").notNull(),
+  status: text("status").notNull().default("open"), // open | settled | dropped
+  reductionRequestedCents: integer("reduction_requested_cents"),
+  reductionAgreedCents: integer("reduction_agreed_cents"),
+  settledOn: date("settled_on"),
+  settlementPaidCents: integer("settlement_paid_cents"),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** An internal coding audit: a sample of each provider's claims over a period. Migration 0063. */
+export const codingAudits = pgTable("coding_audits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  name: text("name").notNull(),
+  fromDate: date("from_date").notNull(),
+  toDate: date("to_date").notNull(),
+  perProvider: integer("per_provider").notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const codingAuditItems = pgTable("coding_audit_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  auditId: uuid("audit_id").notNull().references(() => codingAudits.id),
+  claimId: uuid("claim_id").notNull().references(() => claims.id),
+  providerId: uuid("provider_id").notNull().references(() => providers.id),
+  result: text("result").notNull().default("pending"), // pending | correct | error
+  finding: text("finding"),
+  billedCode: text("billed_code"),
+  correctCode: text("correct_code"),
+  note: text("note"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
 });

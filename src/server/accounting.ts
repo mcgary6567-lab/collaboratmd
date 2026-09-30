@@ -7,10 +7,11 @@
  * transfers to patient responsibility move them to patient A/R, and each
  * payment or adjustment comes off the side it belongs to.
  *
- * Closing a month stores its totals. The ledger is never edited, but entries
- * posted later can still be dated into a closed month (an ERA imported late),
- * so the close page compares the stored totals with the ledger as it is now
- * and shows any difference instead of hiding it.
+ * Closing a month stores its totals and locks it: the database refuses any
+ * ledger entry dated into a closed month (migration 0063), so the books sent to
+ * the accountant stay as they were. An administrator can reopen a month, with
+ * a reason. The close page still compares stored totals with the ledger, for
+ * months closed before the lock existed.
  */
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db";
@@ -107,6 +108,44 @@ export function journalCsv(lines: JournalLine[], period: string, practiceName: s
   return rows.map((r) => r.map((v) => cell(String(v))).join(",")).join("\n") + "\n";
 }
 
+/* ------------------------------ A/R rollforward ------------------------------ */
+
+/** How each ledger type moves insurance and patient A/R (from POSTING: a debit to A/R adds, a credit takes off). */
+export const AR_EFFECT: Record<string, { insurance: number; patient: number }> = Object.fromEntries(
+  Object.entries(POSTING).map(([type, [dr, cr]]) => [type, {
+    insurance: (dr === "arInsurance" ? 1 : 0) - (cr === "arInsurance" ? 1 : 0),
+    patient: (dr === "arPatient" ? 1 : 0) - (cr === "arPatient" ? 1 : 0),
+  }]),
+);
+
+async function arAsOf(db: Db, practiceId: string, before: Date) {
+  const { rows } = await db.execute<{ type: string; cents: string }>(sql`
+    SELECT type, sum(amount_cents)::text AS cents FROM ledger_entries WHERE practice_id = ${practiceId} AND posted_at < ${before} GROUP BY type`);
+  let insurance = 0, patient = 0;
+  for (const r of rows) { const e = AR_EFFECT[r.type]; if (e) { insurance += e.insurance * Number(r.cents); patient += e.patient * Number(r.cents); } }
+  return { insurance, patient };
+}
+
+/**
+ * The month's A/R rollforward: opening A/R, each kind of activity, and closing
+ * A/R, for insurance and patients. Closing is computed twice, from the
+ * opening balance plus the month's activity and straight from the ledger at
+ * month end, and the two must agree to the cent.
+ */
+export async function arRollforward(db: Db, practiceId: string, period: string) {
+  const { start, end } = periodBounds(period);
+  const [opening, totals, closingDirect] = await Promise.all([arAsOf(db, practiceId, start), periodTotals(db, practiceId, period), arAsOf(db, practiceId, end)]);
+  const lines = Object.entries(POSTING).map(([type, [, , memo]]) => {
+    const cents = totals[type] ?? 0;
+    return { type, memo, cents, insurance: AR_EFFECT[type].insurance * cents, patient: AR_EFFECT[type].patient * cents };
+  }).filter((l) => l.cents);
+  const closing = {
+    insurance: opening.insurance + lines.reduce((a, l) => a + l.insurance, 0),
+    patient: opening.patient + lines.reduce((a, l) => a + l.patient, 0),
+  };
+  return { opening, lines, closing, closingDirect, reconciles: closing.insurance === closingDirect.insurance && closing.patient === closingDirect.patient };
+}
+
 /* ------------------------------ Month-end close ------------------------------ */
 
 export async function closePeriod(db: Db, practiceId: string, period: string, userId?: string, now = new Date()) {
@@ -118,9 +157,9 @@ export async function closePeriod(db: Db, practiceId: string, period: string, us
   return totals;
 }
 
-export async function reopenPeriod(db: Db, practiceId: string, period: string, userId?: string) {
+export async function reopenPeriod(db: Db, practiceId: string, period: string, userId?: string, reason?: string) {
   await db.delete(periodCloses).where(and(eq(periodCloses.practiceId, practiceId), eq(periodCloses.period, period)));
-  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "period_reopened", entity: "practice", entityId: practiceId, details: { period } });
+  await db.insert(auditLog).values({ practiceId, userId: userId ?? null, action: "period_reopened", entity: "practice", entityId: practiceId, details: { period, reason: reason?.slice(0, 300) ?? null } });
 }
 
 /** Closed months with what has changed in them since (entries dated into the month after it closed). */

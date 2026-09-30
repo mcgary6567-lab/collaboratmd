@@ -33,6 +33,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
         subtitle={`${total.toLocaleString()} patient${total === 1 ? "" : "s"}${params.q ? ` matching "${params.q}"` : ""}${params.language === "es" ? ", Spanish" : params.language === "en" ? ", English" : ""}`}
         actions={
           <>
+            <Link href="/patients/duplicates" className="btn btn-secondary">Duplicates</Link>
             <Link href="/import" className="btn btn-secondary">Import</Link>
             <Link href="/patients/new" className="btn btn-primary">New patient</Link>
           </>

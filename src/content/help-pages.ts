@@ -112,6 +112,54 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Records requests", href: "/records-requests" }],
   },
+  "/patients/duplicates": {
+    title: "Duplicate patients",
+    steps: [
+      "Records that look like the same person: the same name and date of birth, the same member ID with the same payer, or the same date of birth and phone.",
+      "Check they really are one person, choose the record to keep, and merge: every visit, claim, payment and document moves to it, and the other record opens the one kept.",
+    ],
+    related: [{ label: "Patients", href: "/patients" }],
+  },
+  "/coding/queries": {
+    title: "Provider questions",
+    steps: [
+      "Ask the provider from the claim when a visit cannot be coded as documented; the claim is held by the scrubber until the question is answered or withdrawn.",
+      "Record the answer here, correct the claim if needed, and scrub it again. The table shows each provider's questions and how long answers take.",
+    ],
+    related: [{ label: "Coding audits", href: "/coding/audits" }],
+  },
+  "/coding/audits": {
+    title: "Coding audits",
+    steps: [
+      "Sample a number of each provider's billed claims from a period, at random, and have someone other than the coder check each against the note.",
+      "Mark each correct or in error with what was wrong. Accuracy under 95% is a signal for education and a follow-up audit.",
+    ],
+    related: [{ label: "Provider questions", href: "/coding/queries" }],
+  },
+  "/injury-cases": {
+    title: "Personal injury cases",
+    steps: [
+      "Open a case when a patient's attorney signs a lien or letter of protection: the balance is held from statements, reminders, card charges and collections.",
+      "Record a reduction the attorney asks for and what you agree; when the settlement is paid, post it here, and normal billing resumes for anything left.",
+    ],
+    related: [{ label: "Patient billing", href: "/billing" }],
+  },
+  "/reports/write-offs": {
+    title: "Write-off analysis",
+    steps: [
+      "Everything taken off A/R without being collected, split into contractual adjustments, avoidable write-offs, policy write-offs and discounts, and bad debt.",
+      "Avoidable write-offs (timely filing, no authorization, eligibility, coding, medical necessity) are shown by payer, by month and by who posted them. Each write-off now asks for its reason.",
+    ],
+    related: [{ label: "Denials", href: "/denials" }],
+  },
+  "/reports/registration": {
+    title: "Registration quality",
+    steps: [
+      "Front-end rejections, refused coverage checks and denials that trace back to registration, by the field that was wrong and by who entered the policy.",
+      "Fix each patient's details from the list, and use the counts for front desk training.",
+    ],
+    related: [{ label: "Patients", href: "/patients" }],
+  },
   "/setup": {
     title: "Setup checklist",
     steps: [

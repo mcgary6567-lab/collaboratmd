@@ -75,7 +75,7 @@ export async function writeOffClaimAction(claimId: string, formData: FormData): 
   const db = await getDb();
   await assertOwned(db, s.practiceId, "claim", claimId);
   await assertWriteOffAllowed(db, s.practiceId, s.role, (await getClaimFinancials(db, claimId)).insuranceBalanceCents);
-  await writeOffClaim(db, claimId, String(formData.get("reason") || "Write-off"), s.userId);
+  await writeOffClaim(db, claimId, String(formData.get("reason") || "Write-off"), s.userId, String(formData.get("category") || "other"));
   revalidatePath(`/claims/${claimId}`);
   revalidatePath("/denials");
 }
@@ -172,7 +172,7 @@ export async function createPatientAction(_prev: ActionResult | undefined, formD
   let p;
   try {
     if (parsed.data.payerId) await assertOwned(db, s.practiceId, "payer", parsed.data.payerId);
-    p = await createPatient(db, s.practiceId, { ...parsed.data, payerId: selfPay ? null : parsed.data.payerId!, memberId: parsed.data.memberId ?? "", relationship: parsed.data.relationship ?? "self" });
+    p = await createPatient(db, s.practiceId, { ...parsed.data, payerId: selfPay ? null : parsed.data.payerId!, memberId: parsed.data.memberId ?? "", relationship: parsed.data.relationship ?? "self" }, { userId: s.userId, source: "staff" });
   } catch (e) {
     return fail(e);
   }

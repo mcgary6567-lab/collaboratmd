@@ -63,7 +63,7 @@ const PROOF = [
   {
     icon: Landmark,
     title: "The deadlines a practice is held to, tracked for it",
-    body: "The rules that cost practices money when a date slips run as software: Medicare and Medicaid's 60-day overpayment return, No Surprises Act dispute windows, appeal levels, state prompt-pay interest, HIPAA record requests and accountings of disclosures, unclaimed patient credits, payer contract notice dates, and records requests from auditors.",
+    body: "The rules that cost practices money when a date slips run as software: Medicare and Medicaid's 60-day overpayment return, No Surprises Act dispute windows, appeal levels, state prompt-pay interest, HIPAA record requests and accountings of disclosures, unclaimed patient credits, payer contract notice dates, and records requests from auditors. The practice's own controls run the same way: a month-end close that locks the month, internal coding audits, and write-offs that record why.",
     tag: "Compliance as workflow",
   },
   {

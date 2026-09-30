@@ -269,7 +269,7 @@ export async function applyCheckin(db: Db, practiceId: string, submissionId: str
       .limit(1);
     const samePayer = current && current.payerName.toLowerCase().replace(/\W/g, "") === ins.payerName.toLowerCase().replace(/\W/g, "");
     if (samePayer) {
-      await db.update(patientInsurances).set({ memberId: ins.memberId, groupNumber: ins.groupNumber || null }).where(eq(patientInsurances.id, current.ins.id));
+      await db.update(patientInsurances).set({ memberId: ins.memberId, groupNumber: ins.groupNumber || null, source: "checkin", createdBy: null }).where(eq(patientInsurances.id, current.ins.id));
       const check = await runEligibility(db, current.ins.id);
       notes.push(`Member ID updated; eligibility re-checked: ${check.status}`);
     } else {

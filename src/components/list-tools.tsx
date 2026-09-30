@@ -6,6 +6,7 @@ import { Bookmark, X } from "lucide-react";
 import type { FormResult } from "@/components/action-form";
 import { toast } from "@/components/toaster";
 import { bulkClaimsAction, deleteViewAction, saveViewAction } from "@/app/(app)/work-actions";
+import { WRITE_OFF_CATEGORIES } from "@/lib/billing/write-off-categories";
 
 /** Bulk actions for rows whose checkboxes point at form="bulk-claims". */
 export function ClaimBulkBar({ people }: { people: { id: string; name: string }[] }) {
@@ -40,7 +41,15 @@ export function ClaimBulkBar({ people }: { people: { id: string; name: string }[
             <option value="status">Ask payers for status (276)</option>
             <option value="writeoff">Write off the balance</option>
           </select>
-          {op === "writeoff" && <input name="reason" className="input w-56 py-1 text-xs" placeholder="Reason (goes on each claim)" required />}
+          {op === "writeoff" && (
+            <>
+              <select name="category" className="input w-auto py-1 text-xs" aria-label="Why" required defaultValue="">
+                <option value="" disabled>Why?</option>
+                {Object.entries(WRITE_OFF_CATEGORIES).filter(([k]) => k !== "void").map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <input name="reason" className="input w-56 py-1 text-xs" placeholder="Note (goes on each claim)" aria-label="Write-off note" required />
+            </>
+          )}
           {op === "assign" && (
             <>
               <select name="assigneeId" className="input w-auto py-1 text-xs" required>

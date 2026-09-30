@@ -74,9 +74,11 @@ export async function closePeriodAction(period: string, _prev: FormResult): Prom
   }
 }
 
-export async function reopenPeriodAction(period: string, _prev: FormResult): Promise<FormResult> {
+export async function reopenPeriodAction(period: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
   const s = await requireRole(["admin"]);
-  await reopenPeriod(await getDb(), s.practiceId, period, s.userId);
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { ok: false, message: "Give the reason for reopening the month" };
+  await reopenPeriod(await getDb(), s.practiceId, period, s.userId, reason);
   revalidatePath("/billing/accounting");
   return { ok: true, message: `${period} reopened` };
 }

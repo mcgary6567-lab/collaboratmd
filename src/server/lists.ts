@@ -3,7 +3,7 @@
  * claims and 15,000 patients, so filtering, sorting and paging happen in
  * SQL; the page receives one screen of rows and the total.
  */
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 
@@ -70,7 +70,8 @@ export async function searchClaims(db: Db, practiceId: string, p: ClaimQuery) {
 }
 
 export async function searchPatients(db: Db, practiceId: string, p: { q?: string; language?: string; sort?: string; dir?: string; offset: number; limit: number }) {
-  const where: SQL[] = [eq(patients.practiceId, practiceId)];
+  // A record merged into another is reached through the one kept.
+  const where: SQL[] = [eq(patients.practiceId, practiceId), isNull(patients.mergedInto)];
   if (p.language === "es" || p.language === "en") where.push(eq(patients.preferredLanguage, p.language));
   const q = p.q?.trim();
   if (q) {
