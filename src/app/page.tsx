@@ -225,6 +225,26 @@ const SMART = [
     title: "Contracts renegotiated on time",
     body: "Each payer contract's renewal and notice dates, with reminders before the notice window closes, next to what that payer underpaid you and allowed per code, so you go into the negotiation with numbers.",
   },
+  {
+    icon: Lock,
+    title: "Books that stay closed",
+    body: "Close a month and it is locked: nothing can be posted into it afterwards, so the numbers you sent your accountant stay true. The A/R rollforward has to reconcile to the cent before you close.",
+  },
+  {
+    icon: SearchCheck,
+    title: "Clean registrations",
+    body: "Rejections and denials caused by a wrong member ID, name or date of birth are traced back to the field and to who entered it, so the front desk fixes the pattern, not just the claim.",
+  },
+  {
+    icon: UsersRound,
+    title: "Duplicates merged, not re-keyed",
+    body: "Two charts for the same person are found by name and birth date, member ID or phone, and merged in one step with every visit, claim and payment moved across.",
+  },
+  {
+    icon: ChartLine,
+    title: "Write-offs that say why",
+    body: "Every write-off records its reason, and avoidable ones (late filing, no authorization, coverage not checked) are shown by payer, month and person, apart from contractual adjustments.",
+  },
 ];
 
 /** Medicare and Medicaid rules the product applies; the ones that need CMS's yearly files say so on the page. */
@@ -288,6 +308,21 @@ const MEDICARE = [
     icon: Hourglass,
     title: "Auditors and patients answered on time",
     body: "ADRs, RAC and TPE reviews are tracked to their due dates and the records sent are logged. Patients' HIPAA requests for their records or an accounting of disclosures run on their 30- and 60-day clocks.",
+  },
+  {
+    icon: Stethoscope,
+    title: "Therapy past the threshold, with KX",
+    body: "Physical, speech and occupational therapy are totaled per Medicare patient per year. Over the year's threshold, lines without KX are flagged; over the review amount, you are told to check the plan of care.",
+  },
+  {
+    icon: Send,
+    title: "Ask the provider, then bill",
+    body: "When a note does not support what was billed, the coder asks the provider from the claim, and the claim waits for the answer instead of going out and coming back denied.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Audit yourself first",
+    body: "A random sample of each provider's claims, checked against the notes by someone other than the coder, with accuracy against a 95% target: the internal review the OIG's compliance guidance expects.",
   },
 ];
 
@@ -494,11 +529,12 @@ export default async function LandingPage() {
       {/* ----------------------------------------------------- medicare */}
       <section id="medicare" className="mx-auto max-w-7xl scroll-mt-20 px-6 pt-20 lg:pt-28">
         <div className="max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-green-700">Medicare and Medicaid</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-green-700">Medicare, Medicaid and compliance</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">The government&apos;s rules, built in</h2>
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
             Medicare and Medicaid have rules commercial payers do not, and deadlines that carry penalties. CollaboratMD
-            applies them on every claim and every payment, and says which rule each warning comes from.
+            applies them on every claim and every payment, says which rule each warning comes from, and runs the
+            compliance habits an auditor looks for: answering requests on time, asking before billing, and checking your own coding.
           </p>
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">

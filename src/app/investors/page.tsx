@@ -73,6 +73,18 @@ const PROOF = [
     tag: "ICD-10-CM · HCPCS · NCCI · MPFS · HCC",
   },
   {
+    icon: Lock,
+    title: "Books that stay closed",
+    body: "A closed month is locked in the database itself: no entry can be dated into it, so the figures a practice sent its accountant cannot drift. Each month's A/R rollforward is computed two ways and must agree to the cent, and every write-off records its reason, so avoidable losses are separated from contractual adjustments.",
+    tag: "Month-end close · A/R rollforward",
+  },
+  {
+    icon: Users,
+    title: "Clean data from the front desk on",
+    body: "Duplicate patient records are found and merged with every row moved, discovered from the schema so new tables are never missed. Rejections and denials caused by registration are traced to the field that was wrong and the person who entered it, which turns a denial problem into a training list.",
+    tag: "Patient identity · registration quality",
+  },
+  {
     icon: Network,
     title: "Built for the billing company",
     body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",
