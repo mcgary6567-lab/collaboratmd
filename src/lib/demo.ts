@@ -3,11 +3,12 @@
  * are published (they are in the seed and the public repository). Visitors try
  * it from /demo in one click; the sign-in page never shows or pre-fills them.
  *
- * On the production deployment (Vercel sets VERCEL_ENV=production) the demo is
- * closed unless DEMO_LOGINS=on: its accounts cannot sign in at all, so a
- * published password opens nothing. Everywhere else (local, CI, previews) it is
- * open unless DEMO_LOGINS=off. Running the demo on its own deployment, with its
- * own database, is better still.
+ * The demo is open everywhere, the production deployment included, unless
+ * DEMO_LOGINS=off: then its accounts cannot sign in at all, so a published
+ * password opens nothing. On production the demo practice shares the database
+ * with customers (practices are kept apart by tenancy), and a demo account is
+ * never a platform operator there (server/code-sets.ts). Running the demo on
+ * its own deployment, with its own database, is safer.
  */
 export const DEMO_ACCOUNTS = {
   biller: { email: "biller@collaboratmd.local", label: "Biller", does: "Claims, denials, payments and patient balances" },
@@ -22,9 +23,7 @@ export const isDemoEmail = (email: string | null | undefined) => !!email && /@co
 export const onProduction = () => process.env.VERCEL_ENV === "production";
 
 export function demoOpen() {
-  if (process.env.DEMO_LOGINS === "on") return true;
-  if (process.env.DEMO_LOGINS === "off") return false;
-  return !onProduction();
+  return process.env.DEMO_LOGINS !== "off";
 }
 
 /** Where "see the demo" buttons go: the live demo when it is open, otherwise a request for a guided one. */

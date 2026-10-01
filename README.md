@@ -4,13 +4,12 @@
 Postgres database.
 
 The demo accounts below (`admin@collaboratmd.local` / `admin123` and the
-others) work locally, in CI and on preview deployments. On the production
-deployment they are switched off, because their passwords are public and the
-demo practice shares the production database: they are refused with "Invalid
-email or password", and /demo says the demo is not open. To open them there,
-set `DEMO_LOGINS=on` in the Vercel project's production environment variables
-and redeploy (see `src/lib/demo.ts`); a separate deployment with its own
-database for the demo is safer. The demo data is synthetic.
+others) work everywhere, the production deployment included, and /demo signs
+in with one click. Their passwords are public and on production the demo
+practice shares the database with customers' practices, so to close them set
+`DEMO_LOGINS=off` in the Vercel project's environment variables and redeploy
+(see `src/lib/demo.ts`); a separate deployment with its own database for the
+demo is safer. The demo data is synthetic.
 
 A cloud medical billing and revenue cycle management (RCM) web application. It covers the whole money path a medical practice walks every day:
 

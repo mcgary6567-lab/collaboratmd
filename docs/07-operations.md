@@ -72,7 +72,7 @@ Lists (patients, claims, the schedule) still show the name so the account can be
 
 Lakeside Family Medicine is seeded with fictional patients and published sign-ins (they are in the seed and the public repository), and is marked as the demo (`practices.is_demo`). Visitors try it from **/demo** in one click, as a biller, the front desk or an administrator; the sign-in page never shows or pre-fills demo passwords. The public investors page reads figures only from the demo practice, never a customer's.
 
-On the production deployment (`VERCEL_ENV=production`) the demo is **closed** unless the Vercel environment variable `DEMO_LOGINS=on` is set: the demo accounts cannot sign in at all, so their published passwords open nothing, and /demo offers a walkthrough and the free trial instead. Everywhere else (local, CI, preview deployments) it is open unless `DEMO_LOGINS=off`. A demo account is never a platform operator on production, whatever `PLATFORM_ADMIN_EMAILS` says. Better still, run the demo as its own Vercel project with its own database, and keep the production site for customers only.
+The demo is **open** everywhere, the production deployment included, unless the environment variable `DEMO_LOGINS=off` is set: then the demo accounts cannot sign in at all, so their published passwords open nothing, and /demo offers a walkthrough and the free trial instead. On production the demo practice shares the database with customers' practices (each practice sees only its own data). A demo account is never a platform operator on production, whatever `PLATFORM_ADMIN_EMAILS` says. Safer still, run the demo as its own Vercel project with its own database and set `DEMO_LOGINS=off` on the production site.
 
 ## Claims for dependents and Medicare
 

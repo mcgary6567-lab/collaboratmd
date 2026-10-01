@@ -25,13 +25,15 @@ describe("launch readiness", () => {
     }
   });
 
-  it("closes the demo on the production deployment unless it is switched on, and never makes a demo account an operator there", () => {
+  it("opens the demo everywhere unless it is switched off, and never makes a demo account an operator on production", () => {
     expect(isDemoEmail("biller@collaboratmd.local")).toBe(true);
     expect(isDemoEmail("jane@clinic.com")).toBe(false);
     delete process.env.VERCEL_ENV;
     delete process.env.DEMO_LOGINS;
     expect(demoOpen()).toBe(true);
     process.env.VERCEL_ENV = "production";
+    expect(demoOpen()).toBe(true);
+    process.env.DEMO_LOGINS = "off";
     expect(demoOpen()).toBe(false);
     process.env.DEMO_LOGINS = "on";
     expect(demoOpen()).toBe(true);
