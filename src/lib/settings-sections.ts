@@ -27,6 +27,7 @@ export const SETTINGS_SECTIONS: { title: string; links: SettingsLink[] }[] = [
       { href: "/settings/payer-edits", label: "Payer edits", description: "Your own rules per payer, frequency limits, and ones suggested from denials", keywords: "frequency once per year lifetime" },
       { href: "/settings/sliding-fee", label: "Sliding fee scale", description: "Discounts by income against the poverty guidelines, for health centers and charity care", keywords: "fqhc charity discount poverty fpl" },
       { href: "/settings/prompt-pay", label: "Prompt-pay law", description: "Your state's deadline for commercial payers, and the interest on late payments", keywords: "late payment interest statute" },
+      { href: "/settings/maintenance", label: "Maintenance", description: "What goes out of date: fee schedules, contracts, credentials, certificates, code sets and standards", keywords: "stale expiring overdue update yearly code set calendar certificate runtime" },
       { href: "/settings/code-sets", label: "National code sets", description: "NCCI edits and Medicare coverage data", adminOnly: true, keywords: "ncci mue lcd" },
       { href: "/settings/automation", label: "Automation", description: "Reminders, follow-up, autopay and reports that run every morning", keywords: "daily cron reminders" },
       { href: "/work", label: "Work queues", description: "Rules that assign denials and stuck claims, with due dates", keywords: "assignment sla tasks" },

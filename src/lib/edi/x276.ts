@@ -7,6 +7,7 @@
  * the 277 answers with STC category codes: A acknowledgment, P pending, F
  * finalized, R request for more information, E error.
  */
+import { X12 } from "./standards";
 import { d8, envelope, fromD8, money, toCents, tokenize } from "./x12";
 import { describeStatus } from "./x277ca";
 
@@ -28,7 +29,7 @@ export interface Inquiry276 {
   };
 }
 
-const VERSION = "005010X212";
+const VERSION = X12["276/277"].guide;
 
 export function build276(q: Inquiry276): string {
   const hhmm = q.now.toISOString().slice(11, 16).replace(":", "");

@@ -11,6 +11,8 @@ import { sendEmail } from "@/server/notify";
 import { platformBillingReady, reportClaimUsage, syncSeats } from "@/server/subscription";
 import { deliverPending } from "@/server/webhooks";
 import { beat, checkTickStale } from "@/server/tick";
+import { alertStaleCodeSets } from "@/server/code-set-calendar";
+import { alertOperators } from "@/server/ops-alerts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -35,9 +37,11 @@ export async function GET(req: Request) {
   const accountEmails = await sendLifecycleEmails(db, await siteOrigin(), (to, subject, text) => sendEmail(to, subject, text)).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
   const closures = await runScheduledClosures(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
   const retention = await applyRetention(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
+  // CMS releases on a fixed calendar; operators hear (at most weekly) when a code set is due or overdue.
+  const codeSets = await alertStaleCodeSets(db, alertOperators).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
   // CollaboratMD's own billing: seats follow active providers, and claims sent go to the usage meter.
   const billing = platformBillingReady()
     ? { seats: await syncSeats(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`), claims: await reportClaimUsage(db).catch((e) => `failed: ${e instanceof Error ? e.message : e}`) }
     : null;
-  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing, accountEmails, closures, retention, ticks });
+  return Response.json({ ok: true, practices: Object.keys(result).length, result, webhooks, billing, accountEmails, closures, retention, ticks, codeSets });
 }

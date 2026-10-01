@@ -8,6 +8,7 @@
  * (DTP*435, CL1), principal and admitting diagnoses, an attending provider
  * (NM1*71), and service lines that carry a revenue code (SV2).
  */
+import { X12 } from "./standards";
 import { contactPhone, envelope } from "./x12";
 import { subscriberLoops, type Person, type Subscriber } from "./subscriber";
 import { otherPayerLoops, pwk, type ClaimAttachmentRef, type OtherPayer } from "./x837p";
@@ -60,7 +61,7 @@ export interface Edi837IInput {
   lines: { revenueCode: string; hcpcs?: string | null; modifiers?: string[]; chargeCents: number; units: number; dateOfService: string }[];
 }
 
-const VERSION = "005010X223A2";
+const VERSION = X12["837I"].guide;
 const d8 = (iso: string) => iso.replace(/-/g, "");
 const money = (c: number) => (c / 100).toFixed(2);
 const icd = (c: string) => c.replace(".", "").toUpperCase();

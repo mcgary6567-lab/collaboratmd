@@ -5,6 +5,7 @@
  * for a clearinghouse sandbox. It covers the loops a small practice needs
  * (billing provider, subscriber, payer, claim, diagnoses, service lines).
  */
+import { X12 } from "./standards";
 import { claimDescription, isUnlistedCode } from "@/lib/codes/unlisted";
 import { isAnesthesiaCode } from "@/lib/time-units";
 import { contactPhone } from "./x12";
@@ -200,8 +201,8 @@ export function buildEdi837P(input: Edi837Input): string {
 
 
   s.push(["ISA", "00", pad("", 10), "00", pad("", 10), "ZZ", pad(input.senderId, 15), "ZZ", pad(input.receiverId, 15), yymmdd, hhmm, "^", "00501", icn, "0", "P", ":"]);
-  s.push(["GS", "HC", input.senderId, input.receiverId, ccyymmdd, hhmm, icn.replace(/^0+/, "") || "1", "X", "005010X222A1"]);
-  s.push(["ST", "837", "0001", "005010X222A1"]);
+  s.push(["GS", "HC", input.senderId, input.receiverId, ccyymmdd, hhmm, icn.replace(/^0+/, "") || "1", "X", X12["837P"].guide]);
+  s.push(["ST", "837", "0001", X12["837P"].guide]);
   s.push(["BHT", "0019", "00", input.controlNumber, ccyymmdd, hhmm, "CH"]);
   // 1000A submitter / 1000B receiver
   s.push(["NM1", "41", "2", input.billingProvider.name, "", "", "", "", "46", input.senderId]);

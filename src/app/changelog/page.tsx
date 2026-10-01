@@ -9,6 +9,16 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-10-01",
+    title: "Maintenance: keeping current without surprises",
+    items: [
+      "Settings, Maintenance: fee schedules, payer contracts, credentials, chargemaster, single sign-on certificate and API keys that are going out of date, with morning notifications",
+      "A release calendar for every CMS code set: which file is due or overdue, with the CMS page, and a weekly notice to the platform's operators",
+      "Every HIPAA X12 version in one place, ready for the next mandated version",
+      "A monthly check for security advisories and for the runtime's end of support",
+    ],
+  },
+  {
     date: "2026-09-30",
     title: "Locum tenens, HMO referrals, therapy plans of care, superbills, other-insurance check, expiring cards, statement cycles, interpreters",
     items: [

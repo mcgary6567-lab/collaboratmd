@@ -8,6 +8,7 @@
  * (23 = calendar year, 29 = remaining) and network. If the payer cannot find
  * the subscriber it answers with an AAA rejection instead of benefits.
  */
+import { X12 } from "./standards";
 import { d8, envelope, fromD8, money, toCents, tokenize } from "./x12";
 
 export interface Inquiry270 {
@@ -28,7 +29,7 @@ export interface Inquiry270 {
   serviceTypes?: string[];
 }
 
-const version = "005010X279A1";
+const version = X12["270/271"].guide;
 
 export function build270(q: Inquiry270): string {
   const hhmm = q.now.toISOString().slice(11, 16).replace(":", "");

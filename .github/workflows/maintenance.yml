@@ -1,0 +1,46 @@
+# Monthly maintenance check: the things that go out of date without any code
+# changing. A failed run is the alarm (GitHub emails the repository's owner).
+#
+#  - Security advisories in the packages the app runs on (npm audit, production
+#    dependencies, high or critical). Dependabot proposes the fixes weekly.
+#  - The Node.js release line the app runs on: fails when it has less than 180
+#    days of security fixes left, from the live Node.js schedule
+#    (endoflife.date), so the move to the next line is planned, not rushed.
+name: Maintenance check
+
+on:
+  schedule:
+    - cron: "23 7 3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Security advisories in production dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
+      - name: Node.js support window
+        run: |
+          major=$(grep -E '^\s*NODE_VERSION:' .github/workflows/ci.yml | head -1 | grep -oE '[0-9]+')
+          echo "The app runs on Node.js $major"
+          curl -fsS https://endoflife.date/api/nodejs.json -o node-eol.json
+          node -e '
+            const major = process.argv[1];
+            const line = require("./node-eol.json").find((c) => String(c.cycle) === major);
+            if (!line) { console.error(`Node.js ${major} is not in the release schedule`); process.exit(1); }
+            const eol = line.eol === false ? null : new Date(line.eol);
+            if (!eol) { console.log(`Node.js ${major}: no end-of-life date set yet`); process.exit(0); }
+            const days = Math.floor((eol - Date.now()) / 86400000);
+            console.log(`Node.js ${major} gets security fixes until ${line.eol} (${days} days)`);
+            if (days < 180) { console.error(`Move to the next Node.js release line: update NODE_VERSION in ci.yml, this workflow, and the Vercel project setting, then NODE_END_OF_LIFE in src/server/maintenance.ts.`); process.exit(1); }
+          ' "$major"

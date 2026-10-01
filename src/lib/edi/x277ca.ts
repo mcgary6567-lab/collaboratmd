@@ -5,6 +5,7 @@
  * was accepted into the payer's adjudication system or rejected at the front
  * end, with a Claim Status Category and Status Code explaining why.
  */
+import { X12 } from "./standards";
 import { d8, envelope, fromD8, money, toCents, tokenize } from "./x12";
 
 export interface Ack277Claim {
@@ -126,7 +127,7 @@ export function build277CA(input: {
   });
   return envelope({
     senderId: input.senderId, receiverId: input.receiverId, functionalId: "HN", transactionSet: "277",
-    version: "005010X214", control: input.control, now: input.now, body,
+    version: X12["277CA"].guide, control: input.control, now: input.now, body,
   });
 }
 

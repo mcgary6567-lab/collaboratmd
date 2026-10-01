@@ -12,6 +12,7 @@
  * project's structural tests, not certified by a clearinghouse. Send test
  * claims before relying on it.
  */
+import { X12 } from "./standards";
 import { contactPhone, envelope } from "./x12";
 import { subscriberLoops, type Person, type Subscriber } from "./subscriber";
 import { otherPayerLoops, pwk, serviceFacilityLoop, type ClaimAttachmentRef, type OtherPayer, type ServiceFacility } from "./x837p";
@@ -43,7 +44,7 @@ export interface Edi837DInput {
   lines: { cdt: string; chargeCents: number; units: number; dateOfService: string; tooth?: string | null; surfaces?: string | null; oralCavity?: string | null }[];
 }
 
-const VERSION = "005010X224A2";
+const VERSION = X12["837D"].guide;
 const d8 = (iso: string) => iso.replace(/-/g, "");
 const money = (c: number) => (c / 100).toFixed(2);
 const icd = (c: string) => c.replace(".", "").toUpperCase();

@@ -5,6 +5,7 @@
  * syntactically valid, not whether the claim is any good. A rejected 999 means
  * nothing in the transaction reached a payer.
  */
+import { X12 } from "./standards";
 import { controlNumbers, envelope, tokenize } from "./x12";
 
 export interface SyntaxError999 {
@@ -60,15 +61,15 @@ export function build999(input: { original837: string; senderId: string; receive
   const orig = controlNumbers(input.original837);
   const rejected = input.errors.length > 0;
   const body: string[][] = [
-    ["AK1", orig.functionalId || "HC", orig.groupControl, orig.version || "005010X222A1"],
-    ["AK2", "837", orig.transactionControl, orig.version || "005010X222A1"],
+    ["AK1", orig.functionalId || "HC", orig.groupControl, orig.version || X12["837P"].guide],
+    ["AK2", "837", orig.transactionControl, orig.version || X12["837P"].guide],
     ...input.errors.map((e) => ["IK3", e.segmentId, e.position, "", e.code]),
     rejected ? ["IK5", "R", "5"] : ["IK5", "A"],
     ["AK9", rejected ? "R" : "A", "1", "1", rejected ? "0" : "1"],
   ];
   return envelope({
     senderId: input.senderId, receiverId: input.receiverId, functionalId: "FA", transactionSet: "999",
-    version: "005010X231A1", control: input.control, now: input.now, body,
+    version: X12["999"].guide, control: input.control, now: input.now, body,
   });
 }
 

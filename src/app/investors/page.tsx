@@ -103,6 +103,12 @@ const PROOF = [
     tag: "Q5/Q6 · REF*9F · plans of care · COB",
   },
   {
+    icon: Repeat,
+    title: "Built to stay current",
+    body: "Billing rules change every quarter by regulation. Code sets load as data on a tracked CMS calendar, every HIPAA transaction version lives in one registry, and dependency, security and runtime checks run automatically, so most yearly changes are a file load rather than a software project.",
+    tag: "Code-set calendar · X12 registry · maintenance checks",
+  },
+  {
     icon: Network,
     title: "Built for the billing company",
     body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",

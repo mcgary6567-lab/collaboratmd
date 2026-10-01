@@ -424,6 +424,11 @@ const MEDICARE = [
     title: "Language access on record",
     body: "Interpreters provided or declined are logged for Section 1557, with upcoming visits that need one and Medicaid T1013 units where your state pays.",
   },
+  {
+    icon: CalendarDays,
+    title: "Ready for every code change",
+    body: "Every CMS code set is tracked against its release calendar, so October's diagnosis codes and each quarter's edits are loaded before claims need them, and your fees and contracts are flagged when they fall behind.",
+  },
 ];
 
 const WORKFLOW = [

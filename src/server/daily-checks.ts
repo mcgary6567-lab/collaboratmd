@@ -12,6 +12,7 @@ import { payerAlerts } from "./payer-alerts";
 import { credentialState, CREDENTIAL_KINDS, listCredentials } from "./credentials";
 import { notify } from "./notifications";
 import { notifyAccessAnomalies } from "./access-anomalies";
+import { practiceMaintenance } from "./maintenance";
 
 /** ISO week, e.g. 2026-W39, so a payer alert repeats at most weekly. */
 function isoWeek(d: Date) {
@@ -24,7 +25,7 @@ function isoWeek(d: Date) {
 }
 
 export async function runDailyChecks(db: Db, practiceId: string, now = new Date()) {
-  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0 };
+  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0, maintenance: 0 };
   const week = isoWeek(now);
   for (const a of (await payerAlerts(db, practiceId, now)).filter((x) => x.severity === "high")) {
     await notify(db, practiceId, { kind: "payer_alert", title: `${a.payerName}: ${a.title}`, body: a.detail, href: "/reports/payer-alerts", dedupeKey: `payer:${a.payerId}:${a.kind}:${week}` });
@@ -47,6 +48,14 @@ export async function runDailyChecks(db: Db, practiceId: string, now = new Date(
     const q = `${now.getUTCFullYear()}-Q${Math.floor(now.getUTCMonth() / 3) + 1}`;
     await notify(db, practiceId, { kind: "access_review", title: "Quarterly access review is due", body: last ? "The last review was more than 90 days ago. Confirm who still needs access and remove anyone who does not." : "No access review is on record. Confirm who needs access and remove anyone who does not.", href: "/settings/compliance", dedupeKey: `access-review:${q}` });
     out.accessReview = true;
+  }
+  // Setup that goes out of date on its own (server/maintenance.ts). Credentials and contracts notify on their own above
+  // and in the contract reminders; the rest notify here, at most once a month for the same finding.
+  const month = today.slice(0, 7);
+  for (const item of await practiceMaintenance(db, practiceId, now)) {
+    if (item.status === "ok" || item.key === "credentials" || item.key === "contracts") continue;
+    await notify(db, practiceId, { kind: "maintenance", title: `${item.label}: ${item.status === "attention" ? "needs attention" : "coming up"}`, body: item.detail, href: item.href, dedupeKey: `maint:${item.key}:${item.status}:${month}` });
+    out.maintenance++;
   }
   return out;
 }

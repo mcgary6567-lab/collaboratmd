@@ -6,6 +6,7 @@
  * remark codes (LQ*HE). Generator is used by the mock clearinghouse to
  * simulate payer adjudication.
  */
+import { X12 } from "./standards";
 import { tokenize } from "./x12";
 
 export interface Adjustment {
@@ -204,7 +205,7 @@ export function buildEdi835(input: {
   const total = input.claims.reduce((a, c) => a + c.paidCents, 0);
   const s: string[][] = [];
   s.push(["ISA", "00", " ".repeat(10), "00", " ".repeat(10), "ZZ", input.payerId.padEnd(15), "ZZ", "COLLABORATMD".padEnd(15), d8.slice(2), "1200", "^", "00501", "000000001", "0", "P", ":"]);
-  s.push(["GS", "HP", input.payerId, "COLLABORATMD", d8, "1200", "1", "X", "005010X221A1"]);
+  s.push(["GS", "HP", input.payerId, "COLLABORATMD", d8, "1200", "1", "X", X12["835"].guide]);
   s.push(["ST", "835", "0001"]);
   // BPR02 cannot be negative. When recoupments exceed payments the payer sends
   // a notification-only remittance (BPR01 = H) and nets the rest from a later check.

@@ -160,6 +160,14 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Patients", href: "/patients" }],
   },
+  "/settings/maintenance": {
+    title: "Maintenance",
+    steps: [
+      "Check this page once a month. It lists what goes out of date on its own: your fee schedules after Medicare's January update, contract notice dates, provider credentials, the single sign-on certificate, API keys, and the national code sets CMS replaces on its calendar.",
+      "Open each item marked to fix it. Administrators are also notified each morning when something changes, and the platform's operators are told weekly while a code set is due.",
+    ],
+    related: [{ label: "National code sets", href: "/settings/code-sets" }],
+  },
   "/settings/substitutes": {
     title: "Substitute physicians",
     steps: [

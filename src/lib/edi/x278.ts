@@ -10,6 +10,7 @@
  * and DTP*AAH the period it is valid for. AAA segments mean the request
  * itself could not be processed.
  */
+import { X12 } from "./standards";
 import { d8, envelope, fromD8, tokenize } from "./x12";
 
 export interface Request278 {
@@ -24,7 +25,7 @@ export interface Request278 {
   services: { cpt: string; modifiers?: string[]; units: number }[];
 }
 
-const VERSION = "005010X217";
+const VERSION = X12["278"].guide;
 const dx = (code: string) => code.replace(".", "").toUpperCase();
 
 export function build278(r: Request278): string {
