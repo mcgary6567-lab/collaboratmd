@@ -520,9 +520,12 @@ export default async function LandingPage() {
               </a>
             </div>
             <p className="mt-5 text-sm text-slate-500">
-              Open the demo environment with <span className="font-mono text-slate-700">admin@collaboratmd.local</span> /{" "}
-              <span className="font-mono text-slate-700">admin123</span>
-              {" · "}
+              {/* The demo's published sign-in works only where the demo is open (lib/demo.ts); elsewhere it would be refused. */}
+              {demoLink().open && <>
+                Open the demo environment with <span className="font-mono text-slate-700">admin@collaboratmd.local</span> /{" "}
+                <span className="font-mono text-slate-700">admin123</span>
+                {" · "}
+              </>}
               <a href="https://github.com/mcgary6567-lab/collaboratmd" target="_blank" rel="noreferrer noopener" className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-green-700">
                 Read the source
               </a>

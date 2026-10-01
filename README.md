@@ -3,15 +3,14 @@
 **Deployment:** https://collaboratmd.vercel.app, running on Vercel against a Neon
 Postgres database.
 
-The deployment is private. Vercel Deployment Protection is set to *All
-Deployments*, so every URL, production included, requires a Vercel login with
-access to the project; anonymous visitors are redirected to Vercel. To view it,
-either sign in to Vercel, or create a Shareable Link from the deployment page
-to give someone access without adding them to the project.
-
-Once past that, the app's own demo accounts are `admin@collaboratmd.local` /
-`admin123`, `biller@collaboratmd.local` / `biller123`, and `frontdesk@collaboratmd.local`
-/ `front123`. The data is synthetic.
+The demo accounts below (`admin@collaboratmd.local` / `admin123` and the
+others) work locally, in CI and on preview deployments. On the production
+deployment they are switched off, because their passwords are public and the
+demo practice shares the production database: they are refused with "Invalid
+email or password", and /demo says the demo is not open. To open them there,
+set `DEMO_LOGINS=on` in the Vercel project's production environment variables
+and redeploy (see `src/lib/demo.ts`); a separate deployment with its own
+database for the demo is safer. The demo data is synthetic.
 
 A cloud medical billing and revenue cycle management (RCM) web application. It covers the whole money path a medical practice walks every day:
 
