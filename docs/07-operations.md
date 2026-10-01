@@ -558,3 +558,35 @@ Privacy complaints: log every HIPAA privacy complaint (date, channel, who, the p
 ## Cost to collect
 
 Reports → Cost to collect (administrators): enter each month's billing costs by category (billing staff, outside billing company or coders, software, clearinghouse, card fees, postage, eligibility services, other). Collection agency commissions are added from the recoveries posted. Cost to collect is those costs over what was collected (insurance and patient payments less refunds) in the month.
+
+## Substitute physicians (locum tenens and reciprocal billing)
+
+Settings → Substitute physicians (administrators and billers): record an absent provider's dates and the substitute covering them, a paid locum tenens (Q6) or a reciprocal arrangement (Q5), with the substitute's NPI. On a claim the substitute saw, the Substitute physician card (shown when an arrangement covers the provider on that date) marks the visit: every line gets the modifier and the encounter is linked to the arrangement, which is the record Medicare requires. Medicare allows 60 continuous days; marking a Medicare visit after day 60 is refused, and the scrubber flags Q5 or Q6 with no covering arrangement (SUBSTITUTE_RECORD) or past day 60 (SUBSTITUTE_60_DAYS, an error).
+
+## HMO referrals
+
+Settings → Payers: tick "needs a referral" for HMO plans. On the patient's page, add each referral from the primary care physician (number, referring physician and NPI, dates, visits allowed). A professional claim to that plan carries the covering referral's number as REF*9F (and in box 23 of the paper CMS-1500 when there is no prior authorization). Visits are counted from the patient's claims to that plan within the referral's dates; with none left, or none on file, the scrubber warns (REFERRAL_MISSING). Front desk → HMO referrals lists referrals ending within 14 days or with one visit or none left.
+
+## Therapy plans of care
+
+On the patient's page, record each therapy plan of care (physical, occupational or speech therapy; at most 90 days) and the physician's or NPP's signature. A signature more than 30 days after the first treatment needs the reason for the delay. Medicare claims with GP, GO or GN lines are checked: no plan covering the visit, or an ended one (THERAPY_PLAN), or one still unsigned past 30 days (THERAPY_CERTIFICATION). Recertify from the patient's page to start the next plan the day after the last one ends. Coding → Therapy plans of care lists unsigned plans and plans ending within 14 days.
+
+## Superbills
+
+From a claim (Superbill) or the patient's page (Superbills, by visit date): an itemized visit for the patient's own out-of-network claim, with the practice's tax ID and NPI, the rendering provider's NPI and taxonomy, place of service, each code with modifiers, diagnosis pointers, units and charge, the diagnoses with their descriptions, and what the patient paid for the visit.
+
+## Yearly other-insurance check
+
+Online check-in asks "Do you have any other health insurance?" (in English or Spanish) when the patient has not been asked in the last year; the answer is recorded on the patient and a "yes" shows on the check-in for the desk. Staff record answers on the patient's page or on Front desk → Other insurance check, which lists patients with a visit in the next 14 days who are due, and everyone who said yes.
+
+## Expiring cards on file
+
+Billing → Expiring cards on file: saved cards that pay a plan automatically or balances after insurance and expire within 45 days. "Send link" texts or emails a portal link (in the patient's language); in the portal, "Replace card" opens Stripe's page in setup mode, which saves a new card to the same Stripe customer without charging it. When Stripe confirms (checkout.session.completed, mode setup), the new card replaces the old one and keeps its autopay plan and the patient's card-on-file authorization and limit. A repeated webhook event changes nothing.
+
+## Statement cycles
+
+Settings → Billing policies → Statements: one batch, two cycles (last names A–K, L–Z) or four (A–D, E–K, L–R, S–Z). With cycles on, the statement batch bills only the cycle whose part of the month it is (in the practice's time zone): days 1–14 and 15–31 for two cycles, 1–7, 8–14, 15–21 and 22–31 for four. The minimum balance and days between statements still apply.
+
+## Interpreter log
+
+On the patient's page, note the language a patient needs an interpreter for. Front desk → Interpreter log lists visits in the next seven days that need one, and logs each interpreter provided (in person, phone, video or qualified bilingual staff, with vendor, minutes and cost) or offered and declined. Totals by language and vendor. With "Medicaid pays for interpreters (T1013)" on in Billing policies, Medicaid patients' sessions show T1013 units (one per 15 minutes); state rules on who may bill it vary.

@@ -10,6 +10,20 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-30",
+    title: "Locum tenens, HMO referrals, therapy plans of care, superbills, other-insurance check, expiring cards, statement cycles, interpreters",
+    items: [
+      "Substitute physicians: locum tenens (Q6) and reciprocal (Q5) billing with the substitute's NPI on record and Medicare's 60-day limit",
+      "HMO referrals with visit counts; the referral number goes on the claim (REF*9F) and a missing one is flagged",
+      "Therapy plans of care: certification within 30 days, recertification every 90, checked on Medicare therapy claims",
+      "Superbills patients can file with their own insurer for out-of-network reimbursement",
+      "Online check-in asks once a year about other insurance, before a coordination-of-benefits denial",
+      "Expiring cards on file: patients replace the card from a link without being charged, keeping autopay",
+      "Statement cycles spread statements across the month by last name",
+      "Interpreter log for language access, with Medicaid T1013 units where the state pays",
+    ],
+  },
+  {
+    date: "2026-09-30",
     title: "Bankruptcy and estates, returned mail, adult dependents, front-desk collections, referral sources, privacy complaints, cost to collect",
     items: [
       "Bankruptcy and deceased-patient holds stop statements, reminders, card charges and collections; a discharge or estate settlement closes them with the right write-off, and an estate claim letter prints itemized",

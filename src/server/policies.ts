@@ -5,7 +5,8 @@
  *  - writeOffLimitCents: assertWriteOffAllowed, called before any write-off
  *  - strictScrub: blocksSubmission, used by rescrubClaim and submitClaim
  *  - riskHoldScore: submitClaim, for claims sent by a non-administrator
- *  - statementMinCents / statementIntervalDays: the statement batch defaults
+ *  - statementMinCents / statementIntervalDays / statementCycles: the statement batch defaults
+ *  - interpreterT1013: the interpreter log shows Medicaid T1013 units to bill
  *  - smallBalanceCents / smallBalanceAgeDays: adjustSmallBalances, run daily
  *  - exportsAdminOnly: the CSV export and accounting journal routes
  *  - refundDualControl: approveRefund
@@ -34,6 +35,8 @@ export const DEFAULT_POLICIES: Required<{ [K in keyof PracticePolicies]: NonNull
   collections: null,
   unclaimed: null,
   missedFees: null,
+  statementCycles: 1,
+  interpreterT1013: false,
 };
 
 export async function getPolicies(db: Db, practiceId: string): Promise<PracticePolicies> {
@@ -64,6 +67,8 @@ export function validatePolicies(input: PracticePolicies): PracticePolicies {
     smallBalanceAgeDays: days(input.smallBalanceAgeDays, 30, 730, "The small balance age", 90),
     exportsAdminOnly: !!input.exportsAdminOnly,
     refundDualControl: !!input.refundDualControl,
+    statementCycles: [2, 4].includes(input.statementCycles ?? 1) ? input.statementCycles : 1,
+    interpreterT1013: !!input.interpreterT1013,
   };
 }
 

@@ -33,6 +33,7 @@ export async function submitCheckinAction(token: string, _prev: FormResult, form
       insurance: {
         sameAsOnFile: f("insuranceChoice") !== "new",
         payerName: f("payerName"), memberId: f("memberId"), groupNumber: f("groupNumber"), relationship: f("relationship"),
+        ...(f("otherCoverage") === "yes" || f("otherCoverage") === "no" ? { otherCoverage: f("otherCoverage") as "yes" | "no", otherCoverageDetail: f("otherCoverageDetail") } : {}),
       },
       consents: {
         privacyNotice: formData.get("privacyNotice") === "on",

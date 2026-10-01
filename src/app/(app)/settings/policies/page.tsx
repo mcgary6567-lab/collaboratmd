@@ -65,6 +65,17 @@ export default async function PoliciesPage() {
             <Rule title="Statements" where="The statement batch on Patient billing.">
               <div className="flex flex-wrap items-center gap-2">Bill balances of at least $<input name="statementMin" aria-label="Smallest balance billed, in dollars" inputMode="decimal" defaultValue={dollars(p.statementMinCents ?? 500)} className="input w-28" /></div>
               <div className="flex flex-wrap items-center gap-2">and no more often than every <input name="statementIntervalDays" aria-label="Days between statements" type="number" min={7} max={90} defaultValue={p.statementIntervalDays ?? 25} className="input w-20" /> days</div>
+              <div className="flex flex-wrap items-center gap-2">in
+                <select name="statementCycles" aria-label="Statement cycles" defaultValue={String(p.statementCycles ?? 1)} className="input w-auto">
+                  <option value="1">one batch</option>
+                  <option value="2">two cycles (A–K, L–Z by last name)</option>
+                  <option value="4">four cycles (A–D, E–K, L–R, S–Z)</option>
+                </select>
+                <span className="text-slate-500">each billed in its part of the month</span>
+              </div>
+            </Rule>
+            <Rule title="Interpreters" where="The interpreter log.">
+              <label className="flex items-center gap-2"><input type="checkbox" name="interpreterT1013" defaultChecked={!!p.interpreterT1013} /> Our state&apos;s Medicaid pays for interpreters (T1013): show the units to bill</label>
             </Rule>
             <Rule title="Small balance adjustments" where="Runs every morning with the daily automation, or now with the button below.">
               <label className="flex items-center gap-2"><input type="checkbox" name="smallBalanceOn" defaultChecked={p.smallBalanceCents != null} /> Adjust off patient balances under</label>

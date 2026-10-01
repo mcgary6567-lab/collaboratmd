@@ -110,6 +110,10 @@ export type PracticePolicies = {
   unclaimed?: { state: string; dormancyMonths: number; letterMinCents: number };
   /** Missed-appointment fees the practice charges under its signed policy (server/missed-fees.ts). */
   missedFees?: { noShowCents: number; lateCancelCents: number; lateCancelHours: number };
+  /** Statement cycles: 1 (everyone at once), 2 or 4 groups by last name, each billed in its part of the month. */
+  statementCycles?: number;
+  /** Medicaid in this state pays for interpreters (T1013), so the interpreter log shows what to bill. */
+  interpreterT1013?: boolean;
 };
 
 export type AutomationSettings = {
@@ -183,6 +187,8 @@ export const payers = pgTable("payers", {
   type: text("type").notNull().default("commercial"), // commercial | medicare | medicaid | self_pay
   timelyFilingDays: integer("timely_filing_days").notNull().default(90),
   appealDays: integer("appeal_days").notNull().default(60),
+  /** An HMO that needs a referral from the primary care physician (server/referrals-in.ts). Migration 0066. */
+  requiresReferral: boolean("requires_referral").notNull().default(false),
 });
 
 /* ------------------------------------------------------------------ */
@@ -233,6 +239,12 @@ export const patients = pgTable(
     /** Where the patient came from (server/referrals.ts). Migration 0065. */
     referralSource: text("referral_source"),
     referralDetail: text("referral_detail"),
+    /** The yearly other-insurance question: when asked, and the answer (server/other-coverage.ts). Migration 0066. */
+    otherCoverageCheckedOn: date("other_coverage_checked_on"),
+    otherCoverage: boolean("other_coverage"),
+    otherCoverageDetail: text("other_coverage_detail"),
+    /** The language the patient needs an interpreter for, if any (server/interpreters.ts). Migration 0066. */
+    interpreterLanguage: text("interpreter_language"),
   },
   (t) => [
     uniqueIndex("patients_mrn_idx").on(t.practiceId, t.mrn),
@@ -350,6 +362,8 @@ export const encounters = pgTable("encounters", {
   /** Workers' comp or auto insurer's claim number (REF*Y4, box 11b) and the employer. */
   propertyClaimNumber: text("property_claim_number"),
   employerName: text("employer_name"),
+  /** Seen by a substitute physician covering for the rendering provider (server/substitutes.ts). Migration 0066. */
+  substituteId: uuid("substitute_id"),
   status: text("status").notNull().default("open"), // open | billed
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -1562,6 +1576,9 @@ export type CheckinInsurance = {
   memberId: string;
   groupNumber: string;
   relationship: string;
+  /** The yearly question: any other health insurance? Asked at most once a year (migration 0066). */
+  otherCoverage?: "yes" | "no";
+  otherCoverageDetail?: string;
 };
 export type CheckinConsents = { privacyNotice: boolean; financialPolicy: boolean; assignmentOfBenefits: boolean; signature: string; signedAt: string; missedFees?: boolean };
 
@@ -2514,3 +2531,70 @@ export const billingCosts = pgTable("billing_costs", {
   createdBy: uuid("created_by").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [uniqueIndex("billing_costs_month_idx").on(t.practiceId, t.month, t.category)]);
+
+/** A substitute physician covering for an absent one: locum tenens (Q6) or reciprocal billing (Q5). Migration 0066. */
+export const substituteArrangements = pgTable("substitute_arrangements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  absentProviderId: uuid("absent_provider_id").notNull().references(() => providers.id),
+  kind: text("kind").notNull(), // locum | reciprocal
+  substituteName: text("substitute_name").notNull(),
+  substituteNpi: text("substitute_npi").notNull(),
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on").notNull(),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** A referral from the primary care physician that an HMO requires (REF*9F). Migration 0066. */
+export const patientReferrals = pgTable("patient_referrals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  payerId: uuid("payer_id").notNull().references(() => payers.id),
+  referralNumber: text("referral_number").notNull(),
+  referringName: text("referring_name"),
+  referringNpi: text("referring_npi"),
+  visitsAllowed: integer("visits_allowed"),
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on").notNull(),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** A therapy plan of care and its physician certification (Medicare outpatient therapy). Migration 0066. */
+export const therapyPlans = pgTable("therapy_plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  discipline: text("discipline").notNull(), // pt | ot | slp
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on").notNull(),
+  certifiedOn: date("certified_on"),
+  certifierName: text("certifier_name"),
+  certifierNpi: text("certifier_npi"),
+  delayReason: text("delay_reason"),
+  previousPlanId: uuid("previous_plan_id"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Each time an interpreter was provided (or offered and declined). Migration 0066. */
+export const interpreterServices = pgTable("interpreter_services", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  patientId: uuid("patient_id").notNull().references(() => patients.id),
+  appointmentId: uuid("appointment_id").references(() => appointments.id),
+  servedOn: date("served_on").notNull(),
+  language: text("language").notNull(),
+  mode: text("mode").notNull(), // in_person | phone | video | staff
+  vendor: text("vendor"),
+  minutes: integer("minutes").notNull(),
+  costCents: integer("cost_cents"),
+  declined: boolean("declined").notNull().default(false),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

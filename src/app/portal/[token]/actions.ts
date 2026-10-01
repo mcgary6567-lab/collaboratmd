@@ -10,7 +10,7 @@ import { grantPortal, portalVerifiedFor } from "@/lib/portal-session";
 import { siteOrigin } from "@/lib/origin";
 import { chosenLang } from "@/lib/i18n/patient-server";
 import { rememberLanguage } from "@/server/patient-language";
-import { openPortal, reportInsurance, startPortalPayment, verifyPortalDob } from "@/server/portal";
+import { openPortal, reportInsurance, startCardUpdate, startPortalPayment, verifyPortalDob } from "@/server/portal";
 
 async function verifiedLink(token: string) {
   const db = await getDb();
@@ -42,6 +42,18 @@ export async function payAction(token: string, _prev: FormResult, formData: Form
     const keepCardMaxCents = keepCard ? Math.round(parseFloat(String(formData.get("keepCardMax") ?? "0")) * 100) : undefined;
     const r = await startPortalPayment(v.db, v.link.id, { amountCents, planId, autopay: formData.get("autopay") === "on", keepCard, keepCardMaxCents, origin: await siteOrigin(), token });
     url = r.url;
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Something went wrong" };
+  }
+  redirect(url);
+}
+
+export async function replaceCardAction(token: string, _prev: FormResult): Promise<FormResult> {
+  const v = await verifiedLink(token);
+  if (!v) return { ok: false, message: "Your session has ended. Reload the page and confirm your date of birth again." };
+  let url: string;
+  try {
+    url = (await startCardUpdate(v.db, v.link.id, { origin: await siteOrigin(), token })).url;
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong" };
   }

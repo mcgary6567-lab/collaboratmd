@@ -12,7 +12,7 @@ import { shareReasons } from "@/server/remittance-lines";
 import { patientText } from "@/lib/i18n/patient-server";
 import { formatDate, type Lang, type PatientText } from "@/lib/i18n/patient";
 import { setPatientLangAction } from "@/app/lang-actions";
-import { payAction, reportInsuranceAction, verifyPortalAction } from "./actions";
+import { payAction, replaceCardAction, reportInsuranceAction, verifyPortalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +36,9 @@ function Shell({ practice, children, t, lang, path }: { practice?: string; child
   );
 }
 
-export default async function PortalPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ paid?: string }> }) {
+export default async function PortalPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ paid?: string; card?: string }> }) {
   const { token } = await params;
-  const { paid } = await searchParams;
+  const { paid, card: cardParam } = await searchParams;
   const { lang, t } = await patientText();
   const path = `/portal/${token}`;
   const shell = { t, lang, path };
@@ -81,11 +81,18 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   return (
     <Shell practice={d.practice.name} {...shell}>
       {paid && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">{t.paymentConfirming}</div>}
+      {cardParam === "updated" && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">{lang === "es" ? "Gracias. Su nueva tarjeta aparecerá aquí en unos momentos." : "Thank you. Your new card will show here in a few moments."}</div>}
       <div className="card mb-4 p-6">
         <div className="text-sm text-slate-500">{t.yourBalance(d.patient.firstName)}</div>
         <div className="mt-1 text-4xl font-extrabold tracking-tight">{money(Math.max(d.balance, 0))}</div>
         {d.balance < 0 && <p className="mt-1 text-sm text-green-700">{t.credit(money(-d.balance))}</p>}
         {card?.balanceMaxCents ? <p className="mt-2 text-sm text-slate-600">{t.cardOnFileActive(card.brand ?? "", card.last4 ?? "", money(card.balanceMaxCents))}</p> : null}
+        {card && d.onlinePayments && (
+          <ActionForm action={replaceCardAction.bind(null, token)} className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <span>{lang === "es" ? `Tarjeta guardada que termina en ${card.last4 ?? ""}${card.expMonth ? `, vence ${String(card.expMonth).padStart(2, "0")}/${String(card.expYear ?? "").slice(-2)}` : ""}.` : `Saved card ending ${card.last4 ?? ""}${card.expMonth ? `, expires ${String(card.expMonth).padStart(2, "0")}/${String(card.expYear ?? "").slice(-2)}` : ""}.`}</span>
+            <SubmitButton className="btn btn-secondary" pendingLabel="...">{lang === "es" ? "Cambiar tarjeta" : "Replace card"}</SubmitButton>
+          </ActionForm>
+        )}
         {plan && nextDue && (
           <p className="mt-2 text-sm text-slate-600">
             {t.planNext(money(nextDue.amountCents - nextDue.paidCents), date(nextDue.dueDate + "T00:00:00"))}

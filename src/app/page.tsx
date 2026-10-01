@@ -295,6 +295,21 @@ const SMART = [
     title: "Your cost to collect",
     body: "Enter what billing costs each month and see it as a share of what you collect, with agency commissions counted for you.",
   },
+  {
+    icon: ReceiptText,
+    title: "Superbills in one click",
+    body: "An itemized superbill with codes, diagnoses, NPI and tax ID for patients who file with their own out-of-network plan, from any visit.",
+  },
+  {
+    icon: CreditCard,
+    title: "Cards that never lapse",
+    body: "Saved cards about to expire are found before a charge fails; the patient replaces the card from a text without paying anything, and autopay carries on.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Statements in cycles",
+    body: "Split statements into two or four cycles by last name, so payments and phone calls are spread across the month instead of arriving in one wave.",
+  },
 ];
 
 /** Medicare and Medicaid rules the product applies; the ones that need CMS's yearly files say so on the page. */
@@ -393,6 +408,21 @@ const MEDICARE = [
     icon: ShieldCheck,
     title: "Privacy complaints on file",
     body: "Every HIPAA privacy complaint logged, investigated and answered, with mitigation and sanctions recorded and nothing deleted, as the Privacy Rule requires.",
+  },
+  {
+    icon: UsersRound,
+    title: "Locums billed correctly",
+    body: "A substitute physician's visits go out under the absent provider with Q6 or Q5, the substitute's NPI on record, and Medicare's 60-day limit enforced.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "HMO referrals and therapy plans",
+    body: "Referral numbers go on the claim with visits counted, and Medicare therapy is checked against a plan of care certified within 30 days and renewed every 90.",
+  },
+  {
+    icon: Stethoscope,
+    title: "Language access on record",
+    body: "Interpreters provided or declined are logged for Section 1557, with upcoming visits that need one and Medicaid T1013 units where your state pays.",
   },
 ];
 

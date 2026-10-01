@@ -22,6 +22,7 @@ import { CareCard } from "./care-card";
 import { SlidingFeeCard } from "./sliding-fee-card";
 import { AccountCard } from "./account-card";
 import { StatusCard } from "./status-card";
+import { VisitAccessCard } from "./visit-access-card";
 import { CardOnFileCard } from "./card-on-file-card";
 import { cardOnFileFor } from "@/server/card-on-file";
 import { slidingFeeOf } from "@/server/sliding-fee";
@@ -62,7 +63,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const latestCheck = checks[0];
   const toDate = latestCheck?.status === "active" ? await benefitsToDate(db, latestCheck.patientInsuranceId) : null;
   const [payerList, cfg, [waiting], providerList] = await Promise.all([
-    db.select({ id: schema.payers.id, name: schema.payers.name, type: schema.payers.type }).from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
+    db.select({ id: schema.payers.id, name: schema.payers.name, type: schema.payers.type, requiresReferral: schema.payers.requiresReferral }).from(schema.payers).where(eq(schema.payers.practiceId, s.practiceId)).orderBy(asc(schema.payers.name)),
     practiceConfig(db, s.practiceId),
     db.select().from(schema.waitlistEntries).where(and(eq(schema.waitlistEntries.practiceId, s.practiceId), eq(schema.waitlistEntries.patientId, id), isNull(schema.waitlistEntries.closedAt))).limit(1),
     listProviders(db, s.practiceId),
@@ -242,6 +243,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {(slidingFee || slidingTiers.length > 0) && <SlidingFeeCard patientId={patient.id} fee={slidingFee} canWrite={canWrite} />}
           <AccountCard db={db} practiceId={s.practiceId} patient={patient} insurances={insurances} canWrite={canWrite} canAdjust={(CAN_ADJUST as readonly string[]).includes(s.role)} />
           <StatusCard db={db} patient={patient} canWrite={canWrite} />
+          <VisitAccessCard db={db} practiceId={s.practiceId} patient={patient} payers={payerList} canWrite={canWrite} />
           <CareCard patientId={patient.id} data={care} providers={providerList.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}${p.credential ? `, ${p.credential}` : ""}` }))} canWrite={canWrite} />
           {canWrite && <InsuranceTools patientId={patient.id} payers={payerList.filter((p) => p.type !== "self_pay").map(({ id, name }) => ({ id, name }))} cardReading={!!cfg.anthropic?.phiAllowed} />}
         </Card>

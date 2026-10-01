@@ -91,7 +91,7 @@ export function buildClaimEdi(
     ...claimParties(bundle.patient, bundle.insurance),
     claim: {
       totalCents: bundle.claim.totalCents, placeOfService: bundle.encounter.placeOfService, frequencyCode: bundle.claim.frequencyCode,
-      originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber,
+      originalPayerClaimNumber: bundle.claim.originalPayerClaimNumber, authorizationNumber, referralNumber: bundle.referralNumber ?? null,
       cliaNumber: bundle.lines.some((l) => isLabCode(l.cpt)) ? bundle.practice.cliaNumber : null,
       accident: accidentOf(bundle.encounter),
       dateOfService: bundle.encounter.dateOfService, diagnoses: bundle.encounter.diagnoses, attachments,

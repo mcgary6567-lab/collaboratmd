@@ -69,6 +69,25 @@ export class Stripe {
     }, p.idempotencyKey);
   }
 
+  /** A hosted Checkout page that saves a new card to an existing customer without charging it (setup mode). */
+  createSetupCheckout(p: { customer: string; successUrl: string; cancelUrl: string; metadata: Record<string, string>; idempotencyKey: string; locale?: string }) {
+    return this.call<{ id: string; url: string }>("POST", "/checkout/sessions", {
+      mode: "setup",
+      currency: "usd",
+      customer: p.customer,
+      payment_method_types: ["card"],
+      success_url: p.successUrl,
+      cancel_url: p.cancelUrl,
+      locale: p.locale,
+      metadata: p.metadata,
+      setup_intent_data: { metadata: p.metadata },
+    }, p.idempotencyKey);
+  }
+
+  getSetupIntent(id: string) {
+    return this.call<{ id: string; status: string; payment_method: string | null; customer: string | null }>("GET", `/setup_intents/${encodeURIComponent(id)}`);
+  }
+
   getPaymentIntent(id: string) {
     return this.call<{ id: string; status: string; payment_method: string | null; customer: string | null }>("GET", `/payment_intents/${encodeURIComponent(id)}`);
   }

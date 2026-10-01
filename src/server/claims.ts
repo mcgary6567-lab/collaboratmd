@@ -35,6 +35,9 @@ import { codeSetFindings } from "./code-sets";
 import { WRITE_OFF_CATEGORIES } from "@/lib/billing/write-off-categories";
 import { queryFindings } from "./coding-queries";
 import { therapyFindings } from "./therapy-threshold";
+import { planOfCareFindings } from "./therapy-plans";
+import { substituteFindings } from "./substitutes";
+import { referralFindings, referralFor } from "./referrals-in";
 
 const { claims, claimEvents, claimAcknowledgments, encounters, charges, patients, patientInsurances, payers, providers, practices, remittances, ledgerEntries, denials } = schema;
 
@@ -53,6 +56,8 @@ export interface ClaimBundle {
   supervisor?: typeof providers.$inferSelect | null;
   /** The other practitioner on a split/shared visit. */
   sharedWith?: typeof providers.$inferSelect | null;
+  /** The HMO referral number covering the visit (REF*9F), from server/referrals-in.ts. */
+  referralNumber?: string | null;
 }
 
 export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBundle | null> {
@@ -72,7 +77,10 @@ export async function loadClaimBundle(db: Db, claimId: string): Promise<ClaimBun
   const lines = await db.select().from(charges).where(eq(charges.encounterId, row.encounter.id)).orderBy(asc(charges.lineNumber));
   const [supervisor] = row.encounter.supervisingProviderId ? await db.select().from(providers).where(eq(providers.id, row.encounter.supervisingProviderId)).limit(1) : [];
   const [sharedWith] = row.encounter.sharedWithProviderId ? await db.select().from(providers).where(eq(providers.id, row.encounter.sharedWithProviderId)).limit(1) : [];
-  return { ...row, lines, supervisor: supervisor ?? null, sharedWith: sharedWith ?? null };
+  const referral = row.claim.claimType === "professional" || !row.claim.claimType
+    ? await referralFor(db, { patientId: row.patient.id, payerId: row.payer.id, dateOfService: row.encounter.dateOfService, encounterId: row.encounter.id })
+    : null;
+  return { ...row, lines, supervisor: supervisor ?? null, sharedWith: sharedWith ?? null, referralNumber: referral?.referralNumber ?? null };
 }
 
 function toScrubInput(b: ClaimBundle, today?: Date): ScrubClaim {
@@ -153,11 +161,14 @@ export async function scrubBundle(db: Db, b: ClaimBundle): Promise<{ findings: S
     frequencyCode: b.claim.frequencyCode, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers })),
   });
   const extra = [advantage, managed, birthday].filter((x): x is NonNullable<typeof x> => !!x);
-  const [queries, therapy] = await Promise.all([
+  const [queries, therapy, plans, substitute, referralCheck] = await Promise.all([
     queryFindings(db, b.encounter.id),
     therapyFindings(db, { patientId: b.patient.id, encounterId: b.encounter.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, cpt: l.cpt, modifiers: l.modifiers, units: l.units, chargeCents: l.chargeCents })) }),
+    planOfCareFindings(db, { patientId: b.patient.id, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, modifiers: l.modifiers })) }),
+    substituteFindings(db, { providerId: b.provider.id, substituteId: b.encounter.substituteId, payerType: b.payer.type, dateOfService: b.encounter.dateOfService, lines: b.lines.map((l) => ({ lineNumber: l.lineNumber, modifiers: l.modifiers })) }),
+    referralFindings(db, { patientId: b.patient.id, payerId: b.payer.id, requiresReferral: b.payer.requiresReferral, dateOfService: b.encounter.dateOfService, encounterId: b.encounter.id }),
   ]);
-  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...dupes, ...extra, ...queries, ...therapy, ...(enrolled ? [enrolled] : [])], edits };
+  return { findings: [...general, ...edits.findings, ...national, ...msp, ...abn, ...globals, ...dupes, ...extra, ...queries, ...therapy, ...plans, ...substitute, ...referralCheck, ...(enrolled ? [enrolled] : [])], edits };
 }
 
 async function nextControlNumber(db: Db, practiceId: string): Promise<string> {

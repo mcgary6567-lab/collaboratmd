@@ -119,13 +119,13 @@ export async function setProviderActive(db: Db, practiceId: string, id: string, 
 
 export const PAYER_TYPES = ["commercial", "medicare", "medicaid", "workers_comp", "auto", "self_pay"];
 export const PAYER_TYPE_LABEL: Record<string, string> = { commercial: "Commercial", medicare: "Medicare", medicaid: "Medicaid", workers_comp: "Workers' comp", auto: "Auto insurance", self_pay: "Self-pay" };
-export type PayerInput = { name: string; payerId: string; type: string; timelyFilingDays: number; appealDays: number };
+export type PayerInput = { name: string; payerId: string; type: string; timelyFilingDays: number; appealDays: number; requiresReferral?: boolean };
 
 /** What to assume when the form leaves them empty: Medicare allows one year from the date of service, and 120 days to appeal. */
 export const payerDefaults = (type: string) => (type === "medicare" ? { timelyFilingDays: 365, appealDays: 120 } : { timelyFilingDays: 90, appealDays: 60 });
 
 export async function savePayer(db: Db, practiceId: string, id: string | null, input: PayerInput, userId?: string) {
-  const v = { name: input.name.trim().slice(0, 120), payerId: input.payerId.trim().toUpperCase().slice(0, 20), type: input.type, timelyFilingDays: Math.round(input.timelyFilingDays), appealDays: Math.round(input.appealDays) };
+  const v = { name: input.name.trim().slice(0, 120), payerId: input.payerId.trim().toUpperCase().slice(0, 20), type: input.type, timelyFilingDays: Math.round(input.timelyFilingDays), appealDays: Math.round(input.appealDays), requiresReferral: !!input.requiresReferral };
   if (!v.name) throw new Error("Enter the payer's name");
   if (!/^[A-Z0-9]{2,20}$/.test(v.payerId)) throw new Error("Enter the clearinghouse payer ID (letters and digits)");
   if (!PAYER_TYPES.includes(v.type)) throw new Error("Choose the payer type");

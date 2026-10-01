@@ -14,11 +14,12 @@ export const metadata: Metadata = { title: "Payers" };
 
 export const dynamic = "force-dynamic";
 
-type P = { name: string; payerId: string; type: string; timelyFilingDays: number; appealDays: number };
+type P = { name: string; payerId: string; type: string; timelyFilingDays: number; appealDays: number; requiresReferral?: boolean };
 
 function PayerFields({ p }: { p?: P }) {
   return (
     <div className="grid gap-2 sm:grid-cols-5">
+      <label className="flex items-center gap-2 text-sm sm:order-last sm:col-span-5"><input type="checkbox" name="requiresReferral" defaultChecked={!!p?.requiresReferral} /> HMO: needs a referral from the primary care physician (sent as REF*9F)</label>
       <input name="name" defaultValue={p?.name} placeholder="Payer name" className="input sm:col-span-2" required />
       <input name="payerId" defaultValue={p?.payerId} placeholder="Payer ID" className="input font-mono" required />
       <select name="type" defaultValue={p?.type ?? "commercial"} className="input" aria-label="Payer type">{PAYER_TYPES.map((t) => <option key={t} value={t}>{PAYER_TYPE_LABEL[t] ?? t}</option>)}</select>

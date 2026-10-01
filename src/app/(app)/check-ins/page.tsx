@@ -63,6 +63,8 @@ export default async function CheckInsPage() {
                         {insurance && <div className="text-xs text-slate-500">On file: {insurance.payerName}, {insurance.ins.memberId}</div>}
                       </div>
                     )}
+                    {ins.otherCoverage === "yes" && <div className="mt-1"><Badge tone="amber">Other insurance</Badge> {ins.otherCoverageDetail || "no details given"}: add it as secondary (or primary) coverage</div>}
+                    {ins.otherCoverage === "no" && <div className="mt-1 text-xs text-slate-500">No other insurance (asked this year)</div>}
                   </div>
                   <div>
                     <div className="font-medium text-slate-700">Consents</div>

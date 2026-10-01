@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AccidentCard } from "./accident-card";
 import { QualityCard } from "./quality-card";
 import { AskProviderCard } from "./ask-provider-card";
+import { SubstituteCard } from "./substitute-card";
 import { queriesForEncounters } from "@/server/coding-queries";
 import { measuresForClaim } from "@/server/quality";
 import { EDITABLE } from "@/server/claim-edit";
@@ -100,6 +101,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               <Link href={`/claims/${id}/edit`} className="btn btn-secondary">Edit claim</Link>
             )}
             {b.claim.claimType === "professional" && <Link href={`/print/cms1500/${id}`} className="btn btn-secondary">Paper claim (CMS-1500)</Link>}
+            {b.claim.claimType === "professional" && <Link href={`/print/superbill/${b.encounter.id}`} className="btn btn-secondary">Superbill</Link>}
             {b.claim.claimType === "institutional" && <Link href={`/print/ub04/${id}`} className="btn btn-secondary">Printable UB-04 (plain paper)</Link>}
             {claimDenials.some((d) => d.carc === "29" || d.category === "timely_filing") && <Link href={`/print/timely-filing/${id}`} className="btn btn-secondary">Proof of timely filing</Link>}
             {b.claim.payerSequence === "S" && b.claim.primaryClaimId && <Link href={`/print/eob/${b.claim.primaryClaimId}`} className="btn btn-secondary">Primary EOB page</Link>}
@@ -342,6 +344,10 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               );
             })}
           </Card>
+
+          {b.claim.claimType === "professional" && (
+            <SubstituteCard db={db} claimId={id} providerId={b.provider.id} dateOfService={b.encounter.dateOfService} substituteId={b.encounter.substituteId} editable={["draft", "scrub_errors", "ready", "rejected"].includes(b.claim.status) && (CAN_WRITE as readonly string[]).includes(s.role)} />
+          )}
 
           {b.claim.claimType === "professional" && (
             <AskProviderCard encounterId={b.encounter.id} provider={`${b.provider.firstName} ${b.provider.lastName}`} queries={await queriesForEncounters(db, [b.encounter.id])} canWrite={(CAN_WRITE as readonly string[]).includes(s.role)} />

@@ -59,7 +59,7 @@ export async function providerActiveAction(id: string, active: boolean, _prev: F
 export async function savePayerAction(id: string | null, _prev: FormResult, fd: FormData): Promise<FormResult> {
   const s = await admin();
   try {
-    await savePayer(await getDb(), s.practiceId, id, { name: f(fd, "name"), payerId: f(fd, "payerId"), type: f(fd, "type"), timelyFilingDays: Number(f(fd, "timelyFilingDays") || payerDefaults(f(fd, "type")).timelyFilingDays), appealDays: Number(f(fd, "appealDays") || payerDefaults(f(fd, "type")).appealDays) }, s.userId);
+    await savePayer(await getDb(), s.practiceId, id, { name: f(fd, "name"), payerId: f(fd, "payerId"), type: f(fd, "type"), timelyFilingDays: Number(f(fd, "timelyFilingDays") || payerDefaults(f(fd, "type")).timelyFilingDays), appealDays: Number(f(fd, "appealDays") || payerDefaults(f(fd, "type")).appealDays), requiresReferral: fd.get("requiresReferral") === "on" }, s.userId);
     revalidatePath("/settings/payers");
     return { ok: true, message: id ? "Payer updated" : "Payer added" };
   } catch (e) {
@@ -80,6 +80,8 @@ export async function savePoliciesAction(_prev: FormResult, fd: FormData): Promi
       smallBalanceAgeDays: Number(f(fd, "smallBalanceAgeDays")),
       exportsAdminOnly: fd.get("exportsAdminOnly") === "on",
       refundDualControl: fd.get("refundDualControl") === "on",
+      statementCycles: Number(f(fd, "statementCycles")) || 1,
+      interpreterT1013: fd.get("interpreterT1013") === "on",
     }, s.userId);
     revalidatePath("/settings/policies");
     return { ok: true, message: "Policies saved; they apply immediately" };

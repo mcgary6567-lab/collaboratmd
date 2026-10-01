@@ -97,6 +97,12 @@ const PROOF = [
     tag: "Bankruptcy · estates · privacy complaints",
   },
   {
+    icon: CircleCheck,
+    title: "Payer rules that are easy to miss",
+    body: "Locum tenens and reciprocal billing, HMO referral numbers, therapy plans of care and the yearly other-insurance question are each a common cause of denials that a generic billing system leaves to staff. Here each one is a check on the claim before it goes out.",
+    tag: "Q5/Q6 · REF*9F · plans of care · COB",
+  },
+  {
     icon: Network,
     title: "Built for the billing company",
     body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",

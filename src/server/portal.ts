@@ -155,11 +155,63 @@ export async function startPortalPayment(
 }
 
 /**
+ * Replacing the saved card: Stripe's hosted page in setup mode collects the
+ * new card on the same Stripe customer without charging it. When Stripe
+ * confirms, the new card takes the old one's place, keeping its autopay plan
+ * and the patient's card-on-file authorization and limit.
+ */
+export async function startCardUpdate(db: Db, linkId: string, input: { origin: string; token: string }, client?: Pick<Stripe, "createSetupCheckout">) {
+  const data = await portalData(db, linkId);
+  if (!data) throw new Error("This link can no longer be used");
+  const card = data.cards[0];
+  if (!card) throw new Error("There is no saved card to replace");
+  const stripe = client ?? stripeClient((await practiceConfig(db, data.practice.id)).stripe);
+  const back = `${input.origin}/portal/${input.token}`;
+  const session = await stripe.createSetupCheckout({
+    customer: card.providerCustomer,
+    successUrl: `${back}?card=updated`,
+    cancelUrl: back,
+    locale: checkoutLocale(data.patient.preferredLanguage),
+    metadata: { card_update: "1", practice_id: data.practice.id, patient_id: data.patient.id, saved_card_id: card.id },
+    idempotencyKey: `card-update-${card.id}-${Date.now()}`,
+  });
+  await db.insert(schema.auditLog).values({ practiceId: data.practice.id, userId: null, action: "card_update_started", entity: "patient", entityId: data.patient.id, details: { savedCardId: card.id } });
+  return { url: session.url };
+}
+
+async function finishCardUpdate(db: Db, s: { id: string; setup_intent?: string | null; metadata?: Record<string, string> }, client: (Partial<Pick<Stripe, "getSetupIntent">> & Pick<Stripe, "getPaymentMethod">) | undefined, expectedPracticeId?: string) {
+  const m = s.metadata ?? {};
+  if (m.card_update !== "1" || !m.saved_card_id || !s.setup_intent) return { handled: false };
+  if (expectedPracticeId && m.practice_id !== expectedPracticeId) throw new Error("Card update belongs to another practice");
+  const [old] = await db.select().from(savedCards).where(and(eq(savedCards.id, m.saved_card_id), eq(savedCards.practiceId, m.practice_id))).limit(1);
+  if (!old) throw new Error(`No saved card for Stripe session ${s.id}`);
+  const stripe = client?.getSetupIntent ? (client as Pick<Stripe, "getSetupIntent" | "getPaymentMethod">) : stripeClient((await practiceConfig(db, old.practiceId)).stripe);
+  const si = await stripe.getSetupIntent(s.setup_intent);
+  if (si.status !== "succeeded" || !si.payment_method) return { handled: false };
+  // A repeated event: the new card is already saved.
+  const [already] = await db.select({ id: savedCards.id }).from(savedCards).where(and(eq(savedCards.patientId, old.patientId), eq(savedCards.providerMethod, si.payment_method), isNull(savedCards.removedAt))).limit(1);
+  if (already) return { handled: true, duplicate: true };
+  const pm = await stripe.getPaymentMethod(si.payment_method);
+  await db.update(savedCards).set({ removedAt: new Date() }).where(and(eq(savedCards.patientId, old.patientId), isNull(savedCards.removedAt)));
+  await db.insert(savedCards).values({
+    practiceId: old.practiceId, patientId: old.patientId, providerCustomer: si.customer ?? old.providerCustomer, providerMethod: si.payment_method,
+    brand: pm.card?.brand ?? null, last4: pm.card?.last4 ?? null, expMonth: pm.card?.exp_month ?? null, expYear: pm.card?.exp_year ?? null,
+    autopayPlanId: old.autopayPlanId, balanceMaxCents: old.balanceMaxCents, balanceAuthorizedAt: old.balanceAuthorizedAt,
+  });
+  await db.insert(schema.auditLog).values({ practiceId: old.practiceId, userId: null, action: "card_replaced", entity: "patient", entityId: old.patientId, details: { oldLast4: old.last4, newLast4: pm.card?.last4 ?? null } });
+  return { handled: true, duplicate: false };
+}
+
+/**
  * Applies a Stripe webhook event. checkout.session.completed with a paid
  * session posts the payment (to its plan, if it has one) and saves the card
  * for autopay when asked; a repeated event changes nothing.
  */
-export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pick<Stripe, "getPaymentIntent" | "getPaymentMethod">, expectedPracticeId?: string) {
+export async function handleStripeEvent(db: Db, event: StripeEvent, client?: Pick<Stripe, "getPaymentIntent" | "getPaymentMethod"> & Partial<Pick<Stripe, "getSetupIntent">>, expectedPracticeId?: string) {
+  // A card replaced from the portal (setup mode: nothing is charged).
+  if (event.type === "checkout.session.completed" && (event.data.object as { mode?: string }).mode === "setup") {
+    return finishCardUpdate(db, event.data.object as { id: string; setup_intent?: string | null; metadata?: Record<string, string> }, client, expectedPracticeId);
+  }
   // Card-present payments from a front desk reader settle through their own table (server/terminal.ts).
   if (event.type === "payment_intent.succeeded") {
     const pi = event.data.object as { id: string; metadata?: Record<string, string> };

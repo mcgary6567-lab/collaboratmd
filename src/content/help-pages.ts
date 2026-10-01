@@ -160,6 +160,54 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Patients", href: "/patients" }],
   },
+  "/settings/substitutes": {
+    title: "Substitute physicians",
+    steps: [
+      "When a provider will be away, record the absence and the substitute covering it: a paid locum tenens (Q6) or a reciprocal arrangement with another physician (Q5), with the substitute's NPI.",
+      "On each claim the substitute saw, choose them under Substitute physician: every line gets the modifier. Medicare allows 60 continuous days; after that the substitute bills under their own enrollment.",
+    ],
+    related: [{ label: "Claims", href: "/claims" }],
+  },
+  "/scheduling/referrals": {
+    title: "HMO referrals",
+    steps: [
+      "Mark the plans that need a referral from the primary care physician under Settings, Payers. Add each referral on the patient's page: number, dates and visits allowed.",
+      "The referral number goes on the claim automatically. This list shows referrals ending soon or used up, so you can ask for the next one before the visit.",
+    ],
+    related: [{ label: "Payers", href: "/settings/payers" }],
+  },
+  "/coding/therapy-plans": {
+    title: "Therapy plans of care",
+    steps: [
+      "Record each patient's plan of care on their page when therapy starts, and the physician's signature when it comes back (within 30 days, or late with the reason).",
+      "Recertify before a plan ends (at most every 90 days). Medicare claims with GP, GO or GN lines are flagged when no certified plan covers the visit.",
+    ],
+    related: [{ label: "Coding help", href: "/coding" }],
+  },
+  "/patients/other-coverage": {
+    title: "Other insurance check",
+    steps: [
+      "Once a year, ask each patient whether they have any other health insurance. Online check-in asks automatically; record answers here for everyone else coming in.",
+      "When someone says yes, add the policy on their page and set which plan pays first.",
+    ],
+    related: [{ label: "Online check-ins", href: "/check-ins" }],
+  },
+  "/billing/expiring-cards": {
+    title: "Expiring cards on file",
+    steps: [
+      "Cards that pay a plan automatically or balances after insurance, expiring in the next 45 days.",
+      "Send the patient a link: in the portal they choose Replace card, enter the new one, and nothing is charged. The autopay and their authorization carry over to the new card.",
+    ],
+    related: [{ label: "Patient billing", href: "/billing" }],
+  },
+  "/interpreters": {
+    title: "Interpreter log",
+    steps: [
+      "Note on the patient's page the language they need an interpreter for; visits in the next week that need one are listed here so one can be booked.",
+      "Log each interpreter provided (or offered and declined), with the vendor, minutes and cost. Where your state's Medicaid pays for interpreters, turn on T1013 in Billing policies to see the units to bill.",
+    ],
+    related: [{ label: "Billing policies", href: "/settings/policies" }],
+  },
   "/billing/holds": {
     title: "Bankruptcy and estates",
     steps: [

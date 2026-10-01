@@ -11,7 +11,7 @@ import { listAppointments } from "./encounters";
 import { practiceConfig } from "./integrations";
 import { emit } from "./webhooks";
 import { notify } from "./notifications";
-import { clockDay, practiceNow } from "./practice-time";
+import { clockDay, practiceClock, practiceTimeZone } from "./practice-time";
 import { normalizeMethod } from "@/lib/utils";
 import { cleanReferral } from "./referrals";
 
@@ -299,7 +299,8 @@ export async function medicaidManagedCareFinding(db: Db, c: { patientInsuranceId
  * eligibility and managed care enrollment change month to month.
  */
 export async function recheckMedicaidMonthly(db: Db, practiceId: string, now = new Date(), limit = 100) {
-  const today = clockDay(await practiceNow(db, practiceId, now));
+  const tz = await practiceTimeZone(db, practiceId);
+  const today = clockDay(practiceClock(now, tz));
   const from = today.toISOString().slice(0, 10);
   const to = new Date(today.getTime() + 30 * 86_400_000).toISOString().slice(0, 10);
   const month = from.slice(0, 7);
@@ -310,7 +311,7 @@ export async function recheckMedicaidMonthly(db: Db, practiceId: string, now = n
     JOIN patient_insurances pi ON pi.patient_id = p.id AND pi.active
     JOIN payers py ON py.id = pi.payer_id AND py.type = 'medicaid'
     WHERE a.practice_id = ${practiceId} AND a.status <> 'cancelled' AND a.starts_at >= ${from}::date AND a.starts_at < (${to}::date + 1)
-      AND NOT EXISTS (SELECT 1 FROM eligibility_checks ec WHERE ec.patient_insurance_id = pi.id AND to_char(ec.checked_at, 'YYYY-MM') = ${month} AND ec.status <> 'error')
+      AND NOT EXISTS (SELECT 1 FROM eligibility_checks ec WHERE ec.patient_insurance_id = pi.id AND to_char(ec.checked_at AT TIME ZONE ${tz}, 'YYYY-MM') = ${month} AND ec.status <> 'error')
     ORDER BY pi.id, a.starts_at
     LIMIT ${limit}`);
   const problems: { name: string; message: string }[] = [];
@@ -337,7 +338,8 @@ export async function recheckMedicaidMonthly(db: Db, practiceId: string, now = n
  * the new year's deductible and the front desk hears about lapsed plans early.
  */
 export async function recheckYearStart(db: Db, practiceId: string, now = new Date(), limit = 100) {
-  const today = clockDay(await practiceNow(db, practiceId, now));
+  const tz = await practiceTimeZone(db, practiceId);
+  const today = clockDay(practiceClock(now, tz));
   if (today.getUTCMonth() !== 0) return { skipped: "Only runs in January", checked: 0, problems: 0 };
   const from = today.toISOString().slice(0, 10);
   const to = new Date(today.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
@@ -349,7 +351,7 @@ export async function recheckYearStart(db: Db, practiceId: string, now = new Dat
     JOIN patient_insurances pi ON pi.patient_id = p.id AND pi.active
     JOIN payers py ON py.id = pi.payer_id AND py.type <> 'self_pay'
     WHERE a.practice_id = ${practiceId} AND a.status <> 'cancelled' AND a.starts_at >= ${from}::date AND a.starts_at < (${to}::date + 1)
-      AND NOT EXISTS (SELECT 1 FROM eligibility_checks ec WHERE ec.patient_insurance_id = pi.id AND to_char(ec.checked_at, 'YYYY') = ${year} AND ec.status <> 'error')
+      AND NOT EXISTS (SELECT 1 FROM eligibility_checks ec WHERE ec.patient_insurance_id = pi.id AND to_char(ec.checked_at AT TIME ZONE ${tz}, 'YYYY') = ${year} AND ec.status <> 'error')
     ORDER BY pi.id, a.starts_at
     LIMIT ${limit}`);
   const problems: { name: string; message: string }[] = [];

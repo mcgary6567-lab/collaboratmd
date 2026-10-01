@@ -122,6 +122,8 @@ export interface Edi837Input {
     frequencyCode: string;
     /** REF*F8: required when frequencyCode is 7 (replacement) or 8 (void). */
     originalPayerClaimNumber?: string | null;
+    /** REF*9F: an HMO referral number from the primary care physician. */
+    referralNumber?: string | null;
     /** REF*G1: prior authorization number, when one covers the claim. */
     authorizationNumber?: string | null;
     /** CLIA certificate number, for claims with laboratory tests (REF*X4). */
@@ -236,6 +238,7 @@ export function buildEdi837P(input: Edi837Input): string {
     }
     s.push(["REF", "F8", input.claim.originalPayerClaimNumber]);
   }
+  if (input.claim.referralNumber) s.push(["REF", "9F", input.claim.referralNumber]);
   if (input.claim.authorizationNumber) s.push(["REF", "G1", input.claim.authorizationNumber]);
   if (input.claim.cliaNumber) s.push(["REF", "X4", input.claim.cliaNumber]);
   const hi = ["HI", ...input.claim.diagnoses.map((c, i) => `${i === 0 ? "ABK" : "ABF"}:${icd(c)}`)];

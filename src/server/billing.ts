@@ -9,6 +9,8 @@ import { runEligibility } from "./patients";
 import { benefitsToDate } from "./accumulators";
 import { holdReason } from "./account-holds";
 import { normalizeMethod } from "@/lib/utils";
+import { cycleOfDay, cycleOfName } from "@/lib/billing/statement-cycles";
+import { practiceNow } from "./practice-time";
 
 const {
   patients, patientInsurances, payers, ledgerEntries, claims, encounters, providers, charges, cptCodes, practices,
@@ -408,14 +410,18 @@ export async function generateStatement(db: Db, practiceId: string, patientId: s
  * anyone billed within the last `skipDays` so a batch rerun does not send
  * duplicates.
  */
-export async function generateStatementBatch(db: Db, practiceId: string, opts: { minBalanceCents?: number; skipDays?: number } = {}, userId?: string) {
+export async function generateStatementBatch(db: Db, practiceId: string, opts: { minBalanceCents?: number; skipDays?: number; cycles?: number; now?: Date } = {}, userId?: string) {
   const min = opts.minBalanceCents ?? 500;
   const skipDays = opts.skipDays ?? 25;
   const cutoff = addDays(today(), -skipDays);
   const candidates = await patientsWithBalances(db, practiceId, min, 5_000);
+  // Statement cycles: only the last names whose part of the month it is (lib/billing/statement-cycles.ts).
+  const cycle = cycleOfDay((await practiceNow(db, practiceId, opts.now)).getUTCDate(), opts.cycles);
   let generated = 0;
   let skipped = 0;
+  let otherCycles = 0;
   for (const c of candidates) {
+    if (cycleOfName(c.lastName, opts.cycles) !== cycle) { otherCycles++; continue; }
     if (c.lastStatement && c.lastStatement > cutoff) { skipped++; continue; }
     try {
       await generateStatement(db, practiceId, c.patientId, userId);
@@ -424,7 +430,7 @@ export async function generateStatementBatch(db: Db, practiceId: string, opts: {
       skipped++;
     }
   }
-  return { generated, skipped };
+  return { generated, skipped, otherCycles, cycle };
 }
 
 export async function getStatement(db: Db, practiceId: string, id: string) {

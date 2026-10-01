@@ -29,6 +29,7 @@ const APP = [
   "/patients/duplicates", "/coding/queries", "/coding/audits", "/injury-cases", "/reports/write-offs", "/reports/registration",
   "/billing/cash-close", "/billing/missed-fees", "/reports/denial-causes", "/reports/agencies", "/reports/compensation", "/settings/chargemaster",
   "/billing/holds", "/patients/account-review", "/reports/front-desk", "/reports/referrals", "/privacy-complaints", "/reports/cost-to-collect",
+  "/settings/substitutes", "/scheduling/referrals", "/coding/therapy-plans", "/patients/other-coverage", "/billing/expiring-cards", "/interpreters",
 ];
 const PUBLIC = [
   "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/trust/questionnaire", "/contact", "/status", "/switch", "/changelog", "/demo",

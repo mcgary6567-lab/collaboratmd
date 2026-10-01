@@ -27,7 +27,7 @@ export default async function EstateClaimPage({ params }: { params: Promise<{ id
   const today = new Date().toISOString().slice(0, 10);
   const day = (v: string) => fmtDate(`${v}T00:00:00`);
   return (
-    <main className="mx-auto max-w-3xl bg-white p-10 text-slate-900">
+    <main className="mx-auto max-w-3xl bg-white p-4 text-slate-900 sm:p-10">
       <div className="no-print mb-6 flex flex-wrap gap-3">
         <Link href="/billing/holds" className="btn btn-secondary">Back to bankruptcy and estates</Link>
         <PrintButton />
@@ -41,7 +41,7 @@ export default async function EstateClaimPage({ params }: { params: Promise<{ id
         <p>{practice.name} submits this claim for {money(d.totals.amountDueCents)} for medical services provided to the decedent, as itemized below. Insurance has been billed and its payments and adjustments are applied.</p>
       </div>
       {d.visits.length > 0 && (
-        <table className="mt-6 w-full text-left text-sm">
+        <div tabIndex={0} role="region" aria-label="Visits claimed" className="mt-6 overflow-x-auto"><table className="w-full text-left text-sm">
           <thead><tr className="border-b border-slate-300"><th className="py-1">Date of service</th><th>Services</th><th className="text-right">Charges</th><th className="text-right">Insurance paid</th><th className="text-right">Owed</th></tr></thead>
           <tbody>{d.visits.map((v) => (
             <tr key={v.claimId} className="border-b border-slate-100 align-top">
@@ -52,7 +52,7 @@ export default async function EstateClaimPage({ params }: { params: Promise<{ id
               <td className="text-right tabular-nums">{money(v.youOweCents)}</td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       )}
       <p className="mt-4 text-right text-sm font-semibold">Amount claimed: {money(d.totals.amountDueCents)}</p>
       <div className="mt-6 space-y-3 text-sm leading-relaxed">

@@ -35,7 +35,8 @@ export async function paperClaim(db: Db, practiceId: string, claimId: string, to
     accident: { employment: b.encounter.relatedEmployment, auto: b.encounter.relatedAuto, autoState: b.encounter.autoAccidentState, other: b.encounter.relatedOther, date: b.encounter.accidentDate, propertyClaimNumber: b.encounter.propertyClaimNumber },
     referring: b.encounter.referringNpi && b.encounter.referringLastName ? { lastName: b.encounter.referringLastName, firstName: b.encounter.referringFirstName ?? "", npi: b.encounter.referringNpi } : null,
     supervising: b.supervisor && b.supervisor.npi !== b.provider.npi ? { lastName: b.supervisor.lastName, firstName: b.supervisor.firstName, npi: b.supervisor.npi } : null,
-    priorAuth: b.claim.authorizationNumber,
+    // Box 23 holds the prior authorization, or the HMO referral number when there is no authorization.
+    priorAuth: b.claim.authorizationNumber ?? b.referralNumber ?? null,
     resubmission: (b.claim.frequencyCode === "7" || b.claim.frequencyCode === "8") && b.claim.originalPayerClaimNumber ? { code: b.claim.frequencyCode, originalRef: b.claim.originalPayerClaimNumber } : null,
     diagnoses: b.encounter.diagnoses,
     lines: b.lines.map((l) => ({ from: b.encounter.dateOfService, pos: b.encounter.placeOfService, cpt: l.cpt, modifiers: l.modifiers, pointers: l.dxPointers, chargeCents: l.chargeCents, units: l.units, renderingNpi: b.provider.npi, ndc: l.ndc, ndcUnit: l.ndcUnit, ndcQuantity: l.ndcQuantity, description: l.description })),

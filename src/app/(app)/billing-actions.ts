@@ -10,6 +10,7 @@ import {
   markStatementSent, recordPlanPayment, setPolicyActive, voidStatement,
 } from "@/server/billing";
 import { getPolicies } from "@/server/policies";
+import { cycleLabel } from "@/lib/billing/statement-cycles";
 import { mailStatement, mailUnsentStatements } from "@/server/mail";
 
 const ok = (message: string): FormResult => ({ ok: true, message });
@@ -118,9 +119,10 @@ export async function statementBatchAction(_prev: FormResult, formData: FormData
   try {
     const db = await getDb();
     const policies = await getPolicies(db, s.practiceId);
-    const r = await generateStatementBatch(db, s.practiceId, { minBalanceCents: dollars(formData.get("min")) || policies.statementMinCents || 500, skipDays: policies.statementIntervalDays ?? 25 }, s.userId);
+    const r = await generateStatementBatch(db, s.practiceId, { minBalanceCents: dollars(formData.get("min")) || policies.statementMinCents || 500, skipDays: policies.statementIntervalDays ?? 25, cycles: policies.statementCycles }, s.userId);
     revalidatePath("/billing");
-    return ok(`${r.generated} statements generated, ${r.skipped} skipped as recently billed`);
+    const cycleNote = (policies.statementCycles ?? 1) > 1 ? ` This part of the month bills ${cycleLabel(r.cycle, policies.statementCycles)}; ${r.otherCycles} other patients are billed in their own cycles.` : "";
+    return ok(`${r.generated} statements generated, ${r.skipped} skipped as recently billed.${cycleNote}`);
   } catch (e) {
     return fail(e);
   }

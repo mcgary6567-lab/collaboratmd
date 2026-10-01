@@ -16,6 +16,7 @@ import { schema } from "@/db";
 import type { CheckinConsents, CheckinDemographics, CheckinInsurance } from "@/db/schema";
 import { runEligibility } from "./patients";
 import { practiceNow } from "./practice-time";
+import { recordOtherCoverage } from "./other-coverage";
 
 const { checkinLinks, checkinSubmissions, appointments, patients, patientInsurances, payers, practices, eligibilityChecks } = schema;
 
@@ -192,6 +193,7 @@ export async function submitCheckin(db: Db, linkId: string, input: CheckinInput)
       insurance: {
         sameAsOnFile: input.insurance.sameAsOnFile, payerName: clean(input.insurance.payerName), memberId: clean(input.insurance.memberId),
         groupNumber: clean(input.insurance.groupNumber), relationship: clean(input.insurance.relationship) || "self",
+        ...(input.insurance.otherCoverage ? { otherCoverage: input.insurance.otherCoverage, otherCoverageDetail: clean(input.insurance.otherCoverageDetail ?? "") } : {}),
       },
       consents: { ...input.consents, signature: clean(input.consents.signature), signedAt: new Date().toISOString() },
     })
@@ -199,6 +201,8 @@ export async function submitCheckin(db: Db, linkId: string, input: CheckinInput)
   await db.update(checkinLinks).set({ completedAt: new Date() }).where(eq(checkinLinks.id, linkId));
   // Agreeing to the missed-appointment policy here is what lets the practice charge its fees later.
   if (input.consents.missedFees) await db.update(schema.patients).set({ feePolicySignedOn: new Date().toISOString().slice(0, 10) }).where(eq(schema.patients.id, link.patientId));
+  // The yearly other-insurance question (server/other-coverage.ts); a "yes" shows on the check-in for the desk to add the policy.
+  if (input.insurance.otherCoverage) await recordOtherCoverage(db, link.practiceId, link.patientId, { answer: input.insurance.otherCoverage, detail: input.insurance.otherCoverageDetail, via: "checkin" });
   await db.insert(schema.auditLog).values({ practiceId: link.practiceId, userId: null, action: "patient_checkin", entity: "appointment", entityId: link.appointmentId, details: { submissionId: submission.id } });
   return submission;
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { getDb } from "@/db";
 import { getPolicies } from "@/server/policies";
+import { otherCoverageDue } from "@/server/other-coverage";
 import { LogoMark } from "@/components/logo";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { verifiedFor } from "@/lib/checkin-session";
@@ -125,6 +126,17 @@ export default async function CheckInPage({ params, searchParams }: { params: Pr
             onFile={insurance ? { payerName: insurance.payerName, memberEnding: insurance.ins.memberId.slice(-4) } : null}
             text={{ same: t.insSame, memberEnding: t.insMemberEnding(insurance?.ins.memberId.slice(-4) ?? ""), newCard: t.insNew, add: t.insAdd, company: t.insCompany, memberId: t.memberId, group: t.groupNumber, relationship: t.relationshipLabel, self: t.relSelf, spouse: t.relSpouse, child: t.relChild, other: t.relOther }}
           />
+          {otherCoverageDue(patient.otherCoverageCheckedOn, new Date().toISOString().slice(0, 10)) && (
+            <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3 text-sm">
+              <legend className="px-1 font-medium text-slate-900">{lang === "es" ? "¿Tiene algún otro seguro médico?" : "Do you have any other health insurance?"}</legend>
+              <p className="text-xs text-slate-500">{lang === "es" ? "Por ejemplo, el plan de su cónyuge o de un trabajo, Medicare o Medicaid. Lo preguntamos una vez al año." : "For example a spouse's or employer's plan, Medicare or Medicaid. We ask once a year."}</p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2"><input type="radio" name="otherCoverage" value="no" /> {lang === "es" ? "No" : "No"}</label>
+                <label className="flex items-center gap-2"><input type="radio" name="otherCoverage" value="yes" /> {lang === "es" ? "Sí" : "Yes"}</label>
+              </div>
+              <label className="block"><span className="label">{lang === "es" ? "Si respondió sí: compañía y número de miembro" : "If yes: the company and member ID"}</span><input name="otherCoverageDetail" className="input" maxLength={300} /></label>
+            </fieldset>
+          )}
           {data.copayCents ? (
             <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
               <p>{t.copayExpect(money(data.copayCents), payOnline)}</p>
