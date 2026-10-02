@@ -10,6 +10,17 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-10-01",
+    title: "Biller shifts across time zones",
+    items: [
+      "Each biller's time zone and weekly hours, including night shifts past midnight; see who is on now and when everyone is next on",
+      "Time off: work queues skip people who are off, and their open tasks move to teammates on the same queue",
+      "Clock in and out, and a handover note the next shift sees on its dashboard",
+      "Coverage alerts when a queue has nobody available or tasks are due while their owner is off",
+      "Hours and output: tasks, claims and postings per hour by person",
+    ],
+  },
+  {
+    date: "2026-10-01",
     title: "Maintenance: keeping current without surprises",
     items: [
       "Settings, Maintenance: fee schedules, payer contracts, credentials, chargemaster, single sign-on certificate and API keys that are going out of date, with morning notifications",

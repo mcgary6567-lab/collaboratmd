@@ -11,7 +11,10 @@ import { memo } from "@/lib/memo";
 import { dataStamp } from "@/server/data-stamp";
 import { listAppointments } from "@/server/encounters";
 import { Badge } from "@/components/ui";
-import { practiceNow } from "@/server/practice-time";
+import { practiceClock, practiceNow, practiceTimeZone, validTimeZone } from "@/server/practice-time";
+import { eq } from "drizzle-orm";
+import { schema } from "@/db";
+import { ShiftStrip } from "./shift-card";
 import { FeatureTips } from "./tips";
 import { OnboardingGuide } from "./onboarding";
 import { compactMoney, pct } from "@/components/kpi";
@@ -98,7 +101,10 @@ export default async function UserDashboard() {
 
   const firstName = s.name.split(" ")[0];
   // The practice's clock: appointment times and "today" are clock times (server/practice-time.ts).
-  const hour = clock.getUTCHours();
+  // The greeting follows the person's own time zone, for someone working a shift elsewhere (server/shifts.ts).
+  const [me] = await db.select({ tz: schema.users.timeZone }).from(schema.users).where(eq(schema.users.id, s.userId)).limit(1);
+  const myTz = me?.tz && validTimeZone(me.tz) ? me.tz : null;
+  const hour = myTz ? practiceClock(new Date(), myTz).getUTCHours() : clock.getUTCHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const dateLabel = clock.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
   const waiting = [work.needsAttention, work.readyToSubmit, work.assignedOpen, work.dueSoon, work.overdueAppeals, work.checkedIn].filter((n) => n > 0).length;
@@ -121,6 +127,7 @@ export default async function UserDashboard() {
         </div>
       </header>
 
+      {s.role !== "readonly" && <ShiftStrip db={db} practiceId={s.practiceId} userId={s.userId} timeZone={myTz ?? s.timeZone ?? (await practiceTimeZone(db, s.practiceId))} />}
       {s.role === "admin" && <OnboardingGuide practiceId={s.practiceId} />}
       {s.role === "admin" && <FeatureTips practiceId={s.practiceId} />}
 

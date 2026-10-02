@@ -13,6 +13,7 @@ import { credentialState, CREDENTIAL_KINDS, listCredentials } from "./credential
 import { notify } from "./notifications";
 import { notifyAccessAnomalies } from "./access-anomalies";
 import { practiceMaintenance } from "./maintenance";
+import { coverageGaps } from "./shifts";
 
 /** ISO week, e.g. 2026-W39, so a payer alert repeats at most weekly. */
 function isoWeek(d: Date) {
@@ -25,7 +26,7 @@ function isoWeek(d: Date) {
 }
 
 export async function runDailyChecks(db: Db, practiceId: string, now = new Date()) {
-  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0, maintenance: 0 };
+  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0, maintenance: 0, coverage: 0 };
   const week = isoWeek(now);
   for (const a of (await payerAlerts(db, practiceId, now)).filter((x) => x.severity === "high")) {
     await notify(db, practiceId, { kind: "payer_alert", title: `${a.payerName}: ${a.title}`, body: a.detail, href: "/reports/payer-alerts", dedupeKey: `payer:${a.payerId}:${a.kind}:${week}` });
@@ -56,6 +57,16 @@ export async function runDailyChecks(db: Db, practiceId: string, now = new Date(
     if (item.status === "ok" || item.key === "credentials" || item.key === "contracts") continue;
     await notify(db, practiceId, { kind: "maintenance", title: `${item.label}: ${item.status === "attention" ? "needs attention" : "coming up"}`, body: item.detail, href: item.href, dedupeKey: `maint:${item.key}:${item.status}:${month}` });
     out.maintenance++;
+  }
+  // Shift coverage (server/shifts.ts): a queue with everyone off, or tasks due by tomorrow whose owner is off.
+  const gaps = await coverageGaps(db, practiceId, now);
+  for (const q of gaps.uncovered) {
+    await notify(db, practiceId, { kind: "coverage", title: `Nobody is available for the "${q.name}" queue today`, body: "Everyone on this rule is off. New tasks still go to them; add someone to the rule or reassign the work.", href: "/work/shifts", dedupeKey: `coverage:rule:${q.ruleId}:${today}` });
+    out.coverage++;
+  }
+  if (gaps.stranded.length) {
+    await notify(db, practiceId, { kind: "coverage", title: `${gaps.stranded.length} task${gaps.stranded.length === 1 ? "" : "s"} due by tomorrow belong to someone who is off`, body: gaps.stranded.slice(0, 5).map((s) => `${s.title} (${s.owner})`).join("\n"), href: "/tasks", dedupeKey: `coverage:tasks:${today}` });
+    out.coverage++;
   }
   return out;
 }

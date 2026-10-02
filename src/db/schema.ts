@@ -162,6 +162,8 @@ export const users = pgTable(
     passwordResetSentAt: timestamp("password_reset_sent_at", { withTimezone: true }),
     emailDigest: boolean("email_digest").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    /** The time zone the person works in; null means the practice's (server/shifts.ts). Migration 0067. */
+    timeZone: text("time_zone"),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
@@ -2596,5 +2598,50 @@ export const interpreterServices = pgTable("interpreter_services", {
   declined: boolean("declined").notNull().default(false),
   notes: text("notes"),
   createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Weekly working hours in the person's time zone; ends before starts means past midnight. Migration 0067. */
+export const staffShifts = pgTable("staff_shifts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  weekday: integer("weekday").notNull(),
+  startsAt: text("starts_at").notNull(),
+  endsAt: text("ends_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Vacation, sick days and holidays, as dates in the person's time zone. Migration 0067. */
+export const staffTimeOff = pgTable("staff_time_off", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on").notNull(),
+  kind: text("kind").notNull(),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Clocking in and out. Migration 0067. */
+export const timeEntries = pgTable("time_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  clockIn: timestamp("clock_in", { withTimezone: true }).notNull(),
+  clockOut: timestamp("clock_out", { withTimezone: true }),
+  note: text("note"),
+});
+
+/** End-of-shift notes for whoever works next. Migration 0067. */
+export const shiftHandovers = pgTable("shift_handovers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  done: text("done"),
+  inProgress: text("in_progress"),
+  problems: text("problems"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

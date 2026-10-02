@@ -12,6 +12,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { WorkConditions } from "@/db/schema";
 import { notify } from "./notifications";
+import { availability, pickAssignee } from "./shifts";
 
 const { workRules, tasks, auditLog } = schema;
 type Row = Record<string, string | null>;
@@ -101,13 +102,17 @@ export async function applyRules(db: Db, practiceId: string, opts: { limit?: num
   const now = opts.now ?? new Date();
   const out: Record<string, number> = {};
   const perPerson = new Map<string, number>();
-  for (const rule of (await listRules(db, practiceId)).filter((r) => r.active)) {
+  const rules = (await listRules(db, practiceId)).filter((r) => r.active);
+  // People on time off today (their own date) are skipped in the rotation (server/shifts.ts).
+  const avail = await availability(db, [...new Set(rules.flatMap((r) => r.assigneeIds))], now);
+  for (const rule of rules) {
     const items = await candidates(db, practiceId, rule, opts.limit ?? 200, now);
     let next = rule.nextIndex;
     const due = new Date(now.getTime() + rule.slaDays * 86_400_000).toISOString().slice(0, 10);
     for (const item of items) {
-      const assigneeId = rule.assigneeIds[next % rule.assigneeIds.length];
-      next++;
+      const pick = pickAssignee(rule.assigneeIds, next, avail);
+      const assigneeId = pick.assigneeId;
+      next = pick.next;
       perPerson.set(assigneeId, (perPerson.get(assigneeId) ?? 0) + 1);
       await db.insert(tasks).values({ practiceId, title: TITLES[rule.kind](item.label ?? ""), entityType: item.type, entityId: item.id, assigneeId, dueDate: due, priority: rule.priority, ruleId: rule.id, note: `Assigned by the rule "${rule.name}"` });
     }

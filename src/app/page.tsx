@@ -425,6 +425,11 @@ const MEDICARE = [
     body: "Interpreters provided or declined are logged for Section 1557, with upcoming visits that need one and Medicaid T1013 units where your state pays.",
   },
   {
+    icon: UsersRound,
+    title: "Offshore team, one schedule",
+    body: "Billers in Manila or Karachi work in their own time zone: night shifts past midnight, time off that moves their work to teammates, a handover note between shifts, and output per hour.",
+  },
+  {
     icon: CalendarDays,
     title: "Ready for every code change",
     body: "Every CMS code set is tracked against its release calendar, so October's diagnosis codes and each quarter's edits are loaded before claims need them, and your fees and contracts are flagged when they fall behind.",

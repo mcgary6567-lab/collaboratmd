@@ -160,6 +160,22 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     ],
     related: [{ label: "Patients", href: "/patients" }],
   },
+  "/work/shifts": {
+    title: "Shifts and time off",
+    steps: [
+      "Set each person's time zone and weekly hours in their own time zone; a night shift such as 21:00 to 06:00 runs past midnight. The team table shows who is on now and when everyone else is next on, in your time.",
+      "Record time off: work queue rules skip people who are off, and their open queue tasks due in that time move to others on the same rule. Clock in and out at the start and end of a shift, and leave a handover note; the next shift sees it on its dashboard.",
+    ],
+    related: [{ label: "Work queues", href: "/work" }, { label: "Hours and output", href: "/reports/team-hours" }],
+  },
+  "/reports/team-hours": {
+    title: "Hours and output",
+    steps: [
+      "Hours each person clocked in a period, with the tasks they finished, claims they sent and payments they posted, and each per hour.",
+      "Compare people doing the same kind of work: an appeal takes longer than a payment posting.",
+    ],
+    related: [{ label: "Shifts and time off", href: "/work/shifts" }],
+  },
   "/settings/maintenance": {
     title: "Maintenance",
     steps: [
