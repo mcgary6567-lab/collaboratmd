@@ -5,23 +5,31 @@
  *  - Each person has a time zone and weekly working hours in it. A shift that
  *    ends before it starts (22:00 to 06:00) runs past midnight. Someone with no
  *    hours set is treated as always available, so nothing changes until a
- *    schedule is entered.
- *  - Time off is a range of dates in the person's own time zone. Work queue
- *    rules skip people who are off; recording time off moves their open queue
- *    tasks due in that time to the others on the same rule.
- *  - Clocking in and out records hours worked, for output per hour.
+ *    schedule is entered. One-off changes (from an approved swap) add or
+ *    cancel hours on top of the weekly ones (server/shift-swaps.ts).
+ *  - Time off is requested and approved, as a range of dates in the person's
+ *    own time zone; holidays in the person's calendar count the same
+ *    (server/holidays.ts). Work queue rules skip people who are off. Approving
+ *    time off moves their open queue tasks due in that time to the others on
+ *    the same rule; cancelling it moves them back.
+ *  - Due dates from work queues count the assignee's working days.
+ *  - Clocking in and out, with unpaid breaks, records hours worked; a clock-in
+ *    from outside the practice's office networks is flagged or refused.
  *  - A handover note at the end of a shift is shown to the next shift.
  *
  * Shifts belong to the person, not to one practice: a billing company's
  * billers work across its client practices, and the same hours apply in each.
  */
-import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { practiceClock, practiceTimeZone, validTimeZone } from "./practice-time";
 import { assignableUsers } from "./work";
+import { CALENDARS, holidaysBetween, type Holiday } from "./holidays";
+import { notify } from "./notifications";
+import { ipAllowed, parseCidr } from "@/lib/ip";
 
-const { staffShifts, staffTimeOff, timeEntries, shiftHandovers, users, tasks, workRules, auditLog } = schema;
+const { staffShifts, staffTimeOff, timeEntries, timeBreaks, shiftHandovers, shiftChanges, clockSettings, users, tasks, workRules, auditLog } = schema;
 
 export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const TIME_OFF_KINDS: Record<string, string> = { vacation: "Vacation", sick: "Sick", holiday: "Holiday", other: "Other" };
@@ -30,9 +38,12 @@ export const MAX_ENTRY_HOURS = 16;
 
 export type Shift = { weekday: number; startsAt: string; endsAt: string };
 export type TimeOff = { startsOn: string; endsOn: string };
+export type Change = { kind: string; startsAt: Date; endsAt: Date };
 
 const HM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DAY = 86_400_000;
 export const minutesOf = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 
 /** The person's local date, weekday and minute of the day at a moment. */
 export function localClock(at: Date, tz: string) {
@@ -51,7 +62,15 @@ export function isOnShift(shifts: Shift[], at: Date, tz: string) {
   });
 }
 
-export const isOffOn = (timeOff: TimeOff[], localDate: string) => timeOff.some((t) => t.startsOn <= localDate && localDate <= t.endsOn);
+const inWindow = (changes: Change[], kind: string, at: Date) => changes.some((c) => c.kind === kind && c.startsAt.getTime() <= at.getTime() && at.getTime() < c.endsAt.getTime());
+
+/** Weekly hours, less cancelled windows, plus extra windows. */
+export function isWorking(shifts: Shift[], changes: Change[], at: Date, tz: string) {
+  return (isOnShift(shifts, at, tz) && !inWindow(changes, "cancel", at)) || inWindow(changes, "extra", at);
+}
+
+export const isOffOn = (timeOff: TimeOff[], localDate: string, holidays: Holiday[] = []) =>
+  timeOff.some((t) => t.startsOn <= localDate && localDate <= t.endsOn) || holidays.some((h) => h.date === localDate);
 
 /** The real moment a local date and time in a time zone happens (daylight saving included). */
 export function zonedMoment(date: string, hm: string, tz: string) {
@@ -63,18 +82,49 @@ export function zonedMoment(date: string, hm: string, tz: string) {
   return new Date(at);
 }
 
-/** When the person's next shift starts, skipping days off; null with no schedule in the next 14 days. */
-export function nextShiftStart(shifts: Shift[], timeOff: TimeOff[], at: Date, tz: string) {
-  if (!shifts.length) return null;
+/** The weekly shifts that start in the next `days` days, as real moments, skipping days off and cancelled hours. */
+export function shiftOccurrences(shifts: Shift[], at: Date, tz: string, days = 14, timeOff: TimeOff[] = [], holidays: Holiday[] = [], changes: Change[] = []) {
   const today = localClock(at, tz).date;
-  for (let k = 0; k < 14; k++) {
-    const date = new Date(Date.parse(`${today}T00:00:00Z`) + k * 86_400_000).toISOString().slice(0, 10);
-    if (isOffOn(timeOff, date)) continue;
+  const out: { startsAt: Date; endsAt: Date }[] = [];
+  for (let k = -1; k < days; k++) {
+    const date = addDays(today, k);
+    if (isOffOn(timeOff, date, holidays)) continue;
     const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-    const starts = shifts.filter((s) => s.weekday === weekday).map((s) => zonedMoment(date, s.startsAt, tz)).filter((d) => d.getTime() > at.getTime()).sort((a, b) => a.getTime() - b.getTime());
-    if (starts.length) return starts[0];
+    for (const s of shifts.filter((x) => x.weekday === weekday)) {
+      const startsAt = zonedMoment(date, s.startsAt, tz);
+      const endsAt = zonedMoment(minutesOf(s.endsAt) > minutesOf(s.startsAt) ? date : addDays(date, 1), s.endsAt, tz);
+      if (endsAt.getTime() <= at.getTime()) continue;
+      if (changes.some((c) => c.kind === "cancel" && c.startsAt.getTime() <= startsAt.getTime() && c.endsAt.getTime() >= endsAt.getTime())) continue;
+      out.push({ startsAt, endsAt });
+    }
   }
-  return null;
+  return out.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+/** When the person's next shift starts, skipping days off; null with no schedule in the next 14 days. */
+export function nextShiftStart(shifts: Shift[], timeOff: TimeOff[], at: Date, tz: string, holidays: Holiday[] = [], changes: Change[] = []) {
+  const weekly = shiftOccurrences(shifts, at, tz, 14, timeOff, holidays, changes).map((o) => o.startsAt).filter((d) => d.getTime() > at.getTime());
+  const extra = changes.filter((c) => c.kind === "extra" && c.startsAt.getTime() > at.getTime()).map((c) => c.startsAt);
+  const all = [...weekly, ...extra].sort((a, b) => a.getTime() - b.getTime());
+  return all[0] ?? null;
+}
+
+/**
+ * A due date `slaDays` working days out: days the person has a shift and is
+ * not off, counted from tomorrow in their time zone. Without weekly hours it
+ * is calendar days, as before.
+ */
+export function workingDueDate(shifts: Shift[], timeOff: TimeOff[], holidays: Holiday[], at: Date, tz: string, slaDays: number) {
+  if (!shifts.length) return new Date(at.getTime() + slaDays * DAY).toISOString().slice(0, 10);
+  const workdays = new Set(shifts.map((s) => s.weekday));
+  let date = localClock(at, tz).date;
+  let left = slaDays;
+  for (let guard = 0; left > 0 && guard < 120; guard++) {
+    date = addDays(date, 1);
+    const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+    if (workdays.has(weekday) && !isOffOn(timeOff, date, holidays)) left--;
+  }
+  return date;
 }
 
 /* ------------------------------ Schedules and time off ------------------------------ */
@@ -93,6 +143,14 @@ export async function setTimeZone(db: Db, practiceId: string, userId: string, tz
   await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_time_zone_set", entity: "user", entityId: u.id, details: { timeZone: value } });
 }
 
+export async function setHolidayCalendar(db: Db, practiceId: string, userId: string, calendar: string, by?: string) {
+  const u = await ownUser(db, userId);
+  const value = calendar.trim() || null;
+  if (value && !CALENDARS[value]) throw new Error("Choose a holiday calendar");
+  await db.update(users).set({ holidayCalendar: value }).where(eq(users.id, u.id));
+  await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_holiday_calendar_set", entity: "user", entityId: u.id, details: { calendar: value } });
+}
+
 /** Replaces a person's weekly hours. */
 export async function saveShifts(db: Db, practiceId: string, userId: string, shifts: Shift[], by?: string) {
   const u = await ownUser(db, userId);
@@ -107,58 +165,103 @@ export async function saveShifts(db: Db, practiceId: string, userId: string, shi
   await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_shifts_saved", entity: "user", entityId: u.id, details: { shifts: shifts.length } });
 }
 
-/** Records time off and moves the person's open queue tasks due in that time to others on the same rule. */
-export async function addTimeOff(db: Db, practiceId: string, input: { userId: string; startsOn: string; endsOn: string; kind: string; note?: string }, by?: string, now = new Date()) {
-  const u = await ownUser(db, input.userId);
+function checkTimeOff(input: { startsOn: string; endsOn: string; kind: string }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startsOn) || !/^\d{4}-\d{2}-\d{2}$/.test(input.endsOn) || input.endsOn < input.startsOn) throw new Error("Enter the first and last day off");
   if (!TIME_OFF_KINDS[input.kind]) throw new Error("Choose the kind of time off");
-  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, note: input.note?.trim().slice(0, 200) || null, createdBy: by ?? null }).returning();
+}
+
+/** An administrator records time off: approved at once, and the person's open queue tasks in that time move to teammates. */
+export async function addTimeOff(db: Db, practiceId: string, input: { userId: string; startsOn: string; endsOn: string; kind: string; note?: string }, by?: string, now = new Date()) {
+  const u = await ownUser(db, input.userId);
+  checkTimeOff(input);
+  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, note: input.note?.trim().slice(0, 200) || null, createdBy: by ?? null, status: "approved", decidedBy: by ?? null, decidedAt: now }).returning();
   await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_time_off_added", entity: "user", entityId: u.id, details: { startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind } });
-  const moved = await reassignDuringTimeOff(db, u.id, input.startsOn, input.endsOn, now);
+  const moved = await reassignDuringTimeOff(db, u.id, row.id, input.startsOn, input.endsOn, now);
   return { timeOff: row, moved };
 }
 
-/** Time off that has not ended, for a set of people. */
+/** A person asks for time off; administrators are notified to approve or deny it. */
+export async function requestTimeOff(db: Db, practiceId: string, userId: string, input: { startsOn: string; endsOn: string; kind: string; note?: string }) {
+  const u = await ownUser(db, userId);
+  checkTimeOff(input);
+  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, note: input.note?.trim().slice(0, 200) || null, createdBy: u.id, status: "requested" }).returning();
+  await db.insert(auditLog).values({ practiceId, userId: u.id, action: "staff_time_off_requested", entity: "user", entityId: u.id, details: { startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind } });
+  await notify(db, practiceId, { kind: "time_off", title: `${u.name} asked for time off, ${input.startsOn} to ${input.endsOn}`, body: input.note?.trim() || TIME_OFF_KINDS[input.kind], href: "/work/shifts/manage", dedupeKey: `time-off:${row.id}` });
+  return row;
+}
+
+/** Approves or denies a request; approving moves the person's open queue tasks in that time to teammates. */
+export async function decideTimeOff(db: Db, practiceId: string, id: string, approve: boolean, by: string, now = new Date()) {
+  const [row] = await db.select().from(staffTimeOff).where(eq(staffTimeOff.id, id)).limit(1);
+  if (!row) throw new Error("Not found");
+  if (row.status !== "requested") throw new Error("This request was already decided");
+  if (row.userId === by) throw new Error("Someone else approves your own time off");
+  await db.update(staffTimeOff).set({ status: approve ? "approved" : "denied", decidedBy: by, decidedAt: now }).where(eq(staffTimeOff.id, id));
+  await db.insert(auditLog).values({ practiceId, userId: by, action: approve ? "staff_time_off_approved" : "staff_time_off_denied", entity: "user", entityId: row.userId, details: { startsOn: row.startsOn, endsOn: row.endsOn } });
+  await notify(db, practiceId, { userId: row.userId, kind: "time_off", title: `Your time off ${row.startsOn} to ${row.endsOn} was ${approve ? "approved" : "denied"}`, href: "/work/shifts", dedupeKey: `time-off-decided:${id}` });
+  return approve ? reassignDuringTimeOff(db, row.userId, row.id, row.startsOn, row.endsOn, now) : 0;
+}
+
+/** Cancels time off (an administrator, or the person for their own pending request); moved tasks still open go back. */
+export async function removeTimeOff(db: Db, practiceId: string, id: string, by: string, isAdmin: boolean) {
+  const [row] = await db.select().from(staffTimeOff).where(eq(staffTimeOff.id, id)).limit(1);
+  if (!row) throw new Error("Not found");
+  if (!isAdmin && !(row.userId === by && row.status === "requested")) throw new Error("Ask an administrator to cancel approved time off");
+  const back = await db.select().from(tasks).where(and(eq(tasks.movedFor, row.id), eq(tasks.status, "open")));
+  for (const t of back) {
+    await db.update(tasks).set({ assigneeId: t.movedFrom, movedFrom: null, movedFor: null, note: [t.note, "Moved back: the time off was cancelled"].filter(Boolean).join("\n") }).where(eq(tasks.id, t.id));
+  }
+  await db.update(tasks).set({ movedFor: null }).where(eq(tasks.movedFor, row.id));
+  await db.delete(staffTimeOff).where(eq(staffTimeOff.id, id));
+  await db.insert(auditLog).values({ practiceId, userId: by, action: "staff_time_off_removed", entity: "user", entityId: row.userId, details: { startsOn: row.startsOn, endsOn: row.endsOn, movedBack: back.length } });
+  return { movedBack: back.length };
+}
+
+/** Time off that has not ended, for a set of people, with its status. */
 export async function upcomingTimeOff(db: Db, userIds: string[], today: string) {
   if (!userIds.length) return [];
   return db.select({ o: staffTimeOff, name: users.name }).from(staffTimeOff).innerJoin(users, eq(users.id, staffTimeOff.userId))
-    .where(and(inArray(staffTimeOff.userId, userIds), gte(staffTimeOff.endsOn, today))).orderBy(staffTimeOff.startsOn).limit(100);
+    .where(and(inArray(staffTimeOff.userId, userIds), gte(staffTimeOff.endsOn, today), or(eq(staffTimeOff.status, "approved"), eq(staffTimeOff.status, "requested")))).orderBy(staffTimeOff.startsOn).limit(100);
 }
 
-export async function removeTimeOff(db: Db, practiceId: string, id: string, by?: string) {
-  const [row] = await db.delete(staffTimeOff).where(eq(staffTimeOff.id, id)).returning();
-  if (!row) throw new Error("Not found");
-  await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_time_off_removed", entity: "user", entityId: row.userId, details: { startsOn: row.startsOn, endsOn: row.endsOn } });
-}
+export type Availability = {
+  tz: string; hasSchedule: boolean; onShift: boolean; offToday: boolean; holidayToday: string | null; localTime: string; localDate: string; nextStart: Date | null;
+  timeOff: TimeOff[]; holidays: Holiday[]; shifts: Shift[]; changes: Change[]; calendar: string | null;
+};
 
-type Availability = { tz: string; hasSchedule: boolean; onShift: boolean; offToday: boolean; localTime: string; localDate: string; nextStart: Date | null; timeOff: TimeOff[] };
-
-/** Where each person stands at a moment: on shift, off today, and when they are next on. */
+/** Where each person stands at a moment: on shift, off today (time off or a holiday), and when they are next on. */
 export async function availability(db: Db, userIds: string[], at = new Date(), fallbackTz?: string) {
   const out = new Map<string, Availability>();
   if (!userIds.length) return out;
-  const [people, shifts, off] = await Promise.all([
-    db.select({ id: users.id, tz: users.timeZone, practiceId: users.practiceId }).from(users).where(inArray(users.id, userIds)),
+  const from = new Date(at.getTime() - 2 * DAY).toISOString().slice(0, 10);
+  const to = new Date(at.getTime() + 120 * DAY).toISOString().slice(0, 10);
+  const [people, shifts, off, changes] = await Promise.all([
+    db.select({ id: users.id, tz: users.timeZone, practiceId: users.practiceId, calendar: users.holidayCalendar }).from(users).where(inArray(users.id, userIds)),
     db.select().from(staffShifts).where(inArray(staffShifts.userId, userIds)),
-    db.select().from(staffTimeOff).where(and(inArray(staffTimeOff.userId, userIds), gte(staffTimeOff.endsOn, new Date(at.getTime() - 2 * 86_400_000).toISOString().slice(0, 10)))),
+    db.select().from(staffTimeOff).where(and(inArray(staffTimeOff.userId, userIds), eq(staffTimeOff.status, "approved"), gte(staffTimeOff.endsOn, from))),
+    db.select().from(shiftChanges).where(and(inArray(shiftChanges.userId, userIds), gte(shiftChanges.endsAt, new Date(at.getTime() - DAY)))),
   ]);
+  const holidays = await holidaysBetween(db, [...new Set(people.map((p) => p.practiceId))], people.map((p) => p.calendar ?? ""), from, to);
   for (const p of people) {
     const tz = p.tz && validTimeZone(p.tz) ? p.tz : fallbackTz ?? (await practiceTimeZone(db, p.practiceId));
     const mine = shifts.filter((s) => s.userId === p.id);
     const myOff = off.filter((o) => o.userId === p.id);
+    const myChanges = changes.filter((c) => c.userId === p.id);
+    const myHolidays = holidays.get(p.calendar ?? "") ?? [];
     const local = localClock(at, tz);
-    const offToday = isOffOn(myOff, local.date);
+    const holidayToday = myHolidays.find((h) => h.date === local.date)?.name ?? null;
+    const offToday = isOffOn(myOff, local.date, myHolidays);
     out.set(p.id, {
-      tz, hasSchedule: mine.length > 0, offToday, localTime: local.time, localDate: local.date, timeOff: myOff,
-      onShift: !offToday && (mine.length === 0 || isOnShift(mine, at, tz)),
-      nextStart: nextShiftStart(mine, myOff, at, tz),
+      tz, hasSchedule: mine.length > 0, offToday, holidayToday, localTime: local.time, localDate: local.date, timeOff: myOff, holidays: myHolidays, shifts: mine, changes: myChanges, calendar: p.calendar,
+      onShift: !offToday && (mine.length === 0 || isWorking(mine, myChanges, at, tz)),
+      nextStart: nextShiftStart(mine, myOff, at, tz, myHolidays, myChanges),
     });
   }
   return out;
 }
 
 /** Who can take new work: not off today (their own date). With nobody available, everyone stays in the rotation. */
-export function pickAssignee(assigneeIds: string[], nextIndex: number, avail: Map<string, Availability>) {
+export function pickAssignee(assigneeIds: string[], nextIndex: number, avail: Map<string, Pick<Availability, "offToday">>) {
   const n = assigneeIds.length;
   for (let k = 0; k < n; k++) {
     const id = assigneeIds[(nextIndex + k) % n];
@@ -168,8 +271,14 @@ export function pickAssignee(assigneeIds: string[], nextIndex: number, avail: Ma
   return { assigneeId: assigneeIds[nextIndex % n], next: nextIndex + 1 };
 }
 
+/** A due date for a queue task: working days for someone with weekly hours, calendar days otherwise. */
+export function dueDateFor(a: Availability | undefined, slaDays: number, at: Date) {
+  if (!a) return new Date(at.getTime() + slaDays * DAY).toISOString().slice(0, 10);
+  return workingDueDate(a.shifts, a.timeOff, a.holidays, at, a.tz, slaDays);
+}
+
 /** Moves a person's open queue tasks due in their time off to others on the same rule who are not off then. */
-export async function reassignDuringTimeOff(db: Db, userId: string, startsOn: string, endsOn: string, now = new Date()) {
+export async function reassignDuringTimeOff(db: Db, userId: string, timeOffId: string, startsOn: string, endsOn: string, now = new Date()) {
   const open = await db.select().from(tasks).where(and(eq(tasks.assigneeId, userId), eq(tasks.status, "open"), lte(tasks.dueDate, endsOn)));
   if (!open.length) return 0;
   const [me] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
@@ -187,23 +296,61 @@ export async function reassignDuringTimeOff(db: Db, userId: string, startsOn: st
     const i = turn.get(rule!.id) ?? 0;
     turn.set(rule!.id, i + 1);
     const to = pool[i % pool.length];
-    await db.update(tasks).set({ assigneeId: to, note: [t.note, `Moved from ${me?.name ?? "a teammate"} (time off ${startsOn} to ${endsOn})`].filter(Boolean).join("\n") }).where(eq(tasks.id, t.id));
+    await db.update(tasks).set({ assigneeId: to, movedFrom: userId, movedFor: timeOffId, note: [t.note, `Moved from ${me?.name ?? "a teammate"} (time off ${startsOn} to ${endsOn})`].filter(Boolean).join("\n") }).where(eq(tasks.id, t.id));
     moved++;
   }
   return moved;
 }
 
-/* ------------------------------ Clock and handover ------------------------------ */
+/* ------------------------------ Clock, breaks and handover ------------------------------ */
+
+export async function clockNetworks(db: Db, practiceId: string) {
+  const [row] = await db.select().from(clockSettings).where(eq(clockSettings.practiceId, practiceId)).limit(1);
+  return { networks: row?.networks ?? [], mode: (row?.mode ?? "flag") as "flag" | "require" };
+}
+
+export async function saveClockNetworks(db: Db, practiceId: string, networks: string[], mode: string, by?: string) {
+  const list = networks.map((n) => n.trim()).filter(Boolean);
+  for (const n of list) if (!parseCidr(n)) throw new Error(`${n} is not an IP address or range (for example 203.0.113.0/24)`);
+  if (mode !== "flag" && mode !== "require") throw new Error("Choose whether to flag or refuse");
+  await db.insert(clockSettings).values({ practiceId, networks: list, mode, updatedBy: by ?? null })
+    .onConflictDoUpdate({ target: clockSettings.practiceId, set: { networks: list, mode, updatedBy: by ?? null, updatedAt: new Date() } });
+  await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "clock_networks_saved", entity: "practice", entityId: practiceId, details: { networks: list.length, mode } });
+}
 
 export async function currentEntry(db: Db, userId: string) {
   const [e] = await db.select().from(timeEntries).where(and(eq(timeEntries.userId, userId), isNull(timeEntries.clockOut))).limit(1);
   return e ?? null;
 }
 
-export async function clockIn(db: Db, practiceId: string, userId: string, at = new Date()) {
+export async function currentBreak(db: Db, entryId: string) {
+  const [b] = await db.select().from(timeBreaks).where(and(eq(timeBreaks.entryId, entryId), isNull(timeBreaks.endsAt))).limit(1);
+  return b ?? null;
+}
+
+/** Clocks in; outside the office networks it is flagged, or refused when the practice requires them. */
+export async function clockIn(db: Db, practiceId: string, userId: string, at = new Date(), ip: string | null = null) {
   if (await currentEntry(db, userId)) throw new Error("You are already clocked in");
-  const [row] = await db.insert(timeEntries).values({ practiceId, userId, clockIn: at }).returning();
+  const net = await clockNetworks(db, practiceId);
+  const offNetwork = net.networks.length > 0 && !ipAllowed(ip, net.networks);
+  if (offNetwork && net.mode === "require") throw new Error("Clock in from an office network. Your address is not on the practice's list.");
+  const [row] = await db.insert(timeEntries).values({ practiceId, userId, clockIn: at, ip, offNetwork }).returning();
   return row;
+}
+
+export async function startBreak(db: Db, userId: string, at = new Date()) {
+  const e = await currentEntry(db, userId);
+  if (!e) throw new Error("Clock in first");
+  if (await currentBreak(db, e.id)) throw new Error("You are already on a break");
+  await db.insert(timeBreaks).values({ entryId: e.id, startsAt: at });
+}
+
+export async function endBreak(db: Db, userId: string, at = new Date()) {
+  const e = await currentEntry(db, userId);
+  const b = e ? await currentBreak(db, e.id) : null;
+  if (!b) throw new Error("You are not on a break");
+  await db.update(timeBreaks).set({ endsAt: at }).where(eq(timeBreaks.id, b.id));
+  return (at.getTime() - b.startsAt.getTime()) / 60_000;
 }
 
 export async function clockOut(db: Db, userId: string, at = new Date(), note?: string) {
@@ -211,8 +358,42 @@ export async function clockOut(db: Db, userId: string, at = new Date(), note?: s
   if (!e) throw new Error("You are not clocked in");
   // A forgotten clock-out counts at most MAX_ENTRY_HOURS.
   const out = new Date(Math.min(at.getTime(), e.clockIn.getTime() + MAX_ENTRY_HOURS * 3_600_000));
+  const b = await currentBreak(db, e.id);
+  if (b) await db.update(timeBreaks).set({ endsAt: out }).where(eq(timeBreaks.id, b.id));
   await db.update(timeEntries).set({ clockOut: out, note: note?.trim().slice(0, 200) || null }).where(eq(timeEntries.id, e.id));
-  return { hours: (out.getTime() - e.clockIn.getTime()) / 3_600_000, capped: out.getTime() < at.getTime() };
+  const breaks = await db.select().from(timeBreaks).where(eq(timeBreaks.entryId, e.id));
+  const breakMs = breaks.reduce((a, x) => a + ((x.endsAt ?? out).getTime() - x.startsAt.getTime()), 0);
+  return { hours: (out.getTime() - e.clockIn.getTime() - breakMs) / 3_600_000, breakMinutes: Math.round(breakMs / 60_000), capped: out.getTime() < at.getTime() };
+}
+
+export type WorkedSpan = { userId: string; start: Date; end: Date };
+
+/**
+ * The time each person actually worked between two moments: clocked entries
+ * (an open one runs to `now`, each capped at MAX_ENTRY_HOURS) less breaks,
+ * as spans so they can be split by day for overtime.
+ */
+export async function workedSpans(db: Db, practiceId: string, userIds: string[], start: Date, end: Date, now = new Date()) {
+  if (!userIds.length) return [];
+  const entries = await db.select().from(timeEntries).where(and(eq(timeEntries.practiceId, practiceId), inArray(timeEntries.userId, userIds), lte(timeEntries.clockIn, end)));
+  const breaks = entries.length ? await db.select().from(timeBreaks).where(inArray(timeBreaks.entryId, entries.map((e) => e.id))) : [];
+  const spans: WorkedSpan[] = [];
+  for (const e of entries) {
+    const stop = new Date(Math.min((e.clockOut ?? now).getTime(), e.clockIn.getTime() + MAX_ENTRY_HOURS * 3_600_000));
+    let pieces = [{ start: e.clockIn, end: stop }];
+    for (const b of breaks.filter((x) => x.entryId === e.id)) {
+      const bs = b.startsAt, be = b.endsAt ?? stop;
+      pieces = pieces.flatMap((p) => {
+        if (be <= p.start || bs >= p.end) return [p];
+        return [{ start: p.start, end: bs }, { start: be, end: p.end }].filter((x) => x.end > x.start);
+      });
+    }
+    for (const p of pieces) {
+      const s = new Date(Math.max(p.start.getTime(), start.getTime())), t = new Date(Math.min(p.end.getTime(), end.getTime()));
+      if (t > s) spans.push({ userId: e.userId, start: s, end: t });
+    }
+  }
+  return spans;
 }
 
 export async function saveHandover(db: Db, practiceId: string, userId: string, input: { done?: string; inProgress?: string; problems?: string }) {
@@ -233,19 +414,24 @@ export async function recentHandovers(db: Db, practiceId: string, hours = 24, no
 
 export async function teamBoard(db: Db, practiceId: string, at = new Date()) {
   const team = await assignableUsers(db, practiceId);
-  const [avail, shifts, entries] = await Promise.all([
-    availability(db, team.map((t) => t.id), at),
-    team.length ? db.select().from(staffShifts).where(inArray(staffShifts.userId, team.map((t) => t.id))) : Promise.resolve([]),
-    team.length ? db.select().from(timeEntries).where(and(inArray(timeEntries.userId, team.map((t) => t.id)), isNull(timeEntries.clockOut))) : Promise.resolve([]),
+  const ids = team.map((t) => t.id);
+  const [avail, entries] = await Promise.all([
+    availability(db, ids, at),
+    ids.length ? db.select().from(timeEntries).where(and(inArray(timeEntries.userId, ids), isNull(timeEntries.clockOut))) : Promise.resolve([]),
   ]);
-  return team.map((t) => ({ ...t, ...avail.get(t.id)!, shifts: shifts.filter((s) => s.userId === t.id).sort((a, b) => a.weekday - b.weekday || a.startsAt.localeCompare(b.startsAt)), clockedInSince: entries.find((e) => e.userId === t.id)?.clockIn ?? null }));
+  const breaks = entries.length ? await db.select().from(timeBreaks).where(and(inArray(timeBreaks.entryId, entries.map((e) => e.id)), isNull(timeBreaks.endsAt))) : [];
+  return team.map((t) => {
+    const entry = entries.find((e) => e.userId === t.id);
+    const a = avail.get(t.id)!;
+    return { ...t, ...a, shifts: [...a.shifts].sort((x, y) => x.weekday - y.weekday || x.startsAt.localeCompare(y.startsAt)), clockedInSince: entry?.clockIn ?? null, offNetwork: entry?.offNetwork ?? false, onBreak: !!entry && breaks.some((b) => b.entryId === entry.id) };
+  });
 }
 
 /** Gaps: queues with nobody available today, and open tasks due by tomorrow whose owner is off. */
 export async function coverageGaps(db: Db, practiceId: string, now = new Date()) {
-  const rules = (await db.select().from(workRules).where(and(eq(workRules.practiceId, practiceId), eq(workRules.active, true))));
+  const rules = await db.select().from(workRules).where(and(eq(workRules.practiceId, practiceId), eq(workRules.active, true)));
   const ids = [...new Set(rules.flatMap((r) => r.assigneeIds))];
-  const tomorrow = new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10);
+  const tomorrow = new Date(now.getTime() + DAY).toISOString().slice(0, 10);
   const due = await db.select({ t: tasks, name: users.name }).from(tasks).innerJoin(users, eq(users.id, tasks.assigneeId))
     .where(and(eq(tasks.practiceId, practiceId), eq(tasks.status, "open"), lte(tasks.dueDate, tomorrow)));
   const avail = await availability(db, [...new Set([...ids, ...due.map((d) => d.t.assigneeId!)])], now);
@@ -254,25 +440,24 @@ export async function coverageGaps(db: Db, practiceId: string, now = new Date())
   return { uncovered, stranded };
 }
 
-/** Hours clocked and output per person in a period, and output per hour. */
+/** Hours worked (less breaks) and output per person in a period, and output per hour. */
 export async function hoursAndOutput(db: Db, practiceId: string, from: string, to: string, now = new Date()) {
-  const start = new Date(`${from}T00:00:00Z`), end = new Date(Date.parse(`${to}T00:00:00Z`) + 86_400_000);
+  const start = new Date(`${from}T00:00:00Z`), end = new Date(Date.parse(`${to}T00:00:00Z`) + DAY);
   const team = await assignableUsers(db, practiceId);
   if (!team.length) return [];
   const ids = team.map((t) => t.id);
-  const { rows } = await db.execute<Record<string, string | null>>(sql`
-    SELECT u.id,
-      (SELECT COALESCE(sum(extract(epoch FROM (LEAST(COALESCE(e.clock_out, ${now}), e.clock_in + interval '${sql.raw(String(MAX_ENTRY_HOURS))} hours', ${end}) - GREATEST(e.clock_in, ${start}))) / 3600), 0)
-         FROM time_entries e WHERE e.user_id = u.id AND e.practice_id = ${practiceId} AND e.clock_in < ${end} AND COALESCE(e.clock_out, ${now}) > ${start})::text AS hours,
-      (SELECT count(*) FROM tasks t WHERE t.assignee_id = u.id AND t.practice_id = ${practiceId} AND t.status = 'done' AND t.completed_at >= ${start} AND t.completed_at < ${end})::text AS tasks,
-      (SELECT count(*) FROM ledger_entries l WHERE l.posted_by = u.id AND l.practice_id = ${practiceId} AND l.posted_at >= ${start} AND l.posted_at < ${end})::text AS postings,
-      (SELECT count(*) FROM audit_log a WHERE a.user_id = u.id AND a.practice_id = ${practiceId} AND a.action = 'submit_claim' AND a.at >= ${start} AND a.at < ${end})::text AS claims
-    FROM users u WHERE u.id IN (SELECT jsonb_array_elements_text(${JSON.stringify(ids)}::jsonb)::uuid)`);
+  const spans = await workedSpans(db, practiceId, ids, start, end, now);
+  const [done, posted, sent, flagged] = await Promise.all([
+    db.select({ userId: tasks.assigneeId }).from(tasks).where(and(eq(tasks.practiceId, practiceId), inArray(tasks.assigneeId, ids), eq(tasks.status, "done"), gte(tasks.completedAt, start), lte(tasks.completedAt, end))),
+    db.select({ userId: schema.ledgerEntries.postedBy }).from(schema.ledgerEntries).where(and(eq(schema.ledgerEntries.practiceId, practiceId), inArray(schema.ledgerEntries.postedBy, ids), gte(schema.ledgerEntries.postedAt, start), lte(schema.ledgerEntries.postedAt, end))),
+    db.select({ userId: auditLog.userId }).from(auditLog).where(and(eq(auditLog.practiceId, practiceId), eq(auditLog.action, "submit_claim"), inArray(auditLog.userId, ids), gte(auditLog.at, start), lte(auditLog.at, end))),
+    db.select({ userId: timeEntries.userId }).from(timeEntries).where(and(inArray(timeEntries.userId, ids), eq(timeEntries.offNetwork, true), gte(timeEntries.clockIn, start), lte(timeEntries.clockIn, end))),
+  ]);
+  const count = (rows: { userId: string | null }[], id: string) => rows.filter((r) => r.userId === id).length;
   return team.map((t) => {
-    const r = rows.find((x) => x.id === t.id);
-    const hours = Math.max(0, Number(r?.hours ?? 0));
-    const n = (k: string) => Number(r?.[k] ?? 0);
+    const hours = spans.filter((s) => s.userId === t.id).reduce((a, s) => a + (s.end.getTime() - s.start.getTime()), 0) / 3_600_000;
+    const n = { tasks: count(done, t.id), postings: count(posted, t.id), claims: count(sent, t.id), offNetwork: count(flagged, t.id) };
     const per = (v: number) => (hours >= 0.5 ? v / hours : null);
-    return { userId: t.id, name: t.name, role: t.role, hours, tasks: n("tasks"), postings: n("postings"), claims: n("claims"), tasksPerHour: per(n("tasks")), claimsPerHour: per(n("claims")), postingsPerHour: per(n("postings")) };
+    return { userId: t.id, name: t.name, role: t.role, hours, ...n, tasksPerHour: per(n.tasks), claimsPerHour: per(n.claims), postingsPerHour: per(n.postings) };
   }).sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
 }

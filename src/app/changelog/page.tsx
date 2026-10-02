@@ -9,6 +9,19 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-10-02",
+    title: "Shifts: breaks, overtime and pay, time-off requests, swaps, holiday calendars",
+    items: [
+      "Breaks when clocked in, not counted as hours worked",
+      "A pay worksheet: regular and overtime hours by each person's weekly and daily rules, and gross pay in their currency",
+      "Time-off requests that an administrator approves; cancelling approved time off moves the tasks back",
+      "Shift swaps: a teammate accepts, an administrator approves, and the hours move across time zones",
+      "Holiday calendars for the US, the Philippines, Pakistan and India, plus holidays you add",
+      "Office networks for clocking in: flag or refuse a clock-in from elsewhere",
+      "Work queue due dates count the assignee's working days",
+    ],
+  },
+  {
     date: "2026-10-01",
     title: "Biller shifts across time zones",
     items: [

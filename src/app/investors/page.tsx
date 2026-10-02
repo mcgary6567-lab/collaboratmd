@@ -105,8 +105,8 @@ const PROOF = [
   {
     icon: Users,
     title: "Made for billing companies with offshore teams",
-    body: "Billing companies commonly staff overnight teams abroad to work US claims during the US day. Shifts in each biller's own time zone, time off that reroutes the work queues, shift handovers and output per hour make that model run inside the product instead of in spreadsheets and chat.",
-    tag: "Shifts · time zones · handovers · productivity",
+    body: "Billing companies commonly staff overnight teams abroad to work US claims during the US day. Shifts in each biller's own time zone and holiday calendar, approved time off that reroutes the work queues, shift swaps, handovers, output per hour and a pay worksheet with overtime make that model run inside the product instead of in spreadsheets and chat.",
+    tag: "Shifts · time zones · holidays · overtime · productivity",
   },
   {
     icon: Repeat,

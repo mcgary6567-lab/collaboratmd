@@ -3,39 +3,46 @@ import Link from "next/link";
 import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { hoursAndOutput, MAX_ENTRY_HOURS } from "@/server/shifts";
-import { Card, Empty, PageHeader } from "@/components/ui";
+import { payWorksheet } from "@/server/pay";
+import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Hours and output" };
+export const metadata: Metadata = { title: "Hours, output and pay" };
 export const dynamic = "force-dynamic";
 
 const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const rate = (v: number | null) => (v === null ? "-" : v.toFixed(1));
+const money = (cents: number, currency: string) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+const weekday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
 
-/** Hours clocked by each person and what they got done, per hour. */
+/** Hours clocked by each person, what they got done per hour, and the pay worksheet for the period. */
 export default async function TeamHoursPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   const s = await requireRole(["admin"]);
   const q = await searchParams;
   const to = isDay(q.to) ? q.to! : new Date().toISOString().slice(0, 10);
   const from = isDay(q.from) ? q.from! : new Date(Date.parse(`${to}T12:00:00Z`) - 6 * 86_400_000).toISOString().slice(0, 10);
-  const rows = await hoursAndOutput(await getDb(), s.practiceId, from, to);
+  const db = await getDb();
+  const [rows, pay] = await Promise.all([hoursAndOutput(db, s.practiceId, from, to), payWorksheet(db, s.practiceId, from, to)]);
   const total = rows.reduce((a, r) => a + r.hours, 0);
+  const totals = new Map<string, number>();
+  for (const p of pay) if (p.grossCents !== null && p.currency) totals.set(p.currency, (totals.get(p.currency) ?? 0) + p.grossCents);
+  const wholeWeeks = weekday(from) === 1 && weekday(to) === 0;
   return (
     <>
-      <PageHeader title="Hours and output" subtitle={`${fmtDate(`${from}T00:00:00`)} to ${fmtDate(`${to}T00:00:00`)}: ${total.toFixed(1)} hours clocked across the team`} actions={<Link href="/work/shifts" className="btn btn-secondary">Shifts and time off</Link>} />
+      <PageHeader title="Hours, output and pay" subtitle={`${fmtDate(`${from}T00:00:00`)} to ${fmtDate(`${to}T00:00:00`)}: ${total.toFixed(1)} hours worked across the team`} actions={<Link href="/work/shifts" className="btn btn-secondary">Shifts and time off</Link>} />
       <form className="mb-6 flex flex-wrap items-end gap-3 text-sm" action="/reports/team-hours">
         <label className="block"><span className="label">From</span><input type="date" name="from" defaultValue={from} className="input" /></label>
         <label className="block"><span className="label">To</span><input type="date" name="to" defaultValue={to} className="input" /></label>
         <button className="btn btn-secondary">Show</button>
       </form>
-      <Card title="By person">
+      <Card title="By person" className="mb-6">
         {rows.length === 0 ? <Empty>No team members yet.</Empty> : (
           <div tabIndex={0} role="region" aria-label="Hours and output by person" className="overflow-x-auto">
             <table className="table table-stack text-sm">
               <thead><tr><th>Person</th><th className="text-right">Hours</th><th className="text-right">Tasks done</th><th className="text-right">Claims sent</th><th className="text-right">Payments and adjustments posted</th><th className="text-right">Tasks per hour</th><th className="text-right">Claims per hour</th><th className="text-right">Postings per hour</th></tr></thead>
               <tbody>{rows.map((r) => (
                 <tr key={r.userId}>
-                  <td data-label="Person">{r.name}</td>
+                  <td data-label="Person">{r.name}{r.offNetwork > 0 && <> <Badge tone="amber">{r.offNetwork} off-network clock-in{r.offNetwork === 1 ? "" : "s"}</Badge></>}</td>
                   <td data-label="Hours" className="text-right tabular-nums">{r.hours.toFixed(1)}</td>
                   <td data-label="Tasks done" className="text-right tabular-nums">{r.tasks}</td>
                   <td data-label="Claims sent" className="text-right tabular-nums">{r.claims}</td>
@@ -49,7 +56,30 @@ export default async function TeamHoursPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </Card>
-      <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Hours come from clocking in and out on Shifts and time off; an entry left open counts at most {MAX_ENTRY_HOURS} hours. Per-hour figures need at least half an hour clocked. Work differs in difficulty (an appeal takes longer than a posting), so compare people doing the same kind of work.</p>
+      <Card title="Pay worksheet">
+        {!wholeWeeks && <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">Weekly overtime counts Monday-to-Sunday weeks. This period does not start on a Monday and end on a Sunday, so a part week can show less weekly overtime than the full week has.</p>}
+        {pay.length === 0 ? <Empty>No hours worked and no pay rates set. Set rates on <Link href="/work/shifts/manage" className="underline">Manage shifts</Link>.</Empty> : (
+          <div tabIndex={0} role="region" aria-label="Pay worksheet" className="overflow-x-auto">
+            <table className="table table-stack text-sm">
+              <thead><tr><th>Person</th><th>Time zone</th><th className="text-right">Hours</th><th className="text-right">Regular</th><th className="text-right">Overtime</th><th className="text-right">Rate</th><th className="text-right">Gross</th></tr></thead>
+              <tbody>{pay.map((p) => (
+                <tr key={p.userId}>
+                  <td data-label="Person">{p.name}</td>
+                  <td data-label="Time zone">{p.tz}</td>
+                  <td data-label="Hours" className="text-right tabular-nums">{p.total.toFixed(2)}</td>
+                  <td data-label="Regular" className="text-right tabular-nums">{p.regular.toFixed(2)}</td>
+                  <td data-label="Overtime" className="text-right tabular-nums">{p.overtime.toFixed(2)}</td>
+                  <td data-label="Rate" className="text-right tabular-nums">{p.pay ? `${money(p.pay.rateCents, p.pay.currency)}${p.pay.otMultiplier !== 1 ? `, overtime ×${p.pay.otMultiplier}` : ""}` : "not set"}</td>
+                  <td data-label="Gross" className="text-right tabular-nums">{p.grossCents !== null && p.currency ? money(p.grossCents, p.currency) : "-"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+        {totals.size > 0 && <p className="mt-3 text-sm font-medium">Total gross: {[...totals].map(([c, v]) => money(v, c)).join(" + ")}</p>}
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">A worksheet for payroll, not payroll: no taxes, deductions, benefits or payments. Hours are clocked time less breaks, split by day in each person&apos;s own time zone. Overtime follows each person&apos;s weekly and daily thresholds; with both, each week counts whichever gives more, so no hour counts twice.</p>
+      </Card>
+      <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Hours come from clocking in and out on Shifts and time off, less breaks; an entry left open counts at most {MAX_ENTRY_HOURS} hours. Per-hour figures need at least half an hour clocked. Work differs in difficulty (an appeal takes longer than a posting), so compare people doing the same kind of work.</p>
     </>
   );
 }

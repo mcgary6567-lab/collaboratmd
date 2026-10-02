@@ -163,18 +163,26 @@ export const PAGE_GUIDES: Record<string, Guide> = {
   "/work/shifts": {
     title: "Shifts and time off",
     steps: [
-      "Set each person's time zone and weekly hours in their own time zone; a night shift such as 21:00 to 06:00 runs past midnight. The team table shows who is on now and when everyone else is next on, in your time.",
-      "Record time off: work queue rules skip people who are off, and their open queue tasks due in that time move to others on the same rule. Clock in and out at the start and end of a shift, and leave a handover note; the next shift sees it on its dashboard.",
+      "The team table shows who is on now, on a break, off or on a holiday, in their own time, and when everyone else is next on, in your time. Clock in and out at the start and end of a shift and take breaks with Start break and End break; breaks are not counted as hours worked. If your administrator set office networks, a clock-in from elsewhere is flagged or refused.",
+      "Ask for time off: an administrator approves it, and then your open queue tasks due in that time move to others on the same rule; if approved time off is cancelled, the tasks still open move back. To swap a shift, pick one of your upcoming shifts and a teammate; they accept, and an administrator who is not one of you approves it. Leave a handover note at the end of a shift; the next shift sees it on its dashboard.",
     ],
-    related: [{ label: "Work queues", href: "/work" }, { label: "Hours and output", href: "/reports/team-hours" }],
+    related: [{ label: "Manage shifts", href: "/work/shifts/manage" }, { label: "Work queues", href: "/work" }],
+  },
+  "/work/shifts/manage": {
+    title: "Manage shifts",
+    steps: [
+      "Approve or deny time off and shift swaps; you cannot decide your own. Set each person's time zone, weekly hours in their own time zone (21:00 to 06:00 runs past midnight), holiday calendar and pay: an hourly rate in their currency, overtime after so many hours a week or a day, and the overtime multiplier.",
+      "Holidays: the US, Philippine, Pakistani and Indian calendars hold the dates that can be computed. Add holidays set by the moon or by proclamation, such as Eid or Diwali, once they are announced, to a calendar or company-wide. Office networks: list the IP addresses or ranges people clock in from, and choose whether a clock-in from elsewhere is flagged or refused.",
+    ],
+    related: [{ label: "Shifts and time off", href: "/work/shifts" }, { label: "Hours, output and pay", href: "/reports/team-hours" }],
   },
   "/reports/team-hours": {
-    title: "Hours and output",
+    title: "Hours, output and pay",
     steps: [
-      "Hours each person clocked in a period, with the tasks they finished, claims they sent and payments they posted, and each per hour.",
-      "Compare people doing the same kind of work: an appeal takes longer than a payment posting.",
+      "Hours each person worked in a period (clocked time less breaks), with the tasks they finished, claims they sent and payments they posted, each per hour, and any clock-ins from outside the office networks. Compare people doing the same kind of work: an appeal takes longer than a payment posting.",
+      "The pay worksheet splits hours into regular and overtime by each person's rules and shows gross pay in their currency. Pick a Monday-to-Sunday period so weekly overtime is complete. It is a worksheet for payroll: no taxes, deductions or payments.",
     ],
-    related: [{ label: "Shifts and time off", href: "/work/shifts" }],
+    related: [{ label: "Shifts and time off", href: "/work/shifts" }, { label: "Manage shifts", href: "/work/shifts/manage" }],
   },
   "/settings/maintenance": {
     title: "Maintenance",

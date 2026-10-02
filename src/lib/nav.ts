@@ -1,6 +1,6 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
-  Award, Bot, BuildingComplex, Calculator, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, FolderSearch, Gauge, Gavel, HandCoins,
+  Award, Bot, BuildingComplex, Calculator, CalendarCog, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, FolderSearch, Gauge, Gavel, HandCoins,
   HeartPulse, Hospital, Inbox, Landmark, LayoutDashboard, ListChecks, MessageSquare, Network, Radar, Receipt, ReceiptText, Scale, RotateCcwClock, SearchCheck, Settings, SquareCheckBig, Stethoscope,
   TrendingDown, TriangleAlert, Undo2, Upload, UserSearch, Users, Wallet, WandSparkles,
 } from "lucide-react";
@@ -16,6 +16,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/tasks", label: "Tasks", icon: SquareCheckBig },
       { href: "/work", label: "Work queues", icon: Inbox },
       { href: "/work/shifts", label: "Shifts and time off", icon: Clock },
+      { href: "/work/shifts/manage", label: "Manage shifts", icon: CalendarCog, adminOnly: true },
       { href: "/admin", label: "Practice analytics", icon: BuildingComplex, adminOnly: true },
       { href: "/clients", label: "All clients", icon: Network, multiOnly: true },
       { href: "/clients/invoicing", label: "Client invoicing", icon: ReceiptText, adminOnly: true },
@@ -96,7 +97,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reports/front-desk", label: "Front-desk collections", icon: Wallet },
       { href: "/reports/referrals", label: "Referral sources", icon: Users },
       { href: "/reports/cost-to-collect", label: "Cost to collect", icon: Calculator, adminOnly: true },
-      { href: "/reports/team-hours", label: "Hours and output", icon: Gauge, adminOnly: true },
+      { href: "/reports/team-hours", label: "Hours, output and pay", icon: Gauge, adminOnly: true },
       { href: "/setup", label: "Setup checklist", icon: ListChecks, adminOnly: true },
       { href: "/import", label: "Import", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },

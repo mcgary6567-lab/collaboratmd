@@ -164,6 +164,8 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     /** The time zone the person works in; null means the practice's (server/shifts.ts). Migration 0067. */
     timeZone: text("time_zone"),
+    /** The holiday calendar the person follows: US, PH, PK, IN (server/holidays.ts). Migration 0068. */
+    holidayCalendar: text("holiday_calendar"),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
@@ -1356,6 +1358,9 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   /** The work rule that created it, if any. */
   ruleId: uuid("rule_id"),
+  /** Moved to a teammate for someone's time off (server/shifts.ts), so it can go back. Migration 0068. */
+  movedFrom: uuid("moved_from"),
+  movedFor: uuid("moved_for"),
 });
 
 export const notes = pgTable("notes", {
@@ -2623,6 +2628,10 @@ export const staffTimeOff = pgTable("staff_time_off", {
   note: text("note"),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  /** requested | approved | denied. Migration 0068. */
+  status: text("status").notNull().default("approved"),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
 });
 
 /** Clocking in and out. Migration 0067. */
@@ -2633,6 +2642,9 @@ export const timeEntries = pgTable("time_entries", {
   clockIn: timestamp("clock_in", { withTimezone: true }).notNull(),
   clockOut: timestamp("clock_out", { withTimezone: true }),
   note: text("note"),
+  /** Where the clock-in came from, and whether it was outside the office networks. Migration 0068. */
+  ip: text("ip"),
+  offNetwork: boolean("off_network").notNull().default(false),
 });
 
 /** End-of-shift notes for whoever works next. Migration 0067. */
@@ -2644,4 +2656,72 @@ export const shiftHandovers = pgTable("shift_handovers", {
   inProgress: text("in_progress"),
   problems: text("problems"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Holidays a calendar cannot compute (lunar or proclaimed dates) and company holidays. Migration 0068. */
+export const staffHolidays = pgTable("staff_holidays", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  calendar: text("calendar").notNull(),
+  onDate: date("on_date").notNull(),
+  name: text("name").notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** One-off changes to weekly hours, as real moments: extra hours or cancelled hours. Migration 0068. */
+export const shiftChanges = pgTable("shift_changes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(), // extra | cancel
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  swapId: uuid("swap_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** A shift offered to a teammate: requested, accepted by the teammate, approved by an administrator. Migration 0068. */
+export const shiftSwaps = pgTable("shift_swaps", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  requesterId: uuid("requester_id").notNull().references(() => users.id),
+  takerId: uuid("taker_id").notNull().references(() => users.id),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  note: text("note"),
+  status: text("status").notNull().default("requested"),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Unpaid breaks inside a clocked shift. Migration 0068. */
+export const timeBreaks = pgTable("time_breaks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  entryId: uuid("entry_id").notNull().references(() => timeEntries.id, { onDelete: "cascade" }),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+});
+
+/** The office networks a clock-in should come from. Migration 0068. */
+export const clockSettings = pgTable("clock_settings", {
+  practiceId: uuid("practice_id").primaryKey().references(() => practices.id),
+  networks: jsonb("networks").$type<string[]>().notNull().default([]),
+  mode: text("mode").notNull().default("flag"), // flag | require
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Pay for the pay worksheet: hourly rate in the person's currency and overtime rules. Migration 0068. */
+export const staffPay = pgTable("staff_pay", {
+  userId: uuid("user_id").primaryKey().references(() => users.id),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  rateCents: integer("rate_cents").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  weeklyOtHours: numeric("weekly_ot_hours", { mode: "number" }),
+  dailyOtHours: numeric("daily_ot_hours", { mode: "number" }),
+  otMultiplier: numeric("ot_multiplier", { mode: "number" }).notNull().default(1.5),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

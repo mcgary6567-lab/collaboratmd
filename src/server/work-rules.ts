@@ -12,7 +12,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { WorkConditions } from "@/db/schema";
 import { notify } from "./notifications";
-import { availability, pickAssignee } from "./shifts";
+import { availability, dueDateFor, pickAssignee } from "./shifts";
 
 const { workRules, tasks, auditLog } = schema;
 type Row = Record<string, string | null>;
@@ -108,13 +108,12 @@ export async function applyRules(db: Db, practiceId: string, opts: { limit?: num
   for (const rule of rules) {
     const items = await candidates(db, practiceId, rule, opts.limit ?? 200, now);
     let next = rule.nextIndex;
-    const due = new Date(now.getTime() + rule.slaDays * 86_400_000).toISOString().slice(0, 10);
     for (const item of items) {
       const pick = pickAssignee(rule.assigneeIds, next, avail);
       const assigneeId = pick.assigneeId;
       next = pick.next;
       perPerson.set(assigneeId, (perPerson.get(assigneeId) ?? 0) + 1);
-      await db.insert(tasks).values({ practiceId, title: TITLES[rule.kind](item.label ?? ""), entityType: item.type, entityId: item.id, assigneeId, dueDate: due, priority: rule.priority, ruleId: rule.id, note: `Assigned by the rule "${rule.name}"` });
+      await db.insert(tasks).values({ practiceId, title: TITLES[rule.kind](item.label ?? ""), entityType: item.type, entityId: item.id, assigneeId, dueDate: dueDateFor(avail.get(assigneeId), rule.slaDays, now), priority: rule.priority, ruleId: rule.id, note: `Assigned by the rule "${rule.name}"` });
     }
     if (items.length) await db.update(workRules).set({ nextIndex: next % Math.max(1, rule.assigneeIds.length) }).where(eq(workRules.id, rule.id));
     out[rule.name] = items.length;
