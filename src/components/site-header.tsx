@@ -75,7 +75,10 @@ export function SiteHeader({
                 Start free trial
               </Link>
               <Link href={demoLink().href} className="btn whitespace-nowrap bg-green-700 text-white hover:bg-green-800">
-                {demoLink().open ? "View the demo" : "Book a demo"} <ArrowRight className="hidden h-4 w-4 sm:inline" />
+                {/* Short on phones, so the logo, this button and the menu fit on one line. */}
+                <span className="sm:hidden">Demo</span>
+                <span className="hidden sm:inline">{demoLink().open ? "View the demo" : "Book a demo"}</span>
+                <ArrowRight className="hidden h-4 w-4 sm:inline" />
               </Link>
             </>
           )}
