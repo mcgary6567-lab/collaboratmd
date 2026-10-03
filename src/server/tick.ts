@@ -6,7 +6,9 @@
  * - waitlist offers nobody has taken go to the next people on the list
  *   (server/waitlist.ts advanceOffers);
  * - the morning-of reminder goes out at 7:00 on the practice's clock, and
- *   tomorrow's reminders at 10:00 (both only when switched on in Automation).
+ *   tomorrow's reminders at 10:00 (both only when switched on in Automation);
+ * - staff who have not clocked in for a shift, or forgot to clock out, are
+ *   reminded (server/clock-alerts.ts).
  *
  * It is started from outside, by the live-check workflow on GitHub, with the
  * same CRON_SECRET as the daily job. Everything it does is also safe to repeat
@@ -23,6 +25,7 @@ import { advanceOffers, MAX_ROUNDS, ROUND_MINUTES } from "./waitlist";
 import { practiceClock } from "./practice-time";
 import { alertOperators } from "./ops-alerts";
 import { beat, lastBeat } from "./heartbeats";
+import { clockAlerts } from "./clock-alerts";
 
 export { beat, lastBeat };
 
@@ -53,6 +56,10 @@ export async function runTick(db: Db, origin: string, now = new Date(), deps: { 
     if (s.sameDayReminders && hour === REMINDER_HOURS.sameDay) add(p.id, "sameDay", await sameDayReminders(db, p.id, now, deps.send ? { sms: deps.send } : {}).catch((e) => ({ error: e instanceof Error ? e.message : "failed" })));
     if (s.appointmentReminders && hour === REMINDER_HOURS.dayBefore) add(p.id, "dayBefore", await appointmentReminders(db, p.id, origin, now).catch((e) => ({ error: e instanceof Error ? e.message : "failed" })));
   }
+
+  // Clock reminders, recorded in the result only when one went out (or failed).
+  const clock = await clockAlerts(db, now).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }));
+  if ("error" in clock || clock.late || clock.forgot) add("staff", "clock", clock);
   return out;
 }
 

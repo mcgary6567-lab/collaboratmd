@@ -2722,6 +2722,53 @@ export const staffPay = pgTable("staff_pay", {
   weeklyOtHours: numeric("weekly_ot_hours", { mode: "number" }),
   dailyOtHours: numeric("daily_ot_hours", { mode: "number" }),
   otMultiplier: numeric("ot_multiplier", { mode: "number" }).notNull().default(1.5),
+  /** Premiums, migration 0069: a night differential in percent between two local times, and the multiplier for hours worked on a holiday. */
+  nightPct: numeric("night_pct", { mode: "number" }),
+  nightStart: text("night_start").notNull().default("22:00"),
+  nightEnd: text("night_end").notNull().default("06:00"),
+  holidayMultiplier: numeric("holiday_multiplier", { mode: "number" }),
   updatedBy: uuid("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Corrections to clocked time, asked for by the person and decided by an administrator. Migration 0069. */
+export const timeCorrections = pgTable("time_corrections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  entryId: uuid("entry_id").references(() => timeEntries.id, { onDelete: "set null" }),
+  clockIn: timestamp("clock_in", { withTimezone: true }).notNull(),
+  clockOut: timestamp("clock_out", { withTimezone: true }).notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("requested"),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** A person's week, submitted and approved; approved weeks are locked. Migration 0069. */
+export const timesheets = pgTable("timesheets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  weekStart: date("week_start").notNull(),
+  status: text("status").notNull().default("submitted"),
+  hours: numeric("hours", { mode: "number" }).notNull().default(0),
+  note: text("note"),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
+  approvedBy: uuid("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+}, (t) => [uniqueIndex("timesheets_week_idx").on(t.userId, t.weekStart)]);
+
+/** Leave allowances per person and kind of time off. Migration 0069. */
+export const staffLeave = pgTable("staff_leave", {
+  userId: uuid("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  daysPerYear: numeric("days_per_year", { mode: "number" }).notNull(),
+  accrual: text("accrual").notNull().default("upfront"),
+  carryOver: numeric("carry_over", { mode: "number" }).notNull().default(0),
+  year: integer("year").notNull(),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.kind] })]);

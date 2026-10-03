@@ -427,7 +427,7 @@ const MEDICARE = [
   {
     icon: UsersRound,
     title: "Offshore team, one schedule",
-    body: "Billers in Manila or Karachi work in their own time zone and holiday calendar: night shifts past midnight, time-off requests and shift swaps, breaks and handovers, output per hour, and a pay worksheet with overtime in their currency.",
+    body: "Billers in Manila or Karachi work in their own time zone and holiday calendar: night shifts past midnight, time-off requests with leave balances, shift swaps, weekly timesheets with corrections, clock reminders, a team week view, and a pay worksheet with overtime, night and holiday pay in their currency.",
   },
   {
     icon: CalendarDays,

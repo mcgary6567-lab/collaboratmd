@@ -56,12 +56,12 @@ export default async function TeamHoursPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </Card>
-      <Card title="Pay worksheet">
+      <Card title="Pay worksheet" actions={<a href={`/api/export/payroll?from=${from}&to=${to}`} download className="btn btn-secondary">Download CSV</a>}>
         {!wholeWeeks && <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">Weekly overtime counts Monday-to-Sunday weeks. This period does not start on a Monday and end on a Sunday, so a part week can show less weekly overtime than the full week has.</p>}
         {pay.length === 0 ? <Empty>No hours worked and no pay rates set. Set rates on <Link href="/work/shifts/manage" className="underline">Manage shifts</Link>.</Empty> : (
           <div tabIndex={0} role="region" aria-label="Pay worksheet" className="overflow-x-auto">
             <table className="table table-stack text-sm">
-              <thead><tr><th>Person</th><th>Time zone</th><th className="text-right">Hours</th><th className="text-right">Regular</th><th className="text-right">Overtime</th><th className="text-right">Rate</th><th className="text-right">Gross</th></tr></thead>
+              <thead><tr><th>Person</th><th>Time zone</th><th className="text-right">Hours</th><th className="text-right">Regular</th><th className="text-right">Overtime</th><th className="text-right">Night</th><th className="text-right">Holiday</th><th className="text-right">Rate</th><th className="text-right">Gross</th><th>Weeks approved</th></tr></thead>
               <tbody>{pay.map((p) => (
                 <tr key={p.userId}>
                   <td data-label="Person">{p.name}</td>
@@ -69,15 +69,19 @@ export default async function TeamHoursPage({ searchParams }: { searchParams: Pr
                   <td data-label="Hours" className="text-right tabular-nums">{p.total.toFixed(2)}</td>
                   <td data-label="Regular" className="text-right tabular-nums">{p.regular.toFixed(2)}</td>
                   <td data-label="Overtime" className="text-right tabular-nums">{p.overtime.toFixed(2)}</td>
+                  <td data-label="Night" className="text-right tabular-nums">{p.nightHours.toFixed(2)}</td>
+                  <td data-label="Holiday" className="text-right tabular-nums">{p.holidayHours.toFixed(2)}</td>
                   <td data-label="Rate" className="text-right tabular-nums">{p.pay ? `${money(p.pay.rateCents, p.pay.currency)}${p.pay.otMultiplier !== 1 ? `, overtime ×${p.pay.otMultiplier}` : ""}` : "not set"}</td>
                   <td data-label="Gross" className="text-right tabular-nums">{p.grossCents !== null && p.currency ? money(p.grossCents, p.currency) : "-"}</td>
+                  <td data-label="Weeks approved">{p.weeks.length === 0 ? "-" : <Badge tone={p.approvedWeeks === p.weeks.length ? "green" : "amber"}>{p.approvedWeeks} of {p.weeks.length}</Badge>}</td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
         )}
         {totals.size > 0 && <p className="mt-3 text-sm font-medium">Total gross: {[...totals].map(([c, v]) => money(v, c)).join(" + ")}</p>}
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">A worksheet for payroll, not payroll: no taxes, deductions, benefits or payments. Hours are clocked time less breaks, split by day in each person&apos;s own time zone. Overtime follows each person&apos;s weekly and daily thresholds; with both, each week counts whichever gives more, so no hour counts twice.</p>
+        {pay.some((p) => p.approvedWeeks < p.weeks.length) && <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">Some weeks are not approved yet. Approve them on <Link href="/work/shifts/timesheets" className="underline">Timesheets</Link> before running payroll.</p>}
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">A worksheet for payroll, not payroll: no taxes, deductions, benefits or payments. Hours are clocked time less breaks, split by day in each person&apos;s own time zone. Overtime follows each person&apos;s weekly and daily thresholds; with both, each week counts whichever gives more, so no hour counts twice. Night hours fall in the person&apos;s night window and earn the night differential; holiday hours are worked on a holiday in their calendar and earn the holiday multiplier (the night differential on a holiday is figured on the holiday rate). Premiums are on the base rate and not compounded with overtime.</p>
       </Card>
       <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Hours come from clocking in and out on Shifts and time off, less breaks; an entry left open counts at most {MAX_ENTRY_HOURS} hours. Per-hour figures need at least half an hour clocked. Work differs in difficulty (an appeal takes longer than a posting), so compare people doing the same kind of work.</p>
     </>

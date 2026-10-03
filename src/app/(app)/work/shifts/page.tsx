@@ -4,6 +4,8 @@ import { getDb } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { coverageGaps, currentBreak, currentEntry, recentHandovers, teamBoard, TIME_OFF_KINDS, upcomingTimeOff } from "@/server/shifts";
 import { offerableShifts, swapsFor } from "@/server/shift-swaps";
+import { leaveBalances } from "@/server/leave";
+import { MyTimesheet } from "./my-timesheet";
 import {
   cancelSwapAction, clockAction, handoverAction, removeTimeOffAction, requestSwapAction, requestTimeOffAction, respondSwapAction, timeZoneAction,
 } from "@/app/(app)/shift-actions";
@@ -33,6 +35,7 @@ export default async function ShiftsPage() {
     currentEntry(db, s.userId), recentHandovers(db, s.practiceId, 24, now), coverageGaps(db, s.practiceId, now), upcomingTimeOff(db, board.map((b) => b.id), today),
     offerableShifts(db, s.userId, now), swapsFor(db, s.practiceId, s.userId),
   ]);
+  const balances = (await leaveBalances(db, [s.userId], now)).get(s.userId) ?? [];
   const onBreak = entry ? !!(await currentBreak(db, entry.id)) : false;
   const admin = s.role === "admin";
   const me = board.find((b) => b.id === s.userId);
@@ -45,7 +48,10 @@ export default async function ShiftsPage() {
       <PageHeader
         title="Shifts and time off"
         subtitle={`${onNow.length} of ${board.filter((b) => b.hasSchedule).length} people with set hours are on shift now. Times are shown in each person's own time zone.`}
-        actions={admin ? <><Link href="/work/shifts/manage" className="btn btn-secondary">Manage shifts</Link><Link href="/reports/team-hours" className="btn btn-secondary">Hours, output and pay</Link></> : undefined}
+        actions={<>
+          <Link href="/work/shifts/week" className="btn btn-secondary">Team week</Link>
+          {admin && <><Link href="/work/shifts/manage" className="btn btn-secondary">Manage shifts</Link><Link href="/work/shifts/timesheets" className="btn btn-secondary">Timesheets</Link><Link href="/reports/team-hours" className="btn btn-secondary">Hours, output and pay</Link></>}
+        </>}
       />
 
       {(gaps.uncovered.length > 0 || gaps.stranded.length > 0) && (
@@ -94,6 +100,8 @@ export default async function ShiftsPage() {
         </Card>
       </div>
 
+      <MyTimesheet db={db} practiceId={s.practiceId} userId={s.userId} />
+
       <Card title="Handovers in the last 24 hours" className="mb-6">
         {handovers.length === 0 ? <Empty>No handover notes in the last 24 hours.</Empty> : (
           <ul className="divide-y divide-slate-200 text-sm dark:divide-slate-700">
@@ -135,6 +143,11 @@ export default async function ShiftsPage() {
             <label className="block"><span className="label">Note</span><input name="note" className="input" maxLength={200} /></label>
             <div><SubmitButton pendingLabel="Sending...">Ask for time off</SubmitButton></div>
           </ActionForm>
+          {balances.length > 0 && (
+            <ul className="mb-3 space-y-0.5 text-sm">
+              {balances.map((b) => <li key={b.kind}><span className="font-medium">{b.label}:</span> {b.balance} day{b.balance === 1 ? "" : "s"} left{b.pending ? `, ${b.pending} waiting for approval` : ""} <span className="text-slate-500 dark:text-slate-400">({b.earned} earned{b.carryOver ? ` + ${b.carryOver} carried over` : ""}, {b.used} taken this year)</span></li>)}
+            </ul>
+          )}
           {mine.length === 0 ? <Empty>No time off coming up.</Empty> : (
             <ul className="space-y-1 text-sm">
               {mine.map(({ o }) => (

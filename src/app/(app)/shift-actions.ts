@@ -14,12 +14,14 @@ import {
 import { cancelSwap, decideSwap, requestSwap, respondSwap } from "@/server/shift-swaps";
 import { addHoliday, removeHoliday } from "@/server/holidays";
 import { savePay } from "@/server/pay";
+import { leaveCheck } from "@/server/leave";
+import { weekOpenForClock } from "@/server/timesheets";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const num = (v: string) => (v === "" ? null : Number(v));
 const fail = (e: unknown, fallback: string): FormResult => ({ ok: false, message: e instanceof Error ? e.message : fallback });
 const done = (message: string): FormResult => {
-  for (const p of ["/work/shifts", "/work/shifts/manage", "/dashboard", "/reports/team-hours"]) revalidatePath(p);
+  for (const p of ["/work/shifts", "/work/shifts/manage", "/work/shifts/timesheets", "/work/shifts/week", "/dashboard", "/reports/team-hours"]) revalidatePath(p);
   return { ok: true, message };
 };
 
@@ -79,8 +81,12 @@ export async function timeOffAction(_prev: FormResult, f: FormData): Promise<For
 export async function requestTimeOffAction(_prev: FormResult, f: FormData): Promise<FormResult> {
   try {
     const s = await requireSession();
-    await requestTimeOff(await getDb(), s.practiceId, s.userId, { startsOn: str(f, "startsOn"), endsOn: str(f, "endsOn"), kind: str(f, "kind"), note: str(f, "note") });
-    return done("Requested. An administrator will approve or deny it.");
+    const db = await getDb();
+    const input = { startsOn: str(f, "startsOn"), endsOn: str(f, "endsOn"), kind: str(f, "kind"), note: str(f, "note") };
+    const row = await requestTimeOff(db, s.practiceId, s.userId, input);
+    const check = await leaveCheck(db, s.userId, input.kind, input.startsOn, input.endsOn, new Date(), row.id);
+    const over = check.after !== null && check.after < 0 ? ` This is ${-check.after} day${check.after === -1 ? "" : "s"} over your balance.` : "";
+    return done(`Requested (${check.days} working day${check.days === 1 ? "" : "s"}). An administrator will approve or deny it.${over}`);
   } catch (e) { return fail(e, "Could not send the request"); }
 }
 
@@ -166,6 +172,7 @@ export async function payAction(userId: string, _prev: FormResult, f: FormData):
     await savePay(db, s.practiceId, userId, {
       rateCents: Math.round(Number(str(f, "rate").replace(/[,\s]/g, "")) * 100), currency: str(f, "currency"),
       weeklyOtHours: num(str(f, "weekly")), dailyOtHours: num(str(f, "daily")), multiplier: Number(str(f, "multiplier") || 1.5),
+      nightPct: num(str(f, "nightPct")), nightStart: str(f, "nightStart"), nightEnd: str(f, "nightEnd"), holidayMultiplier: num(str(f, "holidayMultiplier")),
     }, s.userId);
     return done("Pay saved");
   } catch (e) { return fail(e, "Could not save the pay"); }
@@ -179,8 +186,14 @@ export async function clockAction(_prev: FormResult, f: FormData): Promise<FormR
     const db = await getDb();
     const to = str(f, "to");
     if (to === "in") {
-      const entry = await clockIn(db, s.practiceId, s.userId, new Date(), clientIp(await headers()));
-      return done(entry.offNetwork ? "Clocked in. You are not on an office network, so this entry is flagged for your administrator." : "Clocked in");
+      const now = new Date();
+      const week = await weekOpenForClock(db, s.userId, now);
+      const entry = await clockIn(db, s.practiceId, s.userId, now, clientIp(await headers()));
+      const notes = [
+        entry.offNetwork ? "You are not on an office network, so this entry is flagged for your administrator." : "",
+        week.withdrawn ? "This week's submitted timesheet was taken back: submit it again at the end of the week." : "",
+      ].filter(Boolean).join(" ");
+      return done(notes ? `Clocked in. ${notes}` : "Clocked in");
     }
     if (to === "break") {
       await startBreak(db, s.userId);

@@ -6,6 +6,8 @@ import { clockNetworks, teamBoard, TIME_OFF_KINDS, upcomingTimeOff, WEEKDAYS } f
 import { swapsFor } from "@/server/shift-swaps";
 import { addedHolidays, builtInHolidays, CALENDARS, COMPANY } from "@/server/holidays";
 import { CURRENCIES, payFor } from "@/server/pay";
+import { LEAVE_KINDS, leaveBalances, leaveCheck } from "@/server/leave";
+import { leaveAction } from "@/app/(app)/timesheet-actions";
 import {
   addHolidayAction, clockNetworksAction, decideSwapAction, decideTimeOffAction, holidayCalendarAction, payAction, removeHolidayAction, removeTimeOffAction,
   shiftsAction, timeOffAction, timeZoneAction,
@@ -33,6 +35,10 @@ export default async function ManageShiftsPage() {
     upcomingTimeOff(db, ids, today), swapsFor(db, s.practiceId, s.userId), addedHolidays(db, s.practiceId, today), clockNetworks(db, s.practiceId), payFor(db, ids),
   ]);
   const pending = off.filter((o) => o.o.status === "requested");
+  const [balances, checks] = await Promise.all([
+    leaveBalances(db, ids, now),
+    Promise.all(pending.map(({ o }) => leaveCheck(db, o.userId, o.kind, o.startsOn, o.endsOn, now, o.id))),
+  ]);
   const approved = off.filter((o) => o.o.status === "approved");
   const awaiting = swaps.filter((x) => x.status === "accepted");
   const horizon = new Date(now.getTime() + 120 * 86_400_000).toISOString().slice(0, 10);
@@ -44,16 +50,20 @@ export default async function ManageShiftsPage() {
       <PageHeader
         title="Manage shifts"
         subtitle="Approve time off and swaps, and set each person's hours, time zone, holiday calendar and pay."
-        actions={<><Link href="/work/shifts" className="btn btn-secondary">Shifts and time off</Link><Link href="/reports/team-hours" className="btn btn-secondary">Hours, output and pay</Link></>}
+        actions={<><Link href="/work/shifts" className="btn btn-secondary">Shifts and time off</Link><Link href="/work/shifts/timesheets" className="btn btn-secondary">Timesheets</Link><Link href="/work/shifts/week" className="btn btn-secondary">Team week</Link><Link href="/reports/team-hours" className="btn btn-secondary">Hours, output and pay</Link></>}
       />
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
         <Card title={`Time off to approve (${pending.length})`}>
           {pending.length === 0 ? <Empty>No requests waiting.</Empty> : (
             <ul className="divide-y divide-slate-200 text-sm dark:divide-slate-700">
-              {pending.map(({ o, name }) => (
+              {pending.map(({ o, name }, i) => (
                 <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span>{name}: {TIME_OFF_KINDS[o.kind] ?? o.kind}, {day(o.startsOn)}{o.endsOn !== o.startsOn ? ` to ${day(o.endsOn)}` : ""}{o.note ? ` (${o.note})` : ""}</span>
+                  <span>
+                    {name}: {TIME_OFF_KINDS[o.kind] ?? o.kind}, {day(o.startsOn)}{o.endsOn !== o.startsOn ? ` to ${day(o.endsOn)}` : ""}{o.note ? ` (${o.note})` : ""}.{" "}
+                    {checks[i].days} working day{checks[i].days === 1 ? "" : "s"}
+                    {checks[i].after !== null && (checks[i].after! < 0 ? <> <Badge tone="red">{-checks[i].after!} over the balance</Badge></> : <>, {checks[i].after} left after</>)}
+                  </span>
                   {o.userId === s.userId ? <span className="text-xs text-slate-500 dark:text-slate-400">Another administrator decides your own request.</span> : (
                     <span className="flex gap-2">
                       <ActionForm action={decideTimeOffAction.bind(null, o.id, true)}><SubmitButton pendingLabel="...">Approve</SubmitButton></ActionForm>
@@ -117,6 +127,7 @@ export default async function ManageShiftsPage() {
                   <span className="text-slate-500 dark:text-slate-400">
                     {b.shifts.length ? b.shifts.map((x) => `${WEEKDAYS[x.weekday].slice(0, 3)} ${x.startsAt}-${x.endsAt}`).join(", ") : "no set hours"} · {b.tz} · {b.calendar ? calName(b.calendar) : "company holidays only"}
                     {pay ? ` · ${(pay.rateCents / 100).toFixed(2)} ${pay.currency}/hour` : " · no pay rate"}
+                    {(balances.get(b.id) ?? []).map((x) => ` · ${x.label} ${x.balance} days left`).join("")}
                   </span>
                 </summary>
                 <div className="mt-2 grid gap-4 lg:grid-cols-2">
@@ -139,8 +150,23 @@ export default async function ManageShiftsPage() {
                       <label className="block"><span className="label">Overtime pay ×</span><input name="multiplier" inputMode="decimal" defaultValue={pay?.otMultiplier ?? 1.5} className="input" /></label>
                       <label className="block"><span className="label">Overtime after hours a week</span><input name="weekly" inputMode="decimal" defaultValue={pay ? pay.weeklyOtHours ?? "" : 40} className="input" /></label>
                       <label className="block"><span className="label">Overtime after hours a day</span><input name="daily" inputMode="decimal" defaultValue={pay?.dailyOtHours ?? ""} className="input" /></label>
+                      <label className="block"><span className="label">Night differential %</span><input name="nightPct" inputMode="decimal" defaultValue={pay?.nightPct ?? ""} className="input" /></label>
+                      <label className="block"><span className="label">Night from</span><input name="nightStart" type="time" defaultValue={pay?.nightStart ?? "22:00"} className="input" /></label>
+                      <label className="block"><span className="label">Night to</span><input name="nightEnd" type="time" defaultValue={pay?.nightEnd ?? "06:00"} className="input" /></label>
+                      <label className="block"><span className="label">Holiday pay ×</span><input name="holidayMultiplier" inputMode="decimal" defaultValue={pay?.holidayMultiplier ?? ""} className="input" /></label>
                       <div className="self-end"><SubmitButton className="btn btn-secondary" pendingLabel="...">Save pay</SubmitButton></div>
                     </ActionForm>
+                    {LEAVE_KINDS.map((kind) => {
+                      const cur = (balances.get(b.id) ?? []).find((x) => x.kind === kind);
+                      return (
+                        <ActionForm key={kind} action={leaveAction.bind(null, b.id, kind)} className="grid gap-2 sm:grid-cols-4">
+                          <label className="block"><span className="label">{TIME_OFF_KINDS[kind]} days a year</span><input name="days" inputMode="decimal" defaultValue={cur?.daysPerYear ?? ""} className="input" /></label>
+                          <label className="block"><span className="label">Given</span><select name="accrual" defaultValue={cur?.accrual ?? "upfront"} className="input"><option value="upfront">All in January</option><option value="monthly">Monthly</option></select></label>
+                          <label className="block"><span className="label">Carried over</span><input name="carryOver" inputMode="decimal" defaultValue={cur?.carryOver ?? 0} className="input" /></label>
+                          <div className="self-end"><SubmitButton className="btn btn-secondary" pendingLabel="...">Save</SubmitButton></div>
+                        </ActionForm>
+                      );
+                    })}
                   </div>
                   <ActionForm action={shiftsAction.bind(null, b.id)} className="grid gap-2 sm:grid-cols-[7rem_1fr_1fr]">
                     {WEEKDAYS.map((w, i) => {
@@ -160,7 +186,7 @@ export default async function ManageShiftsPage() {
             );
           })}
         </div>
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Enter hours in the person&apos;s own time zone. A shift that ends before it starts (21:00 to 06:00) runs past midnight. Leave every day empty for someone always available. Leave an overtime box empty for no overtime of that kind; local labor law decides the right numbers.</p>
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Enter hours in the person&apos;s own time zone. A shift that ends before it starts (21:00 to 06:00) runs past midnight. Leave every day empty for someone always available. Leave an overtime box empty for no overtime of that kind; local labor law decides the right numbers. The night differential is a percentage of the hourly rate for hours in the night window (the Philippines requires at least 10% from 22:00 to 06:00); holiday pay multiplies hours worked on a holiday in the person&apos;s calendar (2 for double pay). Leave allowances count working days; leave the days empty to remove an allowance.</p>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

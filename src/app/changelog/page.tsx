@@ -10,6 +10,18 @@ export const metadata: Metadata = {
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-10-02",
+    title: "Timesheets, time corrections, night and holiday pay, leave balances, clock reminders, team week",
+    items: [
+      "Weekly timesheets: each person submits their week, an administrator approves it, and approved weeks are locked",
+      "Time corrections with a reason, asked for by the person or made by an administrator, with the times before and after in the audit log",
+      "Night differential and holiday pay on the pay worksheet, and a payroll CSV download",
+      "Leave allowances and balances in working days, with a warning when a request goes over",
+      "Reminders when a shift started and nobody clocked in, or someone forgot to clock out",
+      "Team week: everyone's shifts on one grid in your time zone, with the hours nobody covers in red",
+    ],
+  },
+  {
+    date: "2026-10-02",
     title: "Shifts: breaks, overtime and pay, time-off requests, swaps, holiday calendars",
     items: [
       "Breaks when clocked in, not counted as hours worked",

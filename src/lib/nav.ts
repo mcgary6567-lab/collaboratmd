@@ -1,6 +1,6 @@
 /** The app's navigation, shared by the sidebar (client) and the layout (server). */
 import {
-  Award, Bot, BuildingComplex, Calculator, CalendarCog, CalendarDays, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, FolderSearch, Gauge, Gavel, HandCoins,
+  Award, Bot, BuildingComplex, Calculator, CalendarCog, CalendarDays, CalendarRange, ClipboardClock, ChartColumn, ChartLine, ClipboardCheck, Clock, FaceSlightlySmiling, FileSpreadsheet, FileText, FlaskConical, FolderSearch, Gauge, Gavel, HandCoins,
   HeartPulse, Hospital, Inbox, Landmark, LayoutDashboard, ListChecks, MessageSquare, Network, Radar, Receipt, ReceiptText, Scale, RotateCcwClock, SearchCheck, Settings, SquareCheckBig, Stethoscope,
   TrendingDown, TriangleAlert, Undo2, Upload, UserSearch, Users, Wallet, WandSparkles,
 } from "lucide-react";
@@ -16,7 +16,9 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/tasks", label: "Tasks", icon: SquareCheckBig },
       { href: "/work", label: "Work queues", icon: Inbox },
       { href: "/work/shifts", label: "Shifts and time off", icon: Clock },
+      { href: "/work/shifts/week", label: "Team week", icon: CalendarRange },
       { href: "/work/shifts/manage", label: "Manage shifts", icon: CalendarCog, adminOnly: true },
+      { href: "/work/shifts/timesheets", label: "Timesheets", icon: ClipboardClock, adminOnly: true },
       { href: "/admin", label: "Practice analytics", icon: BuildingComplex, adminOnly: true },
       { href: "/clients", label: "All clients", icon: Network, multiOnly: true },
       { href: "/clients/invoicing", label: "Client invoicing", icon: ReceiptText, adminOnly: true },

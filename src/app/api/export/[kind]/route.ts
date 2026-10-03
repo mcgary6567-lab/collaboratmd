@@ -9,6 +9,7 @@ import { agencyPlacements } from "@/server/collections";
 import { getReport, runReport } from "@/server/report-builder";
 import { auditEvents } from "@/server/compliance";
 import { recordRestrictedDisclosure } from "@/server/restricted";
+import { payWorksheet } from "@/server/pay";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     const r = await auditEvents(db, session.practiceId, { action: q.action, userId: q.user, since: q.since, limit: MAX_ROWS });
     headers = ["When (UTC)", "User", "Email", "Action", "Record type", "Record id", "Details"];
     rows = r.map(({ event: e, userName, userEmail }) => [e.at.toISOString(), userName ?? "", userEmail ?? "", e.action, e.entity, e.entityId ?? "", e.details ? JSON.stringify(e.details) : ""]);
+  } else if (kind === "payroll") {
+    // The pay worksheet for a payroll provider: administrators only.
+    if (session.role !== "admin") return new Response("The payroll export is for administrators", { status: 403 });
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    if (!day.test(q.from ?? "") || !day.test(q.to ?? "") || q.to < q.from) return new Response("Choose the period (from and to)", { status: 400 });
+    const r = await payWorksheet(db, session.practiceId, q.from, q.to);
+    const hours = (v: number) => v.toFixed(2);
+    headers = ["Person", "Time zone", "From", "To", "Hours", "Regular hours", "Overtime hours", "Night hours", "Holiday hours", "Currency", "Hourly rate", "Overtime multiplier", "Night differential %", "Holiday multiplier", "Gross", "Weeks", "Weeks approved"];
+    rows = r.map((p) => [
+      p.name, p.tz, q.from, q.to, hours(p.total), hours(p.regular), hours(p.overtime), hours(p.nightHours), hours(p.holidayHours), p.currency ?? "",
+      p.pay ? dollars(p.pay.rateCents) : "", p.pay?.otMultiplier ?? "", p.pay?.nightPct ?? "", p.pay?.holidayMultiplier ?? "", dollars(p.grossCents), p.weeks.length, p.approvedWeeks,
+    ]);
   } else if (kind === "report") {
     // A saved report-builder report, all rows.
     const report = q.id ? await getReport(db, session.practiceId, q.id) : null;

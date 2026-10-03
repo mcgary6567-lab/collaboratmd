@@ -164,14 +164,31 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     title: "Shifts and time off",
     steps: [
       "The team table shows who is on now, on a break, off or on a holiday, in their own time, and when everyone else is next on, in your time. Clock in and out at the start and end of a shift and take breaks with Start break and End break; breaks are not counted as hours worked. If your administrator set office networks, a clock-in from elsewhere is flagged or refused.",
-      "Ask for time off: an administrator approves it, and then your open queue tasks due in that time move to others on the same rule; if approved time off is cancelled, the tasks still open move back. To swap a shift, pick one of your upcoming shifts and a teammate; they accept, and an administrator who is not one of you approves it. Leave a handover note at the end of a shift; the next shift sees it on its dashboard.",
+      "Ask for time off: your leave balance shows above, and a request tells you if it goes over. An administrator approves it, and then your open queue tasks due in that time move to others on the same rule; if approved time off is cancelled, the tasks still open move back. To swap a shift, pick one of your upcoming shifts and a teammate; they accept, and an administrator who is not one of you approves it. Leave a handover note at the end of a shift; the next shift sees it on its dashboard.",
+      "Your timesheet: check last week's and this week's entries, then submit the week for approval. If a time is wrong or you forgot to clock, ask for a correction with the right times and a reason. You get a reminder if your shift started 15 minutes ago and you have not clocked in, or if you are still clocked in an hour after it ended.",
     ],
-    related: [{ label: "Manage shifts", href: "/work/shifts/manage" }, { label: "Work queues", href: "/work" }],
+    related: [{ label: "Team week", href: "/work/shifts/week" }, { label: "Manage shifts", href: "/work/shifts/manage" }, { label: "Work queues", href: "/work" }],
+  },
+  "/work/shifts/week": {
+    title: "Team week",
+    steps: [
+      "Everyone's shifts for a week in your time zone (or the practice's), with approved time off, holidays and swaps applied. Use Previous week and Next week to plan ahead.",
+      "The hour-by-hour grid counts how many people are on; red hours have nobody, so you can see gaps in the US business day and move hours or ask for a swap.",
+    ],
+    related: [{ label: "Shifts and time off", href: "/work/shifts" }, { label: "Manage shifts", href: "/work/shifts/manage" }],
+  },
+  "/work/shifts/timesheets": {
+    title: "Timesheets",
+    steps: [
+      "Approve corrections people asked for and the weeks they submitted. You cannot decide your own; another administrator does.",
+      "Pick a person and week to correct their time: change an entry's clock-in or clock-out, add, change or remove a break, remove a wrong entry or add a missing one, always with a reason. Every change is in the audit log with the times before and after. An approved week is locked: reopen it first, with a reason. Correcting a submitted week sends it back to the person.",
+    ],
+    related: [{ label: "Hours, output and pay", href: "/reports/team-hours" }, { label: "Manage shifts", href: "/work/shifts/manage" }],
   },
   "/work/shifts/manage": {
     title: "Manage shifts",
     steps: [
-      "Approve or deny time off and shift swaps; you cannot decide your own. Set each person's time zone, weekly hours in their own time zone (21:00 to 06:00 runs past midnight), holiday calendar and pay: an hourly rate in their currency, overtime after so many hours a week or a day, and the overtime multiplier.",
+      "Approve or deny time off and shift swaps; you cannot decide your own. Each request shows how many working days it takes and whether it goes over the person's balance. Set each person's time zone, weekly hours in their own time zone (21:00 to 06:00 runs past midnight), holiday calendar, leave allowances (days a year, given in January or monthly, plus days carried over) and pay: an hourly rate in their currency, overtime after so many hours a week or a day, the overtime multiplier, a night differential and holiday pay.",
       "Holidays: the US, Philippine, Pakistani and Indian calendars hold the dates that can be computed. Add holidays set by the moon or by proclamation, such as Eid or Diwali, once they are announced, to a calendar or company-wide. Office networks: list the IP addresses or ranges people clock in from, and choose whether a clock-in from elsewhere is flagged or refused.",
     ],
     related: [{ label: "Shifts and time off", href: "/work/shifts" }, { label: "Hours, output and pay", href: "/reports/team-hours" }],
@@ -180,7 +197,7 @@ export const PAGE_GUIDES: Record<string, Guide> = {
     title: "Hours, output and pay",
     steps: [
       "Hours each person worked in a period (clocked time less breaks), with the tasks they finished, claims they sent and payments they posted, each per hour, and any clock-ins from outside the office networks. Compare people doing the same kind of work: an appeal takes longer than a payment posting.",
-      "The pay worksheet splits hours into regular and overtime by each person's rules and shows gross pay in their currency. Pick a Monday-to-Sunday period so weekly overtime is complete. It is a worksheet for payroll: no taxes, deductions or payments.",
+      "The pay worksheet splits hours into regular and overtime by each person's rules, counts night and holiday hours for premiums, shows gross pay in their currency and how many of their weeks are approved. Download it as CSV for your payroll provider. Pick a Monday-to-Sunday period so weekly overtime is complete. It is a worksheet for payroll: no taxes, deductions or payments.",
     ],
     related: [{ label: "Shifts and time off", href: "/work/shifts" }, { label: "Manage shifts", href: "/work/shifts/manage" }],
   },
