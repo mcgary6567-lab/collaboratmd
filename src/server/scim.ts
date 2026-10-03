@@ -13,6 +13,7 @@ import type { Db } from "@/db";
 import { schema } from "@/db";
 import type { SsoConfig } from "./sso";
 import { unusablePassword } from "./team";
+import { offboard } from "./staff-offboarding";
 
 const { users, practiceMemberships, auditLog } = schema;
 const USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -105,6 +106,7 @@ async function setActive(db: Db, cfg: SsoConfig, u: U, active: boolean) {
     await db.delete(practiceMemberships).where(and(eq(practiceMemberships.userId, u.id), eq(practiceMemberships.practiceId, cfg.practiceId)));
   }
   await db.insert(auditLog).values({ practiceId: cfg.practiceId, userId: u.id, action: active ? "user_reactivated" : "user_deactivated", entity: "user", entityId: u.id, details: { via: "scim" } });
+  if (!active) await offboard(db, cfg.practiceId, u.id, { home: u.practiceId === cfg.practiceId });
 }
 
 async function owned(db: Db, cfg: SsoConfig, id: string) {

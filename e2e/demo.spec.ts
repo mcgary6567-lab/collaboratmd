@@ -12,3 +12,9 @@ test("the sign-in page shows no demo passwords, and the demo opens in one click"
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 120_000 });
   await expect(page.getByRole("heading", { name: /^Good (morning|afternoon|evening), Jordan/ })).toBeVisible();
 });
+
+test("the home page shows no demo sign-in details", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText(/admin123|biller123|front123|admin@collaboratmd\.local/)).toHaveCount(0);
+});

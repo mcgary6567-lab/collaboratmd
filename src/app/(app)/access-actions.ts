@@ -53,9 +53,15 @@ export async function setRoleAction(userId: string, _prev: FormResult, formData:
 export async function setActiveAction(userId: string, active: boolean, _prev: FormResult): Promise<FormResult> {
   const s = await admin();
   try {
-    await setMemberActive(await getDb(), s.practiceId, userId, active, s.userId);
+    const handed = await setMemberActive(await getDb(), s.practiceId, userId, active, s.userId);
     revalidatePath("/settings/team");
-    return { ok: true, message: active ? "Reactivated" : "Access removed; they are signed out now" };
+    if (active || !handed) return { ok: true, message: active ? "Reactivated. Add them back to work queues on Work queues." : "Access removed; they are signed out now" };
+    const parts = [
+      handed.moved ? `${handed.moved} open task${handed.moved === 1 ? "" : "s"} reassigned` : "",
+      handed.unassigned ? `${handed.unassigned} left unassigned (see Tasks)` : "",
+      handed.rules ? `taken off ${handed.rules} work queue${handed.rules === 1 ? "" : "s"}${handed.paused ? `, ${handed.paused} paused with nobody left` : ""}` : "",
+    ].filter(Boolean);
+    return { ok: true, message: `Access removed; they are signed out now.${parts.length ? ` ${parts.join("; ")}.` : ""}` };
   } catch (e) {
     return fail(e, "Could not change access");
   }

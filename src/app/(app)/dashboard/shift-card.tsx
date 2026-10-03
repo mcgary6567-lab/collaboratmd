@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Db } from "@/db";
 import { currentBreak, currentEntry, recentHandovers } from "@/server/shifts";
+import { todayProgress } from "@/server/targets";
 import { clockAction } from "@/app/(app)/shift-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { fmtDateTime } from "@/lib/utils";
@@ -8,7 +9,7 @@ import { fmtDateTime } from "@/lib/utils";
 /** The start of a shift: clock in or out, breaks, and the last handover note someone else left. */
 export async function ShiftStrip({ db, practiceId, userId, timeZone }: { db: Db; practiceId: string; userId: string; timeZone: string }) {
   const now = new Date();
-  const [entry, handovers] = await Promise.all([currentEntry(db, userId), recentHandovers(db, practiceId, 16, now)]);
+  const [entry, handovers, progress] = await Promise.all([currentEntry(db, userId), recentHandovers(db, practiceId, 16, now), todayProgress(db, practiceId, userId, now)]);
   const onBreak = entry ? !!(await currentBreak(db, entry.id)) : false;
   const last = handovers.find((h) => h.h.userId !== userId);
   return (
@@ -22,6 +23,12 @@ export async function ShiftStrip({ db, practiceId, userId, timeZone }: { db: Db;
             {!last.h.inProgress && !last.h.problems && last.h.done && <p><span className="font-medium">Done:</span> {last.h.done}</p>}
           </>
         ) : <p className="text-slate-600 dark:text-slate-300">No handover notes from the last shift.</p>}
+        {progress.length > 0 && (
+          <p>
+            <span className="font-medium">Today:</span>{" "}
+            {progress.map((p) => `${p.label.toLowerCase()} ${p.done} of ${p.target}${p.done >= p.target ? " (done)" : ""}`).join(", ")}
+          </p>
+        )}
         <Link href="/work/shifts" className="text-brand-700 underline">Shifts and handovers</Link>
       </div>
       <div className="flex flex-wrap items-center gap-3">

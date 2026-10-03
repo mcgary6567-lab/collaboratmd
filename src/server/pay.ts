@@ -20,8 +20,7 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
-import { assignableUsers } from "./work";
-import { localClock, minutesOf, workedSpans, zonedMoment } from "./shifts";
+import { localClock, minutesOf, peopleForPeriod, workedSpans, zonedMoment } from "./shifts";
 import { holidaysBetween } from "./holidays";
 import { approvedWeeks, weekStartOf } from "./timesheets";
 import { practiceTimeZone, validTimeZone } from "./practice-time";
@@ -96,7 +95,8 @@ export function grossPay(h: { regular: number; overtime: number; holidayHours: n
 
 /** Hours, overtime, premiums and gross pay per person for local dates `from` to `to`. */
 export async function payWorksheet(db: Db, practiceId: string, from: string, to: string, now = new Date()) {
-  const team = await assignableUsers(db, practiceId);
+  // Everyone with time here in the period, including people since deactivated (a day either side for time zones).
+  const team = await peopleForPeriod(db, practiceId, new Date(Date.parse(`${from}T00:00:00Z`) - 86_400_000), new Date(Date.parse(`${to}T00:00:00Z`) + 2 * 86_400_000));
   if (!team.length) return [];
   const ids = team.map((t) => t.id);
   const [pays, people] = await Promise.all([
@@ -134,7 +134,7 @@ export async function payWorksheet(db: Db, practiceId: string, from: string, to:
     const hours = { ...split, holidayHours, nightHours, nightHolidayHours };
     const gross = pay ? grossPay(hours, pay) : null;
     const weeks = [...new Set([...byDay.keys()].map(weekStartOf))];
-    if (split.total > 0 || pay) rows.push({ userId: t.id, name: t.name, tz, ...hours, weeks, approvedWeeks: 0, pay, grossCents: gross, currency: pay?.currency ?? null });
+    if (split.total > 0 || (pay && t.active)) rows.push({ userId: t.id, name: t.name, tz, ...hours, weeks, approvedWeeks: 0, pay, grossCents: gross, currency: pay?.currency ?? null });
   }
   const approved = await approvedWeeks(db, rows.map((r) => r.userId), [...new Set(rows.flatMap((r) => r.weeks))]);
   for (const r of rows) r.approvedWeeks = r.weeks.filter((w) => approved.some((a) => a.userId === r.userId && a.weekStart === w)).length;

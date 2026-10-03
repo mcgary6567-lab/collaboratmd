@@ -74,8 +74,8 @@ export function SiteHeader({
               >
                 Start free trial
               </Link>
-              <Link href={demoLink().href} className="btn bg-green-700 text-white hover:bg-green-800">
-                {demoLink().open ? "View the demo" : "Book a demo"} <ArrowRight className="h-4 w-4" />
+              <Link href={demoLink().href} className="btn whitespace-nowrap bg-green-700 text-white hover:bg-green-800">
+                {demoLink().open ? "View the demo" : "Book a demo"} <ArrowRight className="hidden h-4 w-4 sm:inline" />
               </Link>
             </>
           )}

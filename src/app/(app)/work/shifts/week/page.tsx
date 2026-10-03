@@ -6,8 +6,13 @@ import { localClock } from "@/server/shifts";
 import { practiceTimeZone } from "@/server/practice-time";
 import { teamWeek } from "@/server/shift-week";
 import { personTz, weekStartOf } from "@/server/timesheets";
-import { Card, Empty, PageHeader } from "@/components/ui";
+import { upcomingOpenShifts } from "@/server/open-shifts";
+import { staffingForecast } from "@/server/staffing-forecast";
+import { cancelOpenShiftAction, claimOpenShiftAction, decideOpenShiftAction, postOpenShiftAction, unclaimOpenShiftAction } from "@/app/(app)/staff-actions";
+import { ActionForm, SubmitButton } from "@/components/action-form";
+import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
+import { when } from "../my-timesheet";
 
 export const metadata: Metadata = { title: "Team week" };
 export const dynamic = "force-dynamic";
@@ -33,6 +38,11 @@ export default async function TeamWeekPage({ searchParams }: { searchParams: Pro
   const tz = q.tz === "practice" ? practiceTz : mine;
   const week = weekStartOf(isDay(q.week) ? q.week! : localClock(new Date(), tz).date);
   const w = await teamWeek(db, s.practiceId, week, tz);
+  const [open, forecast] = await Promise.all([
+    upcomingOpenShifts(db, s.practiceId),
+    staffingForecast(db, s.practiceId, week, tz, w.people.filter((p) => p.hasSchedule).map((p) => p.spans)),
+  ]);
+  const admin = s.role === "admin";
   const max = Math.max(0, ...w.grid.flat());
   const gaps = w.grid.flat().filter((n) => n === 0).length;
   const link = (wk: string) => `/work/shifts/week?week=${wk}${q.tz === "practice" ? "&tz=practice" : ""}`;
@@ -85,6 +95,64 @@ export default async function TeamWeekPage({ searchParams }: { searchParams: Pro
         )}
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Each cell counts people on for at least half of that hour. Red cells have nobody on.</p>
       </Card>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card title="Open shifts">
+          {admin && (
+            <ActionForm action={postOpenShiftAction} className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
+              <label className="block"><span className="label">Date (your time, {mine})</span><input type="date" name="date" defaultValue={addDays(week, 7)} className="input" required /></label>
+              <label className="block"><span className="label">From</span><input type="time" name="from" defaultValue="21:00" className="input" required /></label>
+              <label className="block"><span className="label">To</span><input type="time" name="to" defaultValue="06:00" className="input" required /></label>
+              <label className="block sm:col-span-2"><span className="label">Note</span><input name="note" className="input" maxLength={300} /></label>
+              <div className="self-end"><SubmitButton pendingLabel="Posting...">Post the shift</SubmitButton></div>
+            </ActionForm>
+          )}
+          {open.length === 0 ? <Empty>No open shifts.</Empty> : (
+            <ul className="divide-y divide-slate-200 text-sm dark:divide-slate-700">
+              {open.map((o) => (
+                <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span>
+                    {when(o.startsAt, tz)} to {when(o.endsAt, tz)}{o.note ? ` (${o.note})` : ""}{" "}
+                    {o.status === "open" ? <Badge tone="amber">open</Badge> : o.status === "claimed" ? <Badge tone="amber">claimed by {o.claimer}, to confirm</Badge> : <Badge tone="green">{o.claimer}</Badge>}
+                  </span>
+                  <span className="flex flex-wrap gap-2">
+                    {o.status === "open" && <ActionForm action={claimOpenShiftAction.bind(null, o.id)}><SubmitButton className="btn btn-secondary" pendingLabel="...">Claim</SubmitButton></ActionForm>}
+                    {o.status === "claimed" && o.claimedBy === s.userId && <ActionForm action={unclaimOpenShiftAction.bind(null, o.id)}><SubmitButton className="btn btn-secondary" pendingLabel="...">Withdraw</SubmitButton></ActionForm>}
+                    {admin && o.status === "claimed" && o.claimedBy !== s.userId && <>
+                      <ActionForm action={decideOpenShiftAction.bind(null, o.id, true)}><SubmitButton pendingLabel="...">Confirm</SubmitButton></ActionForm>
+                      <ActionForm action={decideOpenShiftAction.bind(null, o.id, false)}><SubmitButton className="btn btn-secondary" pendingLabel="...">Turn down</SubmitButton></ActionForm>
+                    </>}
+                    {admin && <ActionForm action={cancelOpenShiftAction.bind(null, o.id)}><SubmitButton className="btn btn-secondary" pendingLabel="...">Cancel</SubmitButton></ActionForm>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Post hours nobody covers; anyone on the team can claim them if they do not already work then, and an administrator confirms. Confirmed hours go on that person&apos;s schedule.</p>
+        </Card>
+
+        <Card title="Workload forecast">
+          <div tabIndex={0} role="region" aria-label="Workload forecast" className="overflow-x-auto">
+            <table className="table text-sm">
+              <thead><tr><th>Day</th><th className="text-right">Queue tasks expected</th><th className="text-right">Hours needed</th><th className="text-right">Hours scheduled</th><th>Status</th></tr></thead>
+              <tbody>{forecast.days.map((d, i) => (
+                <tr key={d.date}>
+                  <td>{DAY_NAMES[i]} {d.date.slice(5)}</td>
+                  <td className="text-right tabular-nums">{d.expected}</td>
+                  <td className="text-right tabular-nums">{d.needed ?? "-"}</td>
+                  <td className="text-right tabular-nums">{d.scheduled}</td>
+                  <td>{d.short && <Badge tone="red">short</Badge>}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            Expected: queue tasks created on that weekday, averaged over the last {forecast.weeks} weeks ({forecast.tasksSeen} tasks).{" "}
+            {forecast.pace ? `Hours needed: at the team's pace of ${forecast.pace.toFixed(1)} queue tasks an hour clocked.` : "Hours needed shows once the team has clocked at least 8 hours."}{" "}
+            An estimate from history: a payer&apos;s batch of denials or a new client will not be in it.
+          </p>
+        </Card>
+      </div>
     </>
   );
 }

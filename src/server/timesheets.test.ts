@@ -105,11 +105,11 @@ describe("against a migrated database", () => {
     await saveLeave(t.db, t.practiceId, rosa.id, "vacation", { daysPerYear: 12, accrual: "monthly", carryOver: 2 }, t.userId, now);
     expect((await leaveBalances(t.db, [rosa.id], now)).get(rosa.id)).toEqual([expect.objectContaining({ kind: "vacation", earned: 3, carryOver: 2, used: 0, balance: 5 })]);
     const req = await requestTimeOff(t.db, t.practiceId, rosa.id, { startsOn: "2031-03-17", endsOn: "2031-03-23", kind: "vacation" });
-    expect(await leaveCheck(t.db, rosa.id, "vacation", "2031-03-17", "2031-03-23", now, req.id)).toEqual({ days: 5, balance: 5, after: 0 });
+    expect(await leaveCheck(t.db, rosa.id, req, now, req.id)).toEqual({ days: 5, balance: 5, after: 0 });
     await decideTimeOff(t.db, t.practiceId, req.id, true, t.userId, now);
     expect((await leaveBalances(t.db, [rosa.id], now)).get(rosa.id)?.[0]).toMatchObject({ used: 5, balance: 0 });
-    expect((await leaveCheck(t.db, rosa.id, "vacation", "2031-03-24", "2031-03-25", now)).after).toBe(-2);
-    expect((await leaveCheck(t.db, rosa.id, "sick", "2031-03-24", "2031-03-25", now)).balance).toBeNull();
+    expect((await leaveCheck(t.db, rosa.id, { kind: "vacation", startsOn: "2031-03-24", endsOn: "2031-03-25" }, now)).after).toBe(-2);
+    expect((await leaveCheck(t.db, rosa.id, { kind: "sick", startsOn: "2031-03-24", endsOn: "2031-03-25" }, now)).balance).toBeNull();
   });
 
   it("adds the night differential and holiday pay, and counts approved weeks", async () => {

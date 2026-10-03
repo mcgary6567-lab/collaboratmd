@@ -8,7 +8,9 @@
  *    schedule is entered. One-off changes (from an approved swap) add or
  *    cancel hours on top of the weekly ones (server/shift-swaps.ts).
  *  - Time off is requested and approved, as a range of dates in the person's
- *    own time zone; holidays in the person's calendar count the same
+ *    own time zone, or part of one day (a morning, an afternoon, or set
+ *    hours, which cancel those hours of the shift); holidays in the person's
+ *    calendar count the same as whole days
  *    (server/holidays.ts). Work queue rules skip people who are off. Approving
  *    time off moves their open queue tasks due in that time to the others on
  *    the same rule; cancelling it moves them back.
@@ -20,7 +22,7 @@
  * Shifts belong to the person, not to one practice: a billing company's
  * billers work across its client practices, and the same hours apply in each.
  */
-import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
 import { practiceClock, practiceTimeZone, validTimeZone } from "./practice-time";
@@ -39,6 +41,8 @@ export const MAX_ENTRY_HOURS = 16;
 export type Shift = { weekday: number; startsAt: string; endsAt: string };
 export type TimeOff = { startsOn: string; endsOn: string };
 export type Change = { kind: string; startsAt: Date; endsAt: Date };
+export const PARTS: Record<string, string> = { full: "Whole days", am: "Morning", pm: "Afternoon", hours: "Set hours" };
+export type PartDay = { startsOn: string; part: string; fromTime: string | null; toTime: string | null };
 
 const HM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DAY = 86_400_000;
@@ -80,6 +84,40 @@ export function zonedMoment(date: string, hm: string, tz: string) {
   const again = practiceClock(new Date(at), tz).getTime() - at;
   if (again !== offset) at = guess - again;
   return new Date(at);
+}
+
+/** The first shift that starts on a local date, as real moments; null on a day without one. */
+export function dayShift(shifts: Shift[], date: string, tz: string) {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const s = shifts.filter((x) => x.weekday === weekday).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+  if (!s) return null;
+  return { startsAt: zonedMoment(date, s.startsAt, tz), endsAt: zonedMoment(minutesOf(s.endsAt) > minutesOf(s.startsAt) ? date : addDays(date, 1), s.endsAt, tz) };
+}
+
+/**
+ * The hours a part-day time off takes out: the first or second half of that
+ * day's shift (of the day itself, with no set hours), or the set hours.
+ */
+export function partWindow(o: PartDay, shifts: Shift[], tz: string) {
+  const date = o.startsOn;
+  if (o.part === "hours" && o.fromTime && o.toTime) {
+    return { startsAt: zonedMoment(date, o.fromTime, tz), endsAt: zonedMoment(minutesOf(o.toTime) > minutesOf(o.fromTime) ? date : addDays(date, 1), o.toTime, tz) };
+  }
+  const day = dayShift(shifts, date, tz) ?? { startsAt: zonedMoment(date, "00:00", tz), endsAt: zonedMoment(addDays(date, 1), "00:00", tz) };
+  const mid = new Date((day.startsAt.getTime() + day.endsAt.getTime()) / 2);
+  return o.part === "am" ? { startsAt: day.startsAt, endsAt: mid } : { startsAt: mid, endsAt: day.endsAt };
+}
+
+/** Spans less the windows that cancel part of them (part-day time off, swapped-away hours). */
+export function subtractWindows<T extends { startsAt: Date; endsAt: Date }>(spans: T[], windows: { startsAt: Date; endsAt: Date }[]) {
+  let out = spans.map((s) => ({ startsAt: s.startsAt, endsAt: s.endsAt }));
+  for (const w of windows) {
+    out = out.flatMap((s) => {
+      if (w.endsAt <= s.startsAt || w.startsAt >= s.endsAt) return [s];
+      return [{ startsAt: s.startsAt, endsAt: w.startsAt }, { startsAt: w.endsAt, endsAt: s.endsAt }].filter((x) => x.endsAt > x.startsAt);
+    });
+  }
+  return out;
 }
 
 /** The weekly shifts that start in the next `days` days, as real moments, skipping days off and cancelled hours. */
@@ -165,28 +203,42 @@ export async function saveShifts(db: Db, practiceId: string, userId: string, shi
   await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_shifts_saved", entity: "user", entityId: u.id, details: { shifts: shifts.length } });
 }
 
-function checkTimeOff(input: { startsOn: string; endsOn: string; kind: string }) {
+export type TimeOffInput = { startsOn: string; endsOn: string; kind: string; note?: string; part?: string; fromTime?: string; toTime?: string };
+
+/** Checks the dates, and makes a part day one day with valid hours. */
+function checkTimeOff(input: TimeOffInput) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startsOn) || !/^\d{4}-\d{2}-\d{2}$/.test(input.endsOn) || input.endsOn < input.startsOn) throw new Error("Enter the first and last day off");
   if (!TIME_OFF_KINDS[input.kind]) throw new Error("Choose the kind of time off");
+  const part = input.part || "full";
+  if (!PARTS[part]) throw new Error("Choose whole days, a morning, an afternoon or set hours");
+  if (part !== "full" && input.endsOn !== input.startsOn) throw new Error("Part of a day is one day: make the first and last day the same");
+  if (part === "hours" && (!HM.test(input.fromTime ?? "") || !HM.test(input.toTime ?? "") || input.fromTime === input.toTime)) throw new Error("Enter the hours off, for example 14:00 to 18:00");
+  return { part, fromTime: part === "hours" ? input.fromTime! : null, toTime: part === "hours" ? input.toTime! : null };
 }
 
+/** "Morning", "Afternoon", "14:00-18:00" or "" for whole days. */
+export const partLabel = (o: { part: string; fromTime: string | null; toTime: string | null }) =>
+  o.part === "hours" ? `${o.fromTime}-${o.toTime}` : o.part === "full" ? "" : PARTS[o.part] ?? o.part;
+
 /** An administrator records time off: approved at once, and the person's open queue tasks in that time move to teammates. */
-export async function addTimeOff(db: Db, practiceId: string, input: { userId: string; startsOn: string; endsOn: string; kind: string; note?: string }, by?: string, now = new Date()) {
+export async function addTimeOff(db: Db, practiceId: string, input: TimeOffInput & { userId: string }, by?: string, now = new Date()) {
   const u = await ownUser(db, input.userId);
-  checkTimeOff(input);
-  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, note: input.note?.trim().slice(0, 200) || null, createdBy: by ?? null, status: "approved", decidedBy: by ?? null, decidedAt: now }).returning();
-  await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_time_off_added", entity: "user", entityId: u.id, details: { startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind } });
-  const moved = await reassignDuringTimeOff(db, u.id, row.id, input.startsOn, input.endsOn, now);
+  const part = checkTimeOff(input);
+  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, ...part, note: input.note?.trim().slice(0, 200) || null, createdBy: by ?? null, status: "approved", decidedBy: by ?? null, decidedAt: now }).returning();
+  await db.insert(auditLog).values({ practiceId, userId: by ?? null, action: "staff_time_off_added", entity: "user", entityId: u.id, details: { startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, part: part.part } });
+  // Part of a day: they still work that day, so their tasks stay with them.
+  const moved = part.part === "full" ? await reassignDuringTimeOff(db, u.id, row.id, input.startsOn, input.endsOn, now) : 0;
   return { timeOff: row, moved };
 }
 
 /** A person asks for time off; administrators are notified to approve or deny it. */
-export async function requestTimeOff(db: Db, practiceId: string, userId: string, input: { startsOn: string; endsOn: string; kind: string; note?: string }) {
+export async function requestTimeOff(db: Db, practiceId: string, userId: string, input: TimeOffInput) {
   const u = await ownUser(db, userId);
-  checkTimeOff(input);
-  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, note: input.note?.trim().slice(0, 200) || null, createdBy: u.id, status: "requested" }).returning();
-  await db.insert(auditLog).values({ practiceId, userId: u.id, action: "staff_time_off_requested", entity: "user", entityId: u.id, details: { startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind } });
-  await notify(db, practiceId, { kind: "time_off", title: `${u.name} asked for time off, ${input.startsOn} to ${input.endsOn}`, body: input.note?.trim() || TIME_OFF_KINDS[input.kind], href: "/work/shifts/manage", dedupeKey: `time-off:${row.id}` });
+  const part = checkTimeOff(input);
+  const [row] = await db.insert(staffTimeOff).values({ practiceId: u.practiceId, userId: u.id, startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, ...part, note: input.note?.trim().slice(0, 200) || null, createdBy: u.id, status: "requested" }).returning();
+  await db.insert(auditLog).values({ practiceId, userId: u.id, action: "staff_time_off_requested", entity: "user", entityId: u.id, details: { startsOn: input.startsOn, endsOn: input.endsOn, kind: input.kind, part: part.part } });
+  const when = part.part === "full" ? `${input.startsOn} to ${input.endsOn}` : `${input.startsOn} (${partLabel(part).toLowerCase()})`;
+  await notify(db, practiceId, { kind: "time_off", title: `${u.name} asked for time off, ${when}`, body: input.note?.trim() || TIME_OFF_KINDS[input.kind], href: "/work/shifts/manage", dedupeKey: `time-off:${row.id}` });
   return row;
 }
 
@@ -199,7 +251,7 @@ export async function decideTimeOff(db: Db, practiceId: string, id: string, appr
   await db.update(staffTimeOff).set({ status: approve ? "approved" : "denied", decidedBy: by, decidedAt: now }).where(eq(staffTimeOff.id, id));
   await db.insert(auditLog).values({ practiceId, userId: by, action: approve ? "staff_time_off_approved" : "staff_time_off_denied", entity: "user", entityId: row.userId, details: { startsOn: row.startsOn, endsOn: row.endsOn } });
   await notify(db, practiceId, { userId: row.userId, kind: "time_off", title: `Your time off ${row.startsOn} to ${row.endsOn} was ${approve ? "approved" : "denied"}`, href: "/work/shifts", dedupeKey: `time-off-decided:${id}` });
-  return approve ? reassignDuringTimeOff(db, row.userId, row.id, row.startsOn, row.endsOn, now) : 0;
+  return approve && row.part === "full" ? reassignDuringTimeOff(db, row.userId, row.id, row.startsOn, row.endsOn, now) : 0;
 }
 
 /** Cancels time off (an administrator, or the person for their own pending request); moved tasks still open go back. */
@@ -225,7 +277,7 @@ export async function upcomingTimeOff(db: Db, userIds: string[], today: string) 
 }
 
 export type Availability = {
-  tz: string; hasSchedule: boolean; onShift: boolean; offToday: boolean; holidayToday: string | null; localTime: string; localDate: string; nextStart: Date | null;
+  tz: string; hasSchedule: boolean; onShift: boolean; offToday: boolean; holidayToday: string | null; partOffToday: string | null; localTime: string; localDate: string; nextStart: Date | null;
   timeOff: TimeOff[]; holidays: Holiday[]; shifts: Shift[]; changes: Change[]; calendar: string | null;
 };
 
@@ -245,14 +297,20 @@ export async function availability(db: Db, userIds: string[], at = new Date(), f
   for (const p of people) {
     const tz = p.tz && validTimeZone(p.tz) ? p.tz : fallbackTz ?? (await practiceTimeZone(db, p.practiceId));
     const mine = shifts.filter((s) => s.userId === p.id);
-    const myOff = off.filter((o) => o.userId === p.id);
-    const myChanges = changes.filter((c) => c.userId === p.id);
+    // Whole days off count as days off; part days cancel those hours of the shift.
+    const myOff = off.filter((o) => o.userId === p.id && o.part === "full");
+    const myParts = off.filter((o) => o.userId === p.id && o.part !== "full");
+    const myChanges: Change[] = [
+      ...changes.filter((c) => c.userId === p.id),
+      ...myParts.map((o) => ({ kind: "cancel", ...partWindow(o, mine, tz) })),
+    ];
     const myHolidays = holidays.get(p.calendar ?? "") ?? [];
     const local = localClock(at, tz);
     const holidayToday = myHolidays.find((h) => h.date === local.date)?.name ?? null;
     const offToday = isOffOn(myOff, local.date, myHolidays);
+    const partToday = myParts.find((o) => o.startsOn === local.date);
     out.set(p.id, {
-      tz, hasSchedule: mine.length > 0, offToday, holidayToday, localTime: local.time, localDate: local.date, timeOff: myOff, holidays: myHolidays, shifts: mine, changes: myChanges, calendar: p.calendar,
+      tz, hasSchedule: mine.length > 0, offToday, holidayToday, partOffToday: partToday ? partLabel(partToday) : null, localTime: local.time, localDate: local.date, timeOff: myOff, holidays: myHolidays, shifts: mine, changes: myChanges, calendar: p.calendar,
       onShift: !offToday && (mine.length === 0 || isWorking(mine, myChanges, at, tz)),
       nextStart: nextShiftStart(mine, myOff, at, tz, myHolidays, myChanges),
     });
@@ -440,16 +498,35 @@ export async function coverageGaps(db: Db, practiceId: string, now = new Date())
   return { uncovered, stranded };
 }
 
+/**
+ * Everyone whose hours belong in a period's report: the team (including people
+ * since deactivated) and anyone who clocked time here in it (someone whose
+ * access from another practice has since been removed). `active` is false for
+ * both kinds of leaver.
+ */
+export async function peopleForPeriod(db: Db, practiceId: string, start: Date, end: Date) {
+  const [all, current, clocked] = await Promise.all([
+    assignableUsers(db, practiceId, { includeDisabled: true }),
+    assignableUsers(db, practiceId),
+    db.selectDistinct({ id: timeEntries.userId }).from(timeEntries).where(and(eq(timeEntries.practiceId, practiceId), lte(timeEntries.clockIn, end), or(isNull(timeEntries.clockOut), gte(timeEntries.clockOut, start)))),
+  ]);
+  const known = new Set(all.map((u) => u.id));
+  const missing = clocked.map((c) => c.id).filter((id) => !known.has(id));
+  const gone = missing.length ? await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(inArray(users.id, missing)) : [];
+  const active = new Set(current.map((u) => u.id));
+  return [...all, ...gone].map((u) => ({ ...u, active: active.has(u.id) })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Hours worked (less breaks) and output per person in a period, and output per hour. */
 export async function hoursAndOutput(db: Db, practiceId: string, from: string, to: string, now = new Date()) {
   const start = new Date(`${from}T00:00:00Z`), end = new Date(Date.parse(`${to}T00:00:00Z`) + DAY);
-  const team = await assignableUsers(db, practiceId);
+  const team = await peopleForPeriod(db, practiceId, start, end);
   if (!team.length) return [];
   const ids = team.map((t) => t.id);
   const spans = await workedSpans(db, practiceId, ids, start, end, now);
   const [done, posted, sent, flagged] = await Promise.all([
     db.select({ userId: tasks.assigneeId }).from(tasks).where(and(eq(tasks.practiceId, practiceId), inArray(tasks.assigneeId, ids), eq(tasks.status, "done"), gte(tasks.completedAt, start), lte(tasks.completedAt, end))),
-    db.select({ userId: schema.ledgerEntries.postedBy }).from(schema.ledgerEntries).where(and(eq(schema.ledgerEntries.practiceId, practiceId), inArray(schema.ledgerEntries.postedBy, ids), gte(schema.ledgerEntries.postedAt, start), lte(schema.ledgerEntries.postedAt, end))),
+    db.select({ userId: schema.ledgerEntries.postedBy }).from(schema.ledgerEntries).where(and(eq(schema.ledgerEntries.practiceId, practiceId), inArray(schema.ledgerEntries.postedBy, ids), ne(schema.ledgerEntries.type, "charge"), gte(schema.ledgerEntries.postedAt, start), lte(schema.ledgerEntries.postedAt, end))),
     db.select({ userId: auditLog.userId }).from(auditLog).where(and(eq(auditLog.practiceId, practiceId), eq(auditLog.action, "submit_claim"), inArray(auditLog.userId, ids), gte(auditLog.at, start), lte(auditLog.at, end))),
     db.select({ userId: timeEntries.userId }).from(timeEntries).where(and(inArray(timeEntries.userId, ids), eq(timeEntries.offNetwork, true), gte(timeEntries.clockIn, start), lte(timeEntries.clockIn, end))),
   ]);
@@ -458,6 +535,6 @@ export async function hoursAndOutput(db: Db, practiceId: string, from: string, t
     const hours = spans.filter((s) => s.userId === t.id).reduce((a, s) => a + (s.end.getTime() - s.start.getTime()), 0) / 3_600_000;
     const n = { tasks: count(done, t.id), postings: count(posted, t.id), claims: count(sent, t.id), offNetwork: count(flagged, t.id) };
     const per = (v: number) => (hours >= 0.5 ? v / hours : null);
-    return { userId: t.id, name: t.name, role: t.role, hours, ...n, tasksPerHour: per(n.tasks), claimsPerHour: per(n.claims), postingsPerHour: per(n.postings) };
-  }).sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
+    return { userId: t.id, name: t.name, role: t.role, active: t.active, hours, ...n, tasksPerHour: per(n.tasks), claimsPerHour: per(n.claims), postingsPerHour: per(n.postings) };
+  }).filter((r) => r.active || r.hours > 0 || r.tasks > 0 || r.claims > 0 || r.postings > 0).sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
 }

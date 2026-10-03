@@ -24,8 +24,10 @@ export default async function TimesheetsPage({ searchParams }: { searchParams: P
   const q = await searchParams;
   const db = await getDb();
   const now = new Date();
-  const [team, corrections, awaiting] = await Promise.all([assignableUsers(db, s.practiceId), correctionRequests(db, s.practiceId), sheetsAwaiting(db, s.practiceId)]);
-  const person = team.find((t) => t.id === q.user) ?? team.find((t) => t.id !== s.userId) ?? team[0];
+  // People since deactivated stay in the list, so their last weeks can be corrected and approved for final pay.
+  const [team, active, corrections, awaiting] = await Promise.all([assignableUsers(db, s.practiceId, { includeDisabled: true }), assignableUsers(db, s.practiceId), correctionRequests(db, s.practiceId), sheetsAwaiting(db, s.practiceId)]);
+  const current = new Set(active.map((u) => u.id));
+  const person = team.find((t) => t.id === q.user) ?? active.find((t) => t.id !== s.userId) ?? team[0];
   const tz = person ? (await personTz(db, person.id)).tz : s.timeZone ?? "UTC";
   const week = weekStartOf(isDay(q.week) ? q.week! : localClock(now, tz).date);
   const w = person ? await weekOf(db, person.id, week, now) : null;
@@ -76,7 +78,7 @@ export default async function TimesheetsPage({ searchParams }: { searchParams: P
 
       <Card title="A person's week">
         <form action="/work/shifts/timesheets" className="mb-4 flex flex-wrap items-end gap-3 text-sm">
-          <label className="block"><span className="label">Person</span><select name="user" defaultValue={person?.id} className="input">{team.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+          <label className="block"><span className="label">Person</span><select name="user" defaultValue={person?.id} className="input">{team.map((t) => <option key={t.id} value={t.id}>{t.name}{current.has(t.id) ? "" : " (deactivated)"}</option>)}</select></label>
           <label className="block"><span className="label">Week of</span><input type="date" name="week" defaultValue={week} className="input" /></label>
           <button className="btn btn-secondary">Show</button>
           {person && <><Link href={link(person.id, addDays(week, -7))} className="btn btn-secondary">Previous week</Link><Link href={link(person.id, addDays(week, 7))} className="btn btn-secondary">Next week</Link></>}

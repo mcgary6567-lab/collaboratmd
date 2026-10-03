@@ -30,7 +30,7 @@ const APP = [
   "/billing/cash-close", "/billing/missed-fees", "/reports/denial-causes", "/reports/agencies", "/reports/compensation", "/settings/chargemaster",
   "/billing/holds", "/patients/account-review", "/reports/front-desk", "/reports/referrals", "/privacy-complaints", "/reports/cost-to-collect",
   "/settings/substitutes", "/scheduling/referrals", "/coding/therapy-plans", "/patients/other-coverage", "/billing/expiring-cards", "/interpreters",
-  "/settings/maintenance", "/work/shifts", "/work/shifts/manage", "/work/shifts/timesheets", "/work/shifts/week", "/reports/team-hours",
+  "/settings/maintenance", "/work/shifts", "/work/shifts/manage", "/work/shifts/timesheets", "/work/shifts/week", "/work/quality", "/work/training", "/reports/team-hours",
 ];
 const PUBLIC = [
   "/", "/about", "/pricing", "/security", "/trust", "/privacy", "/terms", "/gdpr", "/baa", "/accessibility", "/trust/questionnaire", "/contact", "/status", "/switch", "/changelog", "/demo",

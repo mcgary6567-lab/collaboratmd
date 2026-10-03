@@ -2632,6 +2632,10 @@ export const staffTimeOff = pgTable("staff_time_off", {
   status: text("status").notNull().default("approved"),
   decidedBy: uuid("decided_by").references(() => users.id),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
+  /** Part of a day, migration 0070: full | am | pm | hours (from_time to to_time, on one day). */
+  part: text("part").notNull().default("full"),
+  fromTime: text("from_time"),
+  toTime: text("to_time"),
 });
 
 /** Clocking in and out. Migration 0067. */
@@ -2678,6 +2682,8 @@ export const shiftChanges = pgTable("shift_changes", {
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   swapId: uuid("swap_id"),
+  /** The open shift this came from (server/open-shifts.ts). Migration 0070. */
+  openShiftId: uuid("open_shift_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -2772,3 +2778,68 @@ export const staffLeave = pgTable("staff_leave", {
   updatedBy: uuid("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.userId, t.kind] })]);
+
+/** Shifts posted for hours nobody covers, claimed and confirmed. Migration 0070. */
+export const openShifts = pgTable("open_shifts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  note: text("note"),
+  status: text("status").notNull().default("open"),
+  claimedBy: uuid("claimed_by").references(() => users.id),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Quality checks of billers' work. Migration 0070. */
+export const workAudits = pgTable("work_audits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  fromDate: date("from_date").notNull(),
+  toDate: date("to_date").notNull(),
+  perPerson: integer("per_person").notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const workAuditItems = pgTable("work_audit_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  auditId: uuid("audit_id").notNull().references(() => workAudits.id, { onDelete: "cascade" }),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  kind: text("kind").notNull(),
+  refId: uuid("ref_id").notNull(),
+  workerId: uuid("worker_id").notNull().references(() => users.id),
+  reviewerId: uuid("reviewer_id").references(() => users.id),
+  result: text("result").notNull().default("pending"),
+  finding: text("finding"),
+  note: text("note"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+});
+
+/** Staff training and certifications. Migration 0070. */
+export const staffTraining = pgTable("staff_training", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  completedOn: date("completed_on").notNull(),
+  expiresOn: date("expires_on"),
+  credentialNo: text("credential_no"),
+  attested: boolean("attested").notNull().default(false),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Daily targets per person. Migration 0070. */
+export const staffTargets = pgTable("staff_targets", {
+  userId: uuid("user_id").notNull().references(() => users.id),
+  metric: text("metric").notNull(),
+  practiceId: uuid("practice_id").notNull().references(() => practices.id),
+  perDay: integer("per_day").notNull(),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.metric] })]);

@@ -13,6 +13,7 @@ import { schema } from "@/db";
 import type { WorkConditions } from "@/db/schema";
 import { notify } from "./notifications";
 import { availability, dueDateFor, pickAssignee } from "./shifts";
+import { assignableUsers } from "./work";
 
 const { workRules, tasks, auditLog } = schema;
 type Row = Record<string, string | null>;
@@ -103,19 +104,23 @@ export async function applyRules(db: Db, practiceId: string, opts: { limit?: num
   const out: Record<string, number> = {};
   const perPerson = new Map<string, number>();
   const rules = (await listRules(db, practiceId)).filter((r) => r.active);
-  // People on time off today (their own date) are skipped in the rotation (server/shifts.ts).
+  // Only people still on the team (deactivating someone takes them off the rules, server/staff-offboarding.ts; this
+  // also covers anyone deactivated another way). People on time off today are skipped in the rotation (server/shifts.ts).
+  const team = new Set((await assignableUsers(db, practiceId)).map((u) => u.id));
   const avail = await availability(db, [...new Set(rules.flatMap((r) => r.assigneeIds))], now);
   for (const rule of rules) {
+    const assignees = rule.assigneeIds.filter((id) => team.has(id));
+    if (!assignees.length) continue;
     const items = await candidates(db, practiceId, rule, opts.limit ?? 200, now);
     let next = rule.nextIndex;
     for (const item of items) {
-      const pick = pickAssignee(rule.assigneeIds, next, avail);
+      const pick = pickAssignee(assignees, next, avail);
       const assigneeId = pick.assigneeId;
       next = pick.next;
       perPerson.set(assigneeId, (perPerson.get(assigneeId) ?? 0) + 1);
       await db.insert(tasks).values({ practiceId, title: TITLES[rule.kind](item.label ?? ""), entityType: item.type, entityId: item.id, assigneeId, dueDate: dueDateFor(avail.get(assigneeId), rule.slaDays, now), priority: rule.priority, ruleId: rule.id, note: `Assigned by the rule "${rule.name}"` });
     }
-    if (items.length) await db.update(workRules).set({ nextIndex: next % Math.max(1, rule.assigneeIds.length) }).where(eq(workRules.id, rule.id));
+    if (items.length) await db.update(workRules).set({ nextIndex: next % Math.max(1, assignees.length) }).where(eq(workRules.id, rule.id));
     out[rule.name] = items.length;
   }
   for (const [userId, n] of perPerson) {

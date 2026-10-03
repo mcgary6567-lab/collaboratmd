@@ -6,18 +6,18 @@ import { coverageGaps, currentBreak, currentEntry, recentHandovers, teamBoard, T
 import { offerableShifts, swapsFor } from "@/server/shift-swaps";
 import { leaveBalances } from "@/server/leave";
 import { MyTimesheet } from "./my-timesheet";
+import { offText, PartFields } from "./time-off-fields";
 import {
   cancelSwapAction, clockAction, handoverAction, removeTimeOffAction, requestSwapAction, requestTimeOffAction, respondSwapAction, timeZoneAction,
 } from "@/app/(app)/shift-actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { fmtDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Shifts and time off" };
 export const dynamic = "force-dynamic";
 
 const ZONES = Intl.supportedValuesOf("timeZone");
-const day = (v: string) => fmtDate(`${v}T00:00:00`);
 const hours = (from: Date, to: Date) => ((to.getTime() - from.getTime()) / 3_600_000).toFixed(1);
 const SWAP_STATUS: Record<string, { tone: "slate" | "amber" | "green" | "red"; label: string }> = {
   requested: { tone: "amber", label: "waiting for the teammate" }, accepted: { tone: "amber", label: "waiting for approval" }, approved: { tone: "green", label: "approved" },
@@ -125,7 +125,7 @@ export default async function ShiftsPage() {
               <tr key={b.id}>
                 <td data-label="Person">{b.name}</td>
                 <td data-label="Their time" className="tabular-nums">{b.localTime} <span className="text-slate-500 dark:text-slate-400">{b.tz}</span></td>
-                <td data-label="Status">{b.holidayToday ? <Badge tone="amber">holiday: {b.holidayToday}</Badge> : b.offToday ? <Badge tone="amber">off today</Badge> : !b.hasSchedule ? <Badge>no set hours</Badge> : b.onShift ? <Badge tone="green">on shift</Badge> : <Badge>off shift</Badge>}</td>
+                <td data-label="Status">{b.holidayToday ? <Badge tone="amber">holiday: {b.holidayToday}</Badge> : b.offToday ? <Badge tone="amber">off today</Badge> : !b.hasSchedule ? <Badge>no set hours</Badge> : b.onShift ? <Badge tone="green">on shift</Badge> : <Badge>off shift</Badge>}{b.partOffToday && <> <Badge tone="amber">off today: {b.partOffToday.toLowerCase()}</Badge></>}</td>
                 <td data-label="Next shift">{b.nextStart && !b.onShift ? fmtDateTime(b.nextStart, myTz) : "-"}</td>
                 <td data-label="Clocked in">{b.clockedInSince ? <>{hours(b.clockedInSince, now)} h{b.onBreak ? ", on a break" : ""}{b.offNetwork && <> <Badge tone="amber">off network</Badge></>}</> : "-"}</td>
               </tr>
@@ -140,6 +140,7 @@ export default async function ShiftsPage() {
             <label className="block"><span className="label">First day off (your date)</span><input type="date" name="startsOn" defaultValue={today} className="input" required /></label>
             <label className="block"><span className="label">Last day off</span><input type="date" name="endsOn" defaultValue={today} className="input" required /></label>
             <label className="block"><span className="label">Kind</span><select name="kind" className="input">{Object.entries(TIME_OFF_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+            <PartFields />
             <label className="block"><span className="label">Note</span><input name="note" className="input" maxLength={200} /></label>
             <div><SubmitButton pendingLabel="Sending...">Ask for time off</SubmitButton></div>
           </ActionForm>
@@ -152,7 +153,7 @@ export default async function ShiftsPage() {
             <ul className="space-y-1 text-sm">
               {mine.map(({ o }) => (
                 <li key={o.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{TIME_OFF_KINDS[o.kind] ?? o.kind}, {day(o.startsOn)}{o.endsOn !== o.startsOn ? ` to ${day(o.endsOn)}` : ""} <Badge tone={o.status === "approved" ? "green" : "amber"}>{o.status === "approved" ? "approved" : "waiting for approval"}</Badge></span>
+                  <span>{offText(o)} <Badge tone={o.status === "approved" ? "green" : "amber"}>{o.status === "approved" ? "approved" : "waiting for approval"}</Badge></span>
                   {(o.status === "requested" || admin) && <ActionForm action={removeTimeOffAction.bind(null, o.id)}><SubmitButton className="btn btn-secondary" pendingLabel="...">Cancel</SubmitButton></ActionForm>}
                 </li>
               ))}
@@ -160,7 +161,7 @@ export default async function ShiftsPage() {
           )}
           <h3 className="mt-5 text-sm font-semibold">The team&apos;s time off</h3>
           {off.filter((o) => o.o.status === "approved").length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">None coming up.</p> : (
-            <ul className="mt-1 space-y-1 text-sm">{off.filter((o) => o.o.status === "approved").map(({ o, name }) => <li key={o.id}>{name}: {TIME_OFF_KINDS[o.kind] ?? o.kind}, {day(o.startsOn)}{o.endsOn !== o.startsOn ? ` to ${day(o.endsOn)}` : ""}</li>)}</ul>
+            <ul className="mt-1 space-y-1 text-sm">{off.filter((o) => o.o.status === "approved").map(({ o, name }) => <li key={o.id}>{name}: {offText(o)}</li>)}</ul>
           )}
         </Card>
 

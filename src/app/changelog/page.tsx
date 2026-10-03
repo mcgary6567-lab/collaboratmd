@@ -9,6 +9,19 @@ export const metadata: Metadata = {
 /** Written from the project's commit history; each entry is something that shipped. */
 const RELEASES: { date: string; title: string; items: string[] }[] = [
   {
+    date: "2026-10-03",
+    title: "People who leave, part-day time off, open shifts, work quality checks, training, daily targets, staffing forecast",
+    items: [
+      "Deactivating someone now hands over their work: off the work queues, open tasks to teammates, requests withdrawn, clocked out",
+      "Time off for a morning, an afternoon or set hours, counted as part of a day in leave balances",
+      "Open shifts: post hours nobody covers, someone claims them, an administrator confirms",
+      "Work quality checks: a random sample of each biller's claims and postings, checked by someone else, with accuracy against a target",
+      "Training and certifications: yearly HIPAA training sign-off and certifications with expiry reminders",
+      "Daily targets per person, with progress on the dashboard and in the hours report",
+      "Workload forecast on Team week: expected queue work against the hours scheduled",
+    ],
+  },
+  {
     date: "2026-10-02",
     title: "Timesheets, time corrections, night and holiday pay, leave balances, clock reminders, team week",
     items: [

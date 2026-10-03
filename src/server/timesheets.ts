@@ -83,7 +83,8 @@ async function touchWeeks(db: Db, practiceId: string, userId: string, tz: string
 }
 
 async function onTeam(db: Db, practiceId: string, userId: string) {
-  if (!(await assignableUsers(db, practiceId)).some((u) => u.id === userId)) throw new Error("That person is not on this practice's team");
+  // People since deactivated included: their last weeks still get corrected and approved for final pay.
+  if (!(await assignableUsers(db, practiceId, { includeDisabled: true })).some((u) => u.id === userId)) throw new Error("That person is not on this practice's team");
 }
 
 function checkSpan(clockIn: Date, clockOut: Date, now: Date) {
@@ -309,7 +310,7 @@ export async function weekOpenForClock(db: Db, userId: string, at = new Date()) 
 
 /** Submitted timesheets of the practice's team, waiting for approval. */
 export async function sheetsAwaiting(db: Db, practiceId: string) {
-  const ids = (await assignableUsers(db, practiceId)).map((u) => u.id);
+  const ids = (await assignableUsers(db, practiceId, { includeDisabled: true })).map((u) => u.id);
   if (!ids.length) return [];
   return db.select({ s: timesheets, name: users.name }).from(timesheets).innerJoin(users, eq(users.id, timesheets.userId))
     .where(and(inArray(timesheets.userId, ids), eq(timesheets.status, "submitted"))).orderBy(asc(timesheets.weekStart)).limit(100);

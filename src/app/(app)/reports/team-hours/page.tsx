@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { requireRole } from "@/lib/auth";
 import { hoursAndOutput, MAX_ENTRY_HOURS } from "@/server/shifts";
 import { payWorksheet } from "@/server/pay";
+import { targetAttainment } from "@/server/targets";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ export default async function TeamHoursPage({ searchParams }: { searchParams: Pr
   const to = isDay(q.to) ? q.to! : new Date().toISOString().slice(0, 10);
   const from = isDay(q.from) ? q.from! : new Date(Date.parse(`${to}T12:00:00Z`) - 6 * 86_400_000).toISOString().slice(0, 10);
   const db = await getDb();
-  const [rows, pay] = await Promise.all([hoursAndOutput(db, s.practiceId, from, to), payWorksheet(db, s.practiceId, from, to)]);
+  const [rows, pay, goals] = await Promise.all([hoursAndOutput(db, s.practiceId, from, to), payWorksheet(db, s.practiceId, from, to), targetAttainment(db, s.practiceId, from, to)]);
   const total = rows.reduce((a, r) => a + r.hours, 0);
   const totals = new Map<string, number>();
   for (const p of pay) if (p.grossCents !== null && p.currency) totals.set(p.currency, (totals.get(p.currency) ?? 0) + p.grossCents);
@@ -56,6 +57,25 @@ export default async function TeamHoursPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </Card>
+      {goals.length > 0 && (
+        <Card title="Against daily targets" className="mb-6">
+          <div tabIndex={0} role="region" aria-label="Against daily targets" className="overflow-x-auto">
+            <table className="table table-stack text-sm">
+              <thead><tr><th>Person</th><th className="text-right">Days worked</th><th>Target</th><th className="text-right">Done</th><th className="text-right">Of target</th></tr></thead>
+              <tbody>{goals.flatMap((g) => g.metrics.map((m, i) => (
+                <tr key={`${g.userId}:${m.metric}`}>
+                  <td data-label="Person">{i === 0 ? g.name : ""}</td>
+                  <td data-label="Days worked" className="text-right tabular-nums">{i === 0 ? g.days : ""}</td>
+                  <td data-label="Target">{m.label}: {m.perDay} a day ({m.goal})</td>
+                  <td data-label="Done" className="text-right tabular-nums">{m.done}</td>
+                  <td data-label="Of target" className="text-right">{m.pct === null ? "-" : <Badge tone={m.pct >= 1 ? "green" : m.pct >= 0.8 ? "amber" : "red"}>{Math.round(m.pct * 100)}%</Badge>}</td>
+                </tr>
+              )))}</tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Each target times the days the person clocked time in the period. Set targets on Manage shifts.</p>
+        </Card>
+      )}
       <Card title="Pay worksheet" actions={<a href={`/api/export/payroll?from=${from}&to=${to}`} download className="btn btn-secondary">Download CSV</a>}>
         {!wholeWeeks && <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">Weekly overtime counts Monday-to-Sunday weeks. This period does not start on a Monday and end on a Sunday, so a part week can show less weekly overtime than the full week has.</p>}
         {pay.length === 0 ? <Empty>No hours worked and no pay rates set. Set rates on <Link href="/work/shifts/manage" className="underline">Manage shifts</Link>.</Empty> : (

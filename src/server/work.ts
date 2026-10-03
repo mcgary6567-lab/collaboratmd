@@ -25,15 +25,23 @@ async function assertEntity(db: Db, practiceId: string, type: string | null | un
 }
 
 /** People who can be assigned work in a practice: its users and members. */
-export async function assignableUsers(db: Db, practiceId: string) {
-  const own = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.practiceId, practiceId));
+/**
+ * The people who can be given work here: the practice's own staff and anyone
+ * with access from another practice, but not read-only users. Deactivated
+ * people are left out unless `includeDisabled` (for their past hours and pay).
+ */
+export async function assignableUsers(db: Db, practiceId: string, opts: { includeDisabled?: boolean } = {}) {
+  const own = await db.select({ id: users.id, name: users.name, role: users.role, disabledAt: users.disabledAt }).from(users).where(eq(users.practiceId, practiceId));
   const members = await db
-    .select({ id: users.id, name: users.name, role: schema.practiceMemberships.role })
+    .select({ id: users.id, name: users.name, role: schema.practiceMemberships.role, disabledAt: users.disabledAt })
     .from(schema.practiceMemberships)
     .innerJoin(users, eq(users.id, schema.practiceMemberships.userId))
     .where(eq(schema.practiceMemberships.practiceId, practiceId));
   const byId = new Map([...own, ...members].map((u) => [u.id, u]));
-  return [...byId.values()].filter((u) => u.role !== "readonly").sort((a, b) => a.name.localeCompare(b.name));
+  return [...byId.values()]
+    .filter((u) => u.role !== "readonly" && (opts.includeDisabled || !u.disabledAt))
+    .map(({ id, name, role }) => ({ id, name, role }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export interface NewTask {

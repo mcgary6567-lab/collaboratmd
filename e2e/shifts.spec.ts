@@ -91,3 +91,45 @@ test("the team week and the payroll file", async ({ browser }) => {
   expect(await csv.text()).toMatch(/^Person,Time zone,From,To,Hours/);
   await admin.context().close();
 });
+
+test("an open shift is posted, claimed and confirmed", async ({ browser }) => {
+  const admin = await demo(browser, "administrator");
+  await admin.goto("/work/shifts/week");
+  const card = admin.locator("section.card").filter({ has: admin.getByRole("heading", { name: "Open shifts" }) });
+  await card.getByLabel("Note").fill("E2E night cover");
+  await card.getByRole("button", { name: "Post the shift" }).click();
+  await expect(card.getByRole("listitem").filter({ hasText: "E2E night cover" })).toBeVisible({ timeout: 30_000 });
+
+  const biller = await demo(browser, "biller");
+  await biller.goto("/work/shifts/week");
+  const offer = biller.getByRole("listitem").filter({ hasText: "E2E night cover" });
+  await offer.getByRole("button", { name: "Claim" }).click();
+  await expect(offer).toContainText("claimed by Jordan Lee", { timeout: 30_000 });
+
+  await admin.reload();
+  const claimed = admin.getByRole("listitem").filter({ hasText: "E2E night cover" });
+  await claimed.getByRole("button", { name: "Confirm" }).click();
+  await expect(claimed.getByRole("button", { name: "Confirm" })).toHaveCount(0, { timeout: 30_000 });
+  await expect(claimed).toContainText("Jordan Lee");
+  await biller.context().close();
+  await admin.context().close();
+});
+
+test("a biller asks for a morning off and signs for HIPAA training", async ({ browser }) => {
+  const biller = await demo(browser, "biller");
+  await biller.goto("/work/shifts");
+  await biller.getByLabel("First day off (your date)").fill("2031-02-03");
+  await biller.getByLabel("Last day off").fill("2031-02-03");
+  await biller.getByLabel("How much").selectOption({ label: "Morning" });
+  await biller.getByRole("button", { name: "Ask for time off" }).click();
+  const req = biller.getByRole("listitem").filter({ hasText: "(morning)" });
+  await expect(req).toBeVisible({ timeout: 30_000 });
+  await req.getByRole("button", { name: "Cancel" }).click();
+  await expect(req).toHaveCount(0, { timeout: 30_000 });
+
+  await biller.goto("/work/training");
+  const mine = biller.locator("section.card").filter({ has: biller.getByRole("heading", { name: "Yours" }) });
+  await mine.getByRole("button", { name: "Sign and save" }).click();
+  await expect(mine.getByText("current", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await biller.context().close();
+});

@@ -172,10 +172,26 @@ export const PAGE_GUIDES: Record<string, Guide> = {
   "/work/shifts/week": {
     title: "Team week",
     steps: [
-      "Everyone's shifts for a week in your time zone (or the practice's), with approved time off, holidays and swaps applied. Use Previous week and Next week to plan ahead.",
-      "The hour-by-hour grid counts how many people are on; red hours have nobody, so you can see gaps in the US business day and move hours or ask for a swap.",
+      "Everyone's shifts for a week in your time zone (or the practice's), with approved time off (whole and part days), holidays, swaps and open shifts applied. Use Previous week and Next week to plan ahead. The hour-by-hour grid counts how many people are on; red hours have nobody.",
+      "Open shifts: an administrator posts hours nobody covers; anyone who does not already work then can claim them, and an administrator confirms. The workload forecast compares each day's expected queue work (the last eight weeks on the same weekday) with the hours scheduled, at the team's own pace, and flags days that look short.",
     ],
     related: [{ label: "Shifts and time off", href: "/work/shifts" }, { label: "Manage shifts", href: "/work/shifts/manage" }],
+  },
+  "/work/quality": {
+    title: "Work quality checks",
+    steps: [
+      "An administrator draws a random sample of each person's claims sent and payments or adjustments posted in a period. Someone other than the person who did the work opens each one and marks it correct or wrong, with what was wrong.",
+      "Accuracy per person over the last 90 days is shown against a 95% target, with the most common mistakes, so coaching can focus on them. Provider coding is checked separately in Coding audits.",
+    ],
+    related: [{ label: "Coding audits", href: "/coding/audits" }, { label: "Hours, output and pay", href: "/reports/team-hours" }],
+  },
+  "/work/training": {
+    title: "Training and certifications",
+    steps: [
+      "Sign for training you completed: HIPAA training counts for a year unless you enter another expiry date; certifications such as CPC or CPB take the expiry date the certifying body gives.",
+      "Administrators can record anyone's training and see who needs attention: HIPAA training missing or expired, and anything expiring within 60 days. Reminders go to the person and the administrators each morning a record needs renewing.",
+    ],
+    related: [{ label: "Compliance", href: "/settings/compliance" }],
   },
   "/work/shifts/timesheets": {
     title: "Timesheets",

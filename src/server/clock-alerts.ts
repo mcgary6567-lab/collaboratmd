@@ -14,7 +14,7 @@
 import { and, gte, inArray, isNull } from "drizzle-orm";
 import type { Db } from "@/db";
 import { schema } from "@/db";
-import { availability, shiftOccurrences } from "./shifts";
+import { availability, shiftOccurrences, subtractWindows } from "./shifts";
 import { notify } from "./notifications";
 
 const { staffShifts, shiftChanges, timeEntries, users } = schema;
@@ -36,17 +36,18 @@ export async function clockAlerts(db: Db, now = new Date()) {
   const [avail, recent, people] = await Promise.all([
     availability(db, ids, now),
     db.select().from(timeEntries).where(and(inArray(timeEntries.userId, ids), gte(timeEntries.clockIn, new Date(now.getTime() - 20 * HOUR)))),
-    db.select({ id: users.id, practiceId: users.practiceId, name: users.name }).from(users).where(inArray(users.id, ids)),
+    db.select({ id: users.id, practiceId: users.practiceId, name: users.name }).from(users).where(and(inArray(users.id, ids), isNull(users.disabledAt))),
   ]);
   let late = 0, forgot = 0;
   for (const p of people) {
     const a = avail.get(p.id);
     if (!a) continue;
     const since = new Date(now.getTime() - 20 * HOUR);
-    const occ = [
+    // Weekly and extra hours, less hours cancelled (part-day time off, a swap): a morning off moves the start to midday.
+    const occ = subtractWindows([
       ...shiftOccurrences(a.shifts, since, a.tz, 2, a.timeOff, a.holidays, a.changes),
       ...a.changes.filter((c) => c.kind === "extra").map((c) => ({ startsAt: c.startsAt, endsAt: c.endsAt })),
-    ];
+    ], a.changes.filter((c) => c.kind === "cancel"));
     const mine = recent.filter((e) => e.userId === p.id);
     const entry = open.find((e) => e.userId === p.id);
 

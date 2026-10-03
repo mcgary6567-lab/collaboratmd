@@ -2,11 +2,12 @@ import Link from "next/link";
 import { demoLink } from "@/lib/demo";
 import type { Metadata } from "next";
 import {
-  ArrowRight, BadgeCheck, Brain, CalendarDays, ClipboardCheck, CreditCard, EyeOff, FileSearch, FileText, Gauge, HeartPulse, Hourglass, KeyRound, Landmark, Layers, ChartLine, Lock,
+  ArrowRight, BadgeCheck, Brain, CalendarDays, Check, ClipboardCheck, CreditCard, EyeOff, FileSearch, FileText, Gauge, HeartPulse, Hourglass, KeyRound, Landmark, Layers, ChartLine, Lock,
   Radar, ReceiptText, Scale, ScanLine, Scissors, SearchCheck, Send, ShieldCheck, Sparkles, Stethoscope, UsersRound, Video, Wallet, WandSparkles, Zap,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
 import { getSession } from "@/lib/auth";
+import { trialDays } from "@/server/signup";
 import { AppMockup } from "@/components/app-mockup";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -427,7 +428,7 @@ const MEDICARE = [
   {
     icon: UsersRound,
     title: "Offshore team, one schedule",
-    body: "Billers in Manila or Karachi work in their own time zone and holiday calendar: night shifts past midnight, time-off requests with leave balances, shift swaps, weekly timesheets with corrections, clock reminders, a team week view, and a pay worksheet with overtime, night and holiday pay in their currency.",
+    body: "Billers in Manila or Karachi work in their own time zone and holiday calendar: night shifts past midnight, whole or part-day time off with leave balances, shift swaps and open shifts, weekly timesheets with corrections, clock reminders, a team week with a workload forecast, daily targets, quality checks, training records, and a pay worksheet with overtime, night and holiday pay in their currency.",
   },
   {
     icon: CalendarDays,
@@ -506,40 +507,33 @@ export default async function LandingPage() {
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-green-500/40 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-16 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center">
-            <a href="#medicare" className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
-              <Sparkles className="h-3.5 w-3.5" />
-              New: Medicare rules built in, from global periods and Medicare Advantage to ABNs and the 60-day rule
-              <ArrowRight className="h-3.5 w-3.5" />
+            <a href="#medicare" className="group inline-flex items-center gap-2 rounded-full border border-green-200 bg-white/80 py-1 pl-1 pr-3 text-xs font-medium text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-green-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-700 px-2 py-0.5 font-semibold text-white"><Sparkles className="h-3 w-3" /> New</span>
+              Medicare and Medicaid rules, built into every claim
+              <ArrowRight className="h-3.5 w-3.5 text-green-700 transition-transform group-hover:translate-x-0.5" />
             </a>
-            <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+            <h1 className="mt-7 text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
               Get paid faster,
               <br />
               <span className="bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">with fewer denials</span>
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
-              The complete revenue cycle for medical practices and billing companies. Verify coverage,
-              code the visit, check every claim against NCCI, Medicare&apos;s rules and your payers before it goes out, post remittances,
-              match deposits, recover what was missed or underpaid, forecast cash and let patients pay from their phone.
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600 sm:text-xl">
+              Revenue cycle software for medical practices and billing companies. Every claim is checked against NCCI,
+              Medicare and your payers before it goes out, and every dollar is followed to your bank.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link href={demoLink().href} className="btn bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
                 {demoLink().open ? "Explore the live demo" : "Book a demo"} <ArrowRight className="h-4 w-4" />
               </Link>
-              <a href="#calculator" className="btn btn-secondary px-6 py-3 text-base">
-                What do denials cost you?
-              </a>
+              <Link href="/signup" className="btn btn-secondary px-6 py-3 text-base">
+                Start a free trial
+              </Link>
             </div>
-            <p className="mt-5 text-sm text-slate-500">
-              {/* The demo's published sign-in works only where the demo is open (lib/demo.ts); elsewhere it would be refused. */}
-              {demoLink().open && <>
-                Open the demo environment with <span className="font-mono text-slate-700">admin@collaboratmd.local</span> /{" "}
-                <span className="font-mono text-slate-700">admin123</span>
-                {" · "}
-              </>}
-              <a href="https://github.com/mcgary6567-lab/collaboratmd" target="_blank" rel="noreferrer noopener" className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-green-700">
-                Read the source
-              </a>
-            </p>
+            <ul className="mt-7 flex flex-col items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap">
+              {[`${trialDays()}-day free trial, no card needed`, "HIPAA BAA with every customer", "Encrypted in transit and at rest"].map((t) => (
+                <li key={t} className="flex items-center gap-1.5 whitespace-nowrap"><Check className="h-4 w-4 shrink-0 text-green-700" /> {t}</li>
+              ))}
+            </ul>
           </div>
 
           <div className="relative mx-auto mt-16 max-w-5xl">
@@ -554,11 +548,11 @@ export default async function LandingPage() {
                 { icon: Send, title: "Appeals in one click", body: "Filled with the claim's details" },
                 { icon: ShieldCheck, title: "Amounts never edited", body: "Corrections post as reversals" },
               ].map(({ icon: Icon, title, body }) => (
-                <div key={title} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <Icon className="h-5 w-5 shrink-0 text-green-700" />
+                <div key={title} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
+                  <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-700"><Icon className="h-4 w-4" /></span>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{title}</div>
-                    <div className="truncate text-xs text-slate-500">{body}</div>
+                    <div className="text-sm font-semibold text-slate-900">{title}</div>
+                    <div className="text-xs leading-snug text-slate-500">{body}</div>
                   </div>
                 </div>
               ))}

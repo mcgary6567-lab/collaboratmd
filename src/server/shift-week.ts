@@ -5,7 +5,7 @@
  * stands out, so gaps in the US business day are visible at a glance.
  */
 import type { Db } from "@/db";
-import { availability, localClock, shiftOccurrences, zonedMoment } from "./shifts";
+import { availability, localClock, shiftOccurrences, subtractWindows, zonedMoment } from "./shifts";
 import { assignableUsers } from "./work";
 
 const DAY = 86_400_000;
@@ -52,10 +52,10 @@ export async function teamWeek(db: Db, practiceId: string, weekStart: string, tz
   const avail = await availability(db, team.map((t) => t.id), start);
   const people = team.map((t) => {
     const a = avail.get(t.id)!;
-    const spans: Span[] = [
+    const spans: Span[] = subtractWindows([
       ...shiftOccurrences(a.shifts, start, a.tz, 9, a.timeOff, a.holidays, a.changes),
       ...a.changes.filter((c) => c.kind === "extra").map((c) => ({ startsAt: c.startsAt, endsAt: c.endsAt })),
-    ].filter((s) => s.startsAt < end && s.endsAt > start);
+    ], a.changes.filter((c) => c.kind === "cancel")).filter((s) => s.startsAt < end && s.endsAt > start);
     const off = a.timeOff.filter((o) => o.startsOn <= addDays(weekStart, 7) && o.endsOn >= addDays(weekStart, -1));
     const holidays = a.holidays.filter((h) => h.date >= addDays(weekStart, -1) && h.date <= addDays(weekStart, 7));
     return { id: t.id, name: t.name, tz: a.tz, hasSchedule: a.hasSchedule, spans, days: dayPieces(weekStart, tz, spans), hours: spans.reduce((sum, s) => sum + (Math.min(end.getTime(), s.endsAt.getTime()) - Math.max(start.getTime(), s.startsAt.getTime())), 0) / HOUR, off, holidays };

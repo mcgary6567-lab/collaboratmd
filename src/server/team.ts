@@ -12,6 +12,7 @@ import { schema } from "@/db";
 import { appSecret } from "@/lib/app-secret";
 import { BUILT_IN_ROLES, CAPABILITIES } from "@/lib/capabilities";
 import { ipAllowed, parseCidr } from "@/lib/ip";
+import { offboard } from "./staff-offboarding";
 
 const { users, practiceMemberships, customRoles, practices, auditLog } = schema;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -107,6 +108,8 @@ export async function setMemberActive(db: Db, practiceId: string, targetUserId: 
   if (member.home) await db.update(users).set({ disabledAt: active ? null : new Date() }).where(eq(users.id, targetUserId));
   else if (!active) await db.delete(practiceMemberships).where(and(eq(practiceMemberships.userId, targetUserId), eq(practiceMemberships.practiceId, practiceId)));
   await db.insert(auditLog).values({ practiceId, userId: actorId ?? null, action: active ? "user_reactivated" : "user_deactivated", entity: "user", entityId: targetUserId });
+  // Their queues, open tasks and requests are handed over (server/offboarding.ts).
+  if (!active) return offboard(db, practiceId, targetUserId, { by: actorId, home: member.home });
 }
 
 /* ------------------------------ Invites ------------------------------ */

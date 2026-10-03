@@ -19,6 +19,11 @@ import { weekOpenForClock } from "@/server/timesheets";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const num = (v: string) => (v === "" ? null : Number(v));
+/** Dates, kind and part of the day from a time-off form; a part day is the first day only. */
+const timeOffInput = (f: FormData) => {
+  const part = str(f, "part") || "full";
+  return { startsOn: str(f, "startsOn"), endsOn: part === "full" ? str(f, "endsOn") : str(f, "startsOn"), kind: str(f, "kind"), note: str(f, "note"), part, fromTime: str(f, "fromTime"), toTime: str(f, "toTime") };
+};
 const fail = (e: unknown, fallback: string): FormResult => ({ ok: false, message: e instanceof Error ? e.message : fallback });
 const done = (message: string): FormResult => {
   for (const p of ["/work/shifts", "/work/shifts/manage", "/work/shifts/timesheets", "/work/shifts/week", "/dashboard", "/reports/team-hours"]) revalidatePath(p);
@@ -73,7 +78,7 @@ export async function timeOffAction(_prev: FormResult, f: FormData): Promise<For
   try {
     const userId = str(f, "userId");
     const { s, db } = await teamMember(userId);
-    const r = await addTimeOff(db, s.practiceId, { userId, startsOn: str(f, "startsOn"), endsOn: str(f, "endsOn"), kind: str(f, "kind"), note: str(f, "note") }, s.userId);
+    const r = await addTimeOff(db, s.practiceId, { userId, ...timeOffInput(f) }, s.userId);
     return done(r.moved ? `Time off saved; ${r.moved} open task${r.moved === 1 ? "" : "s"} moved to teammates` : "Time off saved");
   } catch (e) { return fail(e, "Could not save the time off"); }
 }
@@ -82,9 +87,8 @@ export async function requestTimeOffAction(_prev: FormResult, f: FormData): Prom
   try {
     const s = await requireSession();
     const db = await getDb();
-    const input = { startsOn: str(f, "startsOn"), endsOn: str(f, "endsOn"), kind: str(f, "kind"), note: str(f, "note") };
-    const row = await requestTimeOff(db, s.practiceId, s.userId, input);
-    const check = await leaveCheck(db, s.userId, input.kind, input.startsOn, input.endsOn, new Date(), row.id);
+    const row = await requestTimeOff(db, s.practiceId, s.userId, timeOffInput(f));
+    const check = await leaveCheck(db, s.userId, row, new Date(), row.id);
     const over = check.after !== null && check.after < 0 ? ` This is ${-check.after} day${check.after === -1 ? "" : "s"} over your balance.` : "";
     return done(`Requested (${check.days} working day${check.days === 1 ? "" : "s"}). An administrator will approve or deny it.${over}`);
   } catch (e) { return fail(e, "Could not send the request"); }

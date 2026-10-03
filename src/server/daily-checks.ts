@@ -1,6 +1,6 @@
 /**
  * Checks that run every morning and turn into notifications for the
- * administrators: payers behaving differently, credentials about to expire,
+ * administrators: payers behaving differently, credentials and staff training about to expire,
  * and a quarterly access review that is due. Each carries a dedupe key, so
  * the same finding notifies once (per week for payer alerts, per expiry date
  * for credentials, per quarter for access reviews).
@@ -14,6 +14,7 @@ import { notify } from "./notifications";
 import { notifyAccessAnomalies } from "./access-anomalies";
 import { practiceMaintenance } from "./maintenance";
 import { coverageGaps } from "./shifts";
+import { trainingReminders } from "./staff-training";
 
 /** ISO week, e.g. 2026-W39, so a payer alert repeats at most weekly. */
 function isoWeek(d: Date) {
@@ -26,7 +27,7 @@ function isoWeek(d: Date) {
 }
 
 export async function runDailyChecks(db: Db, practiceId: string, now = new Date()) {
-  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0, maintenance: 0, coverage: 0 };
+  const out = { payerAlerts: 0, credentials: 0, accessReview: false, accessAnomalies: 0, maintenance: 0, coverage: 0, training: 0 };
   const week = isoWeek(now);
   for (const a of (await payerAlerts(db, practiceId, now)).filter((x) => x.severity === "high")) {
     await notify(db, practiceId, { kind: "payer_alert", title: `${a.payerName}: ${a.title}`, body: a.detail, href: "/reports/payer-alerts", dedupeKey: `payer:${a.payerId}:${a.kind}:${week}` });
@@ -68,5 +69,7 @@ export async function runDailyChecks(db: Db, practiceId: string, now = new Date(
     await notify(db, practiceId, { kind: "coverage", title: `${gaps.stranded.length} task${gaps.stranded.length === 1 ? "" : "s"} due by tomorrow belong to someone who is off`, body: gaps.stranded.slice(0, 5).map((s) => `${s.title} (${s.owner})`).join("\n"), href: "/tasks", dedupeKey: `coverage:tasks:${today}` });
     out.coverage++;
   }
+  // Staff training and certifications coming up for renewal, expired, or HIPAA training missing (server/staff-training.ts).
+  out.training = await trainingReminders(db, practiceId, now);
   return out;
 }

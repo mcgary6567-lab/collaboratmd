@@ -7,7 +7,10 @@ import { swapsFor } from "@/server/shift-swaps";
 import { addedHolidays, builtInHolidays, CALENDARS, COMPANY } from "@/server/holidays";
 import { CURRENCIES, payFor } from "@/server/pay";
 import { LEAVE_KINDS, leaveBalances, leaveCheck } from "@/server/leave";
+import { METRICS, targetsFor } from "@/server/targets";
+import { targetsAction } from "@/app/(app)/staff-actions";
 import { leaveAction } from "@/app/(app)/timesheet-actions";
+import { offText, PartFields } from "../time-off-fields";
 import {
   addHolidayAction, clockNetworksAction, decideSwapAction, decideTimeOffAction, holidayCalendarAction, payAction, removeHolidayAction, removeTimeOffAction,
   shiftsAction, timeOffAction, timeZoneAction,
@@ -35,9 +38,10 @@ export default async function ManageShiftsPage() {
     upcomingTimeOff(db, ids, today), swapsFor(db, s.practiceId, s.userId), addedHolidays(db, s.practiceId, today), clockNetworks(db, s.practiceId), payFor(db, ids),
   ]);
   const pending = off.filter((o) => o.o.status === "requested");
-  const [balances, checks] = await Promise.all([
+  const [balances, checks, targets] = await Promise.all([
     leaveBalances(db, ids, now),
-    Promise.all(pending.map(({ o }) => leaveCheck(db, o.userId, o.kind, o.startsOn, o.endsOn, now, o.id))),
+    Promise.all(pending.map(({ o }) => leaveCheck(db, o.userId, o, now, o.id))),
+    targetsFor(db, ids),
   ]);
   const approved = off.filter((o) => o.o.status === "approved");
   const awaiting = swaps.filter((x) => x.status === "accepted");
@@ -60,7 +64,7 @@ export default async function ManageShiftsPage() {
               {pending.map(({ o, name }, i) => (
                 <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span>
-                    {name}: {TIME_OFF_KINDS[o.kind] ?? o.kind}, {day(o.startsOn)}{o.endsOn !== o.startsOn ? ` to ${day(o.endsOn)}` : ""}{o.note ? ` (${o.note})` : ""}.{" "}
+                    {name}: {offText(o)}{o.note ? ` (${o.note})` : ""}.{" "}
                     {checks[i].days} working day{checks[i].days === 1 ? "" : "s"}
                     {checks[i].after !== null && (checks[i].after! < 0 ? <> <Badge tone="red">{-checks[i].after!} over the balance</Badge></> : <>, {checks[i].after} left after</>)}
                   </span>
@@ -101,6 +105,7 @@ export default async function ManageShiftsPage() {
           <label className="block"><span className="label">First day off (their date)</span><input type="date" name="startsOn" defaultValue={today} className="input" required /></label>
           <label className="block"><span className="label">Last day off</span><input type="date" name="endsOn" defaultValue={today} className="input" required /></label>
           <label className="block"><span className="label">Kind</span><select name="kind" className="input">{Object.entries(TIME_OFF_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+          <PartFields />
           <label className="block sm:col-span-2"><span className="label">Note</span><input name="note" className="input" maxLength={200} /></label>
           <div><SubmitButton pendingLabel="Saving...">Save approved time off</SubmitButton></div>
         </ActionForm>
@@ -108,7 +113,7 @@ export default async function ManageShiftsPage() {
           <ul className="space-y-1 text-sm">
             {approved.map(({ o, name }) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span>{name}: {TIME_OFF_KINDS[o.kind] ?? o.kind}, {day(o.startsOn)}{o.endsOn !== o.startsOn ? ` to ${day(o.endsOn)}` : ""}{o.note ? ` (${o.note})` : ""}</span>
+                <span>{name}: {offText(o)}{o.note ? ` (${o.note})` : ""}</span>
                 <ActionForm action={removeTimeOffAction.bind(null, o.id)}><SubmitButton className="btn btn-secondary" pendingLabel="...">Cancel</SubmitButton></ActionForm>
               </li>
             ))}
@@ -155,6 +160,12 @@ export default async function ManageShiftsPage() {
                       <label className="block"><span className="label">Night to</span><input name="nightEnd" type="time" defaultValue={pay?.nightEnd ?? "06:00"} className="input" /></label>
                       <label className="block"><span className="label">Holiday pay ×</span><input name="holidayMultiplier" inputMode="decimal" defaultValue={pay?.holidayMultiplier ?? ""} className="input" /></label>
                       <div className="self-end"><SubmitButton className="btn btn-secondary" pendingLabel="...">Save pay</SubmitButton></div>
+                    </ActionForm>
+                    <ActionForm action={targetsAction.bind(null, b.id)} className="grid gap-2 sm:grid-cols-4">
+                      {Object.entries(METRICS).map(([m, label]) => (
+                        <label key={m} className="block"><span className="label">{label} a day</span><input name={m} type="number" min={1} defaultValue={targets.find((x) => x.userId === b.id && x.metric === m)?.perDay ?? ""} className="input" /></label>
+                      ))}
+                      <div className="self-end"><SubmitButton className="btn btn-secondary" pendingLabel="...">Save targets</SubmitButton></div>
                     </ActionForm>
                     {LEAVE_KINDS.map((kind) => {
                       const cur = (balances.get(b.id) ?? []).find((x) => x.kind === kind);
