@@ -37,8 +37,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: No known high or critical vulnerabilities in dependencies
-        run: npm audit --audit-level=high
+      # The packages the app runs on: no known high or critical advisory. Development
+      # tools (lint, tests, build helpers) never run in production, so for them only a
+      # critical advisory fails the build; the same production check runs monthly
+      # (maintenance.yml).
+      - name: No known high or critical vulnerabilities in production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: No known critical vulnerabilities in development tools
+        run: npm audit --audit-level=critical
       - run: npm run typecheck
       - name: Lint (React and Next.js rules, no warnings allowed)
         run: npm run lint
