@@ -67,8 +67,10 @@ describe("prior authorization requests against a migrated database", () => {
 
   it("records each answer; approvals go on file and pended requests become tasks", async () => {
     const statuses = new Set<string>();
-    for (let i = 0; i < 12 && statuses.size < 3; i++) {
-      const r = await requestPriorAuth(t.db, t.practiceId, { patientId: patient.id, providerId: provider.id, cpts: ["70553"], diagnoses: ["G43.909"], units: 1, serviceFrom: `2026-10-${String(1 + i).padStart(2, "0")}`, serviceTo: `2026-10-${String(1 + i).padStart(2, "0")}` }, t.userId);
+    // The simulated payer answers from a hash of each request (60% approved): keep asking until both answers
+    // this test checks have come back. Stopping at any three different answers could miss an approval.
+    for (let i = 0; i < 30 && !(statuses.has("approved") && statuses.has("pended")); i++) {
+      const r = await requestPriorAuth(t.db, t.practiceId, { patientId: patient.id, providerId: provider.id, cpts: ["70553"], diagnoses: ["G43.909"], units: 1, serviceFrom: `2026-10-${String(1 + (i % 28)).padStart(2, "0")}`, serviceTo: `2026-10-${String(1 + (i % 28)).padStart(2, "0")}` }, t.userId);
       statuses.add(r.status);
       expect(r.request278).toContain("ST*278");
       if (r.status === "approved") {
