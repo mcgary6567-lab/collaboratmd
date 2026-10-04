@@ -6,6 +6,7 @@ import {
   ArrowUpRight, Compass, Mail, MessageCircle, Network, ChartPie, Plug, Sparkles, Timer, TrendingUp, Users, Workflow,
 } from "lucide-react";
 import { RULE_IDS } from "@/lib/scrub/rules";
+import { demoLink } from "@/lib/demo";
 import { getSession } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -120,6 +121,26 @@ const PROOF = [
     body: "One login across every client practice, a side-by-side view of each one's collections and aged A/R, contract-based underpayment detection, online patient check-in and good faith estimates: the work a billing company is paid to do.",
     tag: "Multi-practice by design",
   },
+];
+
+/** Shown in full first: what is hardest to copy and what the buyer pays for. */
+const FEATURED = [
+  "Native X12, not a conversion layer",
+  "Validation moved to the desk",
+  "Amounts are never edited",
+  "Built for the billing company",
+  "Made for billing companies with offshore teams",
+  "Built to stay current",
+];
+
+/** In-page sections, for the bar that stays under the header. */
+const SECTIONS = [
+  { id: "benchmarks", label: "Benchmarks" },
+  { id: "product", label: "Product" },
+  { id: "market", label: "Market" },
+  { id: "landscape", label: "Landscape" },
+  { id: "model", label: "Business model" },
+  { id: "contact", label: "Data room" },
 ];
 
 const ENGINEERING = [
@@ -259,16 +280,40 @@ export default async function InvestorsPage() {
             <Link href="/contact?topic=investor" className="btn bg-green-700 px-6 py-3 text-base text-white hover:bg-green-800">
               Request the data room <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="/login" className="btn btn-secondary px-6 py-3 text-base">
-              Open the live product
+            <Link href={demoLink().href} className="btn btn-secondary px-6 py-3 text-base">
+              {demoLink().open ? "Open the live product" : "Book a product demo"}
             </Link>
           </div>
+          <dl className="mx-auto mt-14 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 text-left lg:grid-cols-4">
+            {[
+              { value: String(RULE_IDS.length), label: "Checks on every claim before it is sent" },
+              { value: "9", label: "HIPAA X12 transaction types, generated and parsed natively" },
+              { value: "1", label: "Login across every client practice of a billing company" },
+              ...(m ? [{ value: m.claimCount.toLocaleString("en-US"), label: "Claims in the live demo, through the full lifecycle" }] : []),
+            ].map((f) => (
+              <div key={f.label} className="flex flex-col-reverse bg-white p-5">
+                <dt className="mt-1 text-xs leading-snug text-slate-600">{f.label}</dt>
+                <dd className="text-3xl font-extrabold tracking-tight text-slate-900">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
+      {/* ------------------------------------------------- section bar */}
+      <nav aria-label="On this page" className="sticky top-16 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6 py-2 text-sm">
+          {SECTIONS.map((x) => (
+            <a key={x.id} href={`#${x.id}`} className="whitespace-nowrap rounded-lg px-3 py-1.5 font-medium text-slate-600 transition-colors hover:bg-green-50 hover:text-green-800">
+              {x.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
       {/* -------------------------------------------- live benchmark scorecard */}
       {m && (
-        <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+        <section id="benchmarks" className="mx-auto max-w-7xl scroll-mt-32 px-6 py-16 lg:py-24">
           <div className="mx-auto max-w-2xl text-center">
             <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-700">
               <Activity className="h-3.5 w-3.5" /> Computed live from the demo environment
@@ -369,7 +414,7 @@ export default async function InvestorsPage() {
                 system performs at the volume a real customer brings.
               </p>
               <Link
-                href="/login"
+                href={demoLink().href}
                 className="mt-7 inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-bold text-green-700 transition-colors hover:bg-green-50"
               >
                 Open it yourself <ArrowRight className="h-4 w-4" />
@@ -400,7 +445,7 @@ export default async function InvestorsPage() {
       )}
 
       {/* ---------------------------------------------------------- proof */}
-      <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+      <section id="product" className="mx-auto max-w-7xl scroll-mt-32 px-6 py-16 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <span className="text-xs font-bold uppercase tracking-widest text-green-700">The product</span>
           <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
@@ -412,7 +457,7 @@ export default async function InvestorsPage() {
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-2">
-          {PROOF.map(({ icon: Icon, title, body, tag }) => (
+          {PROOF.filter((p) => FEATURED.includes(p.title)).sort((a, b) => FEATURED.indexOf(a.title) - FEATURED.indexOf(b.title)).map(({ icon: Icon, title, body, tag }) => (
             <div
               key={title}
               className="group rounded-2xl border border-slate-200 bg-white p-7 transition-shadow hover:shadow-lg hover:shadow-slate-900/5"
@@ -428,6 +473,23 @@ export default async function InvestorsPage() {
               </div>
               <p className="mt-4 text-sm leading-relaxed text-slate-600">{body}</p>
             </div>
+          ))}
+        </div>
+
+        <h3 className="mt-14 text-center text-xs font-bold uppercase tracking-widest text-slate-500">Also built and running</h3>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {PROOF.filter((p) => !FEATURED.includes(p.title)).map(({ icon: Icon, title, body, tag }) => (
+            <details key={title} className="group rounded-2xl border border-slate-200 bg-white p-5 open:shadow-lg open:shadow-slate-900/5">
+              <summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-700"><Icon className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-slate-900">{title}</span>
+                  <span className="mt-0.5 block font-mono text-[11px] text-green-700">{tag}</span>
+                </span>
+                <span aria-hidden className="text-lg leading-none text-slate-400 transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{body}</p>
+            </details>
           ))}
         </div>
 
@@ -454,7 +516,7 @@ export default async function InvestorsPage() {
       </section>
 
       {/* --------------------------------------------------------- market */}
-      <section className="border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
+      <section id="market" className="scroll-mt-32 border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
             <span className="text-xs font-bold uppercase tracking-widest text-green-700">The market</span>
@@ -578,7 +640,7 @@ export default async function InvestorsPage() {
       </section>
 
       {/* ------------------------------------------------------ landscape */}
-      <section className="border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
+      <section id="landscape" className="scroll-mt-32 border-y border-slate-200 bg-slate-50 py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
             <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-green-700">
@@ -623,7 +685,7 @@ export default async function InvestorsPage() {
       </section>
 
       {/* ------------------------------------------------- model and the ask */}
-      <section className="mx-auto max-w-3xl px-6 py-16 lg:py-24">
+      <section id="model" className="mx-auto max-w-3xl scroll-mt-32 px-6 py-16 lg:py-24">
         <Prose>
           <h2>How the business earns</h2>
           <p>
@@ -724,7 +786,7 @@ export default async function InvestorsPage() {
       )}
 
       {/* ------------------------------------------------------- data room */}
-      <section className="mx-auto max-w-7xl px-6 pb-16 lg:pb-24">
+      <section id="contact" className="mx-auto max-w-7xl scroll-mt-32 px-6 pb-16 lg:pb-24">
         <div className="grid gap-8 rounded-3xl border border-slate-200 bg-white p-8 lg:grid-cols-2 lg:p-10">
           <div>
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-700">
