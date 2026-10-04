@@ -149,9 +149,23 @@ async function seed(runner: Pick<Runner, "db" | "exec" | "shared">) {
  * staging branch instead (docs/11-environments.md), or set
  * ALLOW_PRODUCTION_DATABASE=true for a deliberate one-off.
  */
-export async function environmentGuard(runner: Pick<Runner, "db" | "exec" | "shared">, env: Record<string, string | undefined> = process.env) {
+export async function environmentGuard(runner: Pick<Runner, "db" | "exec" | "shared" | "transaction">, env: Record<string, string | undefined> = process.env) {
   if (!runner.shared) return;
-  await runner.exec("CREATE TABLE IF NOT EXISTS _environment (label text PRIMARY KEY, set_at timestamptz NOT NULL DEFAULT now());");
+  // On a new database, starts that run CREATE TABLE IF NOT EXISTS at the same moment can collide in
+  // Postgres's catalog (a duplicate key on pg_type) and fail, so the first creation takes the bootstrap lock.
+  const create = "CREATE TABLE IF NOT EXISTS _environment (label text PRIMARY KEY, set_at timestamptz NOT NULL DEFAULT now());";
+  const { rows: [t] } = await runner.db.execute<{ ok?: boolean }>("SELECT to_regclass('_environment') IS NOT NULL AS ok");
+  if (!t?.ok) {
+    if (runner.transaction) {
+      await runner.transaction(async (tx) => {
+        await tx.exec(`SET LOCAL lock_timeout = '${STARTUP_LIMITS.lockWaitMs}ms'`);
+        await tx.exec(`SELECT pg_advisory_xact_lock(${BOOTSTRAP_TX_LOCK_ID})`);
+        await tx.exec(create);
+      });
+    } else {
+      await runner.exec(create);
+    }
+  }
   if (env.VERCEL_ENV === "production") {
     await runner.exec("INSERT INTO _environment (label) VALUES ('production') ON CONFLICT DO NOTHING");
     return;
